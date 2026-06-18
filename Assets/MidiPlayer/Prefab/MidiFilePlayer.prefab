@@ -10,9 +10,9 @@ GameObject:
   m_Component:
   - component: {fileID: 4314086310842868}
   - component: {fileID: 114662785300262660}
-  - component: {fileID: 82585700720091338}
-  - component: {fileID: 164935779584603366}
-  - component: {fileID: 166408923624218062}
+  - component: {fileID: 7806412949259753475}
+  - component: {fileID: 6314586839941564368}
+  - component: {fileID: 7032540789882677193}
   m_Layer: 0
   m_Name: MidiFilePlayer
   m_TagString: Untagged
@@ -80,6 +80,10 @@ MonoBehaviour:
   StatDspChannelCount: 0
   GcCollectionCout: 0
   AllocatedBytesForCurrentThread: 0
+  StatSynthLatencyLAST: 0
+  StatSynthLatencyAVG: 0
+  StatSynthLatencyMIN: 0
+  StatSynthLatencyMAX: 0
   StatDeltaThreadMidiMS: 0
   StatDeltaThreadMidiMAX: 0
   StatDeltaThreadMidiMIN: 0
@@ -106,7 +110,6 @@ MonoBehaviour:
   indexBuffSize: -1
   MPTK_DirectSendToPlayer: 1
   MPTK_EnableChangeTempo: 1
-  maxDistance: 0
   MPTK_EnablePanChange: 1
   volumeGlobal: 0.5
   dsp_64: 1
@@ -155,7 +158,7 @@ MonoBehaviour:
       m_Calls: []
   showMidiInfo: 0
   showSynthParameter: 0
-  showSpatialization: 0
+  showSpatialization: 1
   showUnitySynthParameter: 1
   showUnityPerformanceParameter: 0
   showExperimentalFeature: 0
@@ -168,7 +171,11 @@ MonoBehaviour:
   showSynthEvents: 0
   showEvents: 0
   showDefault: 0
-  spatialize: 0
+  distanceAttenuation: 0
+  MPTK_PauseOnMaxDistance: 0
+  minDistance: 0
+  maxDistance: 3000
+  minSoundAttenuation: 0
   MPTK_EffectUnity: {fileID: 0}
   MPTK_ModeSpatializer: 0
   MPTK_MaxSpatialSynth: 0
@@ -208,7 +215,7 @@ MonoBehaviour:
   nextMidi: 0
   prevMidi: 0
   MPTK_PauseOnFocusLoss: 0
---- !u!82 &82585700720091338
+--- !u!82 &7806412949259753475
 AudioSource:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -220,7 +227,7 @@ AudioSource:
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 0}
   m_PlayOnAwake: 1
-  m_Volume: 0
+  m_Volume: 1
   m_Pitch: 1
   Loop: 0
   Mute: 0
@@ -228,10 +235,10 @@ AudioSource:
   SpatializePostEffects: 0
   Priority: 128
   DopplerLevel: 0
-  MinDistance: 0
+  MinDistance: 1
   MaxDistance: 500
   Pan2D: 0
-  rolloffMode: 1
+  rolloffMode: 0
   BypassEffects: 0
   BypassListenerEffects: 0
   BypassReverbZones: 0
@@ -273,7 +280,7 @@ AudioSource:
       outWeight: 0.33333334
     m_PreInfinity: 2
     m_PostInfinity: 2
-    m_RotationOrder: 0
+    m_RotationOrder: 4
   spreadCustomCurve:
     serializedVersion: 2
     m_Curve:
@@ -288,7 +295,7 @@ AudioSource:
       outWeight: 0.33333334
     m_PreInfinity: 2
     m_PostInfinity: 2
-    m_RotationOrder: 0
+    m_RotationOrder: 4
   reverbZoneMixCustomCurve:
     serializedVersion: 2
     m_Curve:
@@ -303,8 +310,8 @@ AudioSource:
       outWeight: 0.33333334
     m_PreInfinity: 2
     m_PostInfinity: 2
-    m_RotationOrder: 0
---- !u!164 &164935779584603366
+    m_RotationOrder: 4
+--- !u!164 &6314586839941564368
 AudioReverbFilter:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -313,13 +320,13 @@ AudioReverbFilter:
   m_GameObject: {fileID: 1668918397659358}
   m_Enabled: 0
   m_DryLevel: 0
-  m_Room: -1000
-  m_RoomHF: -100
-  m_DecayTime: 1.49
-  m_DecayHFRatio: 0.83
-  m_ReflectionsLevel: -2602
-  m_ReverbLevel: 200
-  m_ReverbDelay: 0.011
+  m_Room: 0
+  m_RoomHF: 0
+  m_DecayTime: 1
+  m_DecayHFRatio: 0.5
+  m_ReflectionsLevel: -10000
+  m_ReverbLevel: 0
+  m_ReverbDelay: 0.04
   m_Diffusion: 100
   m_Density: 100
   m_HFReference: 5000
@@ -327,7 +334,7 @@ AudioReverbFilter:
   m_LFReference: 250
   m_ReflectionsDelay: 0
   m_ReverbPreset: 27
---- !u!166 &166408923624218062
+--- !u!166 &7032540789882677193
 AudioChorusFilter:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

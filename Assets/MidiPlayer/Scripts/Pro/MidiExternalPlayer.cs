@@ -10,32 +10,33 @@ using UnityEngine.Networking;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup pro_external_playback
     /// <summary>
-    /// Play a Local MIDI file or from a Web site. This class must be used with the prefab MidiExternalPlayer\n 
+    /// Plays a local MIDI file or a MIDI file from a website. This class must be used with the MidiExternalPlayer prefab.\n
     /// 
-    /// There is no need to writing a script. For a simple usage, all the job can be done in the prefab inspector.\n\n
-    /// But a set of methods are available in this class to drive the music from your script.\n
-    /// This class inherits from MidiFilePlayer and MidiSynth, so all properties, event, methods from MidiFilePlayer and MidiSynth are available in this class.\n\n
+    /// You do not need to write a script for simple usage; everything can be configured in the prefab inspector.\n\n
+    /// A set of methods is also available to control playback from scripts.\n
+    /// This class inherits from MidiFilePlayer and MidiSynth, so all properties, events, and methods from both classes are available.\n\n
     /// More information here: https://paxstellar.fr/midi-external-player-v2/
     ///
-    /// @attention MidiExternalPlayer inherits of classes MidiFilePlayer and MidiSynth. For clarity, only MidiExternalPlayer attibutes are provided here.
-    /// Look at the classes MidiFilePlayer and MidiSynth to discover all attributes available.
+    /// @attention MidiExternalPlayer inherits from MidiFilePlayer and MidiSynth. For clarity, only MidiExternalPlayer attributes are documented here.
+    /// See MidiFilePlayer and MidiSynth for the full API surface.
     ///
     /// @version 
     ///     Maestro Pro 
     /// 
-    /// Exemple for loading and playing a MIDI file from a web site.
+    /// Example for loading and playing a MIDI file from a website.
     /// @code
-    /// // Example of script. See TestMidiExternalPlayer.cs for a more detailed usage.
-    /// // Need for a reference to the Prefab (to be set in the hierarchy or can be done by script)
+    /// // Example script. See TestMidiExternalPlayer.cs for a more detailed use case.
+    /// // A reference to the prefab is required (set in the hierarchy or by script).
     /// MidiExternalPlayer midiExternalPlayer;
     /// 
-    /// if (midiExternalPlayer==null)  
+    /// if (midiExternalPlayer == null)
     ///    Debug.LogError("TestMidiExternalPlayer: there is no MidiExternalPlayer Prefab set in Inspector.");
-    /// // Load a MIDI from a web site   
+    /// // Load a MIDI file from a website.
     /// midiExternalPlayer.MPTK_MidiName = "http://www.midiworld.com/midis/other/c2/bolero.mid";
     /// midiExternalPlayer.MPTK_Play();
-    /// // more later ... load from a local folder (MacOS here)
+    /// // Later, load from a local folder (macOS example).
     /// midiExternalPlayer.MPTK_MidiName = "file:///Users/thierry/Desktop/Nirvana.mid"
     /// midiExternalPlayer.MPTK_Play();
     /// @endcode
@@ -43,10 +44,23 @@ namespace MidiPlayerTK
     [HelpURL("https://paxstellar.fr/midi-external-player-v2/")]
     public class MidiExternalPlayer : MidiFilePlayer
     {
+        /// @name MIDI Playback Control
+        /// @brief Controls playback of MIDI events and sequences.
+        /// @details
+        /// These methods allow scripts to start, stop, pause, or control the flow
+        /// of MIDI playback. They interact with the internal MIDI sequencer and
+        /// control how events are scheduled and rendered by the synthesizer.
+        ///
+        /// This includes transport control and runtime playback management.        
+
+        /// @{
+
         /// <summary>@brief
-        /// Full path to Midi file or URL to play. Must start with file:// or http:// or https://. \n
-        /// Example: MPTK_MidiName="http://www.midiworld.com/midis/other/c2/bolero.mid";\n
-        /// See https://en.wikipedia.org/wiki/File_URI_scheme for example of URI file
+        /// Sets the full URI to a MIDI file: use file:// for a local file, or http:// / https:// for a web resource.
+        /// The MIDI file is then loaded and played.\n
+        /// 
+        /// See https://en.wikipedia.org/wiki/File_URI_scheme for URI examples.
+        /// @snippet SimplestMidiExternalPlayer.cs SimplestMidiExternalPlayer
         /// </summary>
         public new string MPTK_MidiName
         {
@@ -60,6 +74,9 @@ namespace MidiPlayerTK
                 base.MPTK_MidiName = pathmidiNameToPlay;
             }
         }
+
+        /// @}
+
         [SerializeField]
         [HideInInspector]
         private string pathmidiNameToPlay;
@@ -91,9 +108,9 @@ namespace MidiPlayerTK
         }
 
         /// <summary>
-        /// Play the midi file defined with MPTK_MidiName or MPTK_MidiIndex.
+        /// Plays the MIDI file defined with MPTK_MidiName.
         /// </summary>
-        /// <param name="alreadyLoaded">true: the MIDI has already been loaded (see MPTK_Load() v2.9.0</param>
+        /// <param name="alreadyLoaded">True if the MIDI has already been loaded (see MPTK_Load(), v2.9.0).</param>
         public override void MPTK_Play(bool alreadyLoaded = false)
         {
             try
@@ -166,7 +183,7 @@ namespace MidiPlayerTK
 
 
         /// <summary>@brief
-        /// Load midi file in background and play
+        /// Loads the MIDI file in the background and starts playback.
         /// </summary>
         /// <returns></returns>
         private IEnumerator ThreadLoadDataAndPlay()
@@ -194,7 +211,7 @@ namespace MidiPlayerTK
                     {
                         MPTK_StatusLastMidiLoaded = LoadingStatusMidiEnum.MidiFileEmpty;
                         Debug.LogWarning($"Error Loading Midi: '{pathmidiNameToPlay}'");
-                        Debug.LogWarning($"Read 0 byte from the MIDI file.");
+                        Debug.LogWarning($"Read 0 bytes from the MIDI file.");
                     }
                     else if (data.Length < 4)
                     {
@@ -278,7 +295,7 @@ namespace MidiPlayerTK
         //! @cond NODOC
 
         /// <summary>@brief
-        /// Not applicable for external
+        /// Not applicable to external playback.
         /// </summary>
         public new int MPTK_MidiIndex
         {
@@ -293,7 +310,7 @@ namespace MidiPlayerTK
             }
         }
         /// <summary>@brief
-        /// Not applicable for external
+        /// Not applicable to external playback.
         /// </summary>
         public new MidiLoad MPTK_Load()
         {
@@ -302,7 +319,7 @@ namespace MidiPlayerTK
 
 
         /// <summary>@brief
-        /// Not applicable for external
+        /// Not applicable to external playback.
         /// </summary>
         public new void MPTK_Next()
         {
@@ -317,13 +334,13 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Not applicable for external
+        /// Not applicable to external playback.
         /// </summary>
         public new void MPTK_Previous()
         {
             try
             {
-                Debug.LogWarning("MPTK_Next not available for MidiExternalPlayer");
+                Debug.LogWarning("MPTK_Previous not available for MidiExternalPlayer");
             }
             catch (System.Exception ex)
             {

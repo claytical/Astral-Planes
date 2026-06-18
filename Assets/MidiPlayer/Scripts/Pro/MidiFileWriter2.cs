@@ -10,6 +10,7 @@ using UnityEngine;
 namespace MidiPlayerTK
 {
 
+    /// @ingroup legacy_internal_types
     /// <summary>
     /// @deprecated with 2.11.0, replaced by MPTKWriter
     /// </summary>

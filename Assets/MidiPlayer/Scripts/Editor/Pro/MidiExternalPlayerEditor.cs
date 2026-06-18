@@ -101,6 +101,7 @@ namespace MidiPlayerTK
 
                 commonEditor.AllPrefab(instance);
                 commonEditor.MidiFileParameters(instance);
+                commonEditor.SpacialParameters(instance);
                 commonEditor.SynthParameters(instance, serializedObject);
                 instance.showEvents = MidiCommonEditor.DrawFoldoutAndHelp(instance.showEvents, "Show Unity Events", "https://paxstellar.fr/midi-file-player-detailed-view-2/#Foldout-Events");
                 if (instance.showEvents)

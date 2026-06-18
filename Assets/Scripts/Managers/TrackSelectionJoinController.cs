@@ -6,14 +6,34 @@ using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Replaces PlayerInputManager's automatic join detection with explicit per-frame scanning.
-/// Prevents Steam Input from spawning duplicate players when a single physical gamepad
-/// appears as both a raw HID device and a Steam virtual Xbox controller.
+///
+/// Steam registers each physical controller as multiple Unity InputDevices:
+///   (a) Raw HID device  — native button layout (Switch Pro: physical-A = buttonEast,
+///                          physical-B = buttonSouth).
+///   (b) Steam Virtual Gamepad — Xbox-layout remapping (physical-A = buttonSouth).
+///   (c) Steam Deck built-in — mirrors external controller input with a short delay.
+///
+/// Problems this causes:
+///   • Physical-B press fires buttonSouth on the raw HID → phantom join during gameplay.
+///   • Steam Deck built-in mirrors the initial A press → second player at scene load.
+///
+/// Fix:
+///   1. ExcludeRawHidDuplicates() at startup: if Steam Virtual gamepads (non-HID interface)
+///      exist, permanently exclude all raw HID gamepads. They are always redundant with the
+///      virtual devices and have the wrong button layout for the game's action maps.
+///   2. Global 500ms join cooldown: after any device joins, all other devices are blocked for
+///      GraceSeconds, catching delayed mirrors from the Steam Deck built-in.
+///   3. Only buttonSouth and startButton are accepted as join triggers.
 ///
 /// Requires PlayerInputManager.joinBehavior = JoinPlayersManually in the TrackSelection scene.
 /// Self-installs via RuntimeInitializeOnLoadMethod — no scene setup needed.
 /// </summary>
 public class TrackSelectionJoinController : MonoBehaviour
 {
+    private readonly HashSet<int> _excludedIds = new();
+    private float _lastJoinTime = float.MinValue;
+    private const float GraceSeconds = 0.5f;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void RegisterHook()
     {
@@ -28,6 +48,57 @@ public class TrackSelectionJoinController : MonoBehaviour
         go.AddComponent<TrackSelectionJoinController>();
     }
 
+    private void Start()
+    {
+        foreach (var dev in InputSystem.devices)
+            Debug.Log($"[JoinController] Device: {dev.name} | id={dev.deviceId} | " +
+                      $"product={dev.description.product} | interface={dev.description.interfaceName}");
+
+        // Exclude any HID gamepads already present.
+        foreach (var gp in InputSystem.devices.OfType<Gamepad>())
+            TryExcludeHidGamepad(gp);
+
+        // Also catch devices added after Start() — Unity's input system sometimes registers
+        // controllers asynchronously, so a second controller's raw HID may appear after the
+        // initial scan and would otherwise bypass exclusion.
+        InputSystem.onDeviceChange += OnDeviceChange;
+    }
+
+    private void OnDestroy()
+    {
+        InputSystem.onDeviceChange -= OnDeviceChange;
+    }
+
+    private void OnDeviceChange(InputDevice dev, InputDeviceChange change)
+    {
+        if (change == InputDeviceChange.Added && dev is Gamepad gp)
+        {
+            Debug.Log($"[JoinController] Device added: {gp.name} | id={gp.deviceId} | " +
+                      $"product={gp.description.product} | interface={gp.description.interfaceName}");
+            TryExcludeHidGamepad(gp);
+        }
+        else if (change == InputDeviceChange.Removed)
+        {
+            _excludedIds.Remove(dev.deviceId);
+        }
+    }
+
+    // Excludes a raw HID gamepad when Steam Virtual (non-HID) gamepads also exist.
+    // Raw HID devices use the controller's native button layout (Switch Pro: physical-A = buttonEast,
+    // physical-B = buttonSouth) rather than the Xbox remapping the game's action maps expect.
+    // They are always redundant with the Steam Virtual entry for the same physical controller.
+    private void TryExcludeHidGamepad(Gamepad gp)
+    {
+        if (gp.description.interfaceName != "HID") return;
+        bool hasSteamVirtual = InputSystem.devices.OfType<Gamepad>()
+            .Any(g => g.description.interfaceName != "HID");
+        if (!hasSteamVirtual) return;
+
+        _excludedIds.Add(gp.deviceId);
+        Debug.Log($"[JoinController] Excluded raw HID (Steam Virtual present): " +
+                  $"{gp.name} | id={gp.deviceId} | product={gp.description.product}");
+    }
+
     private void Update()
     {
         var pim = PlayerInputManager.instance;
@@ -35,7 +106,6 @@ public class TrackSelectionJoinController : MonoBehaviour
 
         if (GameFlowManager.Instance?.CurrentState != GameState.Selection) return;
 
-        // Collect deviceIds already paired to a player.
         var assignedIds = new HashSet<int>();
         foreach (var lp in FindObjectsOfType<LocalPlayer>())
         {
@@ -45,69 +115,49 @@ public class TrackSelectionJoinController : MonoBehaviour
                 assignedIds.Add(dev.deviceId);
         }
 
-        // Find unassigned gamepads that pressed a join button this frame.
-        var candidates = new List<Gamepad>();
-        foreach (var device in InputSystem.devices)
-        {
-            if (assignedIds.Contains(device.deviceId)) continue;
-            if (device is Gamepad gp &&
-                (gp.buttonSouth.wasPressedThisFrame ||
-                 gp.buttonEast.wasPressedThisFrame  ||
-                 gp.startButton.wasPressedThisFrame))
-            {
-                candidates.Add(gp);
-            }
-        }
+        // Only non-HID gamepads (Steam Virtuals, built-in) are candidates.
+        // Only buttonSouth and startButton are valid join triggers — buttonEast is excluded
+        // because it corresponds to physical-A on raw HID devices (already excluded above) and
+        // physical-B on Steam Virtual remapping, neither of which should trigger a join.
+        var candidates = InputSystem.devices
+            .OfType<Gamepad>()
+            .Where(gp => !assignedIds.Contains(gp.deviceId) &&
+                         !_excludedIds.Contains(gp.deviceId) &&
+                         (gp.buttonSouth.wasPressedThisFrame ||
+                          gp.startButton.wasPressedThisFrame))
+            .OrderBy(g => g.deviceId)
+            .ToList();
 
         if (candidates.Count == 0) return;
 
-        // Remove candidates whose active button is also active on an already-assigned gamepad.
-        // This blocks the delayed-frame case: physical fires frame N (joins), virtual fires frame
-        // N+1 — the physical device is now assigned and still isPressed, so virtual is rejected.
-        var filtered = candidates
-            .Where(c => !MirrorsAssignedGamepad(c, assignedIds))
-            .OrderBy(g => g.deviceId) // lower deviceId = physical HID (prefer it)
-            .ToList();
+        float now = Time.unscaledTime;
 
-        // Within a single frame, if multiple unassigned devices press the same button type
-        // simultaneously, only the first (lowest deviceId) may join for that button.
-        // This catches the same-frame case: physical + virtual both fire wasPressedThisFrame.
+        // Same-frame dedup: only one join per button type per frame.
+        // Global cooldown: after any join, block all other devices for GraceSeconds.
+        // The cooldown is checked inside the loop so that if multiple candidates pass usedButtons
+        // in the same frame, only the first one (lowest deviceId) actually joins.
         var usedButtons = new HashSet<string>();
-        foreach (var gp in filtered)
+        foreach (var gp in candidates)
         {
             string btn = null;
             if      (gp.buttonSouth.wasPressedThisFrame && usedButtons.Add("south")) btn = "south";
-            else if (gp.buttonEast.wasPressedThisFrame  && usedButtons.Add("east"))  btn = "east";
             else if (gp.startButton.wasPressedThisFrame && usedButtons.Add("start")) btn = "start";
 
-            if (btn == null) continue; // duplicate button this frame — skip
+            if (btn == null) continue;
 
-            Debug.Log($"[JoinController] Joining device: {gp.name} | id={gp.deviceId} | btn={btn}");
+            if (now - _lastJoinTime < GraceSeconds)
+            {
+                Debug.Log($"[JoinController] Grace block: {gp.name} | id={gp.deviceId} | " +
+                          $"product={gp.description.product} | btn={btn} | " +
+                          $"{(now - _lastJoinTime) * 1000f:F0}ms since last join");
+                continue;
+            }
+
+            Debug.Log($"[JoinController] Joining: {gp.name} | id={gp.deviceId} | " +
+                      $"product={gp.description.product} | interface={gp.description.interfaceName} | btn={btn}");
             pim.JoinPlayer(pairWithDevices: new InputDevice[] { gp });
-
-            // Mark this device as assigned so subsequent candidates in this loop see it.
+            _lastJoinTime = now;
             assignedIds.Add(gp.deviceId);
         }
-    }
-
-    // Returns true if any join-relevant button currently pressed on `candidate`
-    // is also currently pressed on any already-assigned gamepad.
-    private static bool MirrorsAssignedGamepad(Gamepad candidate, HashSet<int> assignedIds)
-    {
-        foreach (var lp in FindObjectsOfType<LocalPlayer>())
-        {
-            var pi = lp.GetComponent<PlayerInput>();
-            if (pi == null) continue;
-            foreach (var dev in pi.devices)
-            {
-                if (!assignedIds.Contains(dev.deviceId)) continue;
-                if (dev is not Gamepad assignedGp) continue;
-                if ((candidate.buttonSouth.isPressed && assignedGp.buttonSouth.isPressed) ||
-                    (candidate.buttonEast.isPressed  && assignedGp.buttonEast.isPressed)  ||
-                    (candidate.startButton.isPressed && assignedGp.startButton.isPressed))
-                    return true;
-            }
-        }
-        return false;
     }
 }

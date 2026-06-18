@@ -7,8 +7,9 @@ using UnityEngine.SocialPlatforms;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup runtime_global_config
     /// <summary>
-    /// Singleton class to manage all globales MPTK features.
+    /// Singleton class to manage all global MPTK features.
     /// More information here: https://paxstellar.fr/midiplayerglobal/
     /// </summary>
     [HelpURL("https://paxstellar.fr/midiplayerglobal/")]
@@ -171,20 +172,7 @@ namespace MidiPlayerTK
             }
         }
 
-        // If true load all waves when application is started else load when need when playing (default)
-        // Useless? deprecated with v2.16
-        private bool MPTK_LoadWaveAtStartup
-        {
-            get { return instance != null ? instance.LoadWaveAtStartup : false; }
-            set
-            {
-                if (instance != null)
-                    instance.LoadWaveAtStartup = value;
-                else
-                    Debug.LogWarning("MPTK_LoadWaveAtStartup: no MidiPlayerGlobal instance found");
-            }
-        }
-
+      
         /// <summary>@brief
         /// If true load all waves when application is started else load when need when playing (default)
         /// Useless?
@@ -197,7 +185,7 @@ namespace MidiPlayerTK
 
         /// <summary>@brief
         /// Find index of a Midi by name. Use the exact name defined in Unity resources folder MidiDB without any path or extension.\n
-        /// Tips: Add Midi files to your project with the Unity menu MPTK or add it directly in the ressource folder and open Midi File Setup to automatically integrate Midi in MPTK.
+        /// Tips: Add Midi files to your project with the Unity menu MPTK or add it directly in the resource folder and open Midi File Setup to automatically integrate Midi in MPTK.
         /// </summary>
         /// <param name="name">name of the midi without path nor extension</param>
         /// <returns>-1 if not found else return the index of the midi.</returns>
@@ -228,11 +216,13 @@ namespace MidiPlayerTK
             float distance = 0f;
             try
             {
-                if (AudioListener != null)
+                if (MPTK_AudioListener != null)
                 {
-                    distance = Vector3.Distance(AudioListener.transform.position, trf.position);
-                    //Debug.Log("Camera:" + AudioListener.name + " " + distance);
+                    distance = Vector3.Distance(MPTK_AudioListener.transform.position, trf.position);
+                    //Debug.Log("MPTK_DistanceToListener:" + MPTK_AudioListener.name + " " + distance);
                 }
+                //else
+                //    Debug.Log("MPTK_DistanceToListener: MPTK_AudioListener is null");
             }
             catch (System.Exception ex)
             {
@@ -264,7 +254,6 @@ namespace MidiPlayerTK
         //! @cond NODOC
 
         public bool LoadSoundFontAtStartup = true;
-        public bool LoadWaveAtStartup;
         public bool verboseGlobal;
         public static TimeSpan timeToDownloadSoundFont = TimeSpan.Zero;
         public static TimeSpan timeToLoadSoundFont = TimeSpan.Zero;
@@ -287,8 +276,62 @@ namespace MidiPlayerTK
 
         public static string WavePath;
 
-        private static AudioListener AudioListener;
-        private static bool Initialized = false;
+
+        [SerializeField]
+        [HideInInspector]
+        public AudioListener audioListener;
+
+        /// <summary>
+        /// Specify which AudioListener is used.\n
+        /// Distance and orientation calculation are based on this AudioListener.\n
+        /// If not defined, the first AudioListener found in the scene will be used.\n
+        /// @version 2.18.0 Pro
+        /// </summary>
+        public static AudioListener MPTK_AudioListener
+        {
+            get 
+            {
+                try
+                {
+                    if (Instance.audioListener == null)
+                        // If no audio listener defined in the inspector, search one in the hierarchy
+                        Instance.audioListener = FindFirstObjectByType<AudioListener>();
+                    if (Instance.audioListener == null)
+                    {
+                        Debug.LogWarning("No audio listener found. Add one and only one AudioListener component to your hierarchy.");
+                        //return;
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    MidiPlayerGlobal.ErrorDetail(ex);
+                }
+
+                try
+                {
+                    AudioListener[] listeners = Component.FindObjectsByType<AudioListener>(FindObjectsSortMode.None);
+                    if (listeners != null && listeners.Length > 1)
+                    {
+                        Debug.LogWarning("More than one enabled audio listener found. Some unexpected behaviors could happen.");
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    MidiPlayerGlobal.ErrorDetail(ex);
+                }
+
+                //Debug.Log($"Get Instance.audioListener={Instance.audioListener}");
+                return Instance.audioListener; 
+            }
+
+            set
+            { 
+                Instance.audioListener = value;
+                Debug.Log($"Set Instance.audioListener={Instance.audioListener}");
+            }
+        }
+
+        private static bool initialized = false;
         private static DateTime startInstance;
 
 
@@ -381,7 +424,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Get the list of banks available.\n
+        /// Gets the list of banks available.\n
         /// The default bank can be changed with #MPTK_SelectBankInstrument or #MPTK_SelectBankDrum or with the menu "MPTK / SoundFont" or Alt-F in the Unity editor.
         /// </summary>
         public static List<MPTKListItem> MPTK_ListBank;
@@ -411,38 +454,41 @@ namespace MidiPlayerTK
         /// </summary>
         private IEnumerator<float> InitThread()
         {
-            if (!Initialized)
+            if (!initialized)
             {
                 //Debug.Log("MidiPlayerGlobal InitThread");
-                Initialized = true;
+                initialized = true;
                 ImSFCurrent = null;
 
-                try
-                {
-                    AudioListener = FindFirstObjectByType<AudioListener>();
-                    if (AudioListener == null)
-                    {
-                        Debug.LogWarning("No audio listener found. Add one and only one AudioListener component to your hierarchy.");
-                        //return;
-                    }
-                }
-                catch (System.Exception ex)
-                {
-                    MidiPlayerGlobal.ErrorDetail(ex);
-                }
+                // Move to the MPTK_AudioListener getter with v2.18 
+                //try
+                //{
+                //    if (MPTK_AudioListener == null)
+                //        // If no audio listener defined in the inspector, search one in the hierarchy
+                //        MPTK_AudioListener = FindFirstObjectByType<AudioListener>();
+                //    if (MPTK_AudioListener == null)
+                //    {
+                //        Debug.LogWarning("No audio listener found. Add one and only one AudioListener component to your hierarchy.");
+                //        //return;
+                //    }
+                //}
+                //catch (System.Exception ex)
+                //{
+                //    MidiPlayerGlobal.ErrorDetail(ex);
+                //}
 
-                try
-                {
-                    AudioListener[] listeners = Component.FindObjectsByType<AudioListener>(FindObjectsSortMode.None);
-                    if (listeners != null && listeners.Length > 1)
-                    {
-                        Debug.LogWarning("More than one audio listener found. Some unexpected behaviors could happen.");
-                    }
-                }
-                catch (System.Exception ex)
-                {
-                    MidiPlayerGlobal.ErrorDetail(ex);
-                }
+                //try
+                //{
+                //    AudioListener[] listeners = Component.FindObjectsByType<AudioListener>(FindObjectsSortMode.None);
+                //    if (listeners != null && listeners.Length > 1)
+                //    {
+                //        Debug.LogWarning("More than one enabled audio listener found. Some unexpected behaviors could happen.");
+                //    }
+                //}
+                //catch (System.Exception ex)
+                //{
+                //    MidiPlayerGlobal.ErrorDetail(ex);
+                //}
 
                 try
                 {
@@ -505,7 +551,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Stop all MIDI Synthesizers and exit application
+        /// Stops all MIDI synthesizers and exits the application.
         /// </summary>
         public static void MPTK_Quit()
         {
@@ -669,7 +715,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Load a SF when editor
+        /// Loads a SF when editor
         /// </summary>
         private static void LoadSoundFont()
         {
@@ -811,7 +857,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Load samples associated to a patch for High SF
+        /// Loads samples associated to a patch for High SF
         /// </summary>
         private static void LoadAudioClip()
         {
@@ -901,7 +947,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Build list of presets found in the SoundFont
+        /// Builds list of presets found in the SoundFont
         /// </summary>
         static public void BuildBankList()
         {
@@ -937,7 +983,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Build list of presets found in the default bank of the current SoundFont
+        /// Builds list of presets found in the default bank of the current SoundFont
         /// </summary>
         static public void BuildPresetList(bool forInstrument)
         {

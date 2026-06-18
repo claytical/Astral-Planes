@@ -6,52 +6,53 @@ using static MidiPlayerTK.MPTKInnerLoop;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup midifileplayer_pro
     /// <summary>
-    /// MIDI inner loop setting available for MidiFilePlayer and MidiExternalPlayer [Pro].\n
-    /// Look at MidiFilePlayer.MPTK_InnerLoop and MidiExternalPlayer.MPTK_InnerLoop. See Example:\n
+    /// MIDI inner-loop settings for MidiFilePlayer and MidiExternalPlayer [Pro].\n
+    /// See MidiFilePlayer.MPTK_InnerLoop and MidiExternalPlayer.MPTK_InnerLoop. See example:\n
     /// @snippet TestInnerLoop.cs ExampleMidiInnerLoop
     /// </summary>
     public class MPTKInnerLoop
     {
         /// <summary>@brief
-        /// Enable logging message
+        /// Enable log messages.
         /// </summary>
         public bool Log;
 
         /// <summary>@brief
-        /// Loop phase action sent to #OnEventInnerLoop
+        /// Loop phase action sent to #OnEventInnerLoop.
         /// </summary>
         public enum InnerLoopPhase
         {
             /// <summary>
-            /// Start the loop
+            /// Start the loop.
             /// </summary>
             Start,
 
             /// <summary>
-            /// Resume the loop
+            /// Resume the loop.
             /// </summary>
             Resume,
 
             /// <summary>
-            /// Exit the loop
+            /// Exit the loop.
             /// </summary>
             Exit
         }
 
         /// <summary>@brief
-        /// Unity event triggered when a loop occurs. 
-        /// parameters: 
+        /// Callback triggered when an inner-loop event occurs.
+        /// Parameters:
         ///     - InnerLoopPhase  current loop phase
-        ///     - long            current tick player (MPTK_TickPlayer)
-        ///     - long            tick target (End)
-        ///     - long            loop count (Count).
-        /// return: 
-        ///     - boolean         true continue looping, false exit loop.
+        ///     - long            current player tick (MPTK_TickPlayer)
+        ///     - long            loop end tick (End)
+        ///     - long            loop count (Count)
+        /// Return:
+        ///     - boolean         true to continue looping, false to exit.
         /// @note 
-        ///     - this action is done from the MIDI thread, not from the Unity thread. 
-        ///     - It's not possible to call Unity API (only Debug.Log).
-        ///     - it's a managed thread, so all variables from your script are visible.
+        ///     - This callback runs on the MIDI thread, not on the Unity thread.
+        ///     - It is not possible to call Unity APIs (except Debug.Log).
+        ///     - This runs on a managed thread context, so your script fields remain accessible.
         /// </summary>
         public Func<InnerLoopPhase, long, long, int, bool> OnEventInnerLoop;
 
@@ -61,31 +62,31 @@ namespace MidiPlayerTK
         public bool Enabled;
 
         /// <summary>@brief
-        /// Becomes true when the loop is finished or OnEventInnerLoop returns false.\n
+        /// Becomes true when the loop has finished or when OnEventInnerLoop returns false.\n
         /// Can also be set to true to stop looping.
         /// </summary>
         public bool Finished;
 
         /// <summary>@brief
-        /// Tick position where the loop begin when the MIDI start. The MIDI sequencer go immediately to this position.\n
-        /// if #Start > #Resume the loop will begin at #Resume position. Default is 0.
+        /// Tick position where the loop begins when MIDI starts. The sequencer jumps immediately to this position.\n
+        /// If #Start > #Resume, the loop begins at #Resume. Default is 0.
         /// </summary> 
         public long Start;
 
         /// <summary>@brief
-        /// Tick position to resume the loop when MidiLoad.MPTK_TickPlayer >= to #End. Default is 0.
-        /// See also MidiFilePlayer.MPTK_RawSeek
+        /// Tick position where the loop resumes when MidiLoad.MPTK_TickPlayer >= #End. Default is 0.
+        /// See also MidiFilePlayer.MPTK_RawSeek.
         /// </summary>
         public long Resume;
 
         /// <summary>@brief
-        /// Tick position to trigger the loop restart to the #Resume position (when MidiLoad.MPTK_TickPlayer >= to #End). Default is 0.
+        /// Tick position that triggers a restart at #Resume (when MidiLoad.MPTK_TickPlayer >= #End). Default is 0.
         /// </summary>
         public long End;
 
         /// <summary>@brief
-        /// Maximum iteration for the loop including the first. When #Count >= #Max the MIDI sequencer continue to the next MIDI events AFTER TICK #eND.\n
-        /// Set to 0 for infinite loop. Default is 0.
+        /// Maximum number of loop iterations, including the first pass. When #Count >= #Max, the sequencer continues with MIDI events after tick #End.\n
+        /// Set to 0 for an infinite loop. Default is 0.
         /// </summary>
         public int Max;
 
@@ -100,7 +101,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Clear Inner Loop attributes. 
+        /// Resets inner-loop state.
         ///     Enabled = false, Finished = false
         ///     Start = 0,  Resume = 0,  End = 0
         ///     Count = 0

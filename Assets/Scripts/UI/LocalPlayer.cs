@@ -7,6 +7,9 @@ using UnityEngine.SceneManagement;
 
 public class LocalPlayer : MonoBehaviour
 {
+    private static int _nextId;
+    private readonly int _id = System.Threading.Interlocked.Increment(ref _nextId);
+
     public GameObject playerSelect;
     [SerializeField] private GameObject playerVehicle;
     public Vehicle plane;
@@ -182,7 +185,7 @@ public class LocalPlayer : MonoBehaviour
         // --- NEW: carve a safe spawn cell BEFORE we place/instantiate the vehicle ---
         if (carveSpawnPocket && gfm.dustGenerator != null)
         {
-            _dustKeepClearOwnerId = GetInstanceID();
+            _dustKeepClearOwnerId = _id;
             _dustKeepClearCell = spawnCell;
 
             gfm.dustGenerator.SetVehicleKeepClear(

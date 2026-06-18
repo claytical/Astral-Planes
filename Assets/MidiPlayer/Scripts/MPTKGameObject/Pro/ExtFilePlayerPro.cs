@@ -1,79 +1,39 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup midifileplayer_management
     public partial class MidiFilePlayer : MidiSynth
     {
 
         /// <summary>@brief
-        /// Defined looping condition inside the MIDI Sequencer [Pro].
-        /// Instance is automatically created when the MidiFilePlayer prefab is loaded/n
-        /// See class #MPTKInnerLoop and #MPTK_RawSeek
+        /// Defines looping conditions inside the MIDI sequencer [Pro].
+        /// An instance is automatically created when the MidiFilePlayer prefab is loaded.\n
+        /// See #MPTKInnerLoop and #MPTK_RawSeek.
+
+        /// @name Inner Loop
+        /// @{
 
         /// 
         /// @version Maestro Pro 
         /// 
         /// @snippet TestInnerLoop.cs ExampleMidiInnerLoop
         /// </summary>
+        /// @ingroup midifileplayer_pro
         public MPTKInnerLoop MPTK_InnerLoop;
 
+        /// @}
+
+
+
+        /// @name MIDI Loading and Reading
+        /// @{
 
         /// <summary>@brief
-        /// Find a Midi in the Unity resources folder MidiDB which contains searchPartOfName in it's name (case sensitive).\n
-        /// Set MPTK_MidiIndex and MPTK_MidiName if the MIDI has been found
-        /// 
-        /// @note
-        ///     - Add Midi files to your project with the Unity menu Maestro.
-        ///     
-        /// @version Maestro Pro 
-        /// 
-        /// @code
-        /// // Find the first Midi file name in MidiDB which contains "Adagio in it's name"
-        /// if (midiFilePlayer.MPTK_SearchMidiToPlay("Adagio"))
-        /// {
-        ///     Debug.Log($"MPTK_SearchMidiToPlay: {MPTK_MidiIndex} {MPTK_MidiName}");
-        ///     // And play it
-        ///     midiFilePlayer.MPTK_Play();
-        /// }
-        /// @endcode
-        /// </summary>
-        /// <param name="searchPartOfName">Part of MIDI name to search in MIDI list (case sensitive)</param>
-        /// <returns>true if found else false</returns>
-        public bool MPTK_SearchMidiToPlay(string searchPartOfName)
-        {
-            int index = -1;
-            try
-            {
-                if (!string.IsNullOrEmpty(searchPartOfName))
-                {
-                    if (MidiPlayerGlobal.CurrentMidiSet != null && MidiPlayerGlobal.CurrentMidiSet.MidiFiles != null)
-                    {
-                        index = MidiPlayerGlobal.CurrentMidiSet.MidiFiles.FindIndex(s => s.Contains(searchPartOfName));
-                        if (index >= 0)
-                        {
-                            MPTK_MidiIndex = index;
-                            //Debug.Log($"MPTK_SearchMidiToPlay: {MPTK_MidiIndex} - '{MPTK_MidiName}'");
-                            return true;
-                        }
-                        else
-                            Debug.LogWarningFormat("No MIDI file found with '{0}' in name", searchPartOfName);
-                    }
-                    else
-                        Debug.LogWarning(MidiPlayerGlobal.ErrorNoMidiFile);
-                }
-            }
-            catch (System.Exception ex)
-            {
-                MidiPlayerGlobal.ErrorDetail(ex);
-            }
-            return false;
-        }
-
-        /// <summary>@brief
-        /// Load a MIDI file from a local desktop file. Example of path:
+        /// Loads a MIDI file from a local desktop file. Example paths:
         ///     - Mac: "/Users/xxx/Desktop/WellTempered.mid"\n
         ///     - Windows: "C:\Users\xxx\Desktop\BIM\Sound\Midi\DreamOn.mid"\n
         /// @note
@@ -82,8 +42,10 @@ namespace MidiPlayerTK
         ///     - Look at MPTK_MidiLoaded for detailed information about the MIDI loaded.\n
         /// @version Maestro Pro 
         /// </summary>
-        /// <param name="uri">uri or path to the midi file</param>
-        /// <returns>MidiLoad to access all the properties of the midi loaded or null in case of error</returns>
+        /// <param name="uri">URI or path to the MIDI file.</param>
+        /// <returns>A MidiLoad object to access all properties of the loaded MIDI, or null in case of error.</returns>
+        /// @ingroup midifileplayer_pro
+        /// @ingroup midifileplayer_loading
         public MidiLoad MPTK_Load(string uri)
         {
             try
@@ -146,28 +108,72 @@ namespace MidiPlayerTK
             }
             return midiLoaded;
         }
+        /// @}
+
+        /// @name Play and Stop MIDI
+        /// @{
 
         /// <summary>@brief
-        /// MIDI list events must be sorted by ticks before playing. It's mandatory if the list is modified. 
-        /// @version 2.0.0 - Maestro Pro 
-        /// @snippet TestMidiFilePlayerScripting.cs Example_GUI_PreloadAndAlterMIDI
+        /// Finds a MIDI in the Unity Resources folder `MidiDB` whose name contains `searchPartOfName` (case-sensitive).\n
+        /// Sets MPTK_MidiIndex and MPTK_MidiName if the MIDI is found.
+        /// 
+        /// @note
+        ///     - Add Midi files to your project with the Unity menu Maestro.
+        ///     
+        /// @version Maestro Pro 
+        /// 
+        /// @code
+        /// // Find the first MIDI file name in MidiDB that contains "Adagio" in its name
+        /// if (midiFilePlayer.MPTK_SearchMidiToPlay("Adagio"))
+        /// {
+        ///     Debug.Log($"MPTK_SearchMidiToPlay: {MPTK_MidiIndex} {MPTK_MidiName}");
+        ///     // And play it
+        ///     midiFilePlayer.MPTK_Play();
+        /// }
+        /// @endcode
         /// </summary>
-        public void MPTK_SortEvents()
+        /// <param name="searchPartOfName">Part of the MIDI name to search for in the MIDI list (case-sensitive).</param>
+        /// <returns>True if found; otherwise, false.</returns>
+        /// @ingroup midifileplayer_pro
+        /// @ingroup midifileplayer_selection
+        public bool MPTK_SearchMidiToPlay(string searchPartOfName)
         {
-            if (MPTK_MidiEvents != null)
-                MPTK_MidiEvents.Sort((e1, e2) =>
+            int index = -1;
+            try
+            {
+                if (!string.IsNullOrEmpty(searchPartOfName))
                 {
-                    return e1.Compare(e2);
-                });
-            else
-                Debug.LogWarning("MPTK_SortEvents: No MIDI loaded");
+                    if (MidiPlayerGlobal.CurrentMidiSet != null && MidiPlayerGlobal.CurrentMidiSet.MidiFiles != null)
+                    {
+                        index = MidiPlayerGlobal.CurrentMidiSet.MidiFiles.FindIndex(s => s.Contains(searchPartOfName));
+                        if (index >= 0)
+                        {
+                            MPTK_MidiIndex = index;
+                            //Debug.Log($"MPTK_SearchMidiToPlay: {MPTK_MidiIndex} - '{MPTK_MidiName}'");
+                            return true;
+                        }
+                        else
+                            Debug.LogWarningFormat("No MIDI file found with '{0}' in name", searchPartOfName);
+                    }
+                    else
+                        Debug.LogWarning(MidiPlayerGlobal.ErrorNoMidiFile);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MidiPlayerGlobal.ErrorDetail(ex);
+            }
+            return false;
         }
 
+
         /// <summary>@brief
-        /// Play next or previous Midi from the MidiDB list.
+        /// Plays the next or previous MIDI from the MidiDB list.
         /// @version Maestro Pro 
         /// </summary>
-        /// <param name="offset">Forward or backward count in the list. 1:the next, -1:the previous</param>
+        /// <param name="offset">Forward or backward offset in the list. `1` = next, `-1` = previous.</param>
+        /// @ingroup midifileplayer_pro
+        /// @ingroup midifileplayer_playback_controls
         public void MPTK_PlayNextOrPrevious(int offset)
         {
             try
@@ -196,15 +202,17 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Switch playing between two MIDIs with ramp-up.\n
-        /// This method is useful for an integration with Bolt: main MIDI parameters are defined in one call.
+        /// Switches playback between two MIDIs with ramp-up.\n
+        /// This method is useful for integration with Bolt: main MIDI parameters are defined in one call.
         /// @version Maestro Pro 
         /// </summary>
-        /// <param name="index">Index of the MIDI to play. Index is used only if name parameter is null or empty.</param>
-        /// <param name="name">Name of the MIDI to play. Can be part of the MIDI Name. If set, this parameter has the priority over index parameter.</param>
-        /// <param name="volume">Volume of the MIDI. -1 to not change the default volume</param>
-        /// <param name="delayToStopMillisecond">Delay to stop the current MIDI playing (with volume decrease) or delay before playing the MIDI if no MIDI is playing</param>
-        /// <param name="delayToStartMillisecond">Delay to get the MIDI at full volume (ramp-up volume)</param>
+        /// <param name="index">Index of the MIDI to play. Used only if <paramref name="name"/> is null or empty.</param>
+        /// <param name="name">Name of the MIDI to play. Can be part of the MIDI name. If set, this parameter has priority over <paramref name="index"/>.</param>
+        /// <param name="volume">Volume of the MIDI. Use `-1` to keep the default volume.</param>
+        /// <param name="delayToStopMillisecond">Delay before stopping the currently playing MIDI (with volume decrease), or delay before playback if no MIDI is playing.</param>
+        /// <param name="delayToStartMillisecond">Delay to reach full MIDI volume (ramp-up volume).</param>
+        /// @ingroup midifileplayer_pro
+        /// @ingroup midifileplayer_playback_controls
         public void MPTK_SwitchMidiWithDelay(int index, string name, float volume, float delayToStopMillisecond, float delayToStartMillisecond)
         {
             if (volume >= 0f)
@@ -225,13 +233,15 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Play the midi file defined with MPTK_MidiName or MPTK_MidiIndex with ramp-up to the volume defined with MPTK_Volume.\n
+        /// Plays the MIDI file defined by MPTK_MidiName or MPTK_MidiIndex with ramp-up to the volume defined by MPTK_Volume.\n
         /// The time to get a MIDI playing at full MPTK_Volume is delayRampUp + startDelay.\n
         /// A delayed start can also be set.
         /// @version Maestro Pro 
         /// </summary>
-        /// <param name="delayRampUp">ramp-up delay in milliseconds to get the default volume</param>
-        /// <param name="startDelay">delayed start in milliseconds V2.89.1</param>
+        /// <param name="delayRampUp">Ramp-up delay, in milliseconds, to reach the default volume.</param>
+        /// <param name="startDelay">Delayed start, in milliseconds. V2.89.1</param>
+        /// @ingroup midifileplayer_pro
+        /// @ingroup midifileplayer_playback_controls
         public virtual void MPTK_Play(float delayRampUp, float startDelay = 0)
         {
             Routine.CallDelayed(startDelay / 1000f, () =>
@@ -245,11 +255,11 @@ namespace MidiPlayerTK
             });
         }
         /// <summary>@brief
-        /// Play the midi file from a byte array.\n
-        /// Look at MPTK_StatusLastMidiLoaded to get status.
+        /// Plays a MIDI file from a byte array.\n
+        /// Check MPTK_StatusLastMidiLoaded to get the load status.
         /// @version Maestro Pro 
         /// @code
-        ///   // Example of using with Windows or MACOs
+        ///   // Example for Windows or macOS
         ///   using (Stream fsMidi = new FileStream(filepath, FileMode.Open, FileAccess.Read))
         ///   {
         ///         byte[] data = new byte[fsMidi.Length];
@@ -258,6 +268,9 @@ namespace MidiPlayerTK
         ///   }
         /// @endcode
         /// </summary>
+        /// @ingroup midifileplayer_pro
+        /// @ingroup midifileplayer_loading
+        /// @ingroup midifileplayer_playback_controls
         public void MPTK_Play(byte[] data)
         {
             try
@@ -332,12 +345,15 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Play the midi from a MidiFileWriter2 object
+        /// Plays a MIDI from a MidiFileWriter2 object.
         /// @version Maestro Pro 
         /// @snippet TestMidiGenerator.cs ExampleMIDIPlayFromWriter
         /// </summary>
-        /// <param name="mfw2">aMidiFileWriter2 object</param>
+        /// <param name="mfw2">A MidiFileWriter2 object.</param>
         /// <param name="delayRampUp"></param>
+        /// @ingroup midifileplayer_pro
+        /// @ingroup midifileplayer_loading
+        /// @ingroup midifileplayer_playback_controls
         public void MPTK_Play(MPTKWriter mfw2, float delayRampUp = 0f, float fromPosition = 0, float toPosition = 0, long fromTick = 0, long toTick = 0, bool timePosition = true)
         {
             try
@@ -418,12 +434,14 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Stop playing within a delay. After the stop delay (0 by default), the volume decrease until the playing is stopped.\n
+        /// Stops playback after a delay. After the stop delay (0 by default), the volume decreases until playback stops.\n
         /// The time to get a real MIDI stop is delayRampDown + stopDelay.
         /// @version Maestro Pro 
         /// </summary>
-        /// <param name="delayRampDown">decrease time in millisconds</param>
-        /// <param name="stopDelay">delayed stop in milliseconds V2.89.1</param>
+        /// <param name="delayRampDown">Fade-out time in milliseconds.</param>
+        /// <param name="stopDelay">Delayed stop in milliseconds. V2.89.1</param>
+        /// @ingroup midifileplayer_pro
+        /// @ingroup midifileplayer_playback_controls
         public virtual void MPTK_Stop(float delayRampDown, float stopDelay = 0)
         {
             Routine.CallDelayed(stopDelay / 1000f, () =>
@@ -448,6 +466,8 @@ namespace MidiPlayerTK
                 MPTK_MidiIndex = index;
             MPTK_Play();
         }
+
+        /// @}
 
         protected IEnumerator<float> TheadPlayWithDelay(float delayToStopMillisecond, float delayToStartMillisecond)
         {
@@ -508,7 +528,7 @@ namespace MidiPlayerTK
                 else
                 {
                     Debug.Log($"ThreadMFWPlay ThreadLegacyPlay");
-                    Routine.RunCoroutine(ThreadLegacyPlay(midiBytesToPlay: null, currentMidiName, fromPosition, toPosition, alreadyLoaded:true).CancelWith(gameObject), Segment.RealtimeUpdate);
+                    Routine.RunCoroutine(ThreadLegacyPlay(midiBytesToPlay: null, currentMidiName, fromPosition, toPosition, alreadyLoaded: true).CancelWith(gameObject), Segment.RealtimeUpdate);
                 }
             }
             yield return 0;

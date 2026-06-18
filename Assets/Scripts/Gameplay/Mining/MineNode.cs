@@ -997,13 +997,11 @@ public class MineNode : MonoBehaviour
 
     private void OnDisable()
     {
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNode] OnDisable {name} ({GetInstanceID()})");
         if (_drumTrack != null) _drumTrack.OnLoopBoundary -= HandleLoopBoundary;
     }
 
     private void OnDestroy()
     {
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNode] OnDestroy {name} ({GetInstanceID()})");
         if (_drumTrack != null) _drumTrack.OnLoopBoundary -= HandleLoopBoundary;
         if (_drumTrack != null) _drumTrack.activeMineNodes.Remove(this);
     }

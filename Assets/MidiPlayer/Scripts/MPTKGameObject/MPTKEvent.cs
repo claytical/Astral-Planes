@@ -1,23 +1,36 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace MidiPlayerTK
 {
 
-    /// <summary>
-    /// Description of a MIDI Event. It's the heart of MPTK! Essential to handling MIDI by script from all others classes as MidiStreamPlayer, MidiFilePlayer, MidiFileLoader, MidiFileWriter2 ...\n
-    /// 
-    /// The MPTKEvent main property is MPTKEvent.Command, the content and role of other properties (as MPTKEvent.Value) depend on the value of MPTKEvent.Command. Look at the MPTKEvent.Value property.\n
-    /// With this class, you can: play and stop a note, change instrument (preset, patch, ...), change some control as modulation (Pro) ...\n
-    /// Use this class in relation with these classes:
-    ///      - MidiFileLoader     to read MIDI events from a MIDI file.\n
-    ///      - MidiFilePlayer     process MIDI events, thank to the class event OnEventNotesMidi when MIDI events are played from the internal MIDI sequencer.\n
-    ///      - MidiFileWriter2    generate MIDI Music file from your own algorithm.\n
-    ///      - MidiStreamPlayer   real-time generation of MIDI Music from your own algorithm.\n
-    /// See here https://paxstellar.fr/class-mptkevent and here https://mptkapi.paxstellar.com/d9/d50/class_midi_player_t_k_1_1_m_p_t_k_event.html
-    /// \n
-    /// Also, below an example with MidiStreamPlayer\n
+    /// @ingroup midi_event_object
+    /// <summary>@brief
+    /// Represents a MIDI event used throughout MPTK.
+    /// This class is central to script-based MIDI workflows in components such as
+    /// MidiStreamPlayer, MidiFilePlayer, MidiFileLoader, and MPTKWriter.
+    ///
+    /// The key property is Command. The meaning of other fields (for example Value)
+    /// depends on the selected MIDI command type.
+    ///
+    /// Typical use cases:
+    /// - play/stop notes,
+    /// - change instrument (patch/preset),
+    /// - send control changes,
+    /// - handle meta events.
+    ///
+    /// Related components:
+    /// - MidiFileLoader: reads MIDI events from files,
+    /// - MidiFilePlayer: processes MIDI events from the internal sequencer,
+    /// - MPTKWriter: generates MIDI content programmatically,
+    /// - MidiStreamPlayer: plays MIDI events in real time.
+    ///
+    /// More information:
+    /// - https://paxstellar.fr/class-mptkevent
+    /// - https://mptkapi.paxstellar.com/d9/d50/class_midi_player_t_k_1_1_m_p_t_k_event.html
+    ///
+    /// Example with MidiStreamPlayer:
     /// @code
     /// 
     /// // Find a MidiStreamPlayer Prefab from the scene
@@ -27,14 +40,15 @@ namespace MidiPlayerTK
     /// // Change instrument to Marimba for channel 0
     /// MPTKEvent PatchChange = new MPTKEvent() {
     ///        Command = MPTKCommand.PatchChange,
-    ///        Value = 12, // generally Marimba but depend on the SoundFont selected
-    ///        Channel = 0 }; // Instrument are defined by channel (from 0 to 15). So at any time, only 16 différents instruments can be used simultaneously.
+    ///        Value = 12, // usually Marimba, depending on the selected SoundFont
+    ///        Channel = 0 }; // Instruments are assigned per channel (0 to 15).
+    ///                       // At a given time, up to 16 channel instruments can be active.
     /// midiStreamPlayer.MPTK_PlayEvent(PatchChange);    
     ///
     /// // Play a C4 during one second with the Marimba instrument
     /// MPTKEvent NotePlaying = new MPTKEvent() {
     ///        Command = MPTKCommand.NoteOn,
-    ///        Value = 60, // play a C4 note
+    ///        Value = 60, // C4
     ///        Channel = 0,
     ///        Duration = 1000, // one second
     ///        Velocity = 100 };
@@ -43,85 +57,47 @@ namespace MidiPlayerTK
     /// </summary>
     public partial class MPTKEvent : ICloneable
     {
-        public virtual object Clone()
-        {
-            return this.MemberwiseClone();
-        }
+        /// @name Event Type and Message Data
+        /// @brief Core MIDI event identity and associated message data.
+        /// @details
+        /// This section defines what the event is (`Command`) and the data fields
+        /// interpreted from that command (`Controller`, `Meta`, `Info`, `Value`).
+        /// It is the primary model used by playback, serialization, and filtering logic.
+
+        /// @{
 
         /// <summary>@brief
-        /// Track index of the event in the MIDI. \n
-        /// There is any impact on the music played. \n
-        /// It's just a cool way to regroup MIDI events in a ... track like in a sequencer.\n
-        /// Track 0 is the first track read from the MIDI file.
-        /// </summary>
-        public long Track;
-
-        /// <summary>@brief
-        /// Time in MIDI Tick (part of a Beat) of the Event since the start of playing the MIDI file.\n
-        /// This time is independent of the Tempo or Speed. Not used for MidiStreamPlayer nor MidiInReader because they are real-time player.
-        /// </summary>
-        public long Tick;
-
-        /// <summary>@brief
-        /// Measure (bar) when this event will be played. Measure is calculated with the Time Signature event when a MIDI file is loaded.\n
-        /// By default the time signature is 4/4.
-        /// </summary>
-        public int Measure;
-
-        /// <summary>@brief
-        /// Beat in the measure of this event. Present in all MIDI events, but only has musical meaning for noteon. 
-        /// The beat is calculated using the Time Signature event when a MIDI file is loaded.\n
-        /// By default the time signature is 4/4.
-        /// </summary>
-        public int Beat;
-
-        /// <summary>@brief
-        /// Initial Event Index in the MIDI list, set only when a MIDI file is loaded.
-        /// </summary>
-        public int Index;
-
-        /// <summary>@brief
-        /// V2.9.0 Time from System.DateTime when the Event has been created (in the constructor of this class). Divide by 10000 to get milliseconds.\n
-        /// Replace TickTime from previous version (was confusing).
-        /// </summary>
-        public long CreateTime;
-
-        /// <summary>@brief
-        /// Real time in milliseconds of this MIDI Event from the start of the MIDI. It take into account the tempo changes but not MidiFilePlayer.MPTK_Speed \n
-        /// v2.89.6 Correct the time shift when a tempo change is read. Thanks to Ken Scott http://www.youtube.com/vjchaotic for the tip.\n
-        /// Not used for MidiStreamPlayer nor MidiInReader (MIDI events are always in real-time from your app).
-        /// </summary>
-        public float RealTime;
-
-        /// <summary>@brief
-        /// MIDI Command code. Defined the type of message. See #MPTKCommand (Note On, Control Change, Patch Change...)
+        /// MIDI command type for this event.
+        /// See #MPTKCommand (NoteOn, ControlChange, PatchChange, etc.).
         /// </summary>
         public MPTKCommand Command;
 
         /// <summary>@brief
-        /// For #Command = #MPTKCommand.ControlChange contains the controller code (Modulation, Pan, Bank Select ...).\n
-        /// #Value properties will contains the value of the controller. See #MPTKController.
+        /// Controller code when #Command is #MPTKCommand.ControlChange
+        /// (for example modulation, pan, bank select).
+        /// The associated controller value is stored in #Value.
         /// </summary>
         public MPTKController Controller;
 
         /// <summary>@brief
-        /// For #Command = #MPTKCommand.MetaEvent contains MetaEvent Code. (Lyric, TimeSignature, ...).\n
-        /// Others properties will contains the value of the meta. See #MPTKMeta (TextEvent, Lyric, TimeSignature, ...).
+        /// Meta-event type when #Command is #MPTKCommand.MetaEvent
+        /// (for example Lyric, TimeSignature, SetTempo).
+        /// Related meta message data is stored in other fields (such as #Value or #Info).
         /// </summary>
         public MPTKMeta Meta;
 
         /// <summary>@brief
-        /// For #Command = #MPTKCommand.MetaEvent contains text information hold (TextEvent, Lyric, TimeSignature, ...)
+        /// Text message data for meta events (for example TextEvent or Lyric).
         /// </summary>
         public string Info;
 
         /// <summary>@brief
-        /// Contains a value in relation with the #Command.
+        /// Numeric message data whose meaning depends on #Command.
         ///! <ul>
         ///! <li>#Command = #MPTKCommand.NoteOn
         ///!     <ul>
-        ///!       <li> #Value contains MIDI note as defined in the MIDI standard and matched to the Middle C (note number 60) as C4.\n
-        ///!         look here: http://www.music.mcgill.ca/~ich/classes/mumt306/StandardMIDIfileformat.html#BMA1_3
+        ///!       <li> #Value contains the MIDI note number (Middle C is 60 / C4).\n
+        ///!         See: http://www.music.mcgill.ca/~ich/classes/mumt306/StandardMIDIfileformat.html#BMA1_3
         ///        </li>
         ///!     </ul>
         ///! </li>
@@ -132,8 +108,9 @@ namespace MidiPlayerTK
         ///! </li>
         ///! <li>#Command = #MPTKCommand.PatchChange
         ///!     <ul>
-        ///!        <li>  #Value contains patch/preset/instrument value. See the current SoundFont to find value associated to each instrument.\n
-        ///!                If your SoundFont follows the General MIDI (GM) map, instrument Patch map will be like ths one:\n
+        ///!        <li>  #Value contains patch/preset/instrument number.\n
+        ///!                Use the active SoundFont to resolve instrument names.\n
+        ///!                If your SoundFont follows the General MIDI (GM) map, the patch map is similar to:\n
         ///                 http://www.music.mcgill.ca/~ich/classes/mumt306/StandardMIDIfileformat.html#BMA1_4    
         ///!        </li>
         ///!     </ul>
@@ -142,7 +119,7 @@ namespace MidiPlayerTK
         ///!     <ul>
         ///!        <li>  #MPTKMeta.SetTempo</li>
         ///!        <ul>
-        ///!            <li>  #Value contains new Microseconds Per Beat Note</li>
+        ///!            <li>  #Value contains microseconds per quarter note</li>
         ///!        </ul>
         ///!        <li>  #MPTKMeta.TimeSignature. See #MPTKMeta.TimeSignature</li>
         ///!        <li>  #MPTKMeta.KeySignature. See #MPTKMeta.KeySignature</li>
@@ -152,12 +129,154 @@ namespace MidiPlayerTK
         /// </summary>
         public int Value;
 
+        /// @}
+
+
+
+        /// @name Note Playback Attributes
+        /// @brief Parameters used to play and shape notes.
+        /// @details
+        /// These members describe how a note should be rendered:
+        /// channel routing, velocity, note duration, and optional start delay.
+        /// They are mainly used when `Command` is `NoteOn`/`NoteOff`.
+
+        /// @{
+
+        /// <summary>@brief
+        /// Track index of this event in the source MIDI file.
+        /// Track 0 is the first track.
+        /// This value is informational and does not affect playback behavior.
+        /// </summary>
+        public long Track;
+
+        /// <summary>@brief
+        /// MIDI channel from 0 to 15 (channel 9 is typically used for drums).
+        /// </summary>
+        public int Channel;
+
+        /// <summary>@brief
+        /// Note velocity (0 to 127) for #MPTKCommand.NoteOn and #MPTKCommand.NoteOff.
+        /// </summary>
+        public int Velocity;
+
+        /// <summary>@brief
+        /// Note duration in milliseconds when #Command = #MPTKCommand.NoteOn.
+        /// Set to -1 for an indefinitely sustained note (until explicit note-off).
+        /// @version 2.10.0 
+        /// @note
+        /// Previous non-note usages were removed:
+        ///    - SetTempo no longer stores tempo in this field,
+        ///    - TimeSignature no longer stores denominator in this field,
+        ///    - KeySignature no longer stores major/minor flag in this field.
+        /// </summary>
+        public long Duration;
+
+        /// <summary>@brief
+        /// Delay in milliseconds before playing a note.
+        /// Used only for #MPTKCommand.NoteOn and only in Core mode.
+        /// </summary>
+        public long Delay;
+
+        /// <summary>@brief
+        /// Duration in MIDI ticks when #Command = #MPTKCommand.NoteOn.
+        /// @details
+        /// Tick duration is converted to milliseconds (#Duration) when a MIDI file is loaded.
+        /// @note
+        /// Maestro playback uses #Duration in milliseconds rather than this tick field.
+        /// https://en.wikipedia.org/wiki/Note_value
+        /// </summary>
+        public int Length;
+
+        /// @}
+
+        /// @name Musical Position and Timing
+        /// @brief Temporal position of the event in musical and real time.
+        /// @details
+        /// These values provide timeline context:
+        /// tick-based position, measure/beat, index in the source stream,
+        /// and real-time timing useful for diagnostics and synchronization.
+        /// @{
+
+        /// <summary>@brief
+        /// Event time in MIDI ticks (fraction of a beat) from the beginning of the MIDI file.
+        /// This value is independent of tempo or playback speed.
+        /// Not used by MidiStreamPlayer or MidiInReader (real-time sources).
+        /// </summary>
+        public long Tick;
+
+        /// <summary>@brief
+        /// Measure (bar) where this event occurs.
+        /// Computed from time-signature events when a MIDI file is loaded.
+        /// By default the time signature is 4/4.
+        /// </summary>
+        public int Measure;
+
+        /// <summary>@brief
+        /// Beat index inside the measure for this event.
+        /// Present for all events, but musically most relevant for note events.
+        /// Computed from time-signature events when a MIDI file is loaded.
+        /// By default the time signature is 4/4.
+        /// </summary>
+        public int Beat;
+
+        /// <summary>@brief
+        /// Original index of this event in the loaded MIDI event list.
+        /// </summary>
+        public int Index;
+
+        /// <summary>@brief
+        /// UTC timestamp (DateTime ticks) captured when this event instance is created.
+        /// Divide by 10,000 to convert to milliseconds.
+        /// Replaces the former TickTime field.
+        /// </summary>
+        public long CreateTime;
+
+        /// <summary>@brief
+        /// Absolute event time in milliseconds from the start of the MIDI sequence.
+        /// Accounts for tempo changes, but not for MidiFilePlayer.MPTK_Speed.
+        /// Not used by MidiStreamPlayer or MidiInReader (real-time sources).
+        /// </summary>
+        public float RealTime;
+
+        /// <summary>@brief
+        /// Elapsed system time (DateTime.UtcNow.Ticks) since this event was created.
+        /// Mainly useful for latency diagnostics.
+        /// One DateTime tick equals 100 nanoseconds.
+        /// @note Disabled by default. Define DEBUG_PERF_AUDIO in MidiSynth for debug-only use.
+        /// </summary>
+        public long LatenceTime { get { return DateTime.UtcNow.Ticks - CreateTime; } }
+
+        /// <summary>@brief
+        /// Elapsed time in milliseconds since this event was created.
+        /// Mainly useful for latency diagnostics.
+        /// @note Disabled by default. Define DEBUG_PERF_AUDIO in MidiSynth for debug-only use.
+        /// </summary>
+        public long LatenceTimeMillis { get { return LatenceTime / fluid_voice.Nano100ToMilli; } }
+
+        /// @}
+
+
+        /// @name Value Transposition
+        /// @brief Utilities to transpose and restore note values safely.
+        /// @details
+        /// The original value is cached once, then reused so repeated calls
+        /// apply transposition from the same base note instead of accumulating drift.
+        /// @{
 
         // initial value before transpose
         private int notTransposedValue;
+
+        /// <summary>@brief
+        /// Original (untransposed) value captured before calling #TransposeValue.
+        /// </summary>
         public int OriginalValue { get { return notTransposedValue; } }
 
-        // v2.15 - restore initial value before transpose
+        /// <summary>@brief
+        /// Applies a transposition offset to #Value.
+        /// The first call stores the original value, then each call restores and reapplies
+        /// the requested transpose amount from that original value.
+        /// </summary>
+        /// <param name="transpose">Semitone offset to apply.</param>
         public void TransposeValue(int transpose)
         {
             if (notTransposedValue == -1)
@@ -168,84 +287,60 @@ namespace MidiPlayerTK
             // Apply
             Value += transpose;
         }
+        /// <summary>@brief
+        /// Restores #Value to the original untransposed value if available.
+        /// </summary>
         public void ResetTransposeValue()
         {
             if (notTransposedValue > -1)
                 // Restaure initial value
                 Value = notTransposedValue;
         }
+        /// @}
 
 
         /// <summary>@brief
-        /// MIDI channel fom 0 to 15 (9 for drum)
-        /// </summary>
-        public int Channel;
-
-        /// <summary>@brief
-        /// When #Command = #MPTKCommand.NoteOn, the velocity between 0 and 127.
-        /// </summary>
-        public int Velocity;
-
-        /// <summary>@brief
-        /// When #Command = #MPTKCommand.NoteOn, contains duration of the note in millisecond.\n
-        /// Set -1 for a noteon played indefinitely.\n
-        /// @version 2.10.0 
-        /// @note
-        /// Others #Command roles removed:
-        ///    - SetTempo: no longer contains new tempo (quarter per minute)\n
-        ///    - TimeSignature: no longer contains the Denominator (Beat unit: 1 means 2, 2 means 4 (crochet), 3 means 8 (quaver), 4 means 16, ...)\n
-        ///    - KeySignature: no longer contains the MajorMinor flag.\n
-        /// </summary>
-        public long Duration;
-
-        /// <summary>@brief
-        /// Short delay before playing the note in millisecond. Available only in Core mode.
-        /// Apply only on NoteOn event.
-        /// </summary>
-        public long Delay;
-
-        /// <summary>@brief
-        /// When #Command = #MPTKCommand.NoteOn, duration of the note in MIDI Tick. 
-        /// @details
-        /// Duration in ticks is converted in duration in millisecond see (#Duration) when the MIDI file is loaded.
-        /// @note
-        /// Maestro does not use this value for playing a MIDI file but the #Duration in millisecond.
-        /// https://en.wikipedia.org/wiki/Note_value
-        /// </summary>
-        public int Length;
-
-        /// <summary>@brief
-        /// When #Command = #MPTKCommand.NoteOn, length as https://en.wikipedia.org/wiki/Note_value
+        /// Musical note-length categories for note duration: Whole, Half, Quarter, Eighth, Sixteenth.
+        /// See https://en.wikipedia.org/wiki/Note_value
         /// </summary>
         public enum EnumLength { Whole, Half, Quarter, Eighth, Sixteenth }
 
+        /// @name Source and Runtime Context
+        /// @brief Runtime metadata attached to the event during playback.
+        /// @details
+        /// Includes source/session identifiers, user tag, associated voices,
+        /// and playback state (`IsOver`) for voice lifecycle tracking.
+        /// @{
+
         /// <summary>@brief
-        /// Origin of the message. MIDI ID if from MIDI Input else zero. V2.83: rename source to Source et set public.
+        /// Origin of the message.
+        /// Contains MIDI input source ID for incoming MIDI events, otherwise 0.
         /// </summary>
         public uint Source;
 
         /// <summary>@brief
-        /// Associate an id with this event.\n
-        /// When reading a MIDI file with MidiFilePlayer: this Id is unique for all MIDI events played for this MIDI.\n
-        /// MPTK_ClearAllSound is able to clear (note off) only the voices associated with this MIDI file when switching MIDI.\n
-        /// Switching between MIDI playing is very quick.\n
-        /// Could also be used for other prefab like MidiStreamPlayer for your specific need, but avoid changing this properties with MidiFilePlayer.
+        /// Session identifier associated with this event.
+        /// With MidiFilePlayer, this ID is unique per played MIDI session and is used by
+        /// MPTK_ClearAllSound to stop only voices from that session when switching tracks.
+        /// It can also be used in other components such as MidiStreamPlayer for custom grouping,
+        /// but avoid overriding it while MidiFilePlayer manages playback.
         /// </summary>
         public int IdSession;
 
 
         /// <summary>@brief
-        /// Tag information free for use in the application
+        /// Free-form application tag associated with this event.
         /// </summary>
         public object Tag;
 
         /// <summary>@brief
-        /// List of voices associated to a NoteOn Event. This is a list because it is common for several samples to be used simultaneously to play a note.
+        /// Voices associated with a NoteOn event.
+        /// Multiple voices can exist for one note (for example layered samples).
         /// </summary>
         public List<fluid_voice> Voices;
 
         /// <summary>@brief
-        /// Check if this MIDI event has finished playing. All voices are OFF.
+        /// Indicates whether this event has finished playing (all associated voices are OFF).
         /// </summary>
         public bool IsOver
         {
@@ -262,10 +357,28 @@ namespace MidiPlayerTK
             }
         }
 
+        /// @}
+
+        /// @name Constructors, Clone and Message Conversion
+        /// @brief Creation, duplication, and MIDI packed-message conversion.
+        /// @details
+        /// This section contains constructors for default and packed MIDI input,
+        /// cloning support, and conversion to/from compact MIDI data representation.
+        /// @{
+
+        /// <summary>@brief
+        /// Initializes a new MPTKEvent with default NoteOn-oriented values.
+        /// Defaults:
+        /// - Command = NoteOn
+        /// - Duration = -1 (infinite)
+        /// - Channel = 0
+        /// - Delay = 0
+        /// - Velocity = 127
+        /// - IdSession = -1
+        /// </summary>
         public MPTKEvent()
         {
             Command = MPTKCommand.NoteOn;
-            // V2.82 set default value
             Duration = -1;
             Channel = 0;
             Delay = 0;
@@ -276,23 +389,17 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Delta time in system time (calculated with DateTime.UtcNow.Ticks) since the creation of this event.\n
-        /// Mainly useful to evaluate MPTK latency. One system ticks equal 100 nano second.\n
-        /// @note Disabled by default. Defined DEBUG_PERF_AUDIO in MidiSynth to activate for debug purpose only.
+        /// Dupplicate MIDI message.
         /// </summary>
-        public long LatenceTime { get { return DateTime.UtcNow.Ticks - CreateTime; } }
+        public virtual object Clone()
+        {
+            return this.MemberwiseClone();
+        }
 
         /// <summary>@brief
-        /// Delta time in milliseconds (calculated with DateTime.UtcNow.Ticks) since the creation of this event.\n
-        /// Mainly useful to evaluate MPTK latency. One system ticks equal 100 nano second.\n
-        /// @note Disabled by default. Defined DEBUG_PERF_AUDIO in MidiSynth to activate for debug purpose only.
+        /// Creates an MPTKEvent from a packed MIDI input message.
         /// </summary>
-        public long LatenceTimeMillis { get { return LatenceTime / fluid_voice.Nano100ToMilli; } }
-
-        /// <summary>@brief
-        /// Create a MPTK MIDI event from a MIDI input message
-        /// </summary>
-        /// <param name="data"></param>
+        /// <param name="data">Packed MIDI message data.</param>
         public MPTKEvent(ulong data)
         {
             Source = (uint)(data & 0xffffffffUL);
@@ -351,9 +458,10 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Build a packet MIDI message from a MPTKEvent. Example:  0x00403C90 for a noton (90h, 3Ch note,  40h volume)
+        /// Builds a packed MIDI message from this MPTKEvent.
+        /// Example: 0x00403C90 for NoteOn (90h), note 3Ch, velocity 40h.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Packed MIDI message as an unsigned 64-bit value.</returns>
         public ulong ToData()
         {
             ulong data = (ulong)Command | ((ulong)Channel & 0xF);
@@ -395,63 +503,45 @@ namespace MidiPlayerTK
             }
             return data;
         }
+        /// @}
+
+        /// @name Tempo and Byte Conversion Helpers
+        /// @brief Static helpers for tempo conversion and byte packing.
+        /// @details
+        /// Utility methods convert BPM to microseconds-per-quarter-note (and reverse),
+        /// and provide low-level byte extraction/packing used by meta event data.
+        /// @{
 
         /// <summary>@brief
-        /// Convert Beat Per Minute to duration of a quarter in microsecond.\n
-        /// With BPM=1,   microsecondsPerQuaterNote=60 000 000 µs ->  60 secondes per quarter (quite slow!)\n
-        /// With BPM=120, microsecondsPerQuaterNote=500 000 µs -> 0.5 seconde per quarter\n
+        /// Converts beats per minute (BPM) to microseconds per quarter note.
+        /// Example: BPM=120 gives 500000 microseconds per quarter note.
         /// </summary>
-        /// <param name="bpm">Beats Per Minute (with assumption beat=quarter)</param>
-        /// <returns>60000000 / bpm or 500000 if bpm <= 0</returns>
+        /// <param name="bpm">Beats per minute (assuming one beat = quarter note).</param>
+        /// <returns>60000000 / bpm, or 500000 when bpm &lt;= 0.</returns>
         public static int BeatPerMinute2QuarterPerMicroSecond(double bpm)
         {
             return bpm > 0 ? (int)(60000000d / bpm) : 500000;
         }
 
         /// <summary>@brief
-        /// Convert duration of a quarter in microsecond to Beats Per Minute (with assumption beat=quarter).\n
-        /// With microsecondsPerQuaterNote=500 000 µs, BPM = 120
+        /// Converts microseconds per quarter note to beats per minute (BPM).
+        /// Example: 500000 microseconds per quarter note gives BPM=120.
         /// </summary>
-        /// <param name="microsecondsPerQuaterNote"></param>
-        /// <returns>60000000 / bpm or 120 if microsecondsPerQuaterNote <= 0</returns>
+        /// <param name="microsecondsPerQuaterNote">Microseconds per quarter note.</param>
+        /// <returns>60000000 / microsecondsPerQuaterNote, or 120 when input &lt;= 0.</returns>
         public static double QuarterPerMicroSecond2BeatPerMinute(int microsecondsPerQuaterNote)
         {
             return microsecondsPerQuaterNote > 0 ? 60000000d / microsecondsPerQuaterNote : 120;
         }
 
-        /// <summary>
-        /// Store four bytes into one integer.
-        /// </summary>
-        /// <param name="b1">byte 0 - less significant</param>
-        /// <param name="b2">byte 1 </param>
-        /// <param name="b3">byte 2 </param>
-        /// <param name="b4">byte 3 - moss significant</param>
-        /// <returns>(b4 << 24) | (b3 << 16) | (b2 << 8) | b1</returns>
-        static public int BuildIntFromBytes(byte b1, byte b2, byte b3, byte b4)
-        {
-            return (b4 << 24) | (b3 << 16) | (b2 << 8) | b1;
-        }
+        /// @}
 
-        /// <summary>
-        /// Extract byte position 'n' from an integer 
-        /// </summary>
-        /// <param name="v">value build with #BuildIntFromBytes</param>
-        /// <param name="n">byte position from 0 (less significant) to 3 (most significant)</param>
-        /// <returns>(v >> (8*n)) & 0xFF</returns>
-        static public byte ExtractFromInt(uint v, int n)
-        {
-            return (byte)((v >> (8 * n)) & 0xFF);
-        }
-
-        /// <summary>
-        /// Extract value 2 from a double int build with #BuildIntFromBytes
-        /// </summary>
-        /// <param name="v">value build with #BuildIntFromBytes</param>
-        /// <returns>v - (v / 100) * 100</returns>
-        //static public int ExtractDoubleValue2(int v)
-        //{
-        //    return v - (v / 100) * 100;
-        //}
+        /// @name Debug String Helpers
+        /// @brief Human-readable formatting helpers for logs and diagnostics.
+        /// @details
+        /// Produces compact or detailed string representations of `MPTKEvent`
+        /// to simplify debugging, tracing, and inspection during runtime.
+        /// @{
 
         public override string ToString()
         {
@@ -463,10 +553,11 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Build a string description of the MIDI event. V2.83 removes "end of lines" on each returns string.
-        /// For a better result when displayed on the console (Debug.Log), enable "Monospace font" in the setting of the console (three vertical dot in the panel)
+        /// Builds a string description of this MIDI event.
+        /// Since v2.83, returned strings no longer contain trailing end-of-line markers.
+        /// For improved alignment in Debug.Log, enable a monospace font in the Unity console settings.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Formatted event description.</returns>
         public string ConvertToString(bool brief)
         {
             string result = "";
@@ -579,7 +670,10 @@ namespace MidiPlayerTK
             }
             return result;
         }
+        /// @}
+
         // @cond NODOC
+
         public int Compare(MPTKEvent y)
         {
             int tickComparison = Tick.CompareTo(y.Tick);
@@ -600,7 +694,30 @@ namespace MidiPlayerTK
             }
             return tickComparison;
         }
+
+        // Packs four bytes into one integer.
+        // <param name="b1">Byte 0 (least significant).</param>
+        // <param name="b2">Byte 1.</param>
+        // <param name="b3">Byte 2.</param>
+        // <param name="b4">Byte 3 (most significant).</param>
+        // <returns>(b4 << 24) | (b3 << 16) | (b2 << 8) | b1</returns>
+        static public int BuildIntFromBytes(byte b1, byte b2, byte b3, byte b4)
+        {
+            return (b4 << 24) | (b3 << 16) | (b2 << 8) | b1;
+        }
+
+        // Extracts byte position <c>n</c> from an integer.
+        // <param name="v">Value built with #BuildIntFromBytes.</param>
+        // <param name="n">Byte position from 0 (least significant) to 3 (most significant).</param>
+        // <returns>(v >> (8*n)) & 0xFF</returns>
+        static public byte ExtractFromInt(uint v, int n)
+        {
+            return (byte)((v >> (8 * n)) & 0xFF);
+        }
+
+
         // @endcond
 
     }
 }
+

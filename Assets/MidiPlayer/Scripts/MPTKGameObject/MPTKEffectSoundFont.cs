@@ -5,24 +5,25 @@ using UnityEngine;
 namespace MidiPlayerTK
 {
     /// <summary>
-    /// A SoundFont contains parameters to apply three kinds of effects: low-pass filter, reverb, chorus.\n
-    /// These parameters can be specifics for each instruments and even each voices.\n
-    /// Maestro MPTK effects are based on FluidSynth algo effects modules. 
-    /// Furthermore, to get more liberty from SoundFont, Maestro can increase or decrease the impact of effects (from the inspector or by script).
+    /// A SoundFont contains parameters for three effect types: low-pass filter, reverb, and chorus.\n
+    /// These parameters can be specific to each instrument and even each voice.\n
+    /// Maestro MPTK SoundFont effects are based on FluidSynth effect modules.
+    /// To provide more flexibility than the raw SoundFont defaults, Maestro can increase or decrease effect impact from the inspector or by script.
     /// To summarize:
-    ///     - Effects are applied individually to each voices, yet they are statically defined within the SoundFont.
+    ///     - Effects are applied individually to each voice, while defaults remain defined in the SoundFont.
     ///     - Maestro parameters can be adjusted to increase or decrease the default values set in the SoundFont.
-    ///     - These adjustments will be applied across the entire prefab, but the effect will depend on the initial settings defined in the SoundFont preset.
+    ///     - These adjustments are applied across the prefab, but the audible result still depends on preset-level SoundFont settings.
     ///     - Please note that these effects require additional CPU resources.
-    /// See more detailed information here https://paxstellar.fr/sound-effects/
+    /// See more details here: https://paxstellar.fr/sound-effects/
     /// @version Maestro Pro 
     /// @note
-    ///     - Effects modules are exclusively available with the Maestro MPTK Pro version. 
+    ///     - Effect modules are available only in Maestro MPTK Pro.
     ///     - By default, these effects are disabled in Maestro. 
-    ///     - To enable them, you’ll need to adjust the settings from the prefab inspector (Synth Parameters / SoundFont Effect) or by script!
-    ///     - For enhanced sound quality, it’s often beneficial to add a low-filter effect.
+    ///     - To enable them, adjust settings in the prefab inspector (Synth Parameters / SoundFont Effect) or by script.
+    ///     - For better sound quality, enabling the low-pass filter is often useful.
+    /// @ingroup soundfont_effects
     /// @code
-    /// // Find a MPTK Prefab, will works also for MidiStreamPlayer, MidiExternalPlayer ... all classes which inherit from MidiSynth.
+    /// // Find an MPTK prefab (also works for MidiStreamPlayer, MidiExternalPlayer, and all classes that inherit from MidiSynth).
     /// MidiFilePlayer fp = FindFirstObjectByType<MidiFilePlayer>();
     /// fp.MPTK_EffectSoundFont.EnableFilter = true;
     /// fp.MPTK_EffectSoundFont.FilterFreqOffset = 500;
@@ -31,8 +32,8 @@ namespace MidiPlayerTK
     public partial class MPTKEffectSoundFont : ScriptableObject
     {
         /// <summary>@brief
-        /// Apply frequency low-pass filter as defined in the SoundFont.\n 
-        /// This effect is processed with the fluidsynth algo independently on each voices but with a decrease of performace.
+        /// Applies the SoundFont low-pass filter.\n 
+        /// This FluidSynth-based effect is processed independently for each voice and increases CPU usage.
         /// @version Maestro Pro 
         /// @code
         /// midiFilePlayer.MPTK_EffectSoundFont.EnableFilter = true;
@@ -41,8 +42,8 @@ namespace MidiPlayerTK
         public bool EnableFilter { get => applySFFilter; set => applySFFilter = value; }
 
         /// <summary>
-        /// Apply reverberation effect as defined in the SoundFont.\n
-        /// This effect is processed with the fluidsynth algo independently on each voices but with a decrease of performace. 
+        /// Applies the SoundFont reverb effect.\n
+        /// This FluidSynth-based effect is processed independently for each voice and increases CPU usage. 
         /// @version Maestro Pro 
         /// @code
         /// midiFilePlayer.MPTK_EffectSoundFont.EnableReverb = true;
@@ -51,8 +52,8 @@ namespace MidiPlayerTK
         public bool EnableReverb { get => applySFReverb; set => applySFReverb = value; }
 
         /// <summary>
-        /// Apply chorus effect as defined in the SoundFont.\n
-        /// This effect is processed with the fluidsynth algo independently on each voices but with a small decrease of performace. 
+        /// Applies the SoundFont chorus effect.\n
+        /// This FluidSynth-based effect is processed independently for each voice and slightly increases CPU usage. 
         /// @version Maestro Pro 
         /// @code
         /// midiFilePlayer.MPTK_EffectSoundFont.EnableChorus = true;
@@ -139,3 +140,5 @@ namespace MidiPlayerTK
 
     }
 }
+
+

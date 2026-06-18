@@ -4,8 +4,9 @@ using UnityEngine;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup midistreamplayer_chord_tools
     /// <summary>
-    /// Build Chord from a library and Play with MidiStreamPlayer.\n
+    /// Build chords from a library and play them with MidiStreamPlayer.\n
     /// @version Maestro Pro 
     /// 
     /// See example in TestMidiStream.cs and ExtStreamPlayerPro.cs
@@ -13,12 +14,12 @@ namespace MidiPlayerTK
     public class MPTKChordLib
     {
         /// <summary>@brief
-        /// Position in the list
+        /// Position in the list.
         /// </summary>
         public int Index;
 
         /// <summary>@brief
-        /// Long name of the scale
+        /// Long name of the chord.
         /// </summary>
         public string Name;
 
@@ -33,22 +34,22 @@ namespace MidiPlayerTK
         /// </summary>
         public string Modifier3;
 
-        /// Chord contains a 7iem
+        /// Chord contains a seventh.
         /// - 7 = major 
         /// - empty = undetermined
         public string Modifier7;
 
         /// <summary>@brief
-        /// Count of notes in the chord
+        /// Number of notes in the chord.
         /// </summary>
         public int Count;
 
         /// <summary>@brief
-        /// Delta in semitones from the tonic, so first index=0 return 0 regardless the chord selected. 
+        /// Delta in semitones from the tonic. The first index (`0`) returns `0` regardless of the selected chord. 
         /// @version Maestro Pro 
         /// </summary>
-        /// <param name="index">Position in the scale. If exceed count of notes in the scale, the delta semitones is taken from the next octave.</param>
-        /// <returns>Delta in semitones from the tonic</returns>
+        /// <param name="index">Position in the chord. If it exceeds the chord note count, the semitone delta is taken from the next octave.</param>
+        /// <returns>Delta in semitones from the tonic.</returns>
         public int this[int index]
         {
             get
@@ -87,7 +88,7 @@ namespace MidiPlayerTK
         private static List<MPTKChordLib> chords;
 
         /// <summary>@brief
-        /// List of chords availables.
+        /// List of available chords.
         /// @version Maestro Pro 
         /// </summary>
         public static List<MPTKChordLib> Chords
@@ -100,7 +101,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Count of chords availables
+        /// Number of available chords.
         /// @version Maestro Pro 
         /// </summary>
         public static int ChordCount

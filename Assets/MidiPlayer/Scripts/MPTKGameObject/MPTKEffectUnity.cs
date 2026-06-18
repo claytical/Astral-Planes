@@ -4,20 +4,22 @@ using UnityEngine;
 namespace MidiPlayerTK
 {
     /// <summary>
-    /// Unlike SoundFont effects, they applied to the whole player. On the other hand, the Unity effects parameters are rich and, obviously based on Uniy algo!\n
+    /// Unlike SoundFont effects, Unity effects are applied to the whole player.\n
+    /// Unity effect parameters are richer and are based on Unity audio algorithms.\n
     /// https://docs.unity3d.com/Manual/class-AudioEffectMixer.html\n
-    /// Only most important effect are integrated in Maestro: Reverb and Chorus. On need, others effects could be added. 
+    /// Only the most important effects are integrated in Maestro: Reverb and Chorus. Additional Unity effects can be added if needed. 
     /// @version Maestro Pro 
     /// @note
-    ///     - Unity effects integration modules are exclusively available with the Maestro MPTK Pro version. 
+    ///     - Unity effect integration modules are available only in Maestro MPTK Pro. 
     ///     - By default, these effects are disabled in Maestro. 
-    ///     - To enable them, you’ll need to adjust the settings from the prefab inspector: Synth Parameters / Unity Effect.
-    ///     - Each settings are available by script.
+    ///     - To enable them, adjust settings in the prefab inspector: Synth Parameters / Unity Effect.
+    ///     - Each setting is also available by script.
+    /// @ingroup unity_effects
     /// @code
-    /// // Find a MPTK Prefab, will works also for MidiStreamPlayer, MidiExternalPlayer ... all classes which inherit from MidiSynth.
+    /// // Find an MPTK prefab (also works for MidiStreamPlayer, MidiExternalPlayer, and all classes that inherit from MidiSynth).
     /// MidiFilePlayer fp = FindFirstObjectByType<MidiFilePlayer>();
     /// fp.MPTK_EffectUnity.EnableReverb = true;
-    /// fp.MPTK_EffectUnity.ReverbDelay= 0.09f;
+    /// fp.MPTK_EffectUnity.ReverbDelay = 0.09f;
     /// @endcode
     /// </summary>
     public partial class MPTKEffectUnity : ScriptableObject
@@ -25,3 +27,5 @@ namespace MidiPlayerTK
 
     }
 }
+
+

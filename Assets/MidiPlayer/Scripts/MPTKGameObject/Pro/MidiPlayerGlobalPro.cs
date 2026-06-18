@@ -6,12 +6,13 @@ using UnityEngine;
 namespace MidiPlayerTK
 {
     // Singleton class to manage all global features of MPTK.
+    /// @ingroup runtime_global_config
     public partial class MidiPlayerGlobal : MonoBehaviour
     {
         /// <summary>@brief
-        /// @warning MPTK_LiveSoundFont has been deprecated, please investigate <midiSynth>.MPTK_SoundFont.IsReady in place.
-        /// Get or set the full path to SoundFont file (.sf2) or URL to loaded. 
-        /// Defined in the MidiPlayerGlobal editor inspector. 
+        /// @warning MPTK_LiveSoundFont has been deprecated; use &lt;midiSynth&gt;.MPTK_SoundFont.IsReady instead.
+        /// Gets or sets the full path to a SoundFont file (.sf2) or a URL to load.
+        /// Defined in the MidiPlayerGlobal editor inspector.
         /// Must start with file:// or http:// or https://.
         /// @version Maestro Pro 
         /// </summary>
@@ -26,11 +27,11 @@ namespace MidiPlayerTK
 
 
         /// <summary>@brief
-        /// Change the current Soundfont on fly. If MidiFilePlayer are running, they are stopped and optionally restarted.
+        /// Changes the current SoundFont on the fly. If MidiFilePlayers are running, they are stopped and optionally restarted.
         /// @version Maestro Pro 
         /// </summary>
         /// <param name="name">SoundFont name</param>
-        /// <param name="restartPlayer">if a MIDI is playing, restart the current playing midi</param>
+        /// <param name="restartPlayer">If a MIDI is playing, restart the currently playing MIDI.</param>
         public static void MPTK_SelectSoundFont(string name, bool restartPlayer = true)
         {
             if (Application.isPlaying)
@@ -40,7 +41,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Set default soundfont
+        /// Sets the default SoundFont.
         /// @version Maestro Pro 
         /// </summary>
         /// <param name="name"></param>
@@ -67,7 +68,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Select and load a SF when editor
+        /// Selects and loads a SoundFont in the editor.
         /// @version Maestro Pro 
         /// </summary>
         /// <param name="name"></param>
@@ -91,11 +92,11 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        ///  @warning  MPTK_LoadLiveSF has been deprecated, please investigate <midiSynth>.MPTK_SoundFont.IsReady in place.
-        ///  Load a SoundFont on the fly when application is running.\n
-        ///  SoundFont is loaded from a local file or from the web or from a cache.\n
-        ///  If some Midis are playing they are restarted.\n
-        ///  Loading is done in background (coroutine), so method return immediately.\n
+        ///  @warning MPTK_LoadLiveSF has been deprecated; use &lt;midiSynth&gt;.MPTK_SoundFont.IsReady instead.
+        ///  Loads a SoundFont on the fly while the application is running.\n
+        ///  The SoundFont is loaded from a local file, from the web, or from a cache.\n
+        ///  If some MIDIs are playing, they are restarted.\n
+        ///  Loading is done in the background (coroutine), so the method returns immediately.\n
         ///  @version Maestro Pro - updated 2.11.2
         ///  @note Look also:
         ///     - #MPTK_LiveSoundFont
@@ -105,16 +106,16 @@ namespace MidiPlayerTK
         ///     - #MPTK_SoundFontLoaded
         ///     - #MPTK_SoundFontIsReady
         /// </summary>
-        /// <param name="pPathSF">Full path to SoudFont file. Must start with file:// for local desktop loading or with or http:// or https:// for loading from web resource.
-        /// If null, the path defined in MPTK_LiveSoundFont is used</param>
-        /// <param name="defaultBank">default bank to use for instrument, default or -1 to select the first bank</param>
-        /// <param name="drumBank">bank to use for drum kit, default or -1 to select the last bank</param>
-        /// <param name="restartPlayer">Restart midi player if need, default is true</param>
-        /// <param name="useCache">Reuse already downloaded SF if exist, default is true</param>
-        /// <param name="log">Display log, default is false</param>
+        /// <param name="pPathSF">Full path to the SoundFont file. Must start with `file://` for local desktop loading, or `http://` / `https://` for a web resource.
+        /// If null, the path defined in MPTK_LiveSoundFont is used.</param>
+        /// <param name="defaultBank">Default bank to use for instruments; use -1 to select the first bank.</param>
+        /// <param name="drumBank">Bank to use for the drum kit; use -1 to select the last bank.</param>
+        /// <param name="restartPlayer">Restart the MIDI player if needed. Default is true.</param>
+        /// <param name="useCache">Reuse an already downloaded SoundFont if it exists. Default is true.</param>
+        /// <param name="log">Display logs. Default is false.</param>
         /// <returns>
-        ///     - true if loading is in progress, use OnEventPresetLoaded to get information when loading is over, for example MPTK_StatusLastSoundFontLoaded
-        ///     - false if an error is detected in parameters. The callback OnEventPresetLoaded is not call uf return is false.
+        ///     - true if loading is in progress; use OnEventPresetLoaded to get information when loading is complete (for example, MPTK_StatusLastSoundFontLoaded)
+        ///     - false if an error is detected in the parameters. The OnEventPresetLoaded callback is not called if false is returned.
         /// </returns>
         static public bool MPTK_LoadLiveSF(string pPathSF = null, int defaultBank = -1, int drumBank = -1, bool restartPlayer = true, bool useCache = true, bool log = false)
         {

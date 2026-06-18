@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -6,6 +6,7 @@ using UnityEngine.Scripting;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup midi_tempo_signature
     // Contains some information about the count of MIDI events.
     // @version Maestro 1.9.0
     // @note beta
@@ -91,6 +92,7 @@ namespace MidiPlayerTK
         }
     }
 
+    /// @ingroup midi_tempo_signature
     /// <summary>
     /// Contains information about the tempo change.\n
     /// @version Maestro 2.9.0
@@ -98,7 +100,7 @@ namespace MidiPlayerTK
     /// @li The tempo map is automaticalled build when a MIDI file is loaded from the MIDI DB, from an external MIDI or from a MIDI Writer instance.
     /// @li The tempo map must be run by script on your MIDI events when created with MidiFileWriter2 with:\n
     ///     #MPTK_CalculateTempoMap 
-    /// @li Each segments defined the tick start/end and the start real time of the segment and the pulse (duration in millisecond of a MIDI tick) wich is constant all along the segment.
+    /// @li Each segments defined the tick start/end and the start real time of the segment and the pulse (duration in milliseconds of a MIDI tick) which is constant all along the segment.
 
     /// </summary>
     public class MPTKTempo
@@ -129,7 +131,7 @@ namespace MidiPlayerTK
         public double FromTime;
 
         /// <summary>@brief
-        /// Duration in millisecond of a MIDI tick in this segment. The pulse length is the minimum time in millisecond between two MIDI events.\n
+        /// Duration in milliseconds of a MIDI tick in this segment. The pulse length is the minimum time in milliseconds between two MIDI events.\n
         /// @note
         /// @li Depends on the current tempo, the #MPTK_DeltaTicksPerQuarterNote (but not the Speed).
         /// @li Formula: Pulse = (60000000 /  MPTK_CurrentTempo) / MPTK_DeltaTicksPerQuarterNote / 1000
@@ -142,7 +144,7 @@ namespace MidiPlayerTK
         public int MicrosecondsPerQuarterNote;
 
         /// <summary>
-        /// Create a tempo segment with default value
+        /// Creates a tempo segment with default value
         /// </summary>
         /// <param name="index"></param>
         /// <param name="fromTick">default 0</param>
@@ -195,7 +197,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Find an index in the tempo change list from a time position in millisecond.
+        /// Find an index in the tempo change list from a time position in milliseconds.
         /// @warning
         ///     - To avoid confusion with search by ticks, make sure the timeSearch parameter is a float.
         /// @note
@@ -204,7 +206,7 @@ namespace MidiPlayerTK
         /// @snippet MidiEditorProWindow.cs ExampleFindTempoMap 
         /// </summary>
         /// <param name="tempoMap">List of tempo map build with MPTK_CalculateTempoMap </param>
-        /// <param name="timeSearch">search from this time in millisecond</param>
+        /// <param name="timeSearch">search from this time in milliseconds</param>
         /// <param name="fromIndex">search from this index position in the TempoMap list (for optimization)</param>
         /// <returns>index of the segment in tempoMap</returns>
 
@@ -253,7 +255,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Create a tempo map from a MIDI events list with tempo change.  
+        /// Creates a tempo map from a MIDI events list with tempo change.  
         /// An allocated tempo map must be defined in parameter but the content will be cleared.
         /// @note A default tempo segment will be added at tick 0 with BPM = 120
         /// @version 2.10.0
@@ -317,6 +319,7 @@ namespace MidiPlayerTK
         }
     }
 
+    /// @ingroup midi_tempo_signature
     /// <summary>
     /// Contains information about time signature changes in a MIDI file.
     /// @version Maestro 2.10.0
@@ -382,7 +385,7 @@ namespace MidiPlayerTK
         public int ToMeasure;
 
         /// <summary>
-        /// Create a signtaure segment with default value
+        /// Creates a signtaure segment with default value
         /// </summary>
         /// <param name="index"></param>
         /// <param name="fromTick">default 0</param>
@@ -466,7 +469,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Create a signature map from a MIDI events list with time signature.  
+        /// Creates a signature map from a MIDI events list with time signature.  
         /// @li an allocated tempo map must be defined in parameter but the content will be cleared.
         /// @li a default time signature 4/4 is created if no time signature event found
         /// @version 2.10.0

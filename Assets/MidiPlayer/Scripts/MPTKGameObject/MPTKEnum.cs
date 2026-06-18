@@ -1,84 +1,88 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup midi_event_enums
+    /// @name MIDI Event Model Enums
+    /// @{
+
     /// <summary>@brief
-    /// MIDI command codes. Defined the action to be done with the message: note on/off, change instrument, ...\n
-    /// Depending of the command selected, others properties must be set; Value, Channel, ...\n
+    /// MIDI command codes. Defines the action performed by the message: note on/off, patch change, and more.\n
+    /// Depending on the selected command, specific MPTKEvent properties must be set (Value, Channel, Velocity, etc.).\n
     /// </summary>
     public enum MPTKCommand : byte
     {
         /// <summary>@brief
-        /// Note Off\n
-        /// Stop the note defined with the Value and the Channel\n
-        ///      - MPTKEvent#Value contains the note to stop 60=C5.\n
-        ///      - MPTKEvent#Channel the midi channel between 0 and 15\n
+        /// Note Off.\n
+        /// Stops the note identified by Value on the specified Channel.\n
+        ///      - MPTKEvent#Value contains the note number to stop (60 = C5).\n
+        ///      - MPTKEvent#Channel contains the MIDI channel (0 to 15).\n
         /// </summary>
         NoteOff = 0x80,
 
         /// <summary>@brief
         /// Note On.\n
-        ///      - MPTKEvent#Value contains the note to play 60=C5.\n
-        ///      - MPTKEvent#Duration the duration of the note in millisecond, -1 for infinite\n
-        ///      - MPTKEvent#Channel the midi channel between 0 and 15\n
-        ///      - MPTKEvent#Velocity between 0 and 127\n
+        ///      - MPTKEvent#Value contains the note number to play (60 = C5).\n
+        ///      - MPTKEvent#Duration contains the note duration in milliseconds (-1 for infinite).\n
+        ///      - MPTKEvent#Channel contains the MIDI channel (0 to 15).\n
+        ///      - MPTKEvent#Velocity contains the velocity (0 to 127).\n
         /// </summary>
         NoteOn = 0x90,
 
         /// <summary>@brief
-        /// Key After-touch.\n
-        /// Not processed by nAudio, so also not processed by Maestro Synth.
-        /// To Be Done !
+        /// Key After-touch (polyphonic key pressure).\n
+        /// Not processed by NAudio and therefore not processed by Maestro Synth.\n
+        /// Reserved for future support.
         /// </summary>
         KeyAfterTouch = 0xA0, // FS KEY_PRESSURE
 
 
         /// <summary>@brief
-        /// Control change.\n
-        ///      - MPTKEvent.Controller contains the controller to change. See #MPTKController (Modulation, Pan, Bank Select ...).\n
-        ///      - MPTKEvent.Value contains the value of the controller between 0 and 127.
+        /// Control Change.\n
+        ///      - MPTKEvent.Controller contains the controller number to change. See #MPTKController (Modulation, Pan, Bank Select, ...).\n
+        ///      - MPTKEvent.Value contains the controller value (0 to 127).
         /// </summary>
         ControlChange = 0xB0,
 
         /// <summary>@brief
-        /// Patch change.\n
-        ///      - MPTKEvent.Value contains patch/preset/instrument to select between 0 and 127. 
+        /// Patch Change.\n
+        ///      - MPTKEvent.Value contains the patch/preset/instrument number to select (0 to 127). 
         /// </summary>
         PatchChange = 0xC0,
 
         /// <summary>@brief
-        /// Channel after-touch.\n
+        /// Channel after-touch (channel pressure).\n
         /// Not processed by Maestro Synth.\n
         /// </summary>
         ChannelAfterTouch = 0xD0,
 
         /// <summary>@brief
-        /// Pitch wheel change\n
-        /// MPTKEvent.Value contains the Pitch Wheel Value between 0 and 16383.\n
+        /// Pitch Wheel Change.\n
+        /// MPTKEvent.Value contains the pitch wheel value (0 to 16383).\n
         /// Higher values transpose pitch up, and lower values transpose pitch down.\n
-        /// The default sensitivity value is 2. That means that the maximum pitch bend will result in a pitch change of two semitones\n
-        /// above and below the sounding note, meaning a total of four semitones from lowest to highest  pitch bend positions.
-        ///     - 0 is the lowest bend positions (default is 2 semitones), 
-        ///     - 8192 (0x2000) centered value, the sounding notes aren't being transposed up or down,
-        ///     - 16383 (0x3FFF) is the highest  pitch bend position (default is 2 semitones)
+        /// The default sensitivity is 2 semitones. Maximum bend is therefore two semitones up or down\n
+        /// from the original pitch (a 4-semitone span from minimum to maximum bend).
+        ///     - 0 is the lowest bend position (default: -2 semitones), 
+        ///     - 8192 (0x2000) is the center value (no transposition),
+        ///     - 16383 (0x3FFF) is the highest bend position (default: +2 semitones)
         /// </summary>
         PitchWheelChange = 0xE0,
 
         /// <summary>@brief
-        /// Sysex message - not processed by Maestro\n
+        /// SysEx message. Not processed by Maestro Synth.\n
         /// </summary>
         Sysex = 0xF0,
 
         /// <summary>@brief
-        /// Eox (comes at end of a sysex message)  - not processed by Maestro
+        /// End of Exclusive (EOX), marks the end of a SysEx message. Not processed by Maestro Synth.
         /// </summary>
         Eox = 0xF7,
 
         /// <summary>@brief
-        /// Timing clock \n
-        /// (used when synchronization is required)
+        /// Timing clock.\n
+        /// Used when synchronization is required.
         /// </summary>
         TimingClock = 0xF8,
 
@@ -93,39 +97,39 @@ namespace MidiPlayerTK
         ContinueSequence = 0xFB,
 
         /// <summary>@brief
-        /// Stop sequence\n
+        /// Stop sequence.\n
         /// </summary>
         StopSequence = 0xFC,
 
         /// <summary>@brief
-        /// Auto-Sensing\n
+        /// Active Sensing.\n
         /// </summary>
         AutoSensing = 0xFE,
 
         /// <summary>@brief
-        /// Meta events are optionnals information that could be defined in a MIDI. None are mandatory\n
-        /// In MPTKEvent the attibute MPTKEvent#Meta defined the type of meta event. See #MPTKMeta (TextEvent, Lyric, TimeSignature, ...).\n
-        ///     - if MPTKEvent#Meta = #MPTKMeta.SetTempo, MPTKEvent#Value contains new Microseconds Per Beat Note. . Please investigate MPTKEvent.QuarterPerMicroSecond2BeatPerMinute() to convert to BPM.
-        ///     - if MPTKEvent#Meta = #MPTKMeta.TimeSignature, MPTKEvent#Value contains four bytes. From less significant to most significant. Please investigate MPTKEvent.ExtractFromInt().
+        /// Meta events provide optional MIDI information; none are mandatory.\n
+        /// In MPTKEvent, the MPTKEvent#Meta attribute defines the meta event type. See #MPTKMeta (TextEvent, Lyric, TimeSignature, ...).\n
+        ///     - if MPTKEvent#Meta = #MPTKMeta.SetTempo, MPTKEvent#Value contains the new microseconds-per-quarter-note value. Use MPTKEvent.QuarterPerMicroSecond2BeatPerMinute() to convert to BPM.
+        ///     - if MPTKEvent#Meta = #MPTKMeta.TimeSignature, MPTKEvent#Value contains four bytes from least significant to most significant. Use MPTKEvent.ExtractFromInt().
         ///         -# Numerator (number of beats in a bar), 
-        ///         -# Denominator (Beat unit: 1 means 2, 2 means 4 (crochet), 3 means 8 (quaver), 4 means 16, ...)
-        ///         -# TicksInMetronomeClick, generally 24 (number of 1/32nds of a note happen by MIDI quarter note)
-        ///         -# No32ndNotesInQuarterNote, generally 8 (standard MIDI clock ticks every 24 times every quarter note)
-        ///     - if MPTKEvent#Meta = #MPTKMeta.KeySignature, MPTKEvent#Value contains two bytes. From less significant to most significant. Please investigate MPTKEvent.ExtractFromInt().
-        ///         -# SharpsFlats (number of sharp) 
+        ///         -# Denominator (beat unit: 1 means 2, 2 means 4 (quarter), 3 means 8 (eighth), 4 means 16, ...)
+        ///         -# TicksInMetronomeClick, usually 24 (MIDI clocks per metronome click)
+        ///         -# No32ndNotesInQuarterNote, usually 8 (number of 32nd notes per MIDI quarter note)
+        ///     - if MPTKEvent#Meta = #MPTKMeta.KeySignature, MPTKEvent#Value contains two bytes from least significant to most significant. Use MPTKEvent.ExtractFromInt().
+        ///         -# SharpsFlats (number of sharps/flats) 
         ///         -# MajorMinor flag (0 the scale is major, 1 the scale is minor).
-        ///     - for others (TextEvent, ...) , attribute MPTKEvent#Info contains textual information.
+        ///     - for other types (TextEvent, ...), MPTKEvent#Info contains textual information.
         /// </summary>
         MetaEvent = 0xFF,
     }
 
     /// <summary>@brief
-    /// Midi Controller list.\n
+    /// MIDI controller list.\n
     /// Each MIDI CC operates at 7-bit resolution, meaning it has 128 possible values. The values start at 0 and go to 127.\n
     /// Some instruments can receive higher resolution data for their MIDI control assignments. These high res assignments are defined by combining two separate CCs,\n
     /// one being the Most Significant Byte (MSB), and one being the Least Significant Byte (LSB).\n
-    /// Most instruments just receive the MSB with default 7-bit resolution.
-    /// See more information here https://www.presetpatch.com/midi-cc-list.aspx
+    /// Most instruments receive only the MSB (default 7-bit resolution).
+    /// More information: https://www.presetpatch.com/midi-cc-list.aspx
     /// </summary>
     public enum MPTKController : byte
     {
@@ -154,7 +158,7 @@ namespace MidiPlayerTK
         DATA_ENTRY_MSB = 6,
 
         /// <summary>@brief
-        /// Channel volume (was MainVolume before v2.88.2
+        /// Channel volume (named MainVolume before v2.88.2)
         /// </summary>
         VOLUME_MSB = 7,
 
@@ -175,7 +179,7 @@ namespace MidiPlayerTK
         GPC4_MSB = 19, // 0x13,
 
         /// <summary>@brief Bank Select LSB.\n
-        /// MPTK bank style is FLUID_BANK_STYLE_GS (see fluidsynth), bank = CC0/MSB (CC32/LSB ignored)
+        /// MPTK bank style is FLUID_BANK_STYLE_GS (see FluidSynth): bank = CC0/MSB (CC32/LSB ignored).
         /// </summary>
         BankSelectLsb = 32, // 0x20
 
@@ -205,16 +209,16 @@ namespace MidiPlayerTK
         /// <summary>@brief Sustain</summary>
         Sustain = 64, // 0x40
 
-        /// <summary>@brief Portamento On/Off - not yet imlemented </summary>
+        /// <summary>@brief Portamento On/Off - not yet implemented </summary>
         Portamento = 65, // 0x41
 
-        /// <summary>@brief Sostenuto On/Off - not yet imlemented </summary>
+        /// <summary>@brief Sostenuto On/Off - not yet implemented </summary>
         Sostenuto = 66, // 0x42
 
-        /// <summary>@brief Soft Pedal On/Off - not yet imlemented </summary>
+        /// <summary>@brief Soft Pedal On/Off - not yet implemented </summary>
         SoftPedal = 67, // 0x43
 
-        /// <summary>@brief Legato Footswitch - not yet imlemented </summary>
+        /// <summary>@brief Legato Footswitch - not yet implemented </summary>
         LegatoFootswitch = 68, // 0x44
 
         HOLD2_SWITCH = 69, // 0x45,
@@ -247,13 +251,13 @@ namespace MidiPlayerTK
         DATA_ENTRY_DECR = 97, // 0x61,
 
         /// <summary>@brief
-        /// Non Registered Parameter Number LSB\n
+        /// Non-Registered Parameter Number LSB\n
         /// http://www.philrees.co.uk/nrpnq.htm
         /// </summary>
         NRPN_LSB = 98, // 0x62,
 
         /// <summary>@brief
-        /// Non Registered Parameter Number MSB\n
+        /// Non-Registered Parameter Number MSB\n
         /// http://www.philrees.co.uk/nrpnq.htm
         /// </summary>
         NRPN_MSB = 99, // 0x63,
@@ -270,7 +274,7 @@ namespace MidiPlayerTK
         /// </summary>
         RPN_MSB = 101, // 0x65,
 
-        /// <summary@brief >All sound off (ALL_SOUND_OFF)</summary>
+        /// <summary>@brief All sound off (ALL_SOUND_OFF)</summary>
         AllSoundOff = 120, // 0x78,
 
         /// <summary>@brief Reset all controllers (ALL_CTRL_OFF)</summary>
@@ -289,10 +293,10 @@ namespace MidiPlayerTK
 
 
     /// <summary>@brief
-    /// General MIDI RPN event numbers (LSB, MSB = 0)
-    /// The only confusing part of using parameter numbers, initially, is that there are two parts to using them.\n
-    /// First you need to tell the synthesizer what parameter you want to change, then you need to tell it how to change the parameter. \n
-    /// For example, if you want to change the "pitch bend sensitivity" to 12 semitones, you would send the following controler midi message:\n
+    /// General MIDI RPN event numbers (LSB, MSB = 0).
+    /// Parameter numbers are configured in two steps:\n
+    /// first select the parameter, then send the data entry value.\n
+    /// For example, to set pitch bend sensitivity to 12 semitones, send the following controller MIDI messages:\n
     ///     - MPTKEvent#Controller=RPN_MSB (101) MPTKEvent#Value=0
     ///     - MPTKEvent#Controller=RPN_LSB (100) MPTKEvent#Value=midi_rpn_event.RPN_PITCH_BEND_RANGE
     ///     - MPTKEvent#Controller=DATA_ENTRY_MSB (6) MPTKEvent#Value=12
@@ -314,8 +318,8 @@ namespace MidiPlayerTK
     }
 
     /// <summary>@brief
-    /// MIDI MetaEvent Type. Meta events are optionnals information that could be defined in a MIDI. None are mandatory\n
-    /// In MPTKEvent the attibute MPTKEvent.Meta defined the type of meta event. 
+    /// MIDI meta event type. Meta events are optional MIDI information; none are mandatory.\n
+    /// In MPTKEvent, the MPTKEvent.Meta attribute defines the type of meta event. 
     /// </summary>
     public enum MPTKMeta : byte
     {
@@ -339,46 +343,49 @@ namespace MidiPlayerTK
         ProgramName = 0x08,
         /// <summary>@brief Device (port) name</summary>
         DeviceName = 0x09,
-        /// <summary>@brief MIDI Channel (not official?)</summary>
+        /// <summary>@brief MIDI channel (not part of the official SMF meta event set)</summary>
         MidiChannel = 0x20,
 
-        /// <summary>@brief MIDI Port (not official?)</summary>
+        /// <summary>@brief MIDI port (not part of the official SMF meta event set)</summary>
         MidiPort = 0x21,
 
         /// <summary>@brief End track</summary>
         EndTrack = 0x2F,
 
         /// <summary>@brief Set tempo
-        /// MPTKEvent.Value contains new Microseconds Per Beat Note.
-        /// @deprecated MPTKEvent.Value content with version 2.10.0 - Now MPTKEvent.Duration no longer contains tempo in quarter per minute. Please investigate MPTKEvent.QuarterPerMicroSecond2BeatPerMinute()
+        /// MPTKEvent.Value contains the new microseconds-per-quarter-note value.
+        /// @deprecated Since 2.10.0, tempo is no longer stored in MPTKEvent.Duration. Use MPTKEvent.QuarterPerMicroSecond2BeatPerMinute() for BPM conversion.
         /// </summary>
         SetTempo = 0x51,
 
-        /// <summary>@brief MPTE offset</summary>
+        /// <summary>@brief SMPTE offset</summary>
         SmpteOffset = 0x54,
 
         /// <summary>@brief Time signature
-        /// MPTKEvent.Value contains four bytes. From less significant to most significant. Please investigate MPTKEvent.ExtractFromInt():
+        /// MPTKEvent.Value contains four bytes, from least significant to most significant. See MPTKEvent.ExtractFromInt():
         ///    -# Numerator (number of beats in a bar), 
-        ///    -# Denominator (Beat unit: 1 means 2, 2 means 4 (crochet), 3 means 8 (quaver), 4 means 16, ...)
-        ///    -# TicksInMetronomeClick, generally 24 (number of 1/32nds of a note happen by MIDI quarter note)
-        ///    -# No32ndNotesInQuarterNote, generally 8 (standard MIDI clock ticks every 24 times every quarter note)
-        /// @deprecated MPTKEvent.Value content with version 2.10.0 - Now MPTKEvent.Value no longer contains the numerator and MPTKEvent.Duration the Denominator (all values are merged in MPTKEvent::Value 
+        ///    -# Denominator (beat unit: 1 means 2, 2 means 4 (quarter), 3 means 8 (eighth), 4 means 16, ...)
+        ///    -# TicksInMetronomeClick, usually 24 (MIDI clocks per metronome click)
+        ///    -# No32ndNotesInQuarterNote, usually 8 (number of 32nd notes per MIDI quarter note)
+        /// @deprecated Since 2.10.0, all fields are merged into MPTKEvent.Value.
         /// </summary>
         TimeSignature = 0x58,
 
         /// <summary>@brief Key signature
-        /// MPTKEvent.Value contains two bytes. From less significant to most significant. Please investigate MPTKEvent.ExtractFromInt().
-        ///     -# SharpsFlats (number of sharp) 
+        /// MPTKEvent.Value contains two bytes, from least significant to most significant. See MPTKEvent.ExtractFromInt().
+        ///     -# SharpsFlats (number of sharps/flats) 
         ///     -# MajorMinor flag (0 the scale is major, 1 the scale is minor).
-        /// @deprecated MPTKEvent.Value content with version 2.10.0 - MPTKEvent.Duration no longer contains the MajorMinor.
+        /// @deprecated Since 2.10.0, MPTKEvent.Duration no longer contains MajorMinor.
         /// </summary>
         KeySignature = 0x59,
 
         /// <summary>@brief Sequencer specific</summary>
         SequencerSpecific = 0x7F,
     }
+    /// @}
 
+    /// @name Playback Lifecycle Enums
+    /// @{
     [System.Serializable]
     public enum EventEndMidiEnum
     {
@@ -390,41 +397,45 @@ namespace MidiPlayerTK
         MidiErr,
         Loop
     }
+    /// @}
+
+    /// @name Load Status Enums
+    /// @{
 
     /// <summary>@brief
-    /// Status of the last midi file loaded
+    /// Status of the last MIDI file load operation.
     /// @li      -1: midi file is loading
-    /// @li       0: succes, midi file loaded 
-    /// @li       1: error, no Midi found
-    /// @li       2: error, not a midi file, too short size
-    /// @li       3: error, not a midi file, signature MThd not found.
+    /// @li       0: success, MIDI file loaded
+    /// @li       1: error, no MIDI file found
+    /// @li       2: error, not a MIDI file (size too short)
+    /// @li       3: error, not a MIDI file (MThd signature not found)
     /// @li       4: error, network error or site not found.
     /// </summary>
     [System.Serializable]
     public enum LoadingStatusMidiEnum
     {
         /// <summary>@brief
-        /// -1: midi file is loading.
+        /// -1: MIDI file is loading.
         /// </summary>
         NotYetDefined = -1,
 
         /// <summary>@brief
-        /// 0: succes, midi file loaded.
+        /// 0: success, MIDI file loaded.
         /// </summary>
         Success = 0,
 
         /// <summary>@brief
-        /// 1: error, no Midi file found.
+        /// 1: error, no MIDI file found.
         /// </summary>
         NotFound = 1,
 
         /// <summary>@brief
-        /// 2: error, not a midi file, too short size.
+        /// 2: error, not a MIDI file (size too short).
         /// </summary>
         TooShortSize = 2,
 
         /// <summary>@brief
-        /// 3: error, not a midi file, signature MThd not found.
+        /// 3: error, not a MIDI file (MThd signature not found).
         /// </summary>
         NoMThdSignature = 3,
 
@@ -434,7 +445,7 @@ namespace MidiPlayerTK
         NetworkError = 4,
 
         /// <summary>@brief
-        /// 5: error, midi file corrupted, error detected when loading the midi events.
+        /// 5: error, MIDI file is corrupted (error detected while loading MIDI events).
         /// </summary>
         MidiFileInvalid = 5,
 
@@ -444,17 +455,17 @@ namespace MidiPlayerTK
         SoundFontNotLoaded = 6,
 
         /// <summary>@brief
-        /// 7: error, Already playing.
+        /// 7: error, already playing.
         /// </summary>
         AlreadyPlaying = 7,
 
         /// <summary>@brief
-        /// 8: error, MPTK_MidiName must start with file:// or http:// or https:// (only for MidiExternalPlayer).
+        /// 8: error, MPTK_MidiName must start with file://, http://, or https:// (MidiExternalPlayer only).
         /// </summary>
         MidiNameInvalid = 8,
 
         /// <summary>@brief
-        /// 9: error,  Set MPTK_MidiName by script or in the inspector with Midi Url/path before playing.
+        /// 9: error, set MPTK_MidiName by script or in the Inspector with a MIDI URL/path before playing.
         /// </summary>
         MidiNameNotDefined = 9,
 
@@ -465,7 +476,7 @@ namespace MidiPlayerTK
     }
 
     /// <summary>@brief
-    /// Status of the last SoundFont loaded
+    /// Status of the last SoundFont load operation.
     /// </summary>
     [System.Serializable]
     public enum LoadingStatusSoundFontEnum
@@ -476,7 +487,7 @@ namespace MidiPlayerTK
         InProgress = -1,
 
         /// <summary>@brief
-        /// 0: succes, SoundFont loaded.
+        /// 0: success, SoundFont loaded.
         /// </summary>
         Success = 0,
 
@@ -486,12 +497,12 @@ namespace MidiPlayerTK
         //NotFound = 1,
 
         /// <summary>@brief
-        /// 2: error, not a SoundFont, too short size.
+        /// 2: error, not a SoundFont (size too short).
         /// </summary>
         //TooShortSize = 2,
 
         /// <summary>@brief
-        /// 3: error, not a SoundFont, signature RIFF not found.
+        /// 3: error, not a SoundFont (RIFF signature not found).
         /// </summary>
         NoRIFFSignature = 3,
 
@@ -511,7 +522,7 @@ namespace MidiPlayerTK
         SoundFontNotLoaded = 6,
 
         /// <summary>@brief
-        /// 7: error, Already playing.
+        /// 7: error, already playing.
         /// </summary>
         ///AlreadyPlaying = 7,
 
@@ -535,4 +546,6 @@ namespace MidiPlayerTK
         ///// </summary>
         Unknown = 100,
     }
+    /// @}
 }
+

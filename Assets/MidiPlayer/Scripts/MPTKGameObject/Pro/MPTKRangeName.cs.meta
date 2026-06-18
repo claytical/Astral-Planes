@@ -1,12 +1,11 @@
 fileFormatVersion: 2
-guid: fcf7219bab7fe46a1ad266029b2fee19
-timeCreated: 1484669930
-licenseType: Store
+guid: a26b33c94cb7c6342bfe1fca109b85d6
 MonoImporter:
+  externalObjects: {}
   serializedVersion: 2
   defaultReferences: []
   executionOrder: 0
-  icon: {fileID: 2800000, guid: a186f8a87ca4f4d3aa864638ad5dfb65, type: 3}
+  icon: {instanceID: 0}
   userData: 
   assetBundleName: 
   assetBundleVariant: 
@@ -14,6 +13,6 @@ AssetOrigin:
   serializedVersion: 1
   productId: 115331
   packageName: Maestro - Midi Player Tool Kit - Pro
-  packageVersion: 2.16.1
-  assetPath: Assets/MidiPlayer/TutorialInfo/Scripts/Readme.cs
-  uploadId: 786006
+  packageVersion: 2.19.0
+  assetPath: Assets/MidiPlayer/Scripts/MPTKGameObject/Pro/MPTKRangeName.cs
+  uploadId: 889888

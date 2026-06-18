@@ -1,4 +1,4 @@
-﻿
+
 #if UNITY_ANDROID && UNITY_OBOE
 using Oboe.Stream;
 #endif
@@ -12,6 +12,7 @@ using UnityEngine;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup runtime_debug_tools
     public class SynthInfo
     {
         private StringBuilder logSynthInfo;
@@ -79,7 +80,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>
-        /// Build a string with performance and information about the MIDI reader and the MIDI synthesizer.
+        /// Builds a string with performance and information about the MIDI reader and the MIDI synthesizer.
         /// </summary>
         /// <param name="synth"></param>
         /// <returns>Contains all results</returns>

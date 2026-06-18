@@ -1,36 +1,37 @@
-﻿#define MPTK_PRO
-using System;
-using System.Collections;
+#define MPTK_PRO
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Scripting;
 
 namespace MidiPlayerTK
 {
-    /// <summary>
-    /// When your application is running, SoundFonts can be dynamically loaded either from a local file system or directly from the web.\n
-    /// This means you don't need to include a SoundFont in your build, making it ideal for scenarios like in-app purchases or downloadable content. \n
-    /// For compatibility, the legacy mode still allows loading SoundFonts from the internal MPTK database. \n
-    /// Additionally, Maestro MPTK supports assigning different SoundFonts to different MIDI players, enabling flexible and customized audio rendering across multiple instruments or scenes.\n
+    /// <summary>@brief
+    /// Provides runtime access to SoundFont loading, caching,
+    /// state inspection, and preset/bank exploration.
     /// @version 2.14
     /// @note
-    /// - An instance of this class is automatically created for each MPTK prefab (MidiFilePlayer, MidiStreamPlayer ...) loaded in the scene. see MidiSynth.MPTK_SoundFont
-    /// - To get logs when running set MidiFilePlayer.VerboseSoundfont to true.
+    /// - An instance of this class is automatically created for each MPTK prefab
+    ///   (MidiFilePlayer, MidiStreamPlayer, etc.) loaded in the scene.
+    /// - Access this API from MidiSynth.MPTK_SoundFont.
+    /// - To enable detailed runtime logs, set MidiFilePlayer.VerboseSoundfont to true.
     /// </summary>
+    /// @ingroup soundfont_management
     public partial class MPTKSoundFont
     {
+        /// @ingroup soundfont_cache
         /// <summary>@brief
         /// Whether to reuse previously downloaded SoundFonts if available. Default is true.\n
         /// Folder: Application.persistentDataPath/"DownloadedSF"
         /// </summary>
         public bool LoadFromCache;
 
+        /// @ingroup soundfont_cache
         /// <summary>@brief
         /// Whether to store the loaded SoundFont in a local cache. Default is true.\n
         /// Folder: Application.persistentDataPath/"DownloadedSF"
         /// </summary>
         public bool SaveToCache;
 
+        /// @ingroup soundfont_cache
         /// <summary>@brief
         /// Whether to only download the SoundFont. When true, the SoundFont is not loaded in the MidiSynth. Default is false.
         /// @note
@@ -41,6 +42,7 @@ namespace MidiPlayerTK
         public bool DownloadOnly;
 
 
+        /// @ingroup soundfont_state
         /// <summary>@brief
         /// The default bank to use for instruments. Set to -1 to select the first bank.
         /// </summary>
@@ -52,6 +54,7 @@ namespace MidiPlayerTK
         private int defaultBank;
 
 
+        /// @ingroup soundfont_state
         /// <summary>@brief
         /// The bank to use for the drum kit. Set to -1 to select the last bank.
         /// </summary>
@@ -67,22 +70,26 @@ namespace MidiPlayerTK
         private bool isInternal = true; 
         private bool isDefault = true; // Default SoundFont loaded from MPTK
 
+        /// @ingroup soundfont_state
         /// <summary>@brief
         /// True if the Soundfont is loaded from the MPTK resources (internal).\n
         /// False is the Soundfont is loaded from an external resources, local file or from an URL.
         /// </summary>
         public bool IsInternal { get => isInternal; }
 
+        /// @ingroup soundfont_state
         /// <summary>@brief
         /// True if the Soundfont is loaded from the MPTK resources (internal)  and is the default (selected in "Soundfont Setup").
         /// </summary>
         public bool IsDefault { get => isDefault; }
 
+        /// @ingroup soundfont_state
         /// <summary>@brief
         /// True if a Soundfont is available from internal or external.
         /// </summary>
         public bool IsReady { get => SoundFont != null; }
 
+        /// @ingroup soundfont_state
         /// <summary>@brief
         /// When a Soundfont is ready, return an instance of #ImSoundfont else return null 
         /// </summary>
@@ -97,6 +104,7 @@ namespace MidiPlayerTK
             }
         }
 
+        /// @ingroup soundfont_state
         /// <summary>@brief
         /// Name of Soundfont. 
         /// </summary>
@@ -122,19 +130,8 @@ namespace MidiPlayerTK
             SaveToCache = true;
         }
 
-        /// <summary>@brief
-        /// Find a presets name with its preset number from the default bank.\n
-        /// The default bank can be changed with #MPTK_SelectBankInstrument or with the popup "SoundFont Setup Alt-F" in the Unity editor.
-        /// </summary>
-        //public string PresetName(int patch)
-        //{
-        // Not working, because there is no identity between preset index and patch number
-        //    if (ListPreset != null && patch >= 0 && patch < ListPreset.Count && ListPreset[patch] != null)
-        //        return ListPreset[patch].Label;
-        //    else
-        //        return "";
-        //}
 
+        /// @ingroup soundfont_presets
         /// <summary>@brief
         /// This method change the default instrument drum bank and build the presets list associated. See #ListPreset.\n
         /// Note 1: this call doesn't change the current MIDI bank used to play an instrument, only the content of #ListPreset.\n
@@ -143,6 +140,10 @@ namespace MidiPlayerTK
         /// </summary>
         /// <param name="bankNumber">Number of the SoundFont Bank to load for instrument.</param>
         /// <returns>true if bank has been found else false.</returns>
+        /// @see BanksName
+        /// @see BanksNumber
+        /// @see PresetsName
+        /// @see MidiSynth.MPTK_ChannelPresetChange
         public bool SelectBankInstrument(int bankNumber)
         {
             if (synth.VerboseSoundfont) Debug.Log($"SelectBankInstrument: {bankNumber} for {synth.name}");
@@ -167,6 +168,7 @@ namespace MidiPlayerTK
             return false;
         }
 
+        /// @ingroup soundfont_presets
         /// <summary>@brief
         /// This method change the default instrument drum bank and build the presets list associated. See #ListPresetDrum.\n
         /// Note 1: this call doesn't change the current MIDI bank used to play a drum, only the content of #ListPresetDrum.\n
@@ -175,6 +177,9 @@ namespace MidiPlayerTK
         /// </summary>
         /// <param name="bankNumber">Number of the SoundFont Bank to load for drum.</param>
         /// <returns>true if bank has been found else false.</returns>
+        /// @see PresetsDrumName
+        /// @see PresetsDrumNumber
+        /// @see MidiSynth.MPTK_ChannelPresetChange
         public bool SelectBankDrum(int bankNumber)
         {
             if (synth.VerboseSoundfont) Debug.Log($"SelectBankDrum: {bankNumber} for {synth.name}");
@@ -199,6 +204,7 @@ namespace MidiPlayerTK
             return false;
         }
 
+        /// @ingroup soundfont_presets
         /// <summary>@brief
         /// List of banks name available with the format "<number> - Bank". Unlike preset, there is no bank name defined in a Soundfont.\n
         /// Index in the list is not the bank number (missing bank have been removed), use the same index in #BanksNumber to get the bank number.
@@ -209,6 +215,7 @@ namespace MidiPlayerTK
         }
         private List<string> banksName;
 
+        /// @ingroup soundfont_presets
         /// <summary>@brief
         /// List of banks number available. 
         /// Index in the list is not the bank number (missing banks have been removed), use the same index in #BanksName to get the bank name.
@@ -220,6 +227,7 @@ namespace MidiPlayerTK
         private List<int> banksNumber;
 
 
+        /// @ingroup soundfont_presets
         /// <summary>@brief
         /// List of preset name available with the format "<number> - <name>".\n
         /// Index in the list is not the preset number (preset missing has been removed), use the same index in #PresetsNumber to get the preset number.
@@ -230,6 +238,7 @@ namespace MidiPlayerTK
         }
         private List<string> presetsName;
 
+        /// @ingroup soundfont_presets
         /// <summary>@brief
         /// List of preset number available.
         /// Use the same index in #PresetsName to get the preset name.
@@ -241,6 +250,7 @@ namespace MidiPlayerTK
         private List<int> presetsNumber;
 
 
+        /// @ingroup soundfont_presets
         /// <summary>@brief
         /// List of preset name available with the format "<number> - <name>" but dedicated to drum bank.\n
         /// Index in the list is not the preset number (preset missing has been removed), use the same index in #PresetsDrumNumber to get the preset number.
@@ -251,6 +261,7 @@ namespace MidiPlayerTK
         }
         private List<string> presetsDrumName;
 
+        /// @ingroup soundfont_presets
         /// <summary>@brief
         /// List of preset number available but dedicated to drum bank.\n
         /// Use the same index in #PresetsDrumName to get the preset name.
@@ -261,8 +272,9 @@ namespace MidiPlayerTK
         }
         private List<int> presetsDrumNumber;
 
+        /// @ingroup soundfont_presets
         /// <summary>@brief
-        /// Get the list of banks available. It's a full and fixed list of 129 MPTKListItem with null value if a bank is missing.\n
+        /// Gets the list of banks available. It's a full and fixed list of 129 MPTKListItem with null value if a bank is missing.\n
         /// MPTKListItem.Index give the number of the bank\n
         /// Prefer using the #BanksName to get a list of bank available and #BanksNumber to get the bank number at same corresponding index.\n
         /// @note
@@ -276,6 +288,7 @@ namespace MidiPlayerTK
         }
         private List<MPTKListItem> listBank;
 
+        /// @ingroup soundfont_presets
         /// <summary>@brief
         /// List of presets for instrument for the default or selected bank. When using with preset change MIDI event, MPTKListItem.Index give the number of the preset\n
         /// @note
@@ -290,6 +303,7 @@ namespace MidiPlayerTK
         }
         private List<MPTKListItem> listPresetInstrument;
 
+        /// @ingroup soundfont_presets
         /// <summary>@brief
         /// List of presets drum for the default or selected bank. When using with preset change MIDI event, MPTKListItem.Index give the number of the preset\n
         /// @note

@@ -34,6 +34,31 @@ namespace MidiPlayerTK
         string[] midiThreadPriorityLabel = new string[] { "Normal", "Above Normal - avoid low thread MIDI delay", "Highest - minimum 5 ms for thread MIDI delay recommended" };
         int[] midiThreadPriorityIndex = { 0, 1, 2 };
 
+        static Texture buttonIconFolder;
+
+        private void OnEnable()
+        {
+            buttonIconFolder = Resources.Load<Texture2D>("Textures/question-mark");
+        }
+
+        private void SetShowParameter(MidiSynth instance, bool showParameter)
+        {
+            instance.showDefault = showParameter;
+            instance.showEvents = showParameter;
+            instance.showMidiInfo = showParameter;
+            instance.showMidiParameter = showParameter;
+            instance.showMidiPerformanceParameter = showParameter;
+            instance.showMidiPlaying = showParameter;
+            instance.showSoundFontEffect = showParameter;
+            instance.showSpatialization = showParameter;
+            instance.showSynthEvents = showParameter;
+            instance.showSynthParameter = showParameter;
+            instance.showUnityPerformanceParameter = showParameter;
+            instance.showExperimentalFeature = showParameter;
+            instance.showUnitySynthEffect = showParameter;
+            instance.showUnitySynthParameter = showParameter;
+            instance.showVerbose = showParameter;
+        }
         public void DrawAlertOnDefault()
         {
             if (MPTKGui.myStyle == null) MPTKGui.myStyle = new CustomStyle();
@@ -119,29 +144,18 @@ namespace MidiPlayerTK
             //EditorGUILayout.Separator();
         }
 
-        private void SetShowParameter(MidiSynth instance, bool showParameter)
-        {
-            instance.showDefault = showParameter;
-            instance.showEvents = showParameter;
-            instance.showMidiInfo = showParameter;
-            instance.showMidiParameter = showParameter;
-            instance.showMidiPerformanceParameter = showParameter;
-            instance.showMidiPlaying = showParameter;
-            instance.showSoundFontEffect = showParameter;
-            instance.showSpatialization = showParameter;
-            instance.showSynthEvents = showParameter;
-            instance.showSynthParameter = showParameter;
-            instance.showUnityPerformanceParameter = showParameter;
-            instance.showExperimentalFeature = showParameter;
-            instance.showUnitySynthEffect = showParameter;
-            instance.showUnitySynthParameter = showParameter;
-            instance.showVerbose = showParameter;
-        }
-
+        /// <summary>
+        /// Configures various MIDI playback settings for the specified <see cref="MidiSynth"/> instance.
+        /// </summary>
+        /// <remarks>This method provides a user interface for adjusting MIDI playback settings such as
+        /// volume, transpose, and channel-specific options. It also includes options for logging MIDI events and
+        /// configuring sound spatialization parameters. The method should be called within a Unity editor context to
+        /// display the controls properly.</remarks>
+        /// <param name="instance">The <see cref="MidiSynth"/> instance to configure. Must not be null.</param>
         public void AllPrefab(MidiSynth instance)
         {
 
-            float volume = EditorGUILayout.Slider(new GUIContent("Volume", "Set global volume for this MIDI playing"), instance.MPTK_Volume, 0f, Constant.MAX_VOLUME);
+            float volume = EditorGUILayout.Slider(new GUIContent("Global Volume", "Set global volume for this MIDI playing"), instance.MPTK_Volume, 0f, Constant.MAX_VOLUME);
             if (instance.MPTK_Volume != volume)
                 instance.MPTK_Volume = volume;
             string tooltip;
@@ -170,29 +184,126 @@ namespace MidiPlayerTK
                 "Log information about each MIDI event played.\n" +
                 "It is recommended to enable \"Monospace font\" in the console's settings (three vertical dots in the panel).";
             instance.MPTK_LogEvents = EditorGUILayout.Toggle(new GUIContent("Log MIDI Events Played", tooltip), instance.MPTK_LogEvents);
+        }
 
-            //Debug.Log(instance.GetType());
-            string foldoutTitle = $"Show Spatialization Parameters - {instance.MPTK_Spatialize} {Math.Round(instance.distanceToListener, 2)}/{instance.MPTK_MaxDistance}";
-            instance.showSpatialization = DrawFoldoutAndHelp(instance.showSpatialization, foldoutTitle, "https://paxstellar.fr/setup-mptk-sound-spatialization/");
+        /// <summary>
+        /// Configures the attenuation parameters for a MIDI synthesizer based on the distance to the audio listener.
+        /// </summary>
+        /// <remarks>This method adjusts the attenuation settings of the MIDI synthesizer, allowing sound
+        /// volume to decrease with distance. If <see cref="MidiSynth.MPTK_DistanceAttenuation"/> is enabled, the method
+        /// provides controls for setting the maximum distance at which sound is audible and the minimum volume
+        /// attenuation. It also offers an option to pause the MIDI player when the distance exceeds the maximum
+        /// distance.</remarks>
+        /// <param name="instanceSynth">The instance of the <see cref="MidiSynth"/> to configure.</param>
+        /// <param name="distanceToListener">The current distance from the audio listener to the MIDI synthesizer.</param>
+        public void SpacialParameters(MidiSynth instance)
+        {
+            float distanceToListener = 0;
+            if (!Application.isPlaying)
+            {
+                AudioListener listener = FindAnyObjectByType<AudioListener>();
+                if (listener != null)
+                {
+                    distanceToListener = Vector3.Distance(listener.transform.position, instance.transform.position);
+#if MPTK_PRO
+                    instance.CalculateOrientationEffect(listener);
+#endif
+                }
+                else
+                    Debug.LogWarning("No audio listener found. Add one and only one AudioListener component to your hierarchy.");
+            }
+            else
+                distanceToListener = MidiPlayerGlobal.MPTK_DistanceToListener(instance.transform);
+
+            string foldoutTitle = $"Show Spatialization Parameters";
+            foldoutTitle += " - Attenuation " + (instance.MPTK_DistanceAttenuation ? $"{Math.Round(distanceToListener, 2)}/{instance.MPTK_MaxDistance}" : "Off");
+            foldoutTitle += " - Orientation " + (instance.MPTK_Orientation ? $"{Math.Round(instance.MPTK_OrientationToListener, 2)}" : "Off");
+
+            instance.showSpatialization = DrawFoldoutAndHelp(instance.showSpatialization, foldoutTitle,
+                "https://paxstellar.fr/midi-file-player-detailed-view-2#Foldout-Attenuation-On-Distance-Parameters");
             if (instance.showSpatialization)
             {
                 EditorGUI.indentLevel++;
-                GUIContent labelSpatialization = new GUIContent("Spatialization", "Enable spatialization effect");
+
+                EditorGUILayout.BeginHorizontal();
+                string explainAudio3D =
+                    "This spatial audio mode applies distance-based attenuation and controls left/right panning " +
+                    "as well as filtering based on the angle relative to the AudioListener.\n" +
+                    "When enabled, the overall volume may be reduced. You can compensate using the Volume setting in this inspector.\n" +
+                    "Switch to the default editor to access additional settings.";
+
+                EditorGUILayout.LabelField(new GUIContent(explainAudio3D, ""), MPTKGui.myStyle.LabelGreen);
+                if (GUILayout.Button(new GUIContent(buttonIconFolder, "Help"), GUILayout.Width(20f), GUILayout.Height(20f)))
+                    Application.OpenURL("https://paxstellar.fr/setup-mptk-sound-spatialization/");
+                EditorGUILayout.EndHorizontal();
+
+                GUIContent labelAttenuation = new GUIContent("Attenuation", "Enable Attenuation On Distance");
+                instance.MPTK_DistanceAttenuation = EditorGUILayout.Toggle(labelAttenuation, instance.MPTK_DistanceAttenuation);
+
+                if (!instance.MPTK_DistanceAttenuation) GUI.enabled = false;
+
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField("Enables Unity distance-based volume attenuation using a simplified setup.\n" +
+                    "When disabled, MPTK leaves the AudioSource unchanged.\n" +
+                    "External spatializer plugins must be configured directly in the AudioSource bellow.", MPTKGui.myStyle.LabelGreen);
+
+                string tooltipDistance = "Distance between AudioListener and this component where sound either becomes inaudible or stops attenuation, " +
+                    "depending on MPTK_MinSoundAttenuation." +
+                    "\nMPTK_MinDistance: Within the Min distance the AudioSource will cease to grow louder in volume." +
+                    "\nMPTK_MaxDistance: The distance where sound either becomes inaudible or stops attenuation, depending on the MPTK_MinSoundAttenuation.";
+                instance.MPTK_MinDistance = EditorGUILayout.IntField(new GUIContent("Minimum Distance", tooltipDistance), (int)instance.MPTK_MinDistance);
+                instance.MPTK_MaxDistance = EditorGUILayout.IntField(new GUIContent("Maximum Distance", tooltipDistance), (int)instance.MPTK_MaxDistance);
+                instance.MPTK_MinSoundAttenuation = EditorGUILayout.Slider(new GUIContent("Minimum Attenuation", "Minimum volume attenuation"), instance.MPTK_MinSoundAttenuation, 0f, 1f);
+                if (instance is MidiFilePlayer) // works also for MidiSpalizer which inherits from MidiFilePlayer
+                    instance.MPTK_PauseOnMaxDistance = EditorGUILayout.Toggle(new GUIContent("Pause Player",
+                        "If true, the MIDI player will be automatically paused when the distance from the listener exceeds MPTK_MaxDistance."), instance.MPTK_PauseOnMaxDistance);
+                else
+                    // No sense to pause player with distance out of a MidiFilePlayer
+                    instance.MPTK_PauseOnMaxDistance = false;
+
+                if (instance.MPTK_PauseOnMaxDistance && distanceToListener > instance.MPTK_MaxDistance)
+                    EditorGUILayout.LabelField(new GUIContent($"Midi sequencer is paused, current distance to AudioListener: {Math.Round(distanceToListener, 2)}",
+                        tooltipDistance), MPTKGui.myStyle.LabelAlert);
+                else
+                    //Debug.Log("Camera: " + instance.distanceEditorModeOnly);
+                    EditorGUILayout.LabelField(new GUIContent($"Current distance to AudioListener: {Math.Round(distanceToListener, 2)}", tooltipDistance));
+
+                EditorGUI.indentLevel--;
+                GUI.enabled = true;
+
+                // Defined orientation effect
+                // --------------------------
+                GUIContent labelOrientation = new GUIContent("Orientation (Pro)", "Enable orientation effect (pan + front/back + filtering) based on the relative orientation between the sound source and the listener.");
 #if MPTK_PRO
-                if (!(instance is MidiSpatializer))
-                {
+                instance.MPTK_Orientation = EditorGUILayout.Toggle(labelOrientation, instance.MPTK_Orientation);
+#else
+                GUI.enabled = false;
+                instance.MPTK_Orientation = false;
+                EditorGUILayout.Toggle(labelOrientation, instance.MPTK_Orientation);
 #endif
-                    bool spatialize = EditorGUILayout.Toggle(labelSpatialization, instance.MPTK_Spatialize);
-                    if (instance.MPTK_Spatialize != spatialize)
-                        instance.MPTK_Spatialize = spatialize;
-#if MPTK_PRO
-                }
+
+                EditorGUI.indentLevel++;
+                if (!instance.MPTK_Orientation) 
+                    GUI.enabled = false;
                 else
                 {
-                    // Specific inspector value for MidiSpatilizer prefab
-                    // --------------------------------------------------
-                    // Need to be forced to true, here to check.
-                    EditorGUILayout.LabelField(labelSpatialization, new GUIContent(instance.MPTK_Spatialize ? "True" : "False"));
+                    EditorGUILayout.LabelField(new GUIContent(
+                        "Enabling orientation-based audio may slightly reduce perceived volume. " +
+                        "Increase the Global Volume setting if needed.", ""), MPTKGui.myStyle.LabelGreen);
+                }
+                instance.panAmount = EditorGUILayout.Slider("Panoramic amount", instance.panAmount, 0f, 1f);
+                instance.behindMinGain = EditorGUILayout.Slider("Behind Attenuation Gain", instance.behindMinGain, 0.3f, 1f);
+                instance.cutoffBehindHz = EditorGUILayout.Slider("Behind Low-Pass Cutoff (Hz)", instance.cutoffBehindHz, 200f, 12000f);
+                string tooltipAngleSigned = "Angle signed in degrees, range [-180 .. +180] 0°=in front +90°=to the right -90°=to the left ±180°=behind";
+                EditorGUILayout.LabelField(new GUIContent($"Current angle with AudioListener: {Math.Round(instance.MPTK_OrientationToListener, 2)}", tooltipAngleSigned));
+                EditorGUI.indentLevel--;
+                GUI.enabled = true;
+
+#if MPTK_PRO
+                if (instance is MidiSpatializer)
+                {
+                    // Specific inspector value for the MIDI Spatializer prefab
+                    // --------------------------------------------------------
                     bool mode = EditorGUILayout.Toggle(new GUIContent("Channel Spatialization", "Enable channel spatialization effect"), instance.MPTK_ModeSpatializer == MidiSynth.ModeSpatializer.Channel);
                     instance.MPTK_ModeSpatializer = mode == true ? MidiSynth.ModeSpatializer.Channel : MidiSynth.ModeSpatializer.Track;
 
@@ -210,22 +321,21 @@ namespace MidiPlayerTK
                     EditorGUILayout.EndHorizontal();
                 }
 #endif
-
-                string tooltipDistance = "Playing is paused if distance between AudioListener and this component is greater than MaxDistance";
-                float distance = EditorGUILayout.IntField(new GUIContent("Max Distance", tooltipDistance), (int)instance.MPTK_MaxDistance);
-                if (instance.MPTK_MaxDistance != distance) instance.MPTK_MaxDistance = distance;
-                instance.MPTK_PauseOnMaxDistance = EditorGUILayout.Toggle(new GUIContent("Pause On Distance", "If true, the MIDI player will be automatically paused when the distance from the listener exceeds MPTK_MaxDistance."), instance.MPTK_PauseOnMaxDistance);
-                if (instance.distanceToListener > instance.MPTK_MaxDistance)
-                    EditorGUILayout.LabelField(new GUIContent($"Midi sequencer is paused, current distance to AudioListener: {Math.Round(instance.distanceToListener, 2)}",
-                        tooltipDistance), MPTKGui.myStyle.LabelAlert);
-                else
-                    //Debug.Log("Camera: " + instance.distanceEditorModeOnly);
-                    EditorGUILayout.LabelField(new GUIContent($"Current distance to AudioListener: {Math.Round(instance.distanceToListener, 2)}", tooltipDistance));
-
+                GUI.enabled = true;
                 EditorGUI.indentLevel--;
+
             }
         }
 
+
+        /// <summary>
+        /// Configures various parameters for the MIDI file player interface.
+        /// </summary>
+        /// <remarks>This method provides a user interface for setting options related to MIDI playback,
+        /// such as automatic start, playback position, and performance parameters. It allows users to toggle settings
+        /// like starting playback at the first note, stopping at the last note, and handling focus loss. Additionally,
+        /// it includes options for MIDI event handling and playback speed adjustments.</remarks>
+        /// <param name="instance">The instance of <see cref="MidiFilePlayer"/> to configure.</param>
         public void MidiFileParameters(MidiFilePlayer instance)
         {
             string tooltip;
@@ -438,12 +548,14 @@ namespace MidiPlayerTK
                 if (instance.showMidiPerformanceParameter)
                 {
                     EditorGUI.indentLevel++;
-                    string integratedThreadExplanation = "If not enabled, MIDI Reader runs in a dedicated thread (core mode only).\n" +
-                        "For reasons of playback precision, enable 'Audio Thread' to run the Reader in the audio thread. " +
-                        "This guarantees excellent stability even on low-performance devices.\n" +
-                        "The downside is that the MIDI reading frequency depends on the audio configuration." +
-                        "Choose small buffer sizes for the synthesizer.";
-                    EditorGUILayout.LabelField(integratedThreadExplanation, MPTKGui.myStyle.LabelGreen);
+                    string integratedThreadExplanation =
+                        "This setting controls how the MIDI Reader processes MIDI data:\n" +
+                        "• When <b>disabled</b>, the MIDI Reader runs in a <b>dedicated thread</b> (core mode only).\n" +
+                        "• When <b>enabled</b>, the MIDI Reader runs in the <b>audio thread</b>, ensuring higher playback precision." +
+                        "This mode provides excellent stability, even on low-performance devices.\n" +
+                        "• However, the MIDI reading frequency will then depend on your audio configuration." +
+                        "For best results, use <b>small buffer sizes</b> for the synthesizer.\n" +
+                        "Choose the option that aligns with your project’s performance and precision needs."; EditorGUILayout.LabelField(integratedThreadExplanation, MPTKGui.myStyle.LabelGreen);
                     if (EditorApplication.isPlaying && instance.MPTK_IsPlaying)
                         GUI.enabled = false;
 
@@ -462,18 +574,21 @@ namespace MidiPlayerTK
 
                     EditorGUILayout.Space(3);
                     string waitThreadExplanation = "Delay in milliseconds between calls to the MIDI sequencer.\n" +
-                     "Decrease for smoother playing, increase for better performance.\n" +
-                     "A value of 0 removes all waiting, but is not recommended, the CPU will be overwhelmed!";
+                     "• Decrease for smoother playing, increase for better performance.\n" +
+                     "• A value of 0 removes all waiting, but is not recommended, the CPU will be overwhelmed!";
                     EditorGUILayout.LabelField(waitThreadExplanation, MPTKGui.myStyle.LabelGreen);
                     instance.MPTK_ThreadMidiWait = EditorGUILayout.IntSlider(new GUIContent("Delay MIDI Thread", waitThreadExplanation), instance.MPTK_ThreadMidiWait, 1, 30);
 
                     EditorGUILayout.Space(3);
-                    string rawseekExplanation = "This parameter is used when changing the playback position in a MIDI.\n" +
-                     "By default false, all events other than note-on are replayed from the beginning of the MIDI to the new position, to put the synthesizer back in the right context (tempo, selected instruments, controller, ...).\n" +
-                     "If set to true, the current playback position is set, but the current context is retained. This can produce undesired effects (or funny!) on some MIDIs, but it also makes it possible to change position instantly.\n" +
-                     "It's a choice to be made according to your needs.";
-                    EditorGUILayout.LabelField(rawseekExplanation, MPTKGui.myStyle.LabelGreen);
-                    instance.MPTK_RawSeek = EditorGUILayout.Toggle(new GUIContent("Enable Raw Seek", rawseekExplanation), instance.MPTK_RawSeek);
+                    string rawSeekExplanation =
+                        "This parameter controls how the playback position is changed in a MIDI file.\n" +
+                        "• When set to false (default), all events except note-on are <b>replayed from the start</b> of the MIDI up to the new position. " +
+                        "This ensures the synthesizer is restored to the correct context (tempo, selected instruments, controllers, etc.).\n" +
+                        "• When set to true, the playback position is <b>updated instantly</b>, but the current context (tempo, instruments, etc.) is preserved. " +
+                        "This can lead to unexpected—or even amusing!—results in some MIDIs, but it allows for immediate position changes without reprocessing.\n" +
+                        "• Choose the option that best fits your project’s requirements.";
+                    EditorGUILayout.LabelField(rawSeekExplanation, MPTKGui.myStyle.LabelGreen);
+                    instance.MPTK_RawSeek = EditorGUILayout.Toggle(new GUIContent("Enable Raw Seek", rawSeekExplanation), instance.MPTK_RawSeek);
                     EditorGUI.indentLevel--;
                 }
 
@@ -482,6 +597,10 @@ namespace MidiPlayerTK
             }
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="instance"></param>
         public void MidiFileInfo(MidiFilePlayer instance)
         {
             instance.showMidiInfo = DrawFoldoutAndHelp(instance.showMidiInfo, "Show MIDI Info", "https://paxstellar.fr/midi-file-player-detailed-view-2/#Foldout-Midi-Info");
@@ -522,6 +641,17 @@ namespace MidiPlayerTK
             }
         }
 
+        /// <summary>
+        /// Configures and displays the synthesizer parameters for a MIDI synthesizer instance within the Unity editor.
+        /// </summary>
+        /// <remarks>This method provides a user interface in the Unity editor for adjusting various
+        /// synthesizer settings, such as audio settings, performance parameters, and effect parameters. It includes
+        /// options for toggling between core and legacy player modes, adjusting audio settings from Unity or custom
+        /// settings, and enabling or disabling various sound effects. The method also handles the display of
+        /// experimental features and verbose logging options, which can be useful for debugging and performance
+        /// tuning.</remarks>
+        /// <param name="instance">The MIDI synthesizer instance whose parameters are to be configured and displayed.</param>
+        /// <param name="sobject">The serialized object representing the synthesizer's properties in the Unity editor.</param>
         public void SynthParameters(MidiSynth instance, SerializedObject sobject)
         {
             string titleCore = (instance.MPTK_CorePlayer ? "Core" : "Legacy");
@@ -529,7 +659,7 @@ namespace MidiPlayerTK
             titleCore += (instance.MPTK_AudioSettingFromUnity ? "Unity Audio Setting" : "MPTK Audio Setting");
             if (EditorApplication.isPlaying)
                 titleCore += " - Rate " + instance.OutputRate + " Hz - Buffer " + (instance.DspBufferSize > 0 ? instance.DspBufferSize.ToString() : "");
-            
+
             instance.showSynthParameter = DrawFoldoutAndHelp(instance.showSynthParameter, $"Show Synth Parameters - {titleCore}", "https://paxstellar.fr/midi-file-player-detailed-view-2/#Foldout-Synth-Parameters");
             if (instance.showSynthParameter)
             {
@@ -542,14 +672,17 @@ namespace MidiPlayerTK
                 {
                     EditorGUI.indentLevel++;
                     if (MPTKGui.myStyle == null) MPTKGui.myStyle = new CustomStyle();
-                    EditorGUILayout.LabelField(
-                        "When Core Player is enabled, the MIDI reader and synthesizer work on a separate thread from the main Unity thread to provide excellent accuracy. Core mode is disabled when web builder is selected.", MPTKGui.myStyle.LabelGreen);
+                    string codeModeExplain = "In Maestro Core Player mode, the MIDI reader and the synthesizer work on separate threads from the main Unity thread to provide excellent accuracy.\n" +
+                        "• Core mode is disabled with web builder.\n" +
+                        "• Only distance attenuation is applied for spatialization, not panning.\n" +
+                        "• For improved 3D audio spatialization, it is recommended to use an external audio plugin.";
+                    EditorGUILayout.LabelField(codeModeExplain, MPTKGui.myStyle.LabelGreen);
 #if !UNITY_WEBGL
                     if (!EditorApplication.isPlaying)
                         instance.mPTK_CorePlayer = EditorGUILayout.Toggle(labelCore, instance.mPTK_CorePlayer);
                     else
 #endif
-                    EditorGUILayout.LabelField(labelCore, new GUIContent(instance.MPTK_CorePlayer ? "True" : "False"));
+                        EditorGUILayout.LabelField(labelCore, new GUIContent(instance.MPTK_CorePlayer ? "True" : "False"));
                     if (NoErrorValidator.CantChangeAudioConfiguration)
                     {
                         EditorGUILayout.LabelField("Warning: Audio configuration change is disabled on this platform.", MPTKGui.myStyle.LabelAlert);
@@ -571,56 +704,56 @@ namespace MidiPlayerTK
 
                         // Setting from Unity or from Maestro
                         instance.MPTK_AudioSettingFromUnity = EditorGUILayout.Toggle(new GUIContent("Unity Audio Setting",
-                            "If true then synth rate and buffer size will be automatically defined by Unity in accordance of the capacity of the hardware."), instance.MPTK_AudioSettingFromUnity);
-                        {
-                            EditorGUI.indentLevel++;
-                            GUI.enabled = !instance.MPTK_AudioSettingFromUnity;
-                            EditorGUILayout.LabelField("Changing synthesizer rate and buffer size can produce unexpected effect according to the hardware. Save your work before!", MPTKGui.myStyle.LabelGreen);
-                            if (EditorApplication.isPlaying)
-                                EditorGUILayout.LabelField("Changing these setting when playing is not recommended. it's only for test purpose because weird sounds can occurs", MPTKGui.myStyle.LabelAlert);
-                            EditorGUILayout.Space();
-                            EditorGUILayout.LabelField("Increase the rate to get a better sound but with a cost on performance.", MPTKGui.myStyle.LabelGreen);
+                            "If true then synth rate and buffer size will be automatically defined by Unity in accordance of the capacity of the hardware."),
+                            instance.MPTK_AudioSettingFromUnity);
+                        EditorGUI.indentLevel++;
+                        GUI.enabled = !instance.MPTK_AudioSettingFromUnity;
 
-                            instance.MPTK_EnableFreeSynthRate = EditorGUILayout.Toggle(new GUIContent("Synth Rate Free", "Allow free setting of the Synth Rate."), instance.MPTK_EnableFreeSynthRate);
-                            if (!instance.MPTK_EnableFreeSynthRate)
-                            {
+                        EditorGUILayout.LabelField("Changing synthesizer rate and buffer size can produce unexpected effect according to the hardware. Save your work before!", MPTKGui.myStyle.LabelGreen);
+                        if (EditorApplication.isPlaying)
+                            EditorGUILayout.LabelField("Changing these setting when playing is not recommended. it's only for test purpose because weird sounds can occurs", MPTKGui.myStyle.LabelAlert);
+                        EditorGUILayout.Space();
+                        EditorGUILayout.LabelField("Increase the rate to get a better sound but with a cost on performance.", MPTKGui.myStyle.LabelGreen);
+
+                        instance.MPTK_EnableFreeSynthRate = EditorGUILayout.Toggle(new GUIContent("Synth Rate Free", "Allow free setting of the Synth Rate."), instance.MPTK_EnableFreeSynthRate);
+                        if (!instance.MPTK_EnableFreeSynthRate)
+                        {
 #if MPTK_PRO && UNITY_ANDROID && UNITY_OBOE
                                 synthRateLabel[0] = "Default: 36000 Hz";
 #else
-                                synthRateLabel[0] = "Default: " + AudioSettings.outputSampleRate + " Hz";
+                            synthRateLabel[0] = "Default: " + AudioSettings.outputSampleRate + " Hz";
 #endif
-                                int indexrate = EditorGUILayout.IntPopup("Synth Rate", instance.MPTK_IndexSynthRate, synthRateLabel, synthRateIndex);
-                                // now able to change at running time ---- if (!Application.isPlaying)
-                                if (indexrate != instance.MPTK_IndexSynthRate)
-                                    instance.MPTK_IndexSynthRate = indexrate;
-                            }
-                            else
-                            {
-                                //Debug.Log(instance.MPTK_SynthRate);
-                                int rate = (int)EditorGUILayout.Slider(new GUIContent("Synth Rate", ""), (float)instance.MPTK_SynthRate, 12000, 96000);
-                                // now able to change at running time ---- if (!Application.isPlaying)
-                                if (rate != instance.MPTK_SynthRate)
-                                    instance.MPTK_SynthRate = rate;
-                            }
-                            EditorGUILayout.Space();
+                            int indexrate = EditorGUILayout.IntPopup("Synth Rate", instance.MPTK_IndexSynthRate, synthRateLabel, synthRateIndex);
+                            // now able to change at running time ---- if (!Application.isPlaying)
+                            if (indexrate != instance.MPTK_IndexSynthRate)
+                                instance.MPTK_IndexSynthRate = indexrate;
+                        }
+                        else
+                        {
+                            //Debug.Log(instance.MPTK_SynthRate);
+                            int rate = (int)EditorGUILayout.Slider(new GUIContent("Synth Rate", ""), (float)instance.MPTK_SynthRate, 12000, 96000);
+                            // now able to change at running time ---- if (!Application.isPlaying)
+                            if (rate != instance.MPTK_SynthRate)
+                                instance.MPTK_SynthRate = rate;
+                        }
+                        EditorGUILayout.Space();
 
-                            EditorGUILayout.LabelField("Decrease the buffer size to get a more accurate playing.", MPTKGui.myStyle.LabelGreen);
-                            int bufferLenght;
+                        EditorGUILayout.LabelField("Decrease the buffer size to get a more accurate playing.", MPTKGui.myStyle.LabelGreen);
+                        int bufferLenght;
 #if MPTK_PRO && UNITY_ANDROID && UNITY_OBOE
                             bufferLenght = 128;
 #else
-                            int numBuffers;
-                            AudioSettings.GetDSPBufferSize(out bufferLenght, out numBuffers);
+                        int numBuffers;
+                        AudioSettings.GetDSPBufferSize(out bufferLenght, out numBuffers);
 #endif
-                            synthBufferSizeLabel[0] = "Default: " + bufferLenght;
-                            int indexBuffSize = EditorGUILayout.IntPopup("Buffer Synth Size", instance.MPTK_IndexSynthBuffSize, synthBufferSizeLabel, synthBufferSizeIndex);
-                            if (indexBuffSize != instance.MPTK_IndexSynthBuffSize)
-                                instance.MPTK_IndexSynthBuffSize = indexBuffSize;
-                            EditorGUILayout.Space();
-                            GUI.enabled = true;
-                            EditorGUI.indentLevel--;
+                        synthBufferSizeLabel[0] = "Default: " + bufferLenght;
+                        int indexBuffSize = EditorGUILayout.IntPopup("Buffer Synth Size", instance.MPTK_IndexSynthBuffSize, synthBufferSizeLabel, synthBufferSizeIndex);
+                        if (indexBuffSize != instance.MPTK_IndexSynthBuffSize)
+                            instance.MPTK_IndexSynthBuffSize = indexBuffSize;
 
-                        }
+                        EditorGUILayout.Space();
+                        GUI.enabled = true;
+                        EditorGUI.indentLevel--;
                     }
                     else
                         EditorGUILayout.LabelField(
@@ -822,7 +955,6 @@ namespace MidiPlayerTK
             labError.alignment = TextAnchor.MiddleLeft;
             labError.wordWrap = true;
             labError.fontSize = 10;
-            Texture buttonIconFolder = Resources.Load<Texture2D>("Textures/question-mark");
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField(MidiPlayerGlobal.ErrorNoSoundFont, labError, GUILayout.Height(30f));
             if (GUILayout.Button(new GUIContent(buttonIconFolder, "Help"), GUILayout.Width(20f), GUILayout.Height(20f)))

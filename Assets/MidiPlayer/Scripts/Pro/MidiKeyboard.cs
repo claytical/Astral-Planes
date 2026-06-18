@@ -1,20 +1,22 @@
-﻿using System;
+using System;
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Threading;
 using UnityEngine;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup pro_midi_input
     /// <summary>
-    /// Base class to send and receive Midi Message from a Midi keyboard connected to the desktop\n
-    /// @version Maestro Pro 
-    /// 
-    /// More information here https://paxstellar.fr/class-midikeyboard/
+    /// Provides access to the native MidiKeyboard plugin to send and receive MIDI messages
+    /// from desktop MIDI devices.
+    /// <para>Version: Maestro Pro</para>
+    /// <para>More information: https://paxstellar.fr/class-midikeyboard/</para>
     /// </summary>
     public class MidiKeyboard
     {
-        /// <summary>@brief
-        /// General error return values 
+        /// <summary>
+        /// Native plugin error return values (WinMM/MMSystem style).
         /// </summary>
         public enum PluginError
         {
@@ -43,8 +45,8 @@ namespace MidiPlayerTK
             LASTERROR = 21, // last error in range 
         }
 
-        /// <summary>@brief
-        /// Event triggered when a Midi message is available.
+        /// <summary>
+        /// Event raised when an input MIDI message is available.
         /// @code
         /// if (enableRealTimeRead)
         /// {
@@ -65,17 +67,23 @@ namespace MidiPlayerTK
 
         private static string msgPluginsNotFound = "MidiKeyboard Plugin not found, please see here to setup https://paxstellar.fr/class-midikeyboard/";
 
-        /// <summary>@brief
-        /// Empty the read queue
+        // V2.18.2 - more robust process for real-time MIDI input callback, with fallback to main thread dispatch when no synchronization context is available (eg in some Unity Editor contexts).
+        private static SynchronizationContext unitySyncContext;
+        private static MidiMsgDelegate realtimeMidiDelegate;
+        private static volatile bool realtimeReadEnabled;
+        private static readonly ConcurrentQueue<ulong> pendingRealtimeMessages = new ConcurrentQueue<ulong>();
+
+        /// <summary>
+        /// Clears the native MIDI input read queue.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Implementation-specific status value from the native plugin.</returns>
         [DllImport("MidiKeyboard", EntryPoint = "MPTKClearReadQueue")]
         static public extern int MPTK_ClearReadQueue();
 
-        /// <summary>@brief
-        /// Read a Midi message from all devices input connected 
+        /// <summary>
+        /// Reads one MIDI message from the shared native input queue.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>A parsed <see cref="MPTKEvent"/> or null when the queue is empty.</returns>
         static public MPTKEvent MPTK_Read()
         {
             // Pop from the queue.
@@ -99,32 +107,42 @@ namespace MidiPlayerTK
         [DllImport("MidiKeyboard", EntryPoint = "MPTKRead")]
         static private extern ulong _mptkRead();
 
-        /// <summary>@brief
-        /// Count of midi message waiting in the read queue
+        /// <summary>
+        /// Gets the number of MIDI messages waiting in the native read queue.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Queue length.</returns>
         [DllImport("MidiKeyboard", EntryPoint = "MPTKSizeReadQueue")]
         static public extern int MPTK_SizeReadQueue();
 
-        /// <summary>@brief
-        /// Count of output device detected
+        /// <summary>
+        /// Gets the number of MIDI input devices currently detected by Windows (WinMM).
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Detected input device count.</returns>
         [DllImport("MidiKeyboard", EntryPoint = "MPTKCountInp")]
         static public extern int MPTK_CountInp();
 
-        /// <summary>@brief
-        /// Count of input device detected
+        /// <summary>
+        /// Gets the number of MIDI output devices currently detected by Windows (WinMM).
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Detected output device count.</returns>
         [DllImport("MidiKeyboard", EntryPoint = "MPTKCountOut")]
         static public extern int MPTK_CountOut();
 
-        /// <summary>@brief
-        /// Name of the device
+        /*  *** exploration - not yet available for Unity (Windows and MacOS) ***
+        /// <summary>
+        /// Gets the number of MIDI input devices currently opened and tracked by the plugin.
+        /// This differs from <see cref="MPTK_CountInp"/>, which returns the number of devices
+        /// detected by Windows.
         /// </summary>
-        /// <param name="index">Id of the device</param>
-        /// <returns></returns>
+        [DllImport("MidiKeyboard", EntryPoint = "MPTKCountOpenInp")]
+        static public extern int MPTK_CountOpenInp();
+        */
+
+        /// <summary>
+        /// Gets the display name of a MIDI input device from its WinMM index.
+        /// </summary>
+        /// <param name="index">WinMM input device index.</param>
+        /// <returns>Input device display name.</returns>
         static public string MPTK_GetInpName(int index)
         {
             return Marshal.PtrToStringAnsi(_mptkGetInpName(index));
@@ -132,11 +150,11 @@ namespace MidiPlayerTK
         [DllImport("MidiKeyboard", EntryPoint = "MPTKGetInpName")]
         static private extern System.IntPtr _mptkGetInpName(int index);
 
-        /// <summary>@brief
-        /// Name of the device
+        /// <summary>
+        /// Gets the display name of a MIDI output device from its WinMM index.
         /// </summary>
-        /// <param name="index">Id of the device</param>
-        /// <returns></returns>
+        /// <param name="index">WinMM output device index.</param>
+        /// <returns>Output device display name.</returns>
         static public string MPTK_GetOutName(int index)
         {
             return Marshal.PtrToStringAnsi(_mptkGetOutName(index));
@@ -148,25 +166,25 @@ namespace MidiPlayerTK
         // Write to a dedicated midi
         // -------------------------
 
-        /// <summary>@brief
-        /// Open device for output
+        /// <summary>
+        /// Opens a MIDI output device.
         /// </summary>
-        /// <param name="index"></param>
+        /// <param name="index">WinMM output device index.</param>
         [DllImport("MidiKeyboard", EntryPoint = "MPTKOpenOut")]
         static public extern void MPTK_OpenOut(int index);
 
-        /// <summary>@brief
-        /// Close device for output
+        /// <summary>
+        /// Closes a MIDI output device.
         /// </summary>
-        /// <param name="index"></param>
+        /// <param name="index">WinMM output device index.</param>
         [DllImport("MidiKeyboard", EntryPoint = "MPTKCloseOut")]
         static public extern void MPTK_CloseOut(int index);
 
-        /// <summary>@brief
-        /// Play one midi event on the device with a thread so the call return immediately.
+        /// <summary>
+        /// Sends a MIDI event to an output device. If the event has a delay, it is sent from a worker thread.
         /// </summary>
-        /// <param name="evnt">Midi event</param>
-        /// <param name="device">index of the device</param>
+        /// <param name="evnt">MIDI event to send.</param>
+        /// <param name="device">WinMM output device index.</param>
         static public void MPTK_PlayEvent(MPTKEvent evnt, int device)
         {
             ulong data = evnt.ToData();
@@ -204,22 +222,36 @@ namespace MidiPlayerTK
         //[DllImport("MidiKeyboard", EntryPoint = "MPTKCloseInp")]
         //static public extern void MPTK_CloseInp(int index);
 
-        /// <summary>@brief
-        /// Open or refresh all input device for receiving Midi message
+        /// <summary>
+        /// Opens all available MIDI input devices and refreshes the opened list on subsequent calls.
         /// </summary>
+        /// <remarks>
+        /// Hot-plug behavior depends on the Windows MIDI driver (WinMM). Some hardware/drivers,
+        /// especially older USB-MIDI drivers, may not report disconnect/reconnect reliably.
+        /// If a device is not detected after reconnect, call <see cref="MPTK_RebuildAllInp"/>.
+        /// </remarks>
         [DllImport("MidiKeyboard", EntryPoint = "MPTKOpenAllInp")]
         static public extern void MPTK_OpenAllInp();
 
-        /// <summary>@brief
-        /// Close all input device for receiving Midi message
+        /// <summary>
+        /// Closes all MIDI input devices currently opened by the plugin.
         /// </summary>
         [DllImport("MidiKeyboard", EntryPoint = "MPTKCloseAllInp")]
         static public extern void MPTK_CloseAllInp();
 
-        /// <summary>@brief
-        /// Exclude system message
+        /// <summary>
+        /// Forces a full rebuild of all opened MIDI input devices.
         /// </summary>
-        /// <param name="exclude">If true exclude all messages with status/command >= 0xF0. Default: true</param>
+        /// <remarks>
+        /// Use this as a recovery action when hot-plug is not detected correctly by some hardware/drivers.
+        /// </remarks>
+        [DllImport("MidiKeyboard", EntryPoint = "MPTKRebuildAllInp")]
+        static public extern void MPTK_RebuildAllInp();
+
+        /// <summary>
+        /// Enables or disables filtering of MIDI system messages.
+        /// </summary>
+        /// <param name="exclude">If true, excludes messages with status/command &gt;= 0xF0 (default behavior).</param>
         static public void MPTK_ExcludeSystemMessage(bool exclude)
         {
             mptkExcludeSystemMessage(exclude);
@@ -227,10 +259,10 @@ namespace MidiPlayerTK
         [DllImport("MidiKeyboard", EntryPoint = "MPTKExcludeSystemMessage")]
         static private extern void mptkExcludeSystemMessage(bool exclude);
 
-        /// <summary>@brief
-        /// Get current version of the plugins
+        /// <summary>
+        /// Gets the current native plugin version string.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Version string, or a fallback message if the plugin is not available.</returns>
         static public string MPTK_Version()
         {
             string version = msgPluginsNotFound;
@@ -252,8 +284,9 @@ namespace MidiPlayerTK
         static private extern int MPTK_iVersion();
 
 
-        /// <summary>@brief
-        /// Enable read midi event from a callback. The event OnActionInputMidi is triggred when a Midi event is available.
+        /// <summary>
+        /// Enables real-time MIDI input notifications through a native callback.
+        /// The <see cref="OnActionInputMidi"/> event is raised when a MIDI event is available.
         /// @code
         /// if (enableRealTimeRead)
         /// {
@@ -269,14 +302,59 @@ namespace MidiPlayerTK
         /// </summary>
         public static void MPTK_SetRealTimeRead()
         {
-            MPTKSetMidiMsgCB(new MidiMsgDelegate(MidiMsgCB));
+            // V2.18.2 replace
+            // MPTKSetMidiMsgCB(new MidiMsgDelegate(MidiMsgCB));
+            // With a more robust process for real-time MIDI input callback, with fallback to main thread dispatch when no synchronization context is available (eg in some Unity Editor contexts).
+            try
+            {
+                realtimeReadEnabled = true;
+                if (realtimeMidiDelegate == null)
+                    realtimeMidiDelegate = new MidiMsgDelegate(MidiMsgCB);
+                MPTKSetMidiMsgCB(realtimeMidiDelegate);
+            }
+            catch (Exception)
+            {
+                Debug.LogWarning(msgPluginsNotFound);
+            }
         }
+
         // Set a CB to return Midi event
         public delegate void MidiMsgDelegate(ulong data);
         [DllImport("MidiKeyboard")]
         private static extern void MPTKSetMidiMsgCB(MidiMsgDelegate fp);
 
         private static void MidiMsgCB(ulong data)
+        {
+            if (!realtimeReadEnabled)
+                return;
+
+            if (unitySyncContext != null)
+            {
+                unitySyncContext.Post(_ => DispatchRealtimeMidi(data), null);
+                return;
+            }
+
+            pendingRealtimeMessages.Enqueue(data);
+        }
+
+        /// <summary>
+        /// Dispatches MIDI messages received from the native callback when no Unity synchronization
+        /// context is available. Call this from the main thread (for example from Update).
+        /// </summary>
+        /// <param name="maxMessages">Maximum messages to dispatch in one call.</param>
+        /// <returns>Number of dispatched messages.</returns>
+        public static int MPTK_DispatchPendingRealtimeInput(int maxMessages = 256)
+        {
+            int dispatched = 0;
+            while (dispatched < maxMessages && pendingRealtimeMessages.TryDequeue(out ulong queuedData))
+            {
+                DispatchRealtimeMidi(queuedData);
+                dispatched++;
+            }
+            return dispatched;
+        }
+
+        private static void DispatchRealtimeMidi(ulong data)
         {
             MPTKEvent midievent = null;
             try
@@ -289,12 +367,11 @@ namespace MidiPlayerTK
             }
             if (midievent != null)
             {
-                //Debug.Log("MidiMsgCB " + midievent.ToString());
-                // Call event with these midi events
                 try
                 {
-                    if (OnActionInputMidi != null)
-                        OnActionInputMidi.Invoke(midievent);
+                    Action<MPTKEvent> action = OnActionInputMidi;
+                    if (action != null)
+                        action.Invoke(midievent);
                 }
                 catch (Exception ex)
                 {
@@ -304,15 +381,22 @@ namespace MidiPlayerTK
             }
         }
 
-        /// <summary>@brief
-        /// Disable read midi event from a callback. Mandatory before exiting the application, moreover with inside Unity editor to avoid crash.
+        /// <summary>
+        /// Disables real-time MIDI input notifications from the native callback.
+        /// This should be called before application shutdown (especially in the Unity Editor)
+        /// to reduce the risk of crashes caused by stale callbacks.
         /// </summary>
         public static void MPTK_UnsetRealTimeRead()
         {
             try
             {
-                //Debug.Log($"MPTK_UnsetRealTimeRead");
+                // V2.18.2 
+                // Add realtimeReadEnabled set to false to prevent processing of any pending callback messages after unsetting the native callback,
+                // which may arrive before the native plugin fully unregisters the callback and cause null reference exceptions in the managed callback.
+                // And dequeue...
+                realtimeReadEnabled = false;
                 MPTKUnsetMidiMsgCB();
+                while (pendingRealtimeMessages.TryDequeue(out _)) { }
             }
             catch (Exception)
             {
@@ -336,13 +420,15 @@ namespace MidiPlayerTK
         [DllImport("MidiKeyboard")]
         private static extern void UnsetDebugCB();
 
-        /// <summary>@brief
-        /// Plugins Init. Mandatory before executing any other functions of the plugins
+        /// <summary>
+        /// Initializes the native MidiKeyboard plugin.
+        /// This must be called before using any other plugin function.
         /// </summary>
         static public bool MPTK_Init()
         {
             try
             {
+                unitySyncContext = SynchronizationContext.Current;
                 if (MPTK_iVersion() >= 12)
                 {
                     _mptkInit(159789);
@@ -360,8 +446,9 @@ namespace MidiPlayerTK
         [DllImport("MidiKeyboard", EntryPoint = "MPTKInit")]
         static private extern void _mptkInit(int sig);
 
-        /// <summary>@brief
-        /// Last status, value reset to OK after the call
+        /// <summary>
+        /// Gets the last native plugin status.
+        /// The status is reset to OK after each call.
         /// </summary>
         static public PluginError MPTK_LastStatus
         {
@@ -383,4 +470,8 @@ namespace MidiPlayerTK
         static private extern int mptkLastStatus();
     }
 }
+
+
+
+
 

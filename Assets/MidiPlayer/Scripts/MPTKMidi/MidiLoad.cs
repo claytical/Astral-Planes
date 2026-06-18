@@ -10,6 +10,7 @@ using UnityEngine.Rendering;
 namespace MidiPlayerTK
 {
 
+    /// @ingroup runtime_midi_loading
     /// <summary>
     /// Base class for loading a MIDI file and reading MIDI event in a MIDI sequencer. <b>It's not possible to instanciate directly this class.</b>\n
     /// Rather, use MidiFilePlayer to load a MIDI

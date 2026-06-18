@@ -6,6 +6,7 @@ using UnityEngine;
 
 namespace MidiPlayerTK
 {
+    // Used when the synth is in legacy mode (MPTK_LegacyAudioSource) and each sample are played by a dedicated AudioSource component.
     public class VoiceAudioSource : MonoBehaviour
     {
         public MidiSynth synth;
@@ -71,7 +72,9 @@ namespace MidiPlayerTK
 
                 // Play take 0.3 ms
                 yield return 0;
-                Audiosource.Play();
+                
+                // Guard against AudioSource being destroyed while this coroutine was waiting (thanks to Macias for pointing this out on https://discussions.unity.com/t/re-maestro-midi-player-tool-kit-good-news-for-your-rhythm-game/1707497)
+                if (Audiosource != null) Audiosource.Play();
 
                 //#if DEBUGPERF
                 //                synth.DebugPerf("After Audiosource.Play");

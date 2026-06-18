@@ -226,7 +226,6 @@ public partial class DrumTrack : MonoBehaviour
         // - DrumTrack simply clamps and applies it.
         int prev = _binCount;
         _binCount = Mathf.Max(1, bins);
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[DRUM:SET_BIN_COUNT] id={GetInstanceID()} {prev} → {_binCount}");
     }
     private AudioClip ChooseEntryClip()
     {
@@ -912,7 +911,6 @@ public partial class DrumTrack : MonoBehaviour
 
             if (s.isPlaying)
             {
-                Debug.LogWarning($"[DRUM] Stopping extra/old AudioSource id={s.GetInstanceID()} clip={(s.clip ? s.clip.name : "null")}");
                 try { s.Stop(); } catch { }
             }
         }

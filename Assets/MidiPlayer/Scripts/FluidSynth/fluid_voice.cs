@@ -4,9 +4,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text;
 using UnityEngine;
-using UnityEngine.UIElements;
 
 namespace MidiPlayerTK
 {
@@ -29,7 +29,7 @@ namespace MidiPlayerTK
     public partial class fluid_voice
     {
         /// <summary>@brief
-        /// Real time at start of the voice in tick\n
+        /// Time at start of the voice in tick (UTCNow.Ticks)\n
         /// A single tick represents one hundred nanoseconds or one ten-millionth of a second.
         /// There are 10,000 ticks in a millisecond, or 10 million ticks in a second.         
         /// </summary>
@@ -476,19 +476,19 @@ namespace MidiPlayerTK
 
         public bool weakDevice;
 
-        static public long TicksToMilli(long ticks)
+        static public long TicksToMilli(long pTicks)
         {
-            return (long)(ticks / Nano100ToMilli);
+            return (long)(pTicks / Nano100ToMilli);
         }
 
-        static public float TicksToMilliF(long ticks)
+        static public float TicksToMilliF(long pTicks)
         {
-            return (float)ticks / (float)Nano100ToMilli;
+            return (float)pTicks / (float)Nano100ToMilli;
         }
 
-        public fluid_voice(MidiSynth psynth)
+        public fluid_voice(MidiSynth pSynth)
         {
-            synth = psynth;
+            synth = pSynth;
             IdSession = -1;
             id = LastId++;
             //Debug.Log("New  fluid_voice " + IdVoice);
@@ -845,7 +845,10 @@ namespace MidiPlayerTK
 
             // A single tick represents one hundred nanoseconds or one ten-millionth of a second.
             // There are 10,000 ticks in a millisecond, or 10 million ticks in a second. 
-            TimeAtStart = MptkEvent.Delay * fluid_voice.Nano100ToMilli + DateTime.UtcNow.Ticks;
+            // Substrack 2 milliseconds to avoid waiting in fluid_voice_write (root cause not found ... )
+            TimeAtStart = DateTime.UtcNow.Ticks - 20000;
+            if (MptkEvent.Delay > 0)
+                TimeAtStart += MptkEvent.Delay * fluid_voice.Nano100ToMilli;
             TimeAtEnd = DurationTick > -1 ? TimeAtStart + DurationTick : long.MaxValue;
             LastTimeWrite = TimeAtStart;
             //time = 0.0;
@@ -2218,19 +2221,25 @@ namespace MidiPlayerTK
             float[] dsp_left_buf, float[] dsp_right_buf,
             float[] dsp_reverb_buf, float[] dsp_chorus_buf)
         {
-            //uint i;
-            //float incr;
-            //float locfres;
             float target_amp;    /* target amplitude */
             int count;
-            //bool is_looping=false; moved as classe attribut
-
-            //int dsp_interp_method = interp_method;
 
             fluid_env_data env_data;
             float x;
-
+#if MPTK_PRO
+            ticks = PauseApply(onAudioFilterTicks);
+            if (ticks < 0) return 0;
+            //ticks = onAudioFilterTicks - deltaPause;
+#else
             ticks = onAudioFilterTicks;
+#endif
+
+            if (ticks < TimeAtStart)
+            {
+                //Debug.Log($"Not yet {ticks} {TimeAtStart} {(TimeAtStart - ticks) / 10000f:F3} ms"); 
+                return 0;
+            }
+
             if (synth.VerboseSynth || synth.VerboseOverload)
             {
                 NewTimeWrite = ticks;
@@ -2500,6 +2509,12 @@ namespace MidiPlayerTK
                 if (synth.VerboseVolume) DebugVolume($"amp_max:{amp_max:F5} target_amp:{target_amp:F5} amp:{amp:F5} CutOff:{synth.MPTK_CutOffVolume:F6}");
             }
 
+#if MPTK_PRO
+            if (pauseRampCurrent > 0)
+                // A pause or resume action is in progress
+                target_amp = SmoothAmp(target_amp);
+#endif
+
             /* Volume increment to go from amp to target_amp in FLUID_BUFSIZE steps */
             amp_incr = (target_amp - amp) / synth.FLUID_BUFSIZE;
             //Debug.Log($"{volenv_section} {target_amp} {amp}");
@@ -2600,7 +2615,7 @@ namespace MidiPlayerTK
             if (count > 0)
                 fluid_voice_effects(count, dsp_left_buf, dsp_right_buf, dsp_reverb_buf, dsp_chorus_buf);
             else
-//                Debug.Log("Count <= 0 in fluid_rvoice_write");
+                Debug.Log("Count <= 0 in fluid_rvoice_write");
             /* turn off voice if short count (sample ended and not looping) */
             if (count < synth.FLUID_BUFSIZE)
             {
@@ -2710,8 +2725,12 @@ namespace MidiPlayerTK
         /// <summary>@brief
         /// Move phase enveloppe to release //FS fluid_rvoice_noteoff_LOCAL
         /// </summary>
-        public void fluid_rvoice_noteoff(bool force = false)
+        public void fluid_rvoice_noteoff(bool force = false
+                    /*,[CallerMemberName] string nomAppelant = "",
+                    [CallerFilePath] string filePath = "",
+                    [CallerLineNumber] int lineNumber = 0*/)
         {
+            //Debug.Log($"fluid_rvoice_noteoff: {filePath}/{lineNumber} {nomAppelant}");
             if (status == fluid_voice_status.FLUID_VOICE_ON || status == fluid_voice_status.FLUID_VOICE_SUSTAINED)
             {
                 if (!weakDevice)
@@ -2724,7 +2743,7 @@ namespace MidiPlayerTK
                     }
                     else
                     {
-                        //Debug.Log($"fluid_voice_noteoff Channel:{chan} key:{key} Isloop:{IsLoop} Ignore:{synth.keepPlayingNonLooped} DurationTick:{DurationTick} Name:{sample.Name}");
+                        if (synth.VerboseVoice) Debug.Log($"fluid_voice_noteoff {id} Duration:{TimeSpan.FromTicks(DateTime.UtcNow.Ticks - TimeAtStart).TotalSeconds:F2} Name:{sample.Name}");
                         if (volenv_section == fluid_voice_envelope_index.FLUID_VOICE_ENVATTACK)
                         {
                             // A voice is turned off during the attack section of the volume envelope.  
@@ -2873,9 +2892,10 @@ namespace MidiPlayerTK
 
         public void DebugVolEnv(string info)
         {
-            Debug.LogFormat("VolEnv - [{0,4}] {1,-25} TimeFromStart:{2} ms Delta:{3:F2} ms section:{4} volenv_val:{5:0.000} volenv_count:{6} incr:{7:0.0000} coeff:{8:0.00}",
-               id, info, TicksToMilli(ticks - TimeAtStart), TicksToMilliF(DeltaTimeWrite),
-               volenv_section, volenv_val, volenv_data[(int)volenv_section].count, volenv_data[(int)volenv_section].incr, volenv_data[(int)volenv_section].coeff);
+            Debug.LogFormat($"VolEnv - [{id,4}] {info,-25} " +
+                $"TimeFromStart:{TicksToMilli(ticks - TimeAtStart)} ms Delta:{TicksToMilliF(DeltaTimeWrite):F2} ms " +
+                $"section:{volenv_section} volenv_val:{volenv_val:F3} " +
+                $"volenv_count:{volenv_data[(int)volenv_section].count} incr:{volenv_data[(int)volenv_section].incr:F4} coeff:{volenv_data[(int)volenv_section].coeff:F2}");
         }
 
         public void DebugModEnv(string info)

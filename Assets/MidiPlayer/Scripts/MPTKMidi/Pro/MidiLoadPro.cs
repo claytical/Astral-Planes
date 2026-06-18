@@ -6,6 +6,7 @@ using UnityEngine;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup runtime_midi_loading
     public partial class MidiLoad
     {
         /// <summary>@brief

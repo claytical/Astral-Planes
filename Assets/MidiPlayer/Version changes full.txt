@@ -5,6 +5,56 @@ Please, read this before updating:
 
 Thank for your comments and talks, that help a lot to make Maestro better.
 
+V2.19.0 2026-03-28
+	New Feature Pro
+		Chord progression builder. 
+	Fixes
+		Guard against AudioSource being destroyed when MPTK_Stop() coroutine was waiting (thanks to Macias for pointing this out).
+		When MPTK Spatialization is disabled, the AudioSource spatial settings should stay untouched so the inspector values apply (thanks to CharleneAtlas for pointing this out). 
+		Huge review of the code and API documentation. Improve grammar, clarity, and consistency.
+		Full rebuild of the API documentation availabale on https://mptkapi.paxstellar.com/annotated.html. 
+
+V2.18.1 2026-02-23
+	Fixes
+		Correct unexpected using clause.
+		Correct wrong time definition in TestMidiGenerator demo.
+
+V2.18.0 2026-02-09
+	Version Pro
+		New Feature
+			Orientation-based audio behavior, including:
+				Smooth left/right stereo panning
+				Front/back volume attenuation
+				Subtle filtering when the sound source is behind the listener
+		New Attributes:
+			MPTK_Orientation: Enables orientation-based audio behavior (default: false).
+			MPTK_OrientationToListener: Returns the angle (in degrees) between the sound source and the listener.
+	Version All
+		New Attributes
+			Renamed MPTK_Spatialize to MPTK_DistanceAttenuation for clarity.
+			Added MPTK_AudioListener attribute to MidiPlayerGlobal to specify which AudioListener is used (default: first AudioListener found in the scene).
+			Added MPTK_StatVoiceCountSustained.
+	Fixes
+		Ensured the MIDI player stops correctly when notes remain sustained at the end of a MIDI file.
+	Demos & MVP
+		Updated demos to use the new orientation-based audio behavior.
+
+V2.17.0 2025-12-07
+	New Feature Pro
+		Added the ability to pause and resume voices with smooth transitions (especially useful for MidiStreamPlayer).
+	New Feature All
+		Improved spatialization with two new parameters:
+			MPTK_MinDistance: distance at which attenuation begins.
+			MPTK_MinSoundAttenuation: minimum volume applied at maximum distance.
+		The free Maestro edition is now based on the GS v2.0.2 SoundFont from Christian Collins — many thanks to him! Enjoy noticeably enhanced audio.
+	Fix: 
+		Correct spatialization calculation.
+		MPTK_Play: when MIDI player is paused and not yet playing, the player just resume pause and not playing ... now, resume pause and play!
+
+V2.16.2 2025-10-31
+	Fix
+		Parameter AlreadyLoaded was not used when MIDI Player is in autorestart mode.
+
 V2.16.1 2025-09-06
 	New Feature
 		MPTK_PauseOnMaxDistance: MIDI player automatically paused when the distance from the listener exceeds MPTK_MaxDistance.
@@ -37,9 +87,10 @@ V2.16.0 2025-06-16
 		Correct issue on quantization calculation. Thanks to cihadturhan_unity.
 
 V2.15.0 2025-04-25
-	New Features
+	New Features Pro
 		SoundFonts can be dynamically loaded either from a local file system or directly from the web.
         Supports assigning different SoundFonts to different MIDI players.
+	New Features
 		Delays line number for reverb now can be expanded to 12 (default is 8) to produces a better quality sound but with a cpu cost. Add script symbols MPTK_REVERB_NBR_DELAYS_12 to expand.
 		Changes the way each note-on velocity affects the attenuation of a voice. A higher value increases the volume at low velocity (the fluidsynth constant FLUID_PEAK_ATTENUATION is modified). Perfect for soundfont with not audible notes at low velocity. See member MPTK_VelocityAttenuation (experimental feature).
 		Easier access to the verbose mode in the inspector.

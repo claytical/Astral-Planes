@@ -324,6 +324,10 @@ MonoBehaviour:
   StatDspChannelCount: 0
   GcCollectionCout: 0
   AllocatedBytesForCurrentThread: 0
+  StatSynthLatencyLAST: 0
+  StatSynthLatencyAVG: 0
+  StatSynthLatencyMIN: 0
+  StatSynthLatencyMAX: 0
   StatDeltaThreadMidiMS: 0
   StatDeltaThreadMidiMAX: 0
   StatDeltaThreadMidiMIN: 0
@@ -350,7 +354,6 @@ MonoBehaviour:
   indexBuffSize: -1
   MPTK_DirectSendToPlayer: 0
   MPTK_EnableChangeTempo: 0
-  maxDistance: 0
   MPTK_EnablePanChange: 1
   volumeGlobal: 0.5
   dsp_64: 0
@@ -399,7 +402,7 @@ MonoBehaviour:
       m_Calls: []
   showMidiInfo: 0
   showSynthParameter: 0
-  showSpatialization: 0
+  showSpatialization: 1
   showUnitySynthParameter: 1
   showUnityPerformanceParameter: 1
   showExperimentalFeature: 0
@@ -412,7 +415,11 @@ MonoBehaviour:
   showSynthEvents: 0
   showEvents: 0
   showDefault: 0
-  spatialize: 0
+  distanceAttenuation: 1
+  MPTK_PauseOnMaxDistance: 0
+  minDistance: 0
+  maxDistance: 3000
+  minSoundAttenuation: 0
   MPTK_EffectUnity: {fileID: 0}
   MPTK_ModeSpatializer: 0
   MPTK_MaxSpatialSynth: 0

@@ -7,6 +7,9 @@ using Random = UnityEngine.Random;
 public partial class Vehicle : MonoBehaviour
 {
 
+    private static int _nextId;
+    private readonly int _id = System.Threading.Interlocked.Increment(ref _nextId);
+
     private bool  _isActivePlow;
     private float _plowVelocityDrain;
     private float _lastPressureFactor;
@@ -277,7 +280,7 @@ public partial class Vehicle : MonoBehaviour
         {
             // Release keep-clear claim so refuge dust regrows.
             if (gfm != null && gfm.dustGenerator != null && gfm.activeDrumTrack != null)
-                gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID());
+                gfm.dustGenerator.ReleaseVehicleKeepClear(_id);
         }
         else
         {
@@ -1242,7 +1245,7 @@ public partial class Vehicle : MonoBehaviour
         var drum = gfm.activeDrumTrack;
         if (gen == null || drum == null) return;
 
-        int ownerId = GetInstanceID();
+        int ownerId = _id;
 
         Vector2Int centerCell = drum.WorldToGridPosition(rb.position);
 
@@ -1301,7 +1304,7 @@ public partial class Vehicle : MonoBehaviour
 
         // Carve a small pocket *once*, then release keep-clear so regrowth behaves normally.
         // This creates a "rest" volume without creating a tunnel or permanently preventing regrowth.
-        int ownerId = GetInstanceID();
+        int ownerId = _id;
         gen.SetVehicleKeepClear(
             ownerId,
             centerCell,
@@ -1315,7 +1318,7 @@ public partial class Vehicle : MonoBehaviour
     {
         if (gfm == null || gfm.dustGenerator == null) return;
 
-        gfm.dustGenerator.ReleaseVehicleKeepClear(GetInstanceID());
+        gfm.dustGenerator.ReleaseVehicleKeepClear(_id);
     }
     private void OnDestroy()
     {
@@ -1329,7 +1332,7 @@ public partial class Vehicle : MonoBehaviour
         var gen = (gfm != null) ? gfm.dustGenerator : null;
         if (gen == null) return;
 
-        gen.ReleaseVehicleKeepClear(GetInstanceID());
+        gen.ReleaseVehicleKeepClear(_id);
     }
     private void ConsumeEnergy(float amount)
         {

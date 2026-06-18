@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -6,45 +6,18 @@ using UnityEngine.Scripting;
 
 namespace MidiPlayerTK
 {
-    // specific channel properties - internal class
-    // removed 2.10.1 - included in public MptkChannel (class name was fluid_channel);
-    //public class mptk_channel // V2.82 new
-    //{
-    //    public bool enabled; // V2.82 move from MptkChannel 
-    //    public float volume; // volume for the channel, between 0 and 1
-
-    //    public int forcedPreset; // forced preset for this channel
-    //    public int forcedBank; // forced bank for this channel
-    //    public int lastPreset; // last preset for this channel
-    //    public int lastBank; // last bank for this channel
-
-    //    public int countChannel; // countChannel of note-on for the channel
-    //    //private int channum;
-    //    //private MidiSynth synth;
-    //    public mptk_channel(MidiSynth psynth, int pchanum)
-    //    {
-    //        //synth = psynth;
-    //        //channum = pchanum;
-    //        enabled = true;
-    //        volume = 1f;
-    //        countChannel = 0;
-    //        forcedPreset = -1;
-    //        forcedBank = -1;
-    //    }
-    //}
-
+    /// @ingroup midi_channel_state
     /// <summary>
-    /// Description and list of MIDI Channels associated to the MIDI synth.\n
-    /// Each MIDI synth has 16 channels that carry all the relevant MIDI information.
-    ///     - Current instrument / bank
+    /// Collection of MIDI channels managed by a MIDI synth.\n
+    /// A standard MIDI synth uses 16 channels (0 to 15). Each channel keeps an independent state, including:
+    ///     - Instrument (preset) and bank
     ///     - Volume
-    ///     - Mute / Unmute (see Enable)
-    ///     - Pitch bend ...
-    ///     
-    /// They serve to distinguish between instruments and provide independent control over each one. \n
-    /// By transmitting MIDI messages on their respective channels, you can alter the instrument, volume, pitch, and other parameters. \n
-    /// Within the Maestro Midi Player Toolkit, MIDI channels are designated numerically from 0 to 15. Notably, channel 9 is set aside specifically for drum sounds.
-    /// 
+    ///     - Mute state (see Enable)
+    ///     - Pitch bend and controller values
+    ///
+    /// MIDI messages target one channel at a time, allowing different instruments and settings to play simultaneously.
+    /// In General MIDI, channel 9 (10 in 1-based MIDI notation) is conventionally used for percussion.
+    ///
     /// @snippet TestMidiFilePlayerScripting.cs ExampleUsingChannelAPI_Full
     /// </summary>
     public class MPTKChannels : IEnumerable<MPTKChannel>
@@ -53,13 +26,13 @@ namespace MidiPlayerTK
         private List<MPTKChannel> Channels { get; set; }
 
         /// <summary>@brief 
-        /// Channel count. Classically 16 when MIDI is read from a MIDI file.\n
-        /// Can be extended but not compliant with MIDI file, only for internal use (experimental)
+        /// Number of channels in this collection. Usually 16 when reading a standard MIDI file.\n
+        /// Higher values are possible for internal usage, but this is not MIDI-file compliant.
         /// </summary>
         public int Length { get { return Channels.Count; } }
 
         /// <summary>@brief 
-        /// Enable or disable all channels for playing
+        /// Enables or disables playback for all channels.
         /// @snippet TestMidiFilePlayerScripting.cs ExampleUsingChannelAPI_6
         /// </summary>
         public bool EnableAll
@@ -72,7 +45,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief 
-        /// Set the volume for all channels as a percentage between 0 and 1. 
+        /// Sets the volume for all channels, from 0.0 to 1.0.
         /// </summary>
         public float VolumeAll
         {
@@ -86,12 +59,12 @@ namespace MidiPlayerTK
 
 
         /// <summary>@brief 
-        /// Allows access to all channels in the MIDI Synth.
-        /// Within the Maestro Midi Player Toolkit, MIDI channels are designated numerically from 0 to 15. Notably, channel 9 is set aside specifically for drum sounds.
+        /// Indexer access to a channel in the synth.
+        /// Channels are addressed from 0 to 15 in standard MIDI usage.
         /// @snippet TestMidiFilePlayerScripting.cs ExampleUsingChannelAPI_1
         /// </summary>
-        /// <param name="channel">Channel number between 0 and 15 included</param>
-        /// <returns></returns>
+        /// <param name="channel">Zero-based channel index (typically 0 to 15).</param>
+        /// <returns>The channel at the requested index, or null if out of range.</returns>
         public MPTKChannel this[int channel]
         {
             get
@@ -124,6 +97,11 @@ namespace MidiPlayerTK
         }
 
 
+        /// <summary>@brief
+        /// Creates a channel collection for a synth.
+        /// </summary>
+        /// <param name="psynth">Target synth that owns these channels.</param>
+        /// <param name="countChannel">Number of channels to create. Default is 16.</param>
         public MPTKChannels(MidiSynth psynth, int countChannel = 16)
         {
             if (psynth.VerboseChannel) Debug.Log($"Create {countChannel} channels for synth '{psynth.name}'");
@@ -132,30 +110,34 @@ namespace MidiPlayerTK
                 Channels.Add(new MPTKChannel(i, psynth));
         }
 
+        /// <summary>@brief
+        /// Parameterless constructor kept for serialization and code stripping preservation.
+        /// </summary>
         [Preserve]
         public MPTKChannels()
         {
         }
 
         /// <summary>@brief 
-        /// Enable to reset all channels when MIDI start playing (if true, Channels member is allocated at the synth reinit). Default is true.\n
-        /// Weird behaviors could occurs if set to false with MidiFilePlayer but could be useful for MidiStreamPlayer.
+        /// Enables channel-state reset when MIDI playback starts.\n
+        /// If true (default), the channel list is reinitialized when the synth is reinitialized.
+        /// Setting this to false can produce unexpected behavior with MidiFilePlayer, but may be useful with MidiStreamPlayer.
         /// @version 2.10.1
         /// </summary>
         public bool EnableResetChannel = true;
 
 
         /// <summary>@brief 
-        /// Reset Maestro channels extension information. 
+        /// Resets Maestro channel extension fields.
         ///     - LastBank is set to -1 (no last bank feature when reset)
-        ///     - ForcedBank is disable
-        ///     - ForcedPreset is disable
+        ///     - ForcedBank is disabled
+        ///     - ForcedPreset is disabled
         ///     - Enable is set to true
-        ///     - Volume is set to max (1)
-        /// Other information like current preset, bank, controller are not reset.
+        ///     - Volume is set to maximum (1)
+        /// Other channel state, such as current preset, bank, and controllers, is not reset.
         /// @version 2.10.1
         /// </summary>
-        /// <param name="channelNum">select the channel number to reset, by default all</param>
+        /// <param name="channelNum">Channel index to reset. Use -1 (default) to reset all channels.</param>
         public void ResetExtension(int channelNum = -1)
         {
             //if (synth != null && synth.VerboseChannel) Debug.Log("Reset channel extension feature");
@@ -196,16 +178,17 @@ namespace MidiPlayerTK
         }
     }
 
+    /// @ingroup midi_channel_state
     /// <summary>
-    /// Description of a MIDI Channel associated to the MIDI synth.\n
-    /// They serve to distinguish between instruments and provide independent control over each one. \n
-    /// By transmitting MIDI messages on their respective channels, you can alter the instrument, volume, pitch, and other parameters. \n
-    /// Within the Maestro Midi Player Toolkit, MIDI channels are designated numerically from 0 to 15. Notably, channel 9 is set aside specifically for drum sounds.
-    ///     - Current instrument / bank
+    /// Runtime state for one MIDI channel in the synth.\n
+    /// A channel contains independent settings used to render events on that channel:
+    ///     - Current instrument (preset) and bank
     ///     - Volume
-    ///     - Mute / Unmute (see Enable)
-    ///     - Pitch bend ...
-    /// 
+    ///     - Mute state (see Enable)
+    ///     - Pitch bend and controller values
+    ///
+    /// Channels are zero-based in MPTK (0 to 15). In General MIDI, channel 9 is typically used for percussion.
+    ///
     /// @snippet TestMidiFilePlayerScripting.cs ExampleUsingChannelAPI_One
     /// </summary>
     public class MPTKChannel
@@ -232,17 +215,17 @@ namespace MidiPlayerTK
         //public enumStyleBanq StyleBanq = enumStyleBanq.FLUID_BANK_STYLE_GM;
 
         /// <summary>@brief
-        /// Last preset used for this channel, useful when a forced preset has been set.
+        /// Last preset used on this channel. Used when restoring after a forced preset.
         /// </summary>
         public int LastPreset;
 
         /// <summary>@brief
-        /// Last bank used for this channel, useful when a forced preset has been set.
+        /// Last bank used on this channel. Used when restoring after a forced bank.
         /// </summary>
         public int LastBank;
 
         /// <summary>@brief
-        /// Channel number between 0 and 15, channel 9 is set aside specifically for drum sounds.
+        /// Zero-based channel number. Standard MIDI channels are 0 to 15; channel 9 is conventionally percussion.
         /// </summary>
         public int Channel { get { return channum; } }
         private int channum;
@@ -312,12 +295,11 @@ namespace MidiPlayerTK
 
         }
         /// <summary>@brief 
-        /// Build an information string about the channel. It's also a good pretext to display an example of Channel API. \n
-        /// Exemple of return 
+        /// Builds a debug string that summarizes the channel state.\n
+        /// Example output:
         /// @li Channel:2	Enabled	[Preset:18, Bank:0]		'Rock Organ'			Count:1		Volume:1
         /// @li Channel:4	Muted	[Preset:F44, Bank:0]	'Stereo Strings Trem'	Count:33	Volume:0,50
         /// </summary>
-        /// <param name="channel">index channel</param>
         /// <returns>Information string</returns>
         public override string ToString()
         {
@@ -348,28 +330,28 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief 
-        /// Properties to enable (unmute) or disable (mute) a channel or get status.
-        /// All channels are unmuted when MIDI start playing (MidiFilePlayer#MPTK_Play).\n
-        /// By the way, to mute channels just before the playing, use the MidiFilePlayer#OnEventStartPlayMidi.
+        /// Enables (unmutes) or disables (mutes) this channel.
+        /// All channels are unmuted when MIDI starts playing (MidiFilePlayer#MPTK_Play).\n
+        /// To mute channels just before playback starts, use MidiFilePlayer#OnEventStartPlayMidi.
         /// 
-        /// Look to the demo: Assets\MidiPlayer\Demo\FreeMVP\MidiLoop.cs
+        /// See demo: Assets\MidiPlayer\Demo\FreeMVP\MidiLoop.cs
         /// @snippet MidiLoop.cs ExampleFindPlayerAndAddListener
         /// 
         /// @snippet MidiLoop.cs ExampleChannelEnabled
         /// </summary>
-        /// <returns>true if channel is enabled</returns>
+        /// <returns>True if the channel is enabled.</returns>
         /// @snippet TestMidiFilePlayerScripting.cs ExampleUsingChannelAPI_7
         public bool Enable { get; set; }
 
 
         /// <summary>@brief 
-        /// Get or Set the count of notes (NoteOn) played since the start of the MIDI.
-        /// Set could be usefull to reset the value to 0.
+        /// Gets or sets the number of NoteOn events played since MIDI start.
+        /// You can also set it, for example to reset it to 0.
         /// </summary>
         public int NoteCount { get { return count; } set { count = value; } }
 
         /// <summary>@brief 
-        /// Get or Set the volume for a channel as a percentage between 0 and 1. 
+        /// Gets or sets channel volume, from 0.0 to 1.0.
         /// </summary>
         /// @snippet TestMidiFilePlayerScripting.cs ExampleUsingChannelAPI_5
         public float Volume { get; set; }
@@ -377,10 +359,11 @@ namespace MidiPlayerTK
         private int prognum;
 
         /// <summary>@brief 
-        /// Get or Set current preset number associated to the channel. Value must be between 0 and 127 (if you have a full GM SoundFont).\n
+        /// Gets or sets the current preset number for this channel.\n
+        /// Value must be between 0 and 127 (with a full GM SoundFont).
         /// Each MIDI channel can play a different preset and bank.\n
-        /// You can find bank and preset number with the menu Maestro / SoundFont Setup in Right Panel,\n
-        /// click on buttons with an eye icon to get all the presets for each bank.
+        /// You can inspect available banks and presets from Maestro / SoundFont Setup (right panel),
+        /// then click the eye icon buttons.
         /// </summary>
         /// @snippet TestMidiStream.cs ExampleUsingChannelAPI_4
         public int PresetNum
@@ -409,10 +392,10 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Get or Set the current bank number associated to the channel.\n
+        /// Gets or sets the current bank number for this channel.\n
         /// Each MIDI channel can play a different preset and bank.\n
-        /// You can find bank and preset number with the menu Maestro / SoundFont Setup in Right Panel,\n
-        /// click on buttons with an eye icon to get all the presets for each bank.
+        /// You can inspect available banks and presets from Maestro / SoundFont Setup (right panel),
+        /// then click the eye icon buttons.
         /// </summary>
         /// @snippet TestMidiStream.cs ExampleUsingChannelAPI_4
         public int BankNum
@@ -432,22 +415,21 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief 
-        /// Get the current preset name for the channel.\n
-        /// Each MIDI channel can play a different preset.\n
+        /// Gets the current preset name for this channel.\n
+        /// Each MIDI channel can use a different preset.
         /// </summary>
-        /// <param name="channel">MIDI channel must be between 0 and 15</param>
-        /// <returns>channel preset name or "" if channel error</returns>
+        /// <returns>Preset name, or "no preset defined" if unavailable.</returns>
         /// @snippet TestMidiStream.cs ExampleUsingChannelAPI_3
         public string PresetName { get { return hiPreset != null ? hiPreset.Name : "no preset defined"; } }
 
 
 
         /// <summary>@brief 
-        /// Get or Set forced preset on the channel. MIDI will allways playing with this preset even if a MIDI Preset Change message is received.\n
+        /// Gets or sets a forced preset for this channel.\n
+        /// When set to a value >= 0, the channel always uses this preset, even if a Program Change is received.
         /// Set to -1 to disable this behavior.
         /// </summary>
-        /// <param name="channel"></param>
-        /// <returns>preset index, -1 if not set</returns>
+        /// <returns>Preset index, or -1 when not forced.</returns>
         /// @snippet TestMidiFilePlayerScripting.cs ExampleUsingChannelAPI_2
         /// 
         public int ForcedPreset
@@ -475,10 +457,11 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief 
-        /// Get or Set forced bank on the channel from 0 to 65635. MIDI will allways using this bank even if a bank change message is received.\n
+        /// Gets or sets a forced bank for this channel.\n
+        /// When set to a value >= 0, the channel always uses this bank, even if a bank change message is received.
         /// Set to -1 to disable this behavior.
         /// </summary>
-        /// <returns>preset index, -1 if not set</returns>
+        /// <returns>Bank index, or -1 when not forced.</returns>
         /// @snippet TestMidiFilePlayerScripting.cs ExampleUsingChannelAPI_2
         public int ForcedBank
         {
@@ -590,13 +573,13 @@ namespace MidiPlayerTK
 
         /* was  fluid_channel_cc */
         /// <summary>@brief
-        /// Read or write the value of the controller.
-        /// <returns>controller value if read, previous value if write, -1 if error</returns>
+        /// Reads or writes a controller value.
+        /// <returns>Current value if reading, previous value if writing, or -1 on error.</returns>
         /// 
         /// @snippet TestMidiStream.cs ExampleAccessToControler
         /// </summary>
         /// <param name="numController">Controller to read or write</param>
-        /// <param name="valueController">Value to set, default is -1 for only reading the controller value (no write)</param>
+        /// <param name="valueController">Value to set. Default is -1 to read only (no write).</param>
         public int Controller(MPTKController numController, int valueController = -1)
         {
             if ((int)numController < 0 || (int)numController > 127)

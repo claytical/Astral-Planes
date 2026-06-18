@@ -4,6 +4,7 @@ using UnityEngine;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup experimental_analysis_tools
     /// <summary>
     /// Experimental - Search a MIDI from a sequence of notes and calculate a score tempo.\n
     /// 

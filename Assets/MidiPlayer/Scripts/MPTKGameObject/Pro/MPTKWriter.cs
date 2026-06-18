@@ -8,14 +8,14 @@ using UnityEngine;
 namespace MidiPlayerTK
 {
     /// <summary>
-    /// Create, build, write, import, play MIDI by script. See full example with these scripts:
+    /// Create, build, write, import, and play MIDI from script. See full examples in:
     /// @li  TestMidiGenerator.cs for MIDI creation examples. 
     /// @li  TinyMidiSequencer.cs for a light sequencer.
-    /// @li  MidiEditorProWindow.cs.cs for a full Midi Editor.
+    /// @li  MidiEditorProWindow.cs.cs for a full MIDI editor.
     /// @note
-    /// Method like MPTK_AddxxxxMilli will be soon deprecated. Explanation:\n
-    /// Adding MIDI event is done with method like MPTK_Addxxxxxxx. There is two kind of method: adding with a tickFromTime position (AddNote) or with a time position (AddNoteMilli).
-    /// For clarity, all MPTK_AddxxxxMilli will be deprecated in future version. The method #MPTK_ConvertTickToMilli will be used in place.
+    /// Methods such as MPTK_AddxxxxMilli will be deprecated in a future version.\n
+    /// MIDI events can be added either with tick-based positions (AddNote) or millisecond-based positions (AddNoteMilli).
+    /// For consistency, the recommended approach is to use tick-based methods and convert with #ConvertTickToMilli when needed.
     /// More information here: https://paxstellar.fr/class-MPTKWriter/
     ///
     /// @version 
@@ -23,197 +23,30 @@ namespace MidiPlayerTK
     ///
     /// @snippet TestMidiGenerator.cs ExampleFullMidiFileWriter
     /// </summary>
+    /// @ingroup mptkwriter_management
     public class MPTKWriter
     {
-        /// <summary>@brief
-        /// Delta Ticks Per Beat Note (or DTPQN) represent the duration time in "ticks" which make up a quarter-note. \n
-        /// For example, with 96 a duration of an eighth-note in the file would be 48.\n
-        /// From a MIDI file, this value is found in the MIDI Header and remains constant for all the MIDI file.\n
-        /// More info here https://paxstellar.fr/2020/09/11/midi-timing/\n
-        /// </summary>
-        public int DeltaTicksPerQuarterNote;
 
-        //private int _bpm;
-        // version 2.10.0 was an int, becomes a double
-        private double _bpm;
-
-        /// <summary>@brief
-        /// Get current Microseconds Per Quater Note:  60 * 1000 * 1000 https://en.wikipedia.org/wiki/Tempo\n
+        /// @name Initialization and Import
+        /// @ingroup mptkwriter_init_import
+        /// @brief Initialize, reset, and merge event lists into the writer.
         /// @details
-        /// The tempo in a MIDI file is given in micro seconds per quarter beat. To convert this to BPM use method #QuarterPerMicroSecond2BeatPerMinute.\n
-        /// This value can change during the generation when #AddTempoChange is called.\n
-        /// See here for more information https://paxstellar.fr/2020/09/11/midi-timing/        
-        /// </summary>
-        public int MicrosecondsPerQuaterNote
-        {
-            get { return _bpm > 0 ? (int)(60 * 1000 * 1000 / _bpm) : 0; }
-        }
-
+        /// Includes constructor defaults, full reset logic, and list import/merge behavior
+        /// with DTPQN conversion and post-import timing recalculation.
+        /// @{
 
         /// <summary>@brief
-        /// V2.9.0 - Get the current tempo. Set with #AddTempoChange.\n
-        /// https://en.wikipedia.org/wiki/Tempo
-        /// </summary>
-        public double CurrentTempo => _bpm;
-
-        /// <summary>@brief
-        /// List of tempo changes found in #MPTK_MidiEvents. Must be updated with MPTKTempo.MPTK_CalculateMap.\n
-        /// See example:
-        /// @snippet TestMidiGenerator.cs ExampleCalculateMaps
-        /// @version 2.10.0
-        /// </summary>
-        public List<MPTKTempo> MPTK_TempoMap;
-
-        /// <summary>@brief
-        /// List of signature changes found in #MPTK_MidiEvents. Must be updated with MPTKSignature.MPTK_CalculateMap.\n
-        /// See example:
-        /// @snippet TestMidiGenerator.cs ExampleCalculateMaps
-        /// @version 2.10.0
-        /// </summary>
-        public List<MPTKSignature> MPTK_SignMap;
-
-
-        /// <summary>@brief
-        /// Get current lenght in millisecond of a MIDI tickFromTime (related to the current tempo).\n
-        /// @details
-        /// Obviously depends on the current tempo (#CurrentTempo) and the #MPTK_DeltaTicksPerQuarterNote.\n
-        /// PulseLenght = 60000 / #CurrentTempo / #MPTK_DeltaTicksPerQuarterNote
-        /// </summary>
-        public float PulseLenght { get { return _bpm > 0 && DeltaTicksPerQuarterNote > 0 ? (60000f / (float)_bpm) / (float)DeltaTicksPerQuarterNote : 0f; } }
-
-        /// <summary>@brief
-        /// If the value is true, Text for META (e.g. lyrics) will be write with UTF8 encoding. The default is false.\n
-        /// The MIDI standard only allows ASCII characters for this META, but with this extension you will be able to read and display\n
-        /// characters like Korean, Chinese, Japanese and even French accented letters ;-)\n
-        /// To enable reading of UTF8 characters from an MPTK MIDI player, set the MidiFilePlayer#MPTK_ExtendedText attribut to true.\n
-        /// @warning This is an MPTK extension of the MIDI standard, so if you read your MIDI file with another application, you may not find your original text.
-        /// @version 2.11.3
-        /// </summary>
-        public bool ExtendedText { get; set; }
-
-        /// <summary>@brief
-        /// Convert an absolute tickFromTime position to a time in millisecond.\n
-        /// </summary>
-        /// <param name="tick">Absolute tickFromTime position</param>
-        /// <param name="indexTempo">Index in #MPTK_TempoMap for this position. Optional, if not defined or -1, #MPTK_TempoMap will be recalculated and the segment for this position will be searched</param>
-        /// <returns>Duration in milliseconds</returns>
-        public float ConvertTickToMilli(long tick, int indexTempo = -1)
-        {
-            if (indexTempo < 0)
-            {
-                MPTKTempo.CalculateMap(DeltaTicksPerQuarterNote, MPTK_MidiEvents, MPTK_TempoMap);
-                indexTempo = MPTKTempo.FindSegment(MPTK_TempoMap, tick, fromIndex: 0);
-            }
-            return (float)MPTK_TempoMap[indexTempo].CalculateTime(tick);
-        }
-
-        /// <summary>@brief
-        /// Convert a time position in millisecond to an absolute tickFromTime position.\n
-        /// </summary>
-        /// <param name="time">Time position in milliseconds</param>
-        /// <param name="indexTempo">Index in #MPTK_TempoMap for this position. Optional, if not defined or -1, #MPTK_TempoMap will be recalculated and the segment for this position will be searched</param>
-        /// <returns>Absolute tickFromTime position</returns>
-        public long ConvertMilliToTick(float time, int indexTempo = -1)
-        {
-            if (indexTempo < 0)
-            {
-                MPTKTempo.CalculateMap(DeltaTicksPerQuarterNote, MPTK_MidiEvents, MPTK_TempoMap);
-                indexTempo = MPTKTempo.FindSegment(MPTK_TempoMap, time, fromIndex: 0);
-            }
-            return MPTK_TempoMap[indexTempo].CalculatelTick(time);
-        }
-
-        /// <summary>@brief
-        /// Convert the tickFromTime duration to a time duration in millisecond regarding the current tempo.\n
-        /// @note Previous call to #AddBPMChange and #AddTempoChange have direct impact on this calculation.
-        /// </summary>
-        /// <param name="tick">duration in ticks</param>
-        /// <returns>duration in milliseconds</returns>
-        public long DurationTickToMilli(long tick)
-        {
-            return (long)(tick * PulseLenght + 0.5f);
-        }
-
-        /// <summary>@brief
-        /// Convert the tickFromTime duration to a real time duration in millisecond regarding the current tempo.\n
-        /// @note Previous call to #AddBPMChange and #AddTempoChange have direct impact on this calculation.
-        /// </summary>
-        /// <param name="tick">duration in ticks</param>
-        /// <returns>duration in milliseconds</returns>
-        public long DurationMilliToTick(float time)
-        {
-            return PulseLenght > 0d ? (long)(time / PulseLenght + 0.5f) : 0L;
-        }
-
-        /// <summary>@brief
-        /// Get the count of track. The value is available only when CreateTracksStat() has been called.
-        /// There no more limit of count of track with V2.9.0
-        /// </summary>
-        public int TrackCount { get { return MPTK_TrackStat?.Count ?? 0; } }
-
-        public int ChannelCount = 16;
-
-        /// <summary>@brief
-        /// Get the MIDI file type of the loaded MIDI (0,1,2)
-        /// </summary>
-        public int MidiFileType;
-
-        /// <summary>@brief
-        /// Name of this MIDI.
-        /// </summary>
-        public string MidiName;
-
-        /// <summary>@brief
-        /// Get all the MIDI events created.
-        /// @code
-        /// midiFileWriter.MPTK_MidiEvents.ForEach(midiEvent =>
-        /// {
-        ///     midiEvent.Tick += shiftTick;
-        ///     midiEvent.RealTime += shiftTime;
-        /// });
-        /// @endcode
-        /// </summary>
-        public List<MPTKEvent> MPTK_MidiEvents;
-
-        /// <summary>@brief
-        /// Last MIDI events found in the MIDI events created. It's not always the last sound that's played, especially if the previous event lasted longer than the last.
-        /// @note: return null if no MIDI event found.
-        /// </summary>
-        public MPTKEvent MPTK_LastEvent => MPTK_MidiEvents == null || MPTK_MidiEvents.Count == 0 ? null : MPTK_MidiEvents[MPTK_MidiEvents.Count - 1];
-
-        /// <summary>@brief
-        /// Last tick position including the duration.
-        /// @note: It's not always the last sound played. If the previous event lasted longer than the last tick, it won't be.
-        /// </summary>
-        public long TickLast => MPTK_LastEvent == null ? 0 : MPTK_LastEvent.Tick + MPTK_LastEvent.Length;
-
-        // @cond NODOC
-        // Not yet mature to be published.
-        // Track information, built with CreateTracksStat. It's a dictionary with the track number as a key and the item holds some information about the track.
-        public Dictionary<long, MPTKStat> MPTK_TrackStat;
-        // @endcond
-
-        /// <summary>@brief
-        /// Count of MIDI events in the MPTK_Events
-        /// </summary>
-        public int CountEvent
-        {
-            get { return MPTK_MidiEvents == null ? 0 : MPTK_MidiEvents.Count; }
-        }
-
-
-        /// <summary>@brief
-        /// Create an empty MPTKWriter with default or specific header midi value (for advanced use)\n
+        /// Creates an empty MPTKWriter with default or custom MIDI header values.\n
         /// Default:\n
-        /// @li Delta Ticks Per Beat Note = 240 \n
-        /// @li Midi file type = 1 \n
-        /// @li Beats Per Minute = 120\n
+        /// @li Delta ticks per quarter note = 240\n
+        /// @li MIDI file type = 1\n
+        /// @li Tempo = 120 BPM\n
         /// @snippet MidiEditorProWindow.cs.cs ExampleInitMidiFileWriter
         /// 
         /// </summary>
-        /// <param name="deltaTicksPerQuarterNote">Delta Ticks Per Beat Note, default is 240. See #MPTK_DeltaTicksPerQuarterNote.</param>
-        /// <param name="midiFileType">type of Midi format. Must be 0 or 1, default 1</param>
-        /// <param name="bpm">Initial Beats Per Minute, default 120</param>
+        /// <param name="deltaTicksPerQuarterNote">Delta ticks per quarter note, default is 240. See #DeltaTicksPerQuarterNote.</param>
+        /// <param name="midiFileType">Type of MIDI format. Must be 0 or 1. Default is 1.</param>
+        /// <param name="bpm">Initial tempo in beats per minute. Default is 120.</param>
         public MPTKWriter(int deltaTicksPerQuarterNote = 240, int midiFileType = 1, int bpm = 120, int channelcount = 16)
         {
             MPTK_MidiEvents = new List<MPTKEvent>();
@@ -228,7 +61,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Remove all MIDI events and restore default attributs:
+        /// Removes all MIDI events and restores default attributes:
         /// @li MPTK_DeltaTicksPerQuarterNote = 240
         /// @li MPTK_MidiFileType = 1
         /// @li Tempo = 120
@@ -246,13 +79,12 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// New with version V2.9.0 Import a list of MptkEvent.\n
+        /// Imports a list of MPTKEvent instances.\n
         /// @details
-        /// Multiple imports can be done for joining MIDI events from different sources @emoji grin.\n
-        /// @details
-        /// @li The first import will be the reference for the DeltaTicksPerQuarterNote (MPTK_DeltaTicksPerQuarterNote is set with the value in parameter).
-        /// @li The next imports will convert time and duration of the MIDI events with the ratio of DeltaTicksPerQuarterNote in parameter and the initial DeltaTicksPerQuarterNote.
-        /// @li real time, measure and beat for each events are recalculated for the whole MIDI events at the end off the import with #CalculateTiming()
+        /// Multiple imports can be chained to merge events from different sources.\n
+        /// @li The first import defines #DeltaTicksPerQuarterNote.
+        /// @li Subsequent imports convert tick and duration values using the DTPQN ratio between source and destination.
+        /// @li Real time, measure, and beat are recalculated for the full event list at the end with #CalculateTiming().
 
         /// Example from MIDI Generator
         /// @snippet TestMidiGenerator.cs ExampleMIDIImport
@@ -261,16 +93,16 @@ namespace MidiPlayerTK
         /// @snippet MidiJoinAndImport.cs ExampleMIDIImportAndPlay
         /// \n
         /// </summary>
-        /// <param name="midiEventsToInsert">List of MptkEvent to insert</param>
+        /// <param name="midiEventsToInsert">List of MPTKEvent instances to insert.</param>
         /// <param name="deltaTicksPerQuarterNote">
-        /// It's the DTPQN of the MIDI events to insert. \n
-        /// @li If there is not yet MIDI events in #MPTK_MidiEvents, that will be the default #DeltaTicksPerQuarterNote of the MPTKWriter instance.\n
-        /// @li If there is already MIDI events in #MPTK_MidiEvents, the timing of MIDI events in #midiEventsToInsert will be converted accordingly.\n
+        /// DTPQN value of the source events.\n
+        /// @li If #MPTK_MidiEvents is empty, this value becomes #DeltaTicksPerQuarterNote.\n
+        /// @li If events already exist, source timing is converted to the writer DTPQN.\n
         /// </param>
-        /// <param name="position">tickFromTime position to insert, -1 to append, 0 at beguinning</param>
-        /// <param name="name">Name of the MIDI created (set MPTK_MidiName).</param>
-        /// <param name="logDebug">Debug log.</param>
-        /// <returns>true if no error</returns>
+        /// <param name="position">Tick position for insertion: -1 to append, 0 for beginning, or any tick within the sequence.</param>
+        /// <param name="name">Optional sequence name (sets #MidiName).</param>
+        /// <param name="logDebug">Enable debug logs.</param>
+        /// <returns>True if import succeeds.</returns>
         public bool ImportFromEventsList(List<MPTKEvent> midiEventsToInsert, int deltaTicksPerQuarterNote, long position = -1, string name = null, bool logPerf = false, bool logDebug = false)
         {
             bool ok = false;
@@ -328,11 +160,11 @@ namespace MidiPlayerTK
 
                         // DTPQN conversion (real time will be recalculated at the end of the full MIDI events list)
                         midiEventsToInsert.ForEach(midiEvent =>
-                            {
-                                midiEvent.Tick = (long)(midiEvent.Tick * ratioDTPQN + 0.5f);
-                                //midiEvent.RealTime = midiEvent.RealTime * ratioDTPQN;
-                                midiEvent.Length = (int)(midiEvent.Length * ratioDTPQN + 0.5f);
-                            }
+                        {
+                            midiEvent.Tick = (long)(midiEvent.Tick * ratioDTPQN + 0.5f);
+                            //midiEvent.RealTime = midiEvent.RealTime * ratioDTPQN;
+                            midiEvent.Length = (int)(midiEvent.Length * ratioDTPQN + 0.5f);
+                        }
                         );
                     }
 
@@ -346,11 +178,11 @@ namespace MidiPlayerTK
 
                         // time shift source event  (real time will be recalculated at the end of the full MIDI events list)
                         MPTK_MidiEvents.ForEach(midiEvent =>
-                            {
-                                midiEvent.Tick += shiftTick;
-                                // No change on Length (tickFromTime duration) as the original DTPQN is not modified
-                                //midiEvent.RealTime += shiftTime;
-                            }
+                        {
+                            midiEvent.Tick += shiftTick;
+                            // No change on Length (tickFromTime duration) as the original DTPQN is not modified
+                            //midiEvent.RealTime += shiftTime;
+                        }
                         );
                     }
                     else if (logDebug) Debug.Log("No events in source, no time shifting");
@@ -379,11 +211,11 @@ namespace MidiPlayerTK
 
                     // shift event to append + DTPQN conversion  (real time will be recalculated at the end of the full MIDI events list)
                     midiEventsToInsert.ForEach(midiEvent =>
-                        {
-                            midiEvent.Tick = (long)(midiEvent.Tick * ratioDTPQN + 0.5f) + shiftTick;
-                            //midiEvent.RealTime = midiEvent.RealTime * ratioDTPQN + shiftTime;
-                            midiEvent.Length = (int)(midiEvent.Length * ratioDTPQN + 0.5f);
-                        }
+                    {
+                        midiEvent.Tick = (long)(midiEvent.Tick * ratioDTPQN + 0.5f) + shiftTick;
+                        //midiEvent.RealTime = midiEvent.RealTime * ratioDTPQN + shiftTime;
+                        midiEvent.Length = (int)(midiEvent.Length * ratioDTPQN + 0.5f);
+                    }
                     );
 
 
@@ -417,11 +249,11 @@ namespace MidiPlayerTK
 
                         // Time shift event to insert + DTPQN conversion  (real time will be recalculated at the end of the full MIDI events list)
                         midiEventsToInsert.ForEach(midiEvent =>
-                            {
-                                midiEvent.Tick = (long)(midiEvent.Tick * ratioDTPQN + 0.5f) + shiftTick;
-                                //midiEvent.RealTime = midiEvent.RealTime * ratioDTPQN + shiftTime;
-                                midiEvent.Length = (int)(midiEvent.Length * ratioDTPQN + 0.5f);
-                            }
+                        {
+                            midiEvent.Tick = (long)(midiEvent.Tick * ratioDTPQN + 0.5f) + shiftTick;
+                            //midiEvent.RealTime = midiEvent.RealTime * ratioDTPQN + shiftTime;
+                            midiEvent.Length = (int)(midiEvent.Length * ratioDTPQN + 0.5f);
+                        }
                         );
 
                         // Insert at the position found
@@ -462,6 +294,203 @@ namespace MidiPlayerTK
             return ok;
         }
 
+        /// @}
+
+
+        /// @name Tempo and Time Conversion
+        /// @ingroup mptkwriter_tempo
+        /// @brief Tempo state, tempo/signature maps, and tick/millisecond conversion helpers.
+        /// @details
+        /// This section defines the timing model used by the writer.
+        /// It includes DTPQN, current tempo, cached tempo/signature maps,
+        /// and helper methods to convert absolute positions and durations
+        /// between ticks and milliseconds.
+        /// @{
+
+        /// <summary>@brief
+        /// Delta Ticks Per Quarter Note (DTPQN) represents the number of ticks in one quarter note.\n
+        /// For example, with 96 ticks per quarter note, an eighth note has a duration of 48 ticks.\n
+        /// In a MIDI file, this value is found in the MIDI header and remains constant for the entire file.\n
+        /// More information: https://paxstellar.fr/2020/09/11/midi-timing/\n
+        /// </summary>
+        public int DeltaTicksPerQuarterNote;
+
+        //private int _bpm;
+        // version 2.10.0 was an int, becomes a double
+        private double _bpm;
+
+        /// <summary>@brief
+        /// Gets the current tempo value in microseconds per quarter note: 60 * 1000 * 1000 / BPM.\n
+        /// @details
+        /// Tempo in a MIDI file is stored in microseconds per quarter note.
+        /// To convert this to BPM, use #MPTKEvent.QuarterPerMicroSecond2BeatPerMinute.\n
+        /// This value can change while generating MIDI when #AddTempoChange is called.\n
+        /// More information: https://paxstellar.fr/2020/09/11/midi-timing/
+        /// </summary>
+        public int MicrosecondsPerQuaterNote
+        {
+            get { return _bpm > 0 ? (int)(60 * 1000 * 1000 / _bpm) : 0; }
+        }
+
+
+        /// <summary>@brief
+        /// Gets the current tempo in BPM. Updated by #AddTempoChange and #AddBPMChange.\n
+        /// https://en.wikipedia.org/wiki/Tempo
+        /// </summary>
+        public double CurrentTempo => _bpm;
+
+        /// <summary>@brief
+        /// List of tempo segments derived from #MPTK_MidiEvents.
+        /// Rebuild with MPTKTempo.CalculateMap when events change.\n
+        /// See example:
+        /// @snippet TestMidiGenerator.cs ExampleCalculateMaps
+        /// @version 2.10.0
+        /// </summary>
+        public List<MPTKTempo> MPTK_TempoMap;
+
+        /// <summary>@brief
+        /// List of time-signature segments derived from #MPTK_MidiEvents.
+        /// Rebuild with MPTKSignature.CalculateMap when events change.\n
+        /// See example:
+        /// @snippet TestMidiGenerator.cs ExampleCalculateMaps
+        /// @version 2.10.0
+        /// </summary>
+        public List<MPTKSignature> MPTK_SignMap;
+
+
+        /// <summary>@brief
+        /// Gets the current duration, in milliseconds, of one MIDI tick (relative to the current tempo).\n
+        /// @details
+        /// This depends on #CurrentTempo and #DeltaTicksPerQuarterNote.\n
+        /// PulseLength = 60000 / CurrentTempo / DeltaTicksPerQuarterNote
+        /// </summary>
+        public float PulseLenght { get { return _bpm > 0 && DeltaTicksPerQuarterNote > 0 ? (60000f / (float)_bpm) / (float)DeltaTicksPerQuarterNote : 0f; } }
+
+        /// <summary>@brief
+        /// Converts an absolute tick position to time in milliseconds.\n
+        /// </summary>
+        /// <param name="tick">Absolute tick position.</param>
+        /// <param name="indexTempo">Optional index in #MPTK_TempoMap for this position. If -1, the map is recalculated and the segment is searched automatically.</param>
+        /// <returns>Absolute time in milliseconds.</returns>
+        public float ConvertTickToMilli(long tick, int indexTempo = -1)
+        {
+            if (indexTempo < 0)
+            {
+                MPTKTempo.CalculateMap(DeltaTicksPerQuarterNote, MPTK_MidiEvents, MPTK_TempoMap);
+                indexTempo = MPTKTempo.FindSegment(MPTK_TempoMap, tick, fromIndex: 0);
+            }
+            return (float)MPTK_TempoMap[indexTempo].CalculateTime(tick);
+        }
+
+        /// <summary>@brief
+        /// Converts a time position in milliseconds to an absolute tick position.\n
+        /// </summary>
+        /// <param name="time">Time position in milliseconds</param>
+        /// <param name="indexTempo">Optional index in #MPTK_TempoMap for this position. If -1, the map is recalculated and the segment is searched automatically.</param>
+        /// <returns>Absolute tick position.</returns>
+        public long ConvertMilliToTick(float time, int indexTempo = -1)
+        {
+            if (indexTempo < 0)
+            {
+                MPTKTempo.CalculateMap(DeltaTicksPerQuarterNote, MPTK_MidiEvents, MPTK_TempoMap);
+                indexTempo = MPTKTempo.FindSegment(MPTK_TempoMap, time, fromIndex: 0);
+            }
+            //Debug.Log($"Index:{indexTempo} Tick:{MPTK_TempoMap[indexTempo].CalculatelTick(time)} at time {time}");
+            return MPTK_TempoMap[indexTempo].CalculatelTick(time);
+        }
+
+        /// <summary>@brief
+        /// Converts a tick duration to a millisecond duration using the current tempo.\n
+        /// @note Previous calls to #AddBPMChange and #AddTempoChange have a direct impact on this calculation.
+        /// </summary>
+        /// <param name="tick">Duration in ticks.</param>
+        /// <returns>Duration in milliseconds.</returns>
+        public long DurationTickToMilli(long tick)
+        {
+            return (long)(tick * PulseLenght + 0.5f);
+        }
+
+        /// <summary>@brief
+        /// Converts a millisecond duration to a tick duration using the current tempo.\n
+        /// @note Previous calls to #AddBPMChange and #AddTempoChange have a direct impact on this calculation.
+        /// </summary>
+        /// <param name="time">Duration in milliseconds.</param>
+        /// <returns>Duration in ticks.</returns>
+        public long DurationMilliToTick(float time)
+        {
+            return PulseLenght > 0d ? (long)(time / PulseLenght + 0.5f) : 0L;
+        }
+        /// @}
+
+        /// @name Sequence State and Event Collections
+        /// @ingroup mptkwriter_state
+        /// @brief Core state for the current MIDI sequence and generated event list.
+        /// @details
+        /// This section stores global sequence metadata (name, MIDI format, channels),
+        /// accessors for the generated event list, and convenience properties such as
+        /// last event and last tick position.
+        /// @{
+
+        /// <summary>@brief
+        /// Gets the number of tracks. This value is available only when CreateTracksStat() has been called.
+        /// There is no longer a track-count limit as of V2.9.0.
+        /// </summary>
+        public int TrackCount { get { return MPTK_TrackStat?.Count ?? 0; } }
+
+        public int ChannelCount = 16;
+
+        /// <summary>@brief
+        /// Gets the MIDI file type of the loaded MIDI (0, 1, or 2).
+        /// </summary>
+        public int MidiFileType;
+
+        /// <summary>@brief
+        /// Name of this MIDI sequence.
+        /// </summary>
+        public string MidiName;
+
+        /// <summary>@brief
+        /// Gets all created MIDI events.
+        /// @code
+        /// midiFileWriter.MPTK_MidiEvents.ForEach(midiEvent =>
+        /// {
+        ///     midiEvent.Tick += shiftTick;
+        ///     midiEvent.RealTime += shiftTime;
+        /// });
+        /// @endcode
+        /// </summary>
+        public List<MPTKEvent> MPTK_MidiEvents;
+
+        /// <summary>@brief
+        /// Last MIDI event in the created MIDI events list. It is not always the last sound played, especially if a previous event lasts longer.
+        /// @note Returns null if no MIDI event is found.
+        /// </summary>
+        public MPTKEvent MPTK_LastEvent => MPTK_MidiEvents == null || MPTK_MidiEvents.Count == 0 ? null : MPTK_MidiEvents[MPTK_MidiEvents.Count - 1];
+
+        /// <summary>@brief
+        /// Last tick position including event duration.
+        /// @note This is not always the last audible sound. A previous event may still ring longer.
+        /// </summary>
+        public long TickLast => MPTK_LastEvent == null ? 0 : MPTK_LastEvent.Tick + MPTK_LastEvent.Length;
+
+        // @cond NODOC
+        // Not yet mature to be published.
+        // Track information, built with CreateTracksStat. It's a dictionary with the track number as a key and the item holds some information about the track.
+        public Dictionary<long, MPTKStat> MPTK_TrackStat;
+        // @endcond
+
+        /// <summary>@brief
+        /// Number of MIDI events in #MPTK_MidiEvents.
+        /// </summary>
+        public int CountEvent
+        {
+            get { return MPTK_MidiEvents == null ? 0 : MPTK_MidiEvents.Count; }
+        }
+        
+        /// @}
+
+
+
         /*
         /// <summary>@brief
         /// 
@@ -495,11 +524,19 @@ namespace MidiPlayerTK
         }
         */
 
+        /// @name Loading Existing MIDI Content
+        /// @ingroup mptkwriter_loading
+        /// @brief Load sequence data from file system or MidiDB.
+        /// @details
+        /// These methods replace the current in-memory event list with events loaded
+        /// from an external source and restore timing header values such as DTPQN.
+        /// @{
+
         /// <summary>@brief
-        /// Load a Midi file from OS system file (could be dependant of the OS)
+        /// Loads a MIDI file from the OS file system (behavior may depend on the OS).
         /// </summary>
-        /// <param name="filename"></param>
-        /// <returns>true if no error</returns>
+        /// <param name="filename">Full path to the MIDI file.</param>
+        /// <returns>True if loading succeeds.</returns>
         public bool LoadFromFile(string filename)
         {
             bool ok = false;
@@ -523,13 +560,13 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Create a MPTKWriter from a Midi found in MPTK MidiDB. All existing MIDI events before the load will be lost.
-        /// If you add some MIDI events after loading, don't forget to sort the MIDI events after.
-        /// See example.
+        /// Loads a MIDI from MPTK MidiDB into this writer.
+        /// Existing events are replaced.
+        /// If you add events afterward, sort the list before writing.
         /// @snippet TestMidiGenerator.cs ExampleMidiWileWriterLoadMidi
         /// </summary>
-        /// <param name="indexMidiDb"></param>
-        /// <returns>true if no error</returns>
+        /// <param name="indexMidiDb">Index in the MidiDB list.</param>
+        /// <returns>True if loading succeeds.</returns>
         public bool LoadFromMidiDB(int indexMidiDb)
         {
             bool ok = false;
@@ -562,11 +599,21 @@ namespace MidiPlayerTK
             return ok;
         }
 
+        /// @}
+
+        /// @name Track Statistics
+        /// @ingroup mptkwriter_stats
+        /// @brief Build and maintain per-track counters derived from event content.
+        /// @details
+        /// Track statistics are used by export/diagnostic operations to summarize
+        /// event distribution by track (count, notes, preset changes).
+        /// @{
+
         /// <summary>
-        /// Build the tracks information (MPTK_TrackStat) from the MIDI event found in MPTK_Events.
-        /// MPTK_TrackStat is a dictionary with the track number as a key and the item holds some informatio about the track.
+        /// Builds track statistics (`MPTK_TrackStat`) from events in `MPTK_MidiEvents`.
+        /// The dictionary key is the track number, and each value contains aggregated counters.
         /// </summary>
-        /// <returns>Stat dictionary</returns>
+        /// <returns>Track statistics dictionary.</returns>
         /// <exception cref="MaestroException"></exception>
         public Dictionary<long, MPTKStat> CreateTracksStat()
         {
@@ -590,21 +637,31 @@ namespace MidiPlayerTK
             if (midiEvent.Command == MPTKCommand.NoteOn) MPTK_TrackStat[midiEvent.Track].CountNote++;
             if (midiEvent.Command == MPTKCommand.PatchChange) MPTK_TrackStat[midiEvent.Track].CountPreset++;
         }
+        /// @}
+
+        /// @name MIDI Event Creation API
+        /// @ingroup mptkwriter_creation
+        /// @brief Add musical, control, and meta events to the sequence.
+        /// @details
+        /// This section is the main authoring API for building MIDI content:
+        /// notes, chords, program/controller changes, pitch wheel, tempo/signature,
+        /// and text meta events.
+        /// @{
 
         /// <summary>@brief
-        /// Add a MPTK Midi event from a MptkEvent instance. Useful to add a raw MIDI event.\n
+        /// Adds an event directly from an MPTKEvent instance.\n
         /// @details
-        /// These attributs must be defined in the MptkEvent instance:
-        /// @li MptkEvent.Track
-        /// @li MptkEvent.Channel
-        /// @li MptkEvent.Command
-        /// @li MptkEvent.Tick
+        /// The following fields must be set in the input event:
+        /// - MPTKEvent.Track
+        /// - MPTKEvent.Channel
+        /// - MPTKEvent.Command
+        /// - MPTKEvent.Tick
         /// @note
-        /// Others attributs must be defined depending on the value of MptkEvent.Command, see class MidiPlayerTK.MPTKCommand.\n
-        /// For example, MptkEvent.Length must be defined if MptkEvent.Command=MPTKCommand.NoteOn
-        /// </summary>.
-        /// <param name="mptkEvent"></param>
-        /// <returns>Return the MIDI event created or null if error</returns>
+        /// Other fields depend on the command type; see MidiPlayerTK.MPTKCommand.\n
+        /// For example, MPTKEvent.Length must be set when MPTKEvent.Command is MPTKCommand.NoteOn.
+        /// </summary>
+        /// <param name="mptkEvent">Event to add.</param>
+        /// <returns>The same event instance, or null on error.</returns>
         public MPTKEvent AddRawEvent(MPTKEvent mptkEvent)
         {
             try
@@ -636,16 +693,17 @@ namespace MidiPlayerTK
 
 
         /// <summary>@brief
-        /// Add a note on event at an absolute time (tickFromTime count). The corresponding Noteoff is automatically created if length > 0\n
-        /// If an infinite note-on is added (length < 0), don't forget to add a note-off, it will never created automatically.
+        /// Adds a NoteOn event at an absolute tick position.\n
+        /// A corresponding NoteOff is generated automatically when length is greater than 0.\n
+        /// If length is less than 0, no automatic NoteOff is created.
         /// </summary>
         /// <param name="track">Track for this event (do not add to track 0)</param>
-        /// <param name="tick">Tick time for this event</param>
+        /// <param name="tick">Absolute tick position for this event.</param>
         /// <param name="channel">Channel must be in the range 0-15</param>
         /// <param name="note">Note must be in the range 0-127</param>
         /// <param name="velocity">Velocity must be in the range 0-127.</param>
-        /// <param name="length">Duration in tickFromTime. No automatic noteoff is added if duration is < 0, need to be added with MPTK_AddOff</param>
-        /// <returns>Return the MIDI event created or null if error</returns>
+        /// <param name="length">Duration in ticks. If less than 0, you must add NoteOff manually with #AddOff.</param>
+        /// <returns>The MIDI event created, or null on error.</returns>
         public MPTKEvent AddNote(int track, long tick, int channel, int note, int velocity, int length)
         {
             MPTKEvent mptkEvent = null;
@@ -678,16 +736,16 @@ namespace MidiPlayerTK
 
 
         /// <summary>@brief
-        /// Add a silence.\n
+        /// Adds a silence placeholder.\n
         /// @note
-        /// A silent note does not exist in the MIDI norm, we simulate it with a noteon and a very low velocity = 1.\n
-        /// it's not possible to create a noteon with a velocity = 0, it's considered as a noteof by MIDI
+        /// MIDI has no native "silent note". This method simulates silence with a NoteOn event at velocity 1.\n
+        /// A NoteOn velocity of 0 is interpreted as NoteOff by the MIDI standard.
         /// </summary>
         /// <param name="track">Track for this event (do not add to track 0)</param>
         /// <param name="tick">Tick time for this event.</param>
         /// <param name="channel">Channel must be in the range 0-15</param>
-        /// <param name="length">Duration in tickFromTime.</param>
-        /// <returns>Return the MIDI event created or null if error</returns>
+        /// <param name="length">Duration in ticks.</param>
+        /// <returns>The MIDI event created, or null on error.</returns>
         public MPTKEvent AddSilence(int track, long tick, int channel, int length)
         {
             MPTKEvent mptkEvent = null;
@@ -709,14 +767,14 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Add a note off event.\n
-        /// Must always succeed the corresponding NoteOn, obviously on the same channel!
+        /// Adds a note-off event.\n
+        /// It must always follow the corresponding NoteOn, on the same channel.
         /// </summary>
         /// <param name="track">Track for this event (do not add to track 0)</param>
-        /// <param name="tick">Tick time for this event</param>
+        /// <param name="tick">Absolute tick position for this event.</param>
         /// <param name="channel">Channel must be in the range 0-15</param>
         /// <param name="note">Note must be in the range 0-127</param>
-        /// <returns>Return the MIDI event created or null if error</returns>
+        /// <returns>The matching NoteOn event that was updated, or null if not found/error.</returns>
         public MPTKEvent AddOff(int track, long tick, int channel, int note)
         {
             MPTKEvent mptkEvent = null;
@@ -752,15 +810,14 @@ namespace MidiPlayerTK
 
 
         /// <summary>@brief
-        /// Add a chord from a range
+        /// Adds a chord built from a scale range.
         /// @snippet TestMidiGenerator.cs ExampleMidiWriterBuildChordFromRange
         /// </summary>
         /// <param name="track">Track for this event (do not add to track 0)</param>
-        /// <param name="tick"></param>
-        /// <param name="channel"></param>
-        /// <param name="scale">See MPTKScaleLib</param>
-        /// <param name="chord">See MPTKChordBuilder</param>
-        /// <returns>Return the MIDI event created or null if error</returns>
+        /// <param name="tick">Start tick for all generated notes.</param>
+        /// <param name="channel">MIDI channel (0-15).</param>
+        /// <param name="scale">Scale definition (see MPTKScaleLib).</param>
+        /// <param name="chord">Chord builder settings (see MPTKChordBuilder).</param>
         public void AddChordFromScale(int track, long tick, int channel, MPTKScaleLib scale, MPTKChordBuilder chord)
         {
             try
@@ -776,15 +833,14 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Add a chord from a library of chord
+        /// Adds a chord from a chord library.
         /// @snippet TestMidiGenerator.cs ExampleMidiWriterBuildChordFromLib
         /// </summary>
         /// <param name="track">Track for this event (do not add to track 0)</param>
-        /// <param name="tick"></param>
-        /// <param name="channel"></param>
-        /// <param name="chordName">Name of the chord See #MPTKChordName</param>
-        /// <param name="chord">See MPTKChordBuilder</param>
-        /// <returns>Return the MIDI event created or null if error</returns>
+        /// <param name="tick">Start tick for all generated notes.</param>
+        /// <param name="channel">MIDI channel (0-15).</param>
+        /// <param name="chordName">Chord name (see #MPTKChordName).</param>
+        /// <param name="chord">Chord builder settings (see MPTKChordBuilder).</param>
         public void AddChordFromLib(int track, long tick, int channel, MPTKChordName chordName, MPTKChordBuilder chord)
         {
             try
@@ -800,7 +856,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Add a change preset
+        /// Adds a preset change.
         /// </summary>
         /// <param name="track">Track for this event (do not add to track 0)</param>
         /// <param name="tick">Tick time for this event</param>
@@ -825,7 +881,7 @@ namespace MidiPlayerTK
 
 
         /// <summary>@brief
-        /// Add a Channel After-Touch Event
+        /// Adds a Channel After-Touch event.
         /// </summary>
         /// <param name="track">Track for this event (do not add to track 0)</param>
         /// <param name="tick">Tick time for this event</param>
@@ -849,7 +905,7 @@ namespace MidiPlayerTK
 
 
         /// <summary>@brief
-        /// Creates a general control change event (CC)
+        /// Creates a general Control Change event (CC).
         /// </summary>
         /// <param name="track">Track for this event (do not add to track 0)</param>
         /// <param name="tick">Tick time for this event</param>
@@ -873,17 +929,17 @@ namespace MidiPlayerTK
 
 
         /// <summary>@brief
-        /// Creates a control change event (CC) for the pitch (Pitch Wheel)\n
-        /// pitchWheel=
-        /// @li  0      minimum (0 also for midi standard event value) 
-        /// @li  0.5    centered value (8192 for midi standard event value) 
-        /// @li  1      maximum (16383 for midi standard event value)
+        /// Creates a Pitch Wheel event from a normalized value.\n
+        /// pitchWheel:
+        /// @li  0.0 = minimum (MIDI value 0)
+        /// @li  0.5 = center (MIDI value 8192)
+        /// @li  1.0 = maximum (MIDI value 16383)
         /// </summary>
         /// <param name="track">Track for this event (do not add to track 0)</param>
         /// <param name="tick">Tick time for this event</param>
         /// <param name="channel">Channel must be in the range 0-15</param>
-        /// <param name="pitchWheel">Normalized Pitch Wheel Value. Range 0 to 1. V2.88.2 range normalized from 0 to 1.</param>
-        /// <returns>Return the MIDI event created or null if error</returns>
+        /// <param name="pitchWheel">Normalized pitch-wheel value in range [0..1].</param>
+        /// <returns>The MIDI event created, or null on error.</returns>
         public MPTKEvent AddPitchWheelChange(int track, long tick, int channel, float pitchWheel)
         {
             try
@@ -900,15 +956,15 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Add a tempo change to the midi stream. There is no channel in parameter because tempo change is applied to all tracks and channels.\n
-        /// Next note-on with milliseconds defined after the tempo change will take into account the new value of the BPM.
+        /// Adds a tempo change to the MIDI stream. There is no channel parameter because a tempo change is applied to all tracks and channels.\n
+        /// Subsequent duration/time conversions use the new BPM value.
         /// @note 
-        /// TempoMap is not updated, call MPTK_CalculateTempoMap to recreate the full tempo map.
+        /// #MPTK_TempoMap is not updated automatically; call #CalculateTiming to rebuild maps.
         /// </summary>
-        /// <param name="track">Track for this event (it's a good practive to use track 0 for this event)</param>
-        /// <param name="tick">Tick time for this event</param>
-        /// <param name="bpm">quarter per minute</param>
-        /// <returns>Return the MIDI event created or null if error</returns>
+        /// <param name="track">Track for this event (it is good practice to use track 0 for this event).</param>
+        /// <param name="tick">Absolute tick position for this event.</param>
+        /// <param name="bpm">Quarters per minute.</param>
+        /// <returns>The MIDI event created, or null on error.</returns>
         public MPTKEvent AddBPMChange(int track, long tick, int bpm)
         {
             if (bpm <= 0)
@@ -930,17 +986,17 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Add a tempo change to the midi stream in microseconds per quarter note. \n
-        /// There is no channel in parameter because tempo change is applied to all tracks and channels.\n
-        /// Next note-on with milliseconds defined after the tempo change will take into account the new value of the BPM.
+        /// Adds a tempo change to the MIDI stream in microseconds per quarter note.\n
+        /// There is no channel parameter because a tempo change is applied to all tracks and channels.\n
+        /// Subsequent duration/time conversions use the new tempo value.
         /// @note 
-        /// MPTK_TempoMap is not updated. See example:
+        /// #MPTK_TempoMap is not updated automatically. See example:
         /// @snippet TestMidiGenerator.cs ExampleCalculateMaps
         /// </summary>
-        /// <param name="track">Track for this event (it's a good practive to use track 0 for this event)</param>
-        /// <param name="tick">Tick time for this event</param>
-        /// <param name="microsecondsPerQuarterNote">Microseconds per quarter note</param>
-        /// <returns>Return the MIDI event created or null if error</returns>
+        /// <param name="track">Track for this event (it is good practice to use track 0 for this event).</param>
+        /// <param name="tick">Absolute tick position for this event.</param>
+        /// <param name="microsecondsPerQuarterNote">Tempo in microseconds per quarter note.</param>
+        /// <returns>The MIDI event created, or null on error.</returns>
         public MPTKEvent AddTempoChange(int track, long tick, int microsecondsPerQuarterNote)
         {
             if (microsecondsPerQuarterNote <= 0)
@@ -963,20 +1019,21 @@ namespace MidiPlayerTK
 
 
         /// <summary>@brief
-        /// Create a new TimeSignatureEvent. This event is optionnal. 
-        /// Internal Midi sequencer assumes the default value is 4,2,24,32.  No track nor channel as teampo change applied to the whole midi.
-        /// More info here https://paxstellar.fr/2020/09/11/midi-timing/
+        /// Creates a TimeSignature meta event (optional).
+        /// The internal sequencer default is 4,2,24,32.
+        /// No channel is required because time signature applies globally.
+        /// More information: https://paxstellar.fr/2020/09/11/midi-timing/
         /// @note 
         /// MPTK_SignMap is not updated. See example:
         /// @snippet TestMidiGenerator.cs ExampleCalculateMaps
         /// </summary>
-        /// <param name="track">Track for this event (it's a good practive to use track 0 for this event)</param>
-        /// <param name="tick">Time at which to create this event</param>
+        /// <param name="track">Track for this event (it is good practice to use track 0 for this event).</param>
+        /// <param name="tick">Absolute tick position where the event is added.</param>
         /// <param name="numerator">Numerator, beats per measure. Will be MPTKSignature.NumberBeatsMeasure in #MPTK_SignMap</param>
         /// <param name="denominator">Denominator, beat unit: 1 means 2, 2 means 4 (crochet), 3 means 8 (quaver), 4 means 16, ...</param>
         /// <param name="ticksInMetronomeClick">Ticks in Metronome Click. Set to 24 for a standard value.</param>
-        /// <param name="no32ndNotesInQuarterNote">No of 32nd Notes in Beat Click. Set to 32 for a standard value.</param>
-        /// <returns>Return the MIDI event created or null if error</returns>
+        /// <param name="no32ndNotesInQuarterNote">Number of 32nd notes per quarter note. Standard MIDI value is usually 8.</param>
+        /// <returns>The MIDI event created, or null on error.</returns>
         public MPTKEvent AddTimeSignature(int track, long tick, int numerator = 4, int denominator = 2, int ticksInMetronomeClick = 24, int no32ndNotesInQuarterNote = 32)
         {
             try
@@ -1004,14 +1061,14 @@ namespace MidiPlayerTK
 
 
         /// <summary>@brief
-        /// Create a MIDI Text Event.
+        /// Creates a MIDI text event.
         /// @snippet TestMidiGenerator.cs ExampleCreateMeta
         /// </summary>
-        /// <param name="track">Track for this event (it's a good practice to use track 0 for this event)</param>
-        /// <param name="tick">Absolute time of this event</param>
-        /// <param name="typeMeta">MetaEvent type</param>
-        /// <param name="text">The text associated to this MIDI event</param>
-        /// <returns>Return the MIDI event created or null if error</returns>
+        /// <param name="track">Track for this event (good practice: track 0).</param>
+        /// <param name="tick">Absolute tick position of this event.</param>
+        /// <param name="typeMeta">Meta-event type.</param>
+        /// <param name="text">The text associated with this MIDI event.</param>
+        /// <returns>The MIDI event created, or null on error.</returns>
         public MPTKEvent AddText(int track, long tick, MPTKMeta typeMeta, string text)
         {
             try
@@ -1040,9 +1097,30 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Delete all MIDI events on this channel
+        /// If true, META text (for example lyrics) is written with UTF-8 encoding. Default is false.\n
+        /// Standard MIDI text meta events are ASCII. With this extension, you can also store and display\n
+        /// non-ASCII characters (Korean, Chinese, Japanese, accented Latin characters, and more).\n
+        /// To enable reading UTF8 characters from an MPTK MIDI player, set MidiFilePlayer#MPTK_ExtendedText to true.\n
+        /// @warning This is an MPTK extension of the MIDI standard, so if you read your MIDI file with another application, you may not find your original text.
+        /// @version 2.11.3
         /// </summary>
-        /// <param name="channel"></param>
+        public bool ExtendedText { get; set; }
+
+
+        /// @}
+
+        /// @name Event List Maintenance and Timing Recalculation
+        /// @ingroup mptkwriter_maintenance
+        /// @brief Modify event collections and recompute sorted/timed state.
+        /// @details
+        /// Use these methods to delete subsets of events, apply stable sorting,
+        /// and rebuild real-time/measure/beat values after content changes.
+        /// @{
+
+        /// <summary>@brief
+        /// Deletes all MIDI events on this channel.
+        /// </summary>
+        /// <param name="channel">Channel to remove (0-15).</param>
         public void DeleteChannel(int channel)
         {
             if (MPTK_MidiEvents != null)
@@ -1056,9 +1134,9 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Delete all MIDI events on this track
+        /// Deletes all MIDI events on this track.
         /// </summary>
-        /// <param name="track"></param>
+        /// <param name="track">Track index to remove.</param>
         public void DeleteTrack(int track)
         {
             if (MPTK_MidiEvents != null)
@@ -1072,10 +1150,10 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Sort in place events in MPTK_MidiEvents by ascending tickFromTime position.
-        /// Priority is applied for 'bank change' 'preset change' for a group of events with the same position (but 'end track' are set at end of the group. 
+        /// Sorts events in MPTK_MidiEvents in place by ascending tickFromTime position.
+        /// Priority is applied for 'bank change' and 'preset change' within a group of events at the same position (but 'end track' is placed at the end of the group).
         /// </summary>
-        /// <param name="logPerf"></param>
+        /// <param name="logPerf">Enable performance logging.</param>
         public void StableSortEvents(bool logPerf = false)
         {
             if (MPTK_MidiEvents != null)
@@ -1102,16 +1180,16 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Calculate real time, measure and quarter position
+        /// Calculates real-time position, measure, and beat for each event.
         /// @li Calculate #MPTK_TempoMap with #MPTKTempo.MPTK_CalculateMap
         /// @li Calculate #MPTK_SignMap with  #MPTKSignature.MPTK_CalculateMap
-        /// @li Calculate time and duration of each events from the tickFromTime value and from the tempo map.
-        /// @li Calculate measure and quarter position taking into account time signature.
+        /// @li Calculates time and duration of each event from tick values and the tempo map.
+        /// @li Calculates measure and beat using the time-signature map.
         /// @version 2.10.0
         /// @snippet TestMidiGenerator.cs ExampleCalculateMaps
         /// </summary>
-        /// <param name="logPerf"></param>
-        /// <param name="logDebug"></param>
+        /// <param name="logPerf">Enable performance logging.</param>
+        /// <param name="logDebug">Enable detailed debug logging.</param>
         public void CalculateTiming(bool logPerf = false, bool logDebug = false)
         {
             if (MPTK_MidiEvents != null)
@@ -1171,13 +1249,22 @@ namespace MidiPlayerTK
             else
                 Debug.LogWarning("MPTKWriter - CalculateTiming - MPTK_MidiEvents is null");
         }
+        /// @}
+
+        /// @name Export and Diagnostics
+        /// @ingroup mptkwriter_export
+        /// @brief Export MIDI files and inspect generated output/logs.
+        /// @details
+        /// This section converts MPTK events to NAudio structures, writes files
+        /// to disk or MidiDB, and provides detailed logging helpers for validation.
+        /// @{
 
         /// <summary>@brief
-        /// Write Midi file to an OS folder
+        /// Writes a MIDI file to an OS folder.
         /// @snippet TestMidiGenerator.cs ExampleMIDIWriteAndPlay
         /// </summary>
-        /// <param name="filename">filename of the midi file</param>
-        /// <returns>true if ok</returns>
+        /// <param name="filename">Output file path.</param>
+        /// <returns>True if writing succeeds.</returns>
         public bool WriteToFile(string filename)
         {
             bool ok = false;
@@ -1206,12 +1293,12 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Write Midi file to MidiDB.\n
-        /// To be used only in edit mode not in a standalone application.\n
-        /// A call to AssetDatabase.Refresh() must be required after the file has been added to the resource.
+        /// Writes a MIDI file to MidiDB.\n
+        /// To be used only in Edit mode, not in a standalone application.\n
+        /// A call to AssetDatabase.Refresh() is required after the file has been added to the Resources folder.
         /// </summary>
-        /// <param name="filename">filename of the midi file without any folder and any extension</param>
-        /// <returns>true if ok</returns>
+        /// <param name="filename">Filename of the MIDI file, without folder or extension.</param>
+        /// <returns>True if writing succeeds.</returns>
         public bool WriteToMidiDB(string filename)
         {
             bool ok = false;
@@ -1249,9 +1336,10 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        ///  Build a NAudio midi object from the midi events. WriteToMidiDB and WriteToFile call these methods just before writing the MIDI file.
+        /// Builds an NAudio MidiFile object from #MPTK_MidiEvents.
+        /// #WriteToMidiDB and #WriteToFile call this method before exporting.
         /// </summary>
-        /// <returns>NAudio MidiFile</returns>
+        /// <returns>NAudio MidiFile instance.</returns>
         public MidiFile BuildNAudioMidi()
         {
             MidiFile naudioMidi = new MidiFile(MidiFileType, DeltaTicksPerQuarterNote, extendedText: ExtendedText);
@@ -1442,9 +1530,9 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Log information about the MIDI
+        /// Logs writer state and MIDI events.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>True when logging completes without exception.</returns>
         public bool LogWriter()
         {
             bool ok = false;
@@ -1488,7 +1576,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Log information about the tempo map
+        /// Logs information about the tempo map.
         /// </summary>
         public void LogTempoMap()
         {
@@ -1503,7 +1591,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Log information about the signature map
+        /// Logs information about the signature map.
         /// </summary>
         public void LogSignMap()
         {
@@ -1518,7 +1606,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Log information about the stat map
+        /// Logs information about track statistics.
         /// </summary>
         public void LogTrackStat()
         {
@@ -1536,9 +1624,9 @@ namespace MidiPlayerTK
 
 
         /// <summary>@brief
-        /// Log information about the MIDI
+        /// Logs raw NAudio MIDI events built from the current writer state.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>True when logging completes without exception.</returns>
         public bool LogRaw()
         {
             bool ok = false;
@@ -1612,6 +1700,7 @@ namespace MidiPlayerTK
             }
             return ok;
         }
+        /// @}
 
         private static bool Test(string source, string target)
         {

@@ -19,8 +19,9 @@ namespace MidiPlayerTK
         public LocalDicAudioWave DicAudioWaveLocal = null;
         // @endcond
 
+        /// @ingroup soundfont_status
         /// <summary>@brief
-        /// Call every 200 ms when download is in progress. See also #ProgressValue
+        /// Called every 200 ms while a download is in progress. See also #ProgressValue.
         /// @code
         ///   midiSynth.MPTK_SoundFont.ProgressCallback = (float progress) =>
         ///   {
@@ -34,13 +35,15 @@ namespace MidiPlayerTK
         /// </summary>
         public Action<float> ProgressCallback = null;
 
+        /// @ingroup soundfont_status
         /// <summary>@brief
-        /// Provide a value for the progress of the download. 
-        /// Normalized between 0 and 1, should be a percentage but webRequest seems to provide a value not related to real percentage.
+        /// Provides the download progress value.
+        /// Normalized between 0 and 1. It should be a percentage, but `webRequest` may provide a value not directly related to the actual percentage.
         /// </summary>
         public float ProgressValue { get => progressValue; }
         private float progressValue;
 
+        /// @ingroup soundfont_status
         /// <summary>@brief
         /// Define a callback when the SoundFont is loaded and ready to use.
         /// @code
@@ -53,27 +56,32 @@ namespace MidiPlayerTK
         /// </summary>
         public Action<MidiSynth> LoadedCallback = null;
 
+        /// @ingroup soundfont_status
         /// <summary>@brief
-        /// Provide the status of the SoundFont loaded.
+        /// Provides the status of the loaded SoundFont.
         /// </summary>
         public LoadingStatusSoundFontEnum StatusSoundFont { get => statusSoundFont; }
         private LoadingStatusSoundFontEnum statusSoundFont;
 
+        /// @ingroup soundfont_status
         /// <summary>@brief
         /// Time to download the SoundFont from a web resource or a local file.
         /// </summary>
         public TimeSpan TimeToDownloadSoundFont { get => timeToDownloadSoundFont; }
         
+        /// @ingroup soundfont_status
         /// <summary>@brief
-        /// Time to load the SoundFont in MidiSynth prefab.
+        /// Time to load the SoundFont in the MidiSynth prefab.
         /// </summary>
         public TimeSpan TimeToLoadSoundFont { get => timeToLoadSoundFont; }
         
+        /// @ingroup soundfont_status
         /// <summary>@brief
-        /// Time to loas samples in the MidiSynth.
+        /// Time to load samples in the MidiSynth.
         /// </summary>
         public TimeSpan TimeToLoadWave { get => timeToLoadWave; }
 
+        /// @ingroup soundfont_status
         /// <summary>@brief
         /// Total time to load the SoundFont.
         /// </summary>
@@ -88,8 +96,12 @@ namespace MidiPlayerTK
         private System.Diagnostics.Stopwatch watchLoadSF;
         private SFLoad sfLoad = null;
 
+        /// @ingroup soundfont_loading
         /// <summary>@brief
-        /// Load a SoundFont file on the fly when the application is running (MPTK Pro).
+        /// Loads a SoundFont file on the fly while the application is running (MPTK Pro).
+        /// @note This method returns immediately with a boolean status: false if the load was canceled, or true if the load is in progress.
+        /// Since loading may take time, use LoadedCallback to be notified when the SoundFont is ready or if an error occurs.
+        /// StatusSoundFont provides the current loading status, and ProgressCallback can be used to track progress.
         /// <param name="pathSF">The path to the SoundFont, loading from:
         /// - Local desktop  when path starts with file:// 
         /// - a web resource when starts with http:// or https://
@@ -97,7 +109,7 @@ namespace MidiPlayerTK
         /// - if null or empty, the default internal soundfont is selected.
         /// </param>
         /// <returns>
-        ///     - true if loading is in progress. Defined LoadedCallback to get information when loading is complete.
+        ///     - true if loading is in progress. Define LoadedCallback to get information when loading is complete.
         ///     - false if an error is detected in the parameters. The callback LoadedCallback is not called if the return value is false.
         /// </returns>
         /// @code
@@ -117,7 +129,7 @@ namespace MidiPlayerTK
         ///         SoundfontIsReady(synth);
         ///     };
         ///
-        ///     // Prepare switching between SoundFonts for each synths selected.
+        ///     // Prepare switching between SoundFonts for each selected synth.
         ///     // Here we load the SoundFont from the URI defined in the UI.
         ///     // Set download options defined in the UI. 
         ///     // -------------------------------------------------------------------
@@ -130,6 +142,12 @@ namespace MidiPlayerTK
         ///         Debug.Log($"TestLoadSF - Download canceled, status:{MidiPlayerGlobal.MPTK_StatusLastSoundFontLoaded} URI:{InputURLSoundFontAtRun.text}");
         /// }
         /// @endcode
+        /// @see LoadedCallback
+        /// @see ProgressCallback
+        /// @see StatusSoundFont
+        /// @see LoadFromCache
+        /// @see SaveToCache
+        /// @see DownloadOnly
         public bool Load(string path = null)
         {
             //MidiPlayerGlobal.MPTK_SoundFontLoaded = false;
@@ -338,7 +356,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Build list of presets found in the SoundFont
+        /// Builds the list of presets found in the SoundFont.
         /// </summary>
         private void BuildBankList()
         {
@@ -375,7 +393,7 @@ namespace MidiPlayerTK
 
 
         /// <summary>@brief
-        /// Build list of presets found in the default bank of the current SoundFont.
+        /// Builds the list of presets found in the default bank of the current SoundFont.
         /// </summary>
         private void BuildPresetList(bool forInstrument)
         {

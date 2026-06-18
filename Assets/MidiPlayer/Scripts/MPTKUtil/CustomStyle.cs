@@ -44,6 +44,7 @@ namespace MidiPlayerTK
         public GUIStyle LabelRight;
         public GUIStyle LabelSmall;
         public GUIStyle LabelAlert;
+        public GUIStyle LabelWrap;
         public GUIStyle LabelGreen;
         public GUIStyle LabelLink;
         public GUIStyle LabelLeft;
@@ -145,6 +146,9 @@ namespace MidiPlayerTK
             LabelLeft.alignment = TextAnchor.UpperLeft;
             LabelLeft.fontSize = 14;
 
+            LabelWrap = new GUIStyle("Label");
+            LabelWrap.wordWrap = true;
+
             LabelAlert = new GUIStyle("Label");
             LabelAlert.alignment = TextAnchor.MiddleLeft;
             LabelAlert.wordWrap = true;
@@ -155,6 +159,7 @@ namespace MidiPlayerTK
             LabelGreen.alignment = TextAnchor.MiddleLeft;
             LabelGreen.wordWrap = true;
             LabelGreen.normal.textColor = new Color(0f, 0.5f, 0f);
+            LabelGreen.richText = true;
             LabelGreen.fontSize = 12;
 
             LabelLink = new GUIStyle("Label");

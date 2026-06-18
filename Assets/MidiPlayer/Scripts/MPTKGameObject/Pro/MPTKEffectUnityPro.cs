@@ -4,20 +4,21 @@ using UnityEngine;
 namespace MidiPlayerTK
 {
     /// <summary>
-    /// Unlike SoundFont effects, they applied to the whole player. On the other hand, the Unity effects parameters are rich and, obviously based on Uniy algo!\n
+    /// Unlike SoundFont effects, these are applied to the whole player. Unity effect parameters are richer and are based on Unity algorithms.\n
     /// https://docs.unity3d.com/Manual/class-AudioEffectMixer.html\n
-    /// Only most important effect are integrated in Maestro: Reverb and Chorus. On need, others effects could be added. 
+    /// Only the most important effects are integrated in Maestro: Reverb and Chorus. If needed, other effects could be added.
     /// @version Maestro Pro 
     /// @note
-    ///     - Unity effects integration modules are exclusively available with the Maestro MPTK Pro version. 
+    ///     - Unity effect integration modules are available only in Maestro MPTK Pro.
     ///     - By default, these effects are disabled in Maestro. 
-    ///     - To enable them, you’ll need to adjust the settings from the prefab inspector: Synth Parameters / Unity Effect.
-    ///     - Each settings are available by script.
+    ///     - To enable them, adjust settings in the prefab inspector: Synth Parameters / Unity Effect.
+    ///     - Each setting is available by script.
+    /// @ingroup unity_effects
     /// @code
-    /// // Find a MPTK Prefab, will works also for MidiStreamPlayer, MidiExternalPlayer ... all classes which inherit from MidiSynth.
+    /// // Find an MPTK prefab; this also works for MidiStreamPlayer, MidiExternalPlayer, and all classes that inherit from MidiSynth.
     /// MidiFilePlayer fp = FindFirstObjectByType<MidiFilePlayer>();
     /// fp.MPTK_EffectUnity.EnableReverb = true;
-    /// fp.MPTK_EffectUnity.ReverbDelay= 0.09f;
+    /// fp.MPTK_EffectUnity.ReverbDelay = 0.09f;
     /// @endcode
     /// </summary>
     public partial class MPTKEffectUnity : ScriptableObject
@@ -52,7 +53,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>
-        /// Set all Unity effects to default value as defined with Unity.
+        /// Sets all Unity effects to default values as defined by Unity.
         /// @code
         /// midiFilePlayer.MPTK_EffectUnity.DefaultAll();
         /// @endcode
@@ -69,7 +70,7 @@ namespace MidiPlayerTK
         // -------
 
         /// <summary>@brief
-        /// Set Reverb Unity default value as defined with Unity.
+        /// Sets Reverb Unity default values as defined by Unity.
         /// @version Maestro Pro 
         /// </summary>
         public void DefaultReverb()
@@ -91,7 +92,7 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Apply Reverb Unity effect to the AudioSource. The effect is applied to all voices.
+        /// Applies the Reverb Unity effect to the AudioSource. The effect is applied to all voices.
         /// @version Maestro Pro 
         /// @code
         /// midiFilePlayer.MPTK_EffectUnity.EnableReverb= true;
@@ -286,7 +287,7 @@ namespace MidiPlayerTK
         // -------
 
         /// <summary>@brief
-        /// Set Chorus Unity default value as defined with Unity.
+        /// Sets Chorus Unity default values as defined by Unity.
         /// @version Maestro Pro 
         /// </summary>
         public void DefaultChorus()
@@ -306,7 +307,7 @@ namespace MidiPlayerTK
         [HideInInspector, SerializeField]
         private float chorusDryMix, chorusWetMix1, chorusWetMix2, chorusWetMix3, chorusDelay, chorusRate, chorusDepth;
         /// <summary>@brief
-        /// Apply Chorus Unity effect to the AudioSource. The effect is applied to all voices.
+        /// Applies the Chorus Unity effect to the AudioSource. The effect is applied to all voices.
         /// @version Maestro Pro 
         /// </summary>
         [HideInInspector]
@@ -377,8 +378,8 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Chorus modulation rate in hz.\n
-        /// Range from 0 to 20. Default = 0.8 hz.
+        /// Chorus modulation rate in Hz.\n
+        /// Range from 0 to 20. Default = 0.8 Hz.
         /// @version Maestro Pro 
         /// </summary>
         [HideInInspector]
@@ -402,3 +403,4 @@ namespace MidiPlayerTK
 
     }
 }
+

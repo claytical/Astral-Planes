@@ -3,6 +3,7 @@ using UnityEngine;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup pro_midi_input
     /// <summary>
     /// Read MIDI events from a MIDI keyboard connected to your Windows or Mac desktop. This class must be used with the prefab MidiInReader.\n
     /// There is no need to writing a script. For a simple usage, all the job can be done in the prefab inspector.

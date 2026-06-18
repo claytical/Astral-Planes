@@ -3,6 +3,8 @@ using UnityEngine;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup pro_spatial_playback
+    /// @ingroup synth_spatial_audio
     /// <summary>
     /// For playing Spatialized MIDI by channels or by tracks from the MidiDB. This class must be used with the prefab MidiSpatializer.
     /// 
@@ -24,17 +26,18 @@ namespace MidiPlayerTK
     {
         protected new void Awake()
         {
+            // Warning: this a static member, it retains value across scene loading.
+            // v2.12.0 - bug corrected when switching from spatialized scene and classical midi player. The list remained live.
+            //SpatialSynths = null;
+
             //Debug.Log("Awake MidiSpatializer:" + MPTK_IsPlaying + " " + MPTK_PlayOnStart + " " + MPTK_IsPaused);
             // Set this midisynth as the master : read midi events and send to the slave midisynth
-            MPTK_Spatialize = true;
+            MPTK_DistanceAttenuation = true;
             if (!MPTK_CorePlayer)
             {
                 Debug.LogWarning($"MidiSpatializer works only in Core player mode. Change properties in inspector");
                 return;
             }
-
-            if (MPTK_MaxDistance <= 0f)
-                Debug.LogWarning($"Max Distance is set to 0, any sound will be played.");
 
             base.AwakeMidiFilePlayer();
         }
@@ -79,11 +82,6 @@ namespace MidiPlayerTK
                 else
                     mfp.MPTK_SpatialSynthEnabled = true;
             }
-        }
-
-        // This method is deprecated and replaced by MPTK_RefreshedUsedSynth
-        public void MPTK_DisableUnsedSynth(int countOfUsefulSynth)
-        {
         }
     }
 }

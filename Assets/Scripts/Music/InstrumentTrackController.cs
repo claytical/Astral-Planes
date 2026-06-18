@@ -259,10 +259,6 @@ public class InstrumentTrackController : MonoBehaviour
         // If caller provides an owner, only allow the owner to end it.
         if (ownerTrack != null && _gravityVoidOwner != null && ownerTrack != _gravityVoidOwner)
         {
-            Debug.LogWarning(
-                $"[VOID] END ignored (wrong owner) caller={ownerTrack.name} owner={_gravityVoidOwner.name} " +
-                $"go={(_gravityVoidInstance ? _gravityVoidInstance.GetInstanceID() : -1)}"
-            );
             return;
         }
         _gravityVoidOwner = null;
@@ -901,9 +897,6 @@ public class InstrumentTrackController : MonoBehaviour
         var drum = _gfm?.activeDrumTrack;
         if (drum == null) { if (GameFlowManager.VerboseLogging) Debug.Log("[ITC:GET_LEADER_BINS] drum=NULL → returning 1"); return 1; }
         int count = drum.GetCommittedBinCount();
-        // Only log when the result is unexpectedly low — avoids per-frame spam.
-        if (count <= 1)
-            if (GameFlowManager.VerboseLogging) Debug.Log($"[ITC:GET_LEADER_BINS] drum_id={drum.GetInstanceID()} _binCount={count}");
         return Mathf.Max(1, count);
     }
 

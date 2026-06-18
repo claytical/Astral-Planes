@@ -46,11 +46,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   PathToResources: 
   LoadSoundFontAtStartup: 1
-  LoadWaveAtStartup: 0
   verboseGlobal: 0
   InstanceOnEventPresetLoaded:
     m_PersistentCalls:
       m_Calls: []
+  audioListener: {fileID: 0}
   MPTK_LiveSoundFont: 
 --- !u!1 &1735678026735066
 GameObject:
@@ -116,6 +116,18 @@ MonoBehaviour:
   MPTK_ReleaseTimeMod: 1
   MPTK_CutOffVolume: 0.0001
   MPTK_LeanSynthStarting: 0.05
+  enable3DOrientation: 1
+  MPTK_OrientatioToListener: 0
+  panAmount: 1
+  sideFollow: 0.4
+  behindMinGain: 0.8
+  cutoffPoleCount: 1
+  cutoffFrontHz: 16000
+  cutoffBehindHz: 3000
+  frontDeadZone: 0.15
+  behindSmoothSpeed: 8
+  behindGainCurve: 1.2
+  behindLPFCurve: 2.6
   MPTK_AutoBuffer: 1
   MPTK_AutoCleanVoiceLimit: 100
   MPTK_AutoCleanVoiceTime: 1000
@@ -131,6 +143,10 @@ MonoBehaviour:
   StatDspChannelCount: 0
   GcCollectionCout: 0
   AllocatedBytesForCurrentThread: 0
+  StatSynthLatencyLAST: 0
+  StatSynthLatencyAVG: 0
+  StatSynthLatencyMIN: 0
+  StatSynthLatencyMAX: 0
   StatDeltaThreadMidiMS: 0
   StatDeltaThreadMidiMAX: 0
   StatDeltaThreadMidiMIN: 0
@@ -157,7 +173,6 @@ MonoBehaviour:
   indexBuffSize: -1
   MPTK_DirectSendToPlayer: 1
   MPTK_EnableChangeTempo: 1
-  maxDistance: 3000
   MPTK_EnablePanChange: 1
   volumeGlobal: 0.5
   dsp_64: 0
@@ -206,7 +221,7 @@ MonoBehaviour:
       m_Calls: []
   showMidiInfo: 0
   showSynthParameter: 0
-  showSpatialization: 0
+  showSpatialization: 1
   showUnitySynthParameter: 1
   showUnityPerformanceParameter: 1
   showExperimentalFeature: 0
@@ -219,7 +234,11 @@ MonoBehaviour:
   showSynthEvents: 0
   showEvents: 0
   showDefault: 0
-  spatialize: 0
+  distanceAttenuation: 1
+  MPTK_PauseOnMaxDistance: 0
+  minDistance: 0
+  maxDistance: 3000
+  minSoundAttenuation: 0
   MPTK_EffectUnity: {fileID: 0}
   MPTK_ModeSpatializer: 0
   MPTK_MaxSpatialSynth: 16

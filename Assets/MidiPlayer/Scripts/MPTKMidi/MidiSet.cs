@@ -6,6 +6,7 @@ using UnityEngine.Scripting;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup runtime_catalogs
     /// <summary>@brief
     /// Contains the setting of MidiFilePlayer TK
     /// </summary>

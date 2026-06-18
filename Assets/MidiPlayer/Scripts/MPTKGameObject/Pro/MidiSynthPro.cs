@@ -13,24 +13,38 @@ using UnityEngine;
 
 namespace MidiPlayerTK
 {
-    /// <summary>@brief
-    /// class extension pro
-    /// @version Maestro Pro 
-    /// </summary>
-    public partial class MidiSynth : MonoBehaviour
+/// @ingroup synth_engine_pro
+/// <summary>@brief
+/// Maestro MPTK Pro extension for MidiSynth.
+/// @version Maestro Pro
+/// </summary>
+public partial class MidiSynth : MonoBehaviour
     {
+        /// @name Synthesizer Events
+        /// @brief Events raised by the MIDI synthesizer during playback.
+        /// @details
+        /// These callbacks allow scripts to interact with the synthesizer during
+        /// audio processing. Some events may run on the audio processing thread,
+        /// therefore Unity API calls are generally not allowed except Debug.Log.
+        ///
+        /// Typical uses include:
+        /// - monitoring playback timing
+        /// - intercepting MIDI events
+        /// - synchronizing gameplay with music.
+        
+        /// @{
+
         /// <summary>@brief
-        /// Delegate for the event OnAudioFrameStartHandler. see #OnAudioFrameStart.
-        /// @version Maestro Pro 
+        /// Delegate for the #OnAudioFrameStart event.
+        /// @version Maestro Pro
         /// </summary>
-        /// <param name="synthTime"></param>
         public delegate void OnAudioFrameStartHandler(double synthTime);
 
         /// <summary>@brief
-        /// this event is triggered at each start of a new audio frame from the audio engine.<br>
+        /// Raised at the start of each audio frame by the audio engine.<br>
         /// @details
-        /// The parameter (double) is the current synth time in milliseconds. See example of use.\n
-        /// The callbach function will not run on the Unity thread, so you can't call Unity API except Debug.Log.
+        /// The callback parameter is the current synth time, in milliseconds.<br>
+        /// The callback does not run on the Unity main thread, so you must not call Unity APIs (except Debug.Log).
         /// @version Maestro Pro
         /// @par
         /// @code
@@ -45,23 +59,23 @@ namespace MidiPlayerTK
         /// private void PlayHits(double synthTimeMS)
         /// {
         ///     if (lastSynthTime <= 0d)
-        ///         // First call, init the last time
+        ///         // First call, initialize the last time
         ///         lastSynthTime = synthTimeMS;
-        ///     // Calculate time in millisecond since the last loop
+        ///     // Time (ms) since the last callback
         ///     double deltaTime = synthTimeMS - lastSynthTime;
         ///     lastSynthTime = synthTimeMS;
         ///     timeMidiFromStartPlay += deltaTime;
-        /// 
-        ///     // Calculate time since last beat played
+        ///
+        ///     // Time since last beat played
         ///     timeSinceLastBeat += deltaTime;
-        /// 
+        ///
         ///     // Slider SldTempo in BPM.
-        ///     //  60 BPM means 60 beats in each minute, 1 beat per second, 1000 ms between beat.
-        ///     // 120 BPM would be twice as fast: 120 beats in each minute, 2 per second, 500 ms between beat.
-        ///     // Calculate the delay between two quarter notes in millisecond
+        ///     //  60 BPM means 60 beats per minute: 1 beat per second, 1000 ms between beats.
+        ///     // 120 BPM is twice as fast: 2 beats per second, 500 ms between beats.
+        ///     // Delay between two quarter notes (ms)
         ///     CurrentTempo = (60d / SldTempo.Value) * 1000d;
-        /// 
-        ///     // Is it time to play a hit ?
+        ///
+        ///     // Is it time to play a hit?
         ///     if (IsPlaying && timeSinceLastBeat > CurrentTempo)
         ///     {
         ///         timeSinceLastBeat = 0d;
@@ -73,23 +87,22 @@ namespace MidiPlayerTK
         public event OnAudioFrameStartHandler OnAudioFrameStart;
 
         /// <summary>@brief
-        /// This function is called by the MIDI sequencer before sending the MIDI message to the MIDI synthesizer.\n
-        /// From version 2.10.0 the callback must return a boolean (see example). true to keep the event, false to skip it.
+        /// Called by the MIDI sequencer before sending a MIDI message to the synthesizer.\n
+        /// From version 2.10.0 onward, the callback must return true to keep the event or false to skip it.
         /// @details
-        /// It can be used like a MIDI events preprocessor: it's possible to change the value of the MIDI events and therefore change the playback of the song.\n
-        /// The callback function receives a MPTKEvent object by reference (normal, it's a C# class).\n
-        /// Look at https://mptkapi.paxstellar.com/d9/d50/class_midi_player_t_k_1_1_m_p_t_k_event.html \n
-        /// Many changes are possible on the MIDI event: change note, velocity, channel, skip ..., even changing the MIDI type of the message!!! \n
-        /// See below some examples of run-time changes.\n
+        /// Acts as a MIDI event preprocessor: you can change MIDI values and therefore alter playback.\n
+        /// The callback receives an MPTKEvent object by reference (as it is a C# class).\n
+        /// See https://mptkapi.paxstellar.com/d9/d50/class_midi_player_t_k_1_1_m_p_t_k_event.html for the event structure.\n
+        /// You can change note, velocity, channel, skip events, or even change the MIDI message type.\n
         /// @version Maestro Pro 
         /// @note
-        /// @li The callback is running on a system thread not on the Unity thread. Unity API call is not possible except for the Debug.Log (to be gently used, it consumes CPU)\n
-        /// @li Avoid heavy processing or waiting inside the callback otherwise MIDI playing accuracy will be bad.\n
-        /// @li The midiEvent is passed by reference to the callback, so re-instanciate object (midiEvent = new MPTKEvent()) or set to null, has no effect!\n
-        /// @li MIDI position attributs (Tick and RealTime) can be used in your algo but changing their values has no effect, it's too late!\n
-        /// @li Changing SetTempo event is too late for the MIDI Sequencer (already taken into account). But you can use midiFilePlayer.CurrentTempo to change the tempo\n
+        /// @li The callback runs on a system thread, not the Unity main thread. Unity API calls are not allowed except Debug.Log (use sparingly).
+        /// @li Avoid heavy processing or waiting in the callback or timing accuracy will degrade.
+        /// @li The midiEvent is passed by reference. Re-instantiating it (midiEvent = new MPTKEvent()) or setting it to null has no effect.
+        /// @li MIDI position attributes (Tick and RealTime) can be read but changing them has no effect.
+        /// @li Changing a SetTempo event is too late for the sequencer (it has already been processed). Use midiFilePlayer.CurrentTempo to change tempo at runtime.
         /// @par
-        /// Some examples:
+        /// Example:
         /// @code
         /// // See TestMidiFilePlayerScripting.cs for the demo.
         /// void Start()
@@ -98,10 +111,10 @@ namespace MidiPlayerTK
         ///     midiFilePlayer.OnMidiEvent = PreProcessMidi;
         /// }
         /// 
-        /// // Some example 
+        /// // Example 
         /// bool PreProcessMidi(MPTKEvent midiEvent)
         /// {
-        ///     bool playEvent=true;
+        ///     bool playEvent = true;
         /// 
         ///     switch (midiEvent.Command)
         ///     {
@@ -111,22 +124,22 @@ namespace MidiPlayerTK
         ///                 midiEvent.Value += 24;
         ///             else
         ///                 // Drums are muted
-        ///                 playEvent= false;
-        ///         break;
+        ///                 playEvent = false;
+        ///             break;
         ///         case MPTKCommand.PatchChange:
-        ///             // Remove all patch change: all channels will played the default preset 0!!!
+        ///             // Remove all patch changes: all channels will play the default preset 0
         ///             midiEvent.Command = MPTKCommand.MetaEvent;
         ///             midiEvent.Meta = MPTKMeta.TextEvent;
         ///             midiEvent.Info = "Patch Change removed";
         ///             break;
-        ///        case MPTKCommand.MetaEvent:
+        ///         case MPTKCommand.MetaEvent:
         ///             if (midiEvent.Meta == MPTKMeta.SetTempo)
-        ///                // Tempo forced to 100
-        ///                midiFilePlayer.CurrentTempo = 100
+        ///                 // Tempo forced to 100
+        ///                 midiFilePlayer.CurrentTempo = 100;
         ///             break;
         ///     }
         ///     
-        ///     // true: plays this event, false to skip
+        ///     // true: play this event, false to skip
         ///     return playEvent;
         /// }
         /// 
@@ -134,23 +147,246 @@ namespace MidiPlayerTK
         /// </summary>
         public Func<MPTKEvent, bool> OnMidiEvent;
 
-        /// <summary>
-        /// Action is executed at each beat and received these parameters: 
-        ///     - time: time in milliseconds since the start of the playing MIDI.
+        /// <summary>@brief 
+        /// Invoked on each beat with the following parameters:
+        ///     - time: time in milliseconds since MIDI playback started.
         ///     - tick: current tick.
-        ///     - measure: current measure (start from 1).
-        ///     - beat: current beat (start from 1).
-        ///     
+        ///     - measure: current measure (starts at 1).
+        ///     - beat: current beat (starts at 1).
         /// @note
-        ///    - OnBeatEvent is executed at each beat even if there is there no MIDI event on the beat.
-        ///    - Accuracy is garanteed (internal thread).
-        ///    - Direct call to Unity API is not possible but Debug.Log and Maestro API (example, play a sound at each beat) are allowed.
-        ///    
+        ///     - OnBeatEvent is invoked on every beat, even if there is no MIDI event exactly on that beat.
+        ///     - Timing accuracy is guaranteed (runs on an internal thread).
+        ///     - Direct calls to the Unity API are not allowed, but Debug.Log and Maestro APIs (for example, playing a sound on each beat) are allowed.
         /// @version Maestro Pro 
-        /// 
         /// @snippet TestMidiFilePlayerScripting.cs Example_OnBeatEvent
         /// </summary>
         public Action<int, long, int, int> OnBeatEvent;
+
+        /// @}
+
+        // private used for 3D audio
+        private volatile float _gML = 0.70710678f;
+        private volatile float _gMR = 0.70710678f;
+        private volatile float _gSL = 1f;
+        private volatile float _gSR = 1f;
+        private volatile float _globalGain = 1f;
+        private volatile float _alpha = 1f;
+        // --- Smoothed front/back state (temporal crossfade) ---
+        private float _behind01Smoothed = 0f;
+
+        void Update()
+        {
+            if (enable3DOrientation)
+            {
+                bool flowControl = CalculateOrientationEffect(MidiPlayerGlobal.MPTK_AudioListener);
+                if (!flowControl)
+                {
+                    return;
+                }
+            }
+        }
+
+        public bool CalculateOrientationEffect(AudioListener listener)
+        {
+            // Direction from listener to source, flattened to horizontal plane
+            Transform listenerTrf = listener.transform;
+            Vector3 toSrcWorld = transform.position - listenerTrf.position;
+            toSrcWorld.y = 0f;
+            if (toSrcWorld.sqrMagnitude < 1e-8f) return false;
+            Vector3 toSrc = toSrcWorld.normalized;
+
+            // Listener reference axes (horizontal only)
+            Vector3 fwd = listenerTrf.forward; fwd.y = 0f; fwd.Normalize();
+            Vector3 right = listenerTrf.right; right.y = 0f; right.Normalize();
+
+            // =========================================================
+            // 1) Front / Back evaluation
+            // =========================================================
+            // frontDot: +1 = fully in front, 0 = on the side, -1 = fully behind
+            float frontDot = Mathf.Clamp(Vector3.Dot(fwd, toSrc), -1f, 1f);
+
+            // ---------------------------------------------------------
+            // Dead zone around the frontal plane:
+            // - No "behind" effect near frontDot ≈ 0
+            // - Prevents audible switching when crossing the front plane
+            // ---------------------------------------------------------
+            float targetBehind01 = 0f;
+
+            if (frontDot < 0f)
+            {
+                // Map frontDot from [-frontDeadZone .. -1] to [0 .. 1]
+                // Effect starts only after the dead zone
+                targetBehind01 = Mathf.InverseLerp(-frontDeadZone, -1f, frontDot);
+                targetBehind01 = Mathf.Clamp01(targetBehind01);
+            }
+
+            // ---------------------------------------------------------
+            // Temporal smoothing (crossfade in time)
+            // Masks rapid geometric changes and removes "hard" transitions
+            // ---------------------------------------------------------
+            float k = 1f - Mathf.Exp(-behindSmoothSpeed * Time.deltaTime);
+            _behind01Smoothed += (targetBehind01 - _behind01Smoothed) * k;
+
+            float behind01 = _behind01Smoothed;
+
+            // =========================================================
+            // 2) Global gain (reacts earlier than the filter)
+            // =========================================================
+            float behindGainT = Mathf.Pow(behind01, behindGainCurve);
+            _globalGain = Mathf.Lerp(1f, behindMinGain, behindGainT);
+
+            // =========================================================
+            // 3) Stereo pan (unchanged, equal-power on the Mid)
+            // =========================================================
+            float rightDot = Mathf.Clamp(Vector3.Dot(right, toSrc), -1f, 1f);
+            float pan = rightDot * panAmount;   // [-1 .. +1]
+            float u = (pan + 1f) * 0.5f;        // [0 .. 1]
+
+
+            // Angle signed in degrees, range [-180 .. +180]
+            // 0°   = in front
+            // +90° = to the right
+            // -90° = to the left
+            // ±180° = behind
+            MPTK_OrientationToListener = Mathf.Atan2(rightDot, frontDot) * Mathf.Rad2Deg;
+            // Example to remap [0..360[ MPTK_OrientatioToListener < 0f ? MPTK_OrientatioToListener + 360f : MPTK_OrientatioToListener;
+
+            // Equal-power panning for the Mid component
+            float gML = Mathf.Cos(u * Mathf.PI * 0.5f);
+            float gMR = Mathf.Sin(u * Mathf.PI * 0.5f);
+            _gML = gML;
+            _gMR = gMR;
+
+            // Side component partially follows the pan
+            // 1 = neutral width, gM* = fully follows Mid
+            float s = sideFollow;
+            _gSL = Mathf.Lerp(1f, gML, s);
+            _gSR = Mathf.Lerp(1f, gMR, s);
+
+            if (cutoffPoleCount > 0)
+            {
+                // =========================================================
+                // 4) Low-pass filter (starts later than gain)
+                // =========================================================
+                float behindLPFT = Mathf.Pow(behind01, behindLPFCurve);
+                float cutoff = Mathf.Lerp(cutoffFrontHz, cutoffBehindHz, behindLPFT);
+
+                // pole low-pass coefficient
+                float fs = AudioSettings.outputSampleRate;
+                _alpha = 1f - Mathf.Exp(-2f * Mathf.PI * cutoff / fs);
+            }
+            //Debug.Log($"{this.name} pan!{pan:F2} ML:{_gML:F2} MR:{_gMR:F2} SL:{_gSL:F2} SR:{_gSR:F2} alpha:{_alpha:F2}");
+
+            return true;
+        }
+
+        // audio state
+        private float y1L = 0f, y2L = 0f;
+        private float y1R = 0f, y2R = 0f;
+
+        void ApplyMPTK3DSound(float[] data)
+        {
+            float gML = _gML, gMR = _gMR;
+            float gSL = _gSL, gSR = _gSR;
+            float g = _globalGain;
+            float a = _alpha;
+
+            for (int i = 0; i < data.Length; i += 2)
+            {
+                float inL = data[i];
+                float inR = data[i + 1];
+
+                // Mid/Side
+                float M = 0.5f * (inL + inR);
+                float S = 0.5f * (inL - inR);
+
+                // Rebuild with Mid move + partial Side follow
+                float xL = (M * gML) + (S * gSL);
+                float xR = (M * gMR) - (S * gSR);
+
+                // Global attenuation (when behind)
+                xL *= g;
+                xR *= g;
+
+                switch (cutoffPoleCount)
+                {
+                    case 0:
+                        // no cutoff low-pass
+                        data[i] = xL;
+                        data[i + 1] = xR;
+                        break;
+                    case 1:
+                        // one pole 
+                        y1L += a * (xL - y1L);
+                        y1R += a * (xR - y1R);
+                        data[i] = y1L;
+                        data[i + 1] = y1R;
+                        break;
+                    case 2:
+                        // 1st pole 
+                        y1L += a * (xL - y1L);
+                        y1R += a * (xR - y1R);
+                        // 2nd pole 
+                        y2L += a * (y1L - y2L);
+                        y2R += a * (y1R - y2R);
+
+                        data[i] = y2L;
+                        data[i + 1] = y2R;
+                        break;
+                }
+            }
+        }
+
+        /// @name Pause and Resume Voices
+        /// @brief Runtime control of active synthesizer voices.
+        /// @details
+        /// This section provides methods to pause or resume all currently active
+        /// voices with smooth transitions. The transition duration controls how
+        /// quickly voices fade out or fade back in.
+        ///
+        /// These functions are useful for:
+        /// - implementing transport controls
+        /// - temporarily muting playback
+        /// - synchronizing audio with gameplay or UI events.
+        /// @version Maestro Pro
+        
+        /// @{
+
+        /// <summary>@brief 
+        /// Pauses all active voices using the specified transition duration.
+        /// @note
+        ///     - Iterates over all active voices and pauses them with the given transition duration.
+        /// @see MPTK_ResumeVoices
+        /// Example with the MidiStreamPlayer prefab:
+        /// @code
+        /// midiStreamPlayer.MPTK_PauseVoices(100);
+        /// @endcode
+        /// @version 2.17.0 Pro 
+        /// </summary>
+        public void MPTK_PauseVoices(float transitionDuration = 30f)
+        {
+            foreach (fluid_voice voice in ActiveVoices)
+                voice.Pause(Math.Clamp(transitionDuration, 0f, 5000f));
+        }
+
+        /// <summary>@brief
+        /// Resumes all active voices using the specified transition duration.
+        /// @note 
+        ///     - Iterates over all active voices and resumes them with the given transition duration.
+        /// @see MPTK_PauseVoices
+        /// Example with the MidiStreamPlayer prefab:
+        /// @code
+        /// midiStreamPlayer.MPTK_ResumeVoices(100);
+        /// @endcode
+        /// @version 2.17.0 Pro 
+        /// </summary>
+        public void MPTK_ResumeVoices(float transitionDuration = 30f)
+        {
+            foreach (fluid_voice voice in ActiveVoices)
+                voice.Resume(Math.Clamp(transitionDuration, 0f, 5000f));
+        }
+
+        /// @}
 
         public bool CheckBeatEvent(int time)
         {
@@ -183,25 +419,41 @@ namespace MidiPlayerTK
             return true;
         }
 
+        /// @name Audio Effects
+        /// @brief Integration of Unity audio effects applied to the synthesizer.
+        /// @details
+        /// Unlike SoundFont effects which operate at the instrument level,
+        /// Unity audio effects are applied to the entire output of the MIDI
+        /// synthesizer.
+        ///
+        /// Maestro integrates selected Unity effects such as Reverb and Chorus.
+        /// These effects can be configured from the inspector or controlled
+        /// directly from scripts at runtime.
+
+        /// @{
 
         [SerializeField]
-        /// <summary>
-        /// Unlike SoundFont effects, they applied to the whole player. On the other hand, the Unity effects parameters are rich and, obviously based on Uniy algo!\n
+        /// <summary>@brief
+        /// Unlike SoundFont effects, Unity audio effects apply to the whole player. Their parameters are richer and rely on Unity's audio algorithms.\n
         /// https://docs.unity3d.com/Manual/class-AudioEffectMixer.html\n
-        /// Only most important effect are integrated in Maestro: Reverb and Chorus. On need, others effects could be added. 
+        /// Maestro integrates the most important effects: Reverb and Chorus. Other effects could be added if needed. 
         /// @note
-        ///     - Unity effects integration modules are exclusively available with the Maestro MPTK Pro version. 
+        ///     - Unity effects integration modules are available only in Maestro MPTK Pro. 
         ///     - By default, these effects are disabled in Maestro. 
-        ///     - To enable them, you’ll need to adjust the settings from the prefab inspector: Synth Parameters / Unity Effect.
-        ///     - Each settings are available by script.
+        ///     - Enable them from the prefab inspector: Synth Parameters / Unity Effect.
+        ///     - Each setting is also available by script.
+        /// @version Maestro Pro 
         /// @code
-        /// // Find a MPTK Prefab, will works also for MidiStreamPlayer, MidiExternalPlayer ... all classes which inherit from MidiSynth.
+        /// // Find an MPTK prefab; this will also work for MidiStreamPlayer, MidiExternalPlayer, and all classes that inherit from MidiSynth.
         /// MidiFilePlayer fp = FindFirstObjectByType<MidiFilePlayer>();
         /// fp.MPTK_EffectUnity.EnableReverb = true;
-        /// fp.MPTK_EffectUnity.ReverbDelay= 0.09f;
+        /// fp.MPTK_EffectUnity.ReverbDelay = 0.09f;
         /// @endcode
         /// </summary>
+        [Header("---------------- MPTK Unity effect ----------------")]
         public MPTKEffectUnity MPTK_EffectUnity;
+
+        /// @}
 
         private void InitEffectUnity()
         {
@@ -216,66 +468,111 @@ namespace MidiPlayerTK
             MPTK_EffectUnity.Init(this);
         }
 
+
+        /// @name MIDI Spatial Mapper
+        /// @brief Spatial routing system used by the MidiSpatializer prefab.
+        /// @details
+        /// The MIDI Spatial Mapper distributes incoming MIDI events from the main
+        /// MIDI reader to multiple MidiSynth instances in the scene. This allows
+        /// instruments or tracks to be rendered from different spatial positions.
+        ///
+        /// Two routing modes are available:
+        /// - Channel mode: one spatial synth per MIDI channel.
+        /// - Track mode: one spatial synth per MIDI track.
+        ///
+        /// This system is typically used with the MidiSpatializer prefab to create
+        /// immersive 3D audio scenes.
+        /// @version Maestro Pro
+
+        /// @{
+
         /// <summary>@brief
-        /// Spatializer Mode for the prefab MidiSpatializer
-        /// @version Maestro Pro 
+        /// Routing mode used by the MidiSpatializer prefab (MIDI Spatial Mapper).\n
+        /// Selects how incoming Note On events are dispatched to spatial synth instances.
+        /// @version Maestro Pro
         /// </summary>
         public enum ModeSpatializer
         {
             /// <summary>@brief
-            /// Spatial Synth are enabled to dispatch note-on by channels.\n
-            /// As a reminder, only one instrument at at time can be played by a MIDI channel\n
-            /// Instrument (preset) are defined by channel with the MIDI message MPTKCommand.PatchChange
+            /// Dispatch Note On events by MIDI channel.\n
+            /// Reminder: a MIDI channel plays one instrument at a time.\n
+            /// Instruments (presets) are selected per channel with MPTKCommand.PatchChange.
             /// </summary>
             Channel,
 
             /// <summary>@brief
-            /// Spatial Synth are enabled to dispatch note-on by tracks defined in the MIDI.\n
-            /// As a reminder, multiple channels can be played on a tracks, so multiple instruments can be played on a Synth.\n
-            /// Track name are defined with the Meta MIDI message SequenceTrackName. This MIDI message is always defined in MIDI, so name can be missing.
+            /// Dispatch Note On events by MIDI track.\n
+            /// Reminder: a track may contain multiple MIDI channels, therefore multiple instruments.\n
+            /// Track names come from the Meta MIDI event SequenceTrackName.\n
+            /// This meta event is not always present in MIDI files, so the track name may be empty.
             /// </summary>
             Track,
         }
 
         /// <summary>@brief
-        /// True if this MidiSynth is the master synth responsible to read midi events and to dispatch to other MidiSynths
-        /// @version Maestro Pro 
+        /// True if this MidiSynth is the master spatial synth used by MidiSpatializer.\n
+        /// The master synth reads MIDI events and dispatches them to the other spatial synth instances.
+        /// @version Maestro Pro
         /// </summary>
         public bool MPTK_IsSpatialSynthMaster { get { return isSpatialSynthMaster; } }
-        protected bool isSpatialSynthMaster = true; // for internal use, true only for the master midisynth responsible to read events, false for slave midisynth responsible to play note
+
+        // @cond nodoc
+        /// <summary>@brief
+        /// Internal flag.\n
+        /// True for the master MidiSynth that reads and dispatches MIDI events.\n
+        /// False for slave MidiSynth instances that only render audio.\n
+        /// </summary>
+        protected bool isSpatialSynthMaster = true;
+        // @endcond
 
         [HideInInspector]
+        /// <summary>@brief
+        /// Current routing mode for MidiSpatializer (MIDI Spatial Mapper).
+        /// @version Maestro Pro
+        /// </summary>
         public ModeSpatializer MPTK_ModeSpatializer;
 
+        /// <summary>@brief
+        /// Gets or sets the maximum number of spatial synth instances that can be created/used by MidiSpatializer.
+        /// @version Maestro Pro
+        /// </summary>
         [HideInInspector]
         public int MPTK_MaxSpatialSynth;
 
         /// <summary>@brief
-        /// In spatialization mode not all MidiSynths are enabled.
-        /// @version Maestro Pro 
+        /// In MidiSpatializer mode, not all MidiSynth instances are active.\n
+        /// True if this synth instance is currently enabled for spatial rendering.
+        /// @version Maestro Pro
         /// </summary>
         [HideInInspector]
         public bool MPTK_SpatialSynthEnabled;
 
         /// <summary>@brief
-        /// If spatialization is track mode, contains the last instrument played on this track.
-        /// @version Maestro Pro 
+        /// In Track mode, returns the name of the last instrument played on this track.\n
+        /// Empty string if unknown.
+        /// @version Maestro Pro
         /// </summary>
         public string MPTK_InstrumentPlayed { get { return string.IsNullOrEmpty(instrumentPlayed) ? "" : instrumentPlayed; } }
+
+        // @cond nodoc
         protected string instrumentPlayed;
+        // @endcond
 
         /// <summary>@brief
-        /// When spatialization is track mode, contains the last instrument (preset) played.
-        /// @version Maestro Pro 
+        /// In Track mode, contains the program number (preset) of the last instrument played.
+        /// @version Maestro Pro
         /// </summary>
         public int MPTK_InstrumentNum;
 
         /// <summary>@brief
-        /// If spatialization is track mode, contains the last name of the track .
-        /// @version Maestro Pro 
+        /// In Track mode, returns the last known track name.\n
+        /// Empty string if the MIDI file does not provide SequenceTrackName.
+        /// @version Maestro Pro
         /// </summary>
         public string MPTK_TrackName { get { return string.IsNullOrEmpty(trackName) ? "" : trackName; } }
 
+
+        /// @}
 
 
         protected string trackName;
@@ -287,7 +584,7 @@ namespace MidiPlayerTK
             {
                 // Channel mode, list of synths are indexed by channel, also send only event to the dedicated synth by channel
                 MidiFilePlayer spatialChannel = SpatialSynths[midievent.Channel];
-                if (VerboseSpatialSynth) Debug.Log($"{MPTK_SpatialSynthIndex} {distanceToListener}");
+                if (VerboseSpatialSynth) Debug.Log($"Send MIDI event by channel to synth index {spatialChannel.MPTK_SpatialSynthIndex} distance:{spatialChannel.distanceToListener}");
                 spatialChannel.MPTK_PlayDirectEvent((MPTKEvent)midievent/*.Clone()*/, false);
             }
             else
@@ -297,6 +594,7 @@ namespace MidiPlayerTK
                 {
                     // List of synths are indexed by tracks
                     MidiSpatializer spatialTrack = (MidiSpatializer)SpatialSynths[(int)midievent.Track];
+                    if (VerboseSpatialSynth) Debug.Log($"Send MIDI event by track to synth index {spatialTrack.MPTK_SpatialSynthIndex} distance:{spatialTrack.distanceToListener}");
                     if (spatialTrack.MPTK_SpatialSynthEnabled)
                     {
                         switch (midievent.Command)
@@ -396,20 +694,23 @@ namespace MidiPlayerTK
                     if (VerboseSpatialSynth) Debug.Log($"BuildSpatialSynth: instantiate synth IdSynth:{idSynth} from '{this.name}'");
                     // Bad parameters could run in an infinite loop, bodyguard below
                     if (lastIdSynth > 100) break;
+
                     MidiFilePlayer mfp = Instantiate<MidiFilePlayer>((MidiFilePlayer)this);
                     //Debug.Log($"BuildSpatialSynth: after Instantiate, internal synth ID:{mfp.IdSynth}");
+
                     mfp.spatialSynthIndex = idSynth;
                     mfp.name = $"Synth Id{idSynth + 1}";
                     mfp.MPTK_PlayOnStart = false;
                     mfp.MPTK_InitSynth();
-                    mfp.MPTK_Spatialize = true;
                     mfp.isSpatialSynthMaster = false;
                     mfp.trackName = "";
                     mfp.instrumentPlayed = "";
                     //mfp.hideFlags = HideFlags.DontSave;
                     SpatialSynths.Add(mfp);
                 }
+
                 // Avoid set parent in the previous loop because infinite loop are created. Why? I don't known!!!
+                // Classically, parent is also defined by the user script to assign MIDI synth to dedicated game object.
                 foreach (MidiFilePlayer mfp in SpatialSynths)
                 {
                     try
@@ -425,6 +726,17 @@ namespace MidiPlayerTK
             }
         }
 
+        private void ApplyDistanceAttenuationForSpatializer()
+        {
+            foreach (MidiFilePlayer mfp in SpatialSynths)
+            {
+                if (mfp != null)
+                {
+                    //Debug.Log($"ApplySpatialToAudioSource to {mfp.name}");
+                    ApplyDistanceAttenuationToAudioSource(mfp.CoreAudioSource);
+                }
+            }
+        }
         private void OnDestroy()
         {
             //Debug.Log($"OnDestroy {MPTK_SpatialSynthIndex}");
@@ -540,7 +852,7 @@ namespace MidiPlayerTK
             }
         }
 
-     
+
 #if UNITY_ANDROID && UNITY_OBOE
         public AudioStream oboeAudioStream;
         public void InitOboe()

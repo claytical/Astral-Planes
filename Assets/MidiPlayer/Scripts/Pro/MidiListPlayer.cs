@@ -4,6 +4,7 @@ using UnityEngine;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup pro_playlist_playback
     /// <summary>
     /// Play a list of pre-selected MIDI files from the MidiDB. This class must be used with the prefab MidiListPlayer.\n
     /// @version Maestro Pro 

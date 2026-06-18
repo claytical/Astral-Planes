@@ -8,6 +8,7 @@ using UnityEngine.Scripting;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup runtime_catalogs
     /// <summary>
     /// This class is useful when a list of paired value string+id is needed.\n
     /// 
@@ -41,6 +42,7 @@ namespace MidiPlayerTK
         public MPTKListItem() { }
     }
 
+    /// @ingroup runtime_catalogs
     // Not used, perhaps for the V3?
     public class MPTKItems : IEnumerable<MPTKListItem>
     {

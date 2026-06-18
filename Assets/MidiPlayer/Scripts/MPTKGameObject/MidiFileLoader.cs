@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -6,6 +6,7 @@ using UnityEngine.Scripting;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup runtime_midi_loading
     /// <summary>
     /// @Warning - will be soon deprecated, please rather use MidiFilePlayer prefab which have the same features + eventually MIDI sequencer and MIDI synth!
     /// Exemple for just loading a MIDI with MidiFilePlayer:\n
@@ -20,7 +21,7 @@ namespace MidiPlayerTK
 
         /// <summary>@brief
         /// Midi name to load. Use the exact name defined in Unity resources folder MidiDB without any path or extension.
-        /// Tips: Add Midi files to your project with the Unity menu MPTK or add it directly in the ressource folder and open Midi File Setup to automatically integrate Midi in MPTK.
+        /// Tips: Add Midi files to your project with the Unity menu MPTK or add it directly in the resource folder and open Midi File Setup to automatically integrate Midi in MPTK.
         /// </summary>
         public string MPTK_MidiName
         {
@@ -44,7 +45,7 @@ namespace MidiPlayerTK
 
         /// <summary>@brief
         /// Index Midi. Find the Index of Midi file from the popup in MidiFileLoader inspector.\n
-        /// Tips: Add Midi files to your project with the Unity menu MPTK or add it directly in the ressource folder and open Midi File Setup to automatically integrate Midi in MPTK.\n
+        /// Tips: Add Midi files to your project with the Unity menu MPTK or add it directly in the resource folder and open Midi File Setup to automatically integrate Midi in MPTK.\n
         /// return -1 if not found
         /// @code
         /// midiFilePlayer.MPTK_MidiIndex = 1;
@@ -95,18 +96,18 @@ namespace MidiPlayerTK
 
         /// <summary>@brief
         /// If true display in console all midi events loaded. v2.9.0\n
-        /// Set to true could increase greatly the load time. To be used only for debug.
+        /// Sets to true could increase greatly the load time. To be used only for debug.
         /// </summary>
         public bool MPTK_LogLoadEvents;
         // Deprecated v2.9.0 public bool MPTK_LogEvents;
 
         /// <summary>@brief
         /// A MIDI file is a kind of keyboard simulation: in general, a key pressed generates a 'note-on' and a key release generates a 'note-off'.\n
-        /// But there is an other possibility in a MIDI file: create a 'note-on' with a velocity=0 wich must act as a 'midi-off'\n
+        /// But there is an other possibility in a MIDI file: create a 'note-on' with a velocity=0 which must act as a 'midi-off'\n
         /// By default, MPTK create only one MPTK event with the command NoteOn and a duration.\n
         /// But in some cases, you could want to keep the note-off events if they exist in the MIDI file.\n
-        /// Set to false if there is no need (could greatly increases the MIDI list events).\n
-        /// Set to true to keep 'note-off' events.
+        /// Sets to false if there is no need (could greatly increases the MIDI list events).\n
+        /// Sets to true to keep 'note-off' events.
         /// </summary>
         public bool MPTK_KeepNoteOff;
 
@@ -179,7 +180,7 @@ namespace MidiPlayerTK
         public int MPTK_TimeSigDenominator;
 
         /// <summary>@brief
-        /// From KeySignature event: Values between -7 and 7 and specifies the key signature in terms of number of flats (if negative) or sharps (if positive)
+        /// From KeySignature event: Values between -7 and 7 and specifies the key signature in terms of number of flast (if negative) or sharps (if positive)
         /// https://www.recordingblogs.com/wiki/midi-key-signature-meta-message
         /// </summary>
         public int MPTK_KeySigSharpsFlats;
@@ -232,7 +233,7 @@ namespace MidiPlayerTK
         private MidiLoad midiLoaded;
 
         /// <summary>@brief 
-        /// Get all the MPTK MIDI events available in the midi file. New v2.9.0\n
+        /// Gets all the MPTK MIDI events available in the midi file. New v2.9.0\n
         /// </summary>
         public List<MPTKEvent> MPTK_MidiEvents
         {
@@ -242,7 +243,7 @@ namespace MidiPlayerTK
             }
         }
         /// <summary>@brief
-        /// Get detailed information about the midi loaded. 
+        /// Gets detailed information about the midi loaded. 
         /// </summary>
         public MidiLoad MPTK_MidiLoaded { get { return midiLoaded; } }
 
@@ -258,7 +259,7 @@ namespace MidiPlayerTK
 
 
         /// <summary>@brief
-        /// Load the midi file defined with MPTK_MidiName or MPTK_MidiIndex or from a array of bytes.\n
+        /// Loads the midi file defined with MPTK_MidiName or MPTK_MidiIndex or from a array of bytes.\n
         /// Look at MPTK_MidiLoaded for detailed information about the MIDI loaded.
         /// MPTK_MidiEvents will contains all MIDI events loaded.
         /// </summary>

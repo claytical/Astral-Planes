@@ -14,11 +14,11 @@ namespace MidiPlayerTK
         public const string CustomGptSite = "https://discord.gg/33sAXkYqZ7";
 
 #if MPTK_PRO
-        public const string version = "2.16.1 Pro";
+        public const string version = "2.19.0 Pro";
 #else
-        public const string version = "2.16.1 Free";
+        public const string version = "2.19.0 Free";
 #endif
-        public const string releaseDate = "Sep, 6 2025";
+        public const string releaseDate = "Mar, 28 2026";
 
 
 #if MPTK_UNLOCK_VOLUME

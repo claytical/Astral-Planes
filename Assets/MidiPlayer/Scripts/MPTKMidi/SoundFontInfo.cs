@@ -2,6 +2,7 @@
 
 namespace MidiPlayerTK
 {
+    /// @ingroup runtime_catalogs
     /// <summary>@brief
     /// Define parameter and information for the SF to avoid loading all a SF 
     /// </summary>

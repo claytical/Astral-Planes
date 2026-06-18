@@ -4,6 +4,9 @@ using System.Collections.Generic;
 using UnityEngine;
 public partial class Collectable : MonoBehaviour
 {
+    private static int _nextId;
+    private readonly int _id = System.Threading.Interlocked.Increment(ref _nextId);
+
     [Header("Core References")]
     [Tooltip("Track that spawned this collectable and receives collection callbacks.")]
     public InstrumentTrack assignedInstrumentTrack; // 🎼 The track that spawned this collectable
@@ -264,7 +267,7 @@ public partial class Collectable : MonoBehaviour
 
         _role = assignedInstrumentTrack != null ? assignedInstrumentTrack.assignedRole : MusicalRole.None;
         _roleProfile = MusicalRoleProfileLibrary.GetProfile(_role);
-        _orbitalChirality = (GetInstanceID() & 1) == 0 ? 1f : -1f;
+        _orbitalChirality = (_id & 1) == 0 ? 1f : -1f;
         if (assignedInstrumentTrack != null)
         {
             _s_liveByTrack[assignedInstrumentTrack] =
@@ -290,12 +293,12 @@ public partial class Collectable : MonoBehaviour
         {
             _currentCell = dt.CellOf(transform.position);
             RegisterOccupant(_currentCell);
-            GetDustClaims()?.ClaimCell($"Collectable#{GetInstanceID()}", _currentCell, DustClaimType.Occupancy, seconds: -1f);
+            GetDustClaims()?.ClaimCell($"Collectable#{_id}", _currentCell, DustClaimType.Occupancy, seconds: -1f);
 
             if (_gfm == null) _gfm = GameFlowManager.Instance;
             var dustGen = _gfm?.dustGenerator;
             if (dustGen != null)
-                dustGen.CreateJailCenterForCollectable(_currentCell, holdSeconds: 0f, ownerId: GetInstanceID());
+                dustGen.CreateJailCenterForCollectable(_currentCell, holdSeconds: 0f, ownerId: _id);
         }
     }
 
@@ -319,7 +322,7 @@ public partial class Collectable : MonoBehaviour
         UnbindLoopBoundary();
         UnregisterOccupant();
         UnregisterCarryOrbit();
-        GetDustClaims()?.ReleaseOwner($"Collectable#{GetInstanceID()}");
+        GetDustClaims()?.ReleaseOwner($"Collectable#{_id}");
         NotifyDestroyedOnce();
     }
 
@@ -328,7 +331,7 @@ public partial class Collectable : MonoBehaviour
         ClearReservation();
         UnbindLoopBoundary();
         UnregisterOccupant();
-        GetDustClaims()?.ReleaseOwner($"Collectable#{GetInstanceID()}");
+        GetDustClaims()?.ReleaseOwner($"Collectable Released");
         NotifyDestroyedOnce();
     }
 }

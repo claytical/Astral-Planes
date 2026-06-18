@@ -7,6 +7,7 @@ using UnityEngine;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup runtime_midi_loading
     /// <summary>@brief
     /// Scan a midifile and return information
     /// </summary>

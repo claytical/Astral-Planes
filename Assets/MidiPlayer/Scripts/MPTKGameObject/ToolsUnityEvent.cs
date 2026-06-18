@@ -5,31 +5,37 @@ namespace MidiPlayerTK
 {
 
     [System.Serializable]
+    /// @ingroup unity_event_bridges
     public class EventMidiClass : UnityEvent<MPTKEvent>
     {
     }
 
     [System.Serializable]
+    /// @ingroup unity_event_bridges
     public class EventNotesMidiClass : UnityEvent<List<MPTKEvent>>
     {
     }
 
     [System.Serializable]
+    /// @ingroup unity_event_bridges
     public class EventSynthClass : UnityEvent<string>
     {
     }
 
     [System.Serializable]
+    /// @ingroup unity_event_bridges
     public class EventStartMidiClass : UnityEvent<string>
     {
     }
 
     [System.Serializable]
+    /// @ingroup unity_event_bridges
     public class EventEndMidiClass : UnityEvent<string, EventEndMidiEnum>
     {
     }
 
     [System.Serializable]
+    /// @ingroup unity_event_bridges
     static public class ToolsUnityEvent
     {
 

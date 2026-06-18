@@ -5,20 +5,26 @@ namespace MidiPlayerTK
 {
     public partial class MidiStreamPlayer : MidiSynth
     {
-        public bool MPTK_LogChord;
+        // @cond nodoc
+        // Log chord building process in the console. It can be useful to understand how chords are built and to debug the chord library.
+        // It is not recommended to set this parameter to true in production as it can generate a lot of logs.
+        // Replaced with VerboseChord 
+        [HideInInspector] public bool MPTK_LogChord;
+        // @endcond 
 
         private MPTKScaleName currentScaleIndex;
         private MPTKScaleLib scaleLib;
 
         /// <summary>@brief
-        /// [Play a Midi pitch change event for all notes on the channel.
+        /// Plays a MIDI pitch change event for all notes on the channel.
+        /// @ingroup midistreamplayer_pro
         /// @version Maestro Pro 
         /// </summary>
-        /// <param name="channel">Channel must be in the range 0-15</param>
-        /// <param name="pitchWheel">Normalized Pitch Wheel Value. Range 0 to 1. V2.88.2 range normalized from 0 to 1.
-        /// @li  0      minimum (equivalent to value 0 for midi standard event) 
-        /// @li  0.5    centered (equivalent to value 8192 for midi standard event) 
-        /// @li  1      maximum (equivalent to value 16383 for midi standard event)
+        /// <param name="channel">MIDI channel in the range 0 to 15.</param>
+        /// <param name="pitchWheel">Normalized pitch wheel value in the range 0 to 1 (normalized since v2.88.2).
+        /// @li  0      minimum (equivalent to value 0 in the MIDI standard event)
+        /// @li  0.5    centered (equivalent to value 8192 in the MIDI standard event)
+        /// @li  1      maximum (equivalent to value 16383 in the MIDI standard event)
         /// </param> 
         public void MPTK_PlayPitchWheelChange(int channel, float pitchWheel)
         {
@@ -27,12 +33,13 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Play a midi pitch sensitivity change for all notes on the channel.
+        /// Plays a MIDI pitch sensitivity change for all notes on the channel.
+        /// @ingroup midistreamplayer_pro
         /// @version Maestro Pro 
         /// </summary>
-        /// <param name="channel">Channel must be in the range 0-15</param>
-        /// <param name="sensitivity">Pitch change sensitivity from 0 to 24 semitones up and down. Default value 2.\
-        /// Example: 4, means semitones range is from -4 to 4 when MPTK_PlayPitchWheelChange change from 0 to 1.
+        /// <param name="channel">MIDI channel in the range 0 to 15.</param>
+        /// <param name="sensitivity">Pitch bend sensitivity from 0 to 24 semitones. Default is 2.
+        /// Example: 4 means the range is -4 to +4 semitones when MPTK_PlayPitchWheelChange moves from 0 to 1.
         /// </param>
         public void MPTK_PlayPitchWheelSensitivity(int channel, int sensitivity)
         {
@@ -46,7 +53,9 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Scale Name selected (musical scale).
+        /// Name of the currently selected musical scale.
+        /// @ingroup midistreamplayer_pro
+        /// @ingroup midistreamplayer_chord_tools
         /// @version Maestro Pro 
         /// </summary>
         public string MPTK_ScaleName
@@ -58,7 +67,9 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Current selected scale
+        /// Currently selected scale.
+        /// @ingroup midistreamplayer_pro
+        /// @ingroup midistreamplayer_chord_tools
         /// @version Maestro Pro 
         /// </summary>
         public MPTKScaleName MPTK_ScaleSelected
@@ -69,15 +80,18 @@ namespace MidiPlayerTK
                 if (currentScaleIndex != value || scaleLib == null)
                 {
                     currentScaleIndex = value;
-                    scaleLib = MPTKScaleLib.CreateScale(currentScaleIndex, MPTK_LogChord);
+                    scaleLib = MPTKScaleLib.CreateScale(currentScaleIndex, MPTK_LogChord || VerboseChord);
                 }
             }
         }
 
         /// <summary>@brief
-        /// Play a chord from the current selected scale (MPTK_ScaleSelected), Tonic and Degree are defined in parameter MPTKChord chord.\n
-        /// Major scale is selected if no scale is defined.\n
-        /// See file GammeDefinition.csv in folder Resources/GeneratorTemplate
+        /// Plays a chord from the currently selected scale (MPTK_ScaleSelected).
+        /// Tonic and degree are defined in the MPTKChordBuilder parameter.
+        /// If no scale is selected, the major scale is used by default.
+        /// @ingroup midistreamplayer_pro
+        /// @ingroup midistreamplayer_chord_tools
+        /// See `GammeDefinition.csv` in `Resources/GeneratorTemplate`.
         /// @version Maestro Pro 
         /// @code
         /// using MidiPlayerTK; // Add a reference to the MPTK namespace at the top of your script
@@ -86,15 +100,15 @@ namespace MidiPlayerTK
         /// public class YourClass : MonoBehaviour
         /// {
 
-        ///     // Need a reference to the prefab MidiStreamPlayer you have added in your scene hierarchy.
+        ///     // Reference the MidiStreamPlayer prefab added to your scene hierarchy.
         ///     public MidiStreamPlayer midiStreamPlayer;
         /// 
-        ///     // This object will be pass to the MPTK_PlayEvent for playing an event
+        ///     // This object is passed to MPTK_PlayEvent to play an event.
         ///     MPTKEvent mptkEvent;
 
         ///     void Start()
         ///     {
-        ///         // Find the MidiStreamPlayer. Could be also set directly from the inspector.
+        ///         // Find the MidiStreamPlayer. It can also be set directly from the inspector.
         ///         midiStreamPlayer = FindFirstObjectByType<MidiStreamPlayer>();
         ///     }
         ///     private void PlayOneChordFromLib()
@@ -106,9 +120,9 @@ namespace MidiPlayerTK
         ///             Tonic = 60,
         ///             FromLib = 2,
         /// 
-        ///             // Midi Parameters how to play the chord
+        ///             // MIDI parameters for how to play the chord
         ///             Channel = 0,
-        ///             // delay in milliseconds between each notes of the chord
+        ///             // Delay in milliseconds between each note of the chord
         ///             Arpeggio = 100,
         ///             // millisecond, -1 to play indefinitely
         ///             Duration = 500,
@@ -122,8 +136,8 @@ namespace MidiPlayerTK
         /// 
         /// @endcode
         /// </summary>
-        /// <param name="chord">required: Tonic and Degree on top of the classical Midi parameters</param>
-        /// <returns></returns>
+        /// <param name="chord">Required: Tonic and Degree, in addition to the standard MIDI parameters.</param>
+        /// <returns>The same MPTKChordBuilder instance, enriched with generated events.</returns>
         public MPTKChordBuilder MPTK_PlayChordFromScale(MPTKChordBuilder chord)
         {
             try
@@ -161,8 +175,10 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Play a chord from the chord library. See file ChordLib.csv in folder Resources/GeneratorTemplate.\n
-        /// The Tonic is used to buid the chord
+        /// Plays a chord from the chord library. See `ChordLib.csv` in `Resources/GeneratorTemplate`.
+        /// The tonic is used to build the chord.
+        /// @ingroup midistreamplayer_pro
+        /// @ingroup midistreamplayer_chord_tools
         /// @version Maestro Pro 
         /// @code
         /// private void PlayOneChordFromLib()
@@ -174,9 +190,9 @@ namespace MidiPlayerTK
         ///        Tonic = CurrentNote,
         ///        FromLib = CurrentChord,
         ///
-        ///        // Midi Parameters how to play the chord
+        ///        // MIDI parameters for how to play the chord
         ///        Channel = StreamChannel,
-        ///        // delay in milliseconds between each notes of the chord
+        ///        // Delay in milliseconds between each note of the chord
         ///        Arpeggio = ArpeggioPlayChord, 
         ///        // millisecond, -1 to play indefinitely
         ///        Duration = Convert.ToInt64(NoteDuration * 1000f), 
@@ -188,8 +204,8 @@ namespace MidiPlayerTK
         /// }
         /// @endcode
         /// </summary>
-        /// <param name="chord">required: Tonic and FromLib on top of the classical Midi parameters</param>
-        /// <returns></returns>
+        /// <param name="chord">Required: Tonic and FromLib, in addition to the standard MIDI parameters.</param>
+        /// <returns>The same MPTKChordBuilder instance, enriched with generated events.</returns>
         public MPTKChordBuilder MPTK_PlayChordFromLib(MPTKChordBuilder chord)
         {
             try
@@ -221,10 +237,12 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Stop playing the chord. All samples associated to the chord are stopped by sending a noteoff.
+        /// Stops the chord. All samples associated with the chord are stopped by sending a note-off.
+        /// @ingroup midistreamplayer_pro
+        /// @ingroup midistreamplayer_chord_tools
         /// @version Maestro Pro 
         /// </summary>
-        /// <param name="chord"></param>
+        /// <param name="chord">Chord definition and generated events to stop.</param>
         public void MPTK_StopChord(MPTKChordBuilder chord)
         {
             if (chord.Events != null)

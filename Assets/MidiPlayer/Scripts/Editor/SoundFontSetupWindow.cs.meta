@@ -14,6 +14,6 @@ AssetOrigin:
   serializedVersion: 1
   productId: 115331
   packageName: Maestro - Midi Player Tool Kit - Pro
-  packageVersion: 2.16.1
+  packageVersion: 2.19.0
   assetPath: Assets/MidiPlayer/Scripts/Editor/SoundFontSetupWindow.cs
-  uploadId: 786006
+  uploadId: 889888

@@ -49,6 +49,7 @@ namespace MidiPlayerTK
 
                 commonEditor.DrawCaption(instance, "Midi Stream Player - Create your music with your algo.", "https://paxstellar.fr/midi-file-player-detailed-view-2-2/", "d9/d1e/class_midi_player_t_k_1_1_midi_stream_player.html#details");
                 commonEditor.AllPrefab(instance);
+                commonEditor.SpacialParameters(instance);
                 commonEditor.SynthParameters(instance, serializedObject);
 #if SHOWDEFAULT
                 instance.showDefault = EditorGUILayout.Foldout(instance.showDefault, "Show default editor");

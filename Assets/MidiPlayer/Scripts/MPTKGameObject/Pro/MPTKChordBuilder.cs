@@ -3,8 +3,9 @@ using UnityEngine;
 
 namespace MidiPlayerTK
 {
+    /// @ingroup midistreamplayer_chord_tools
     /// <summary>
-    /// Build Chord and Play with MidiStreamPlayer.\n
+    /// Build chords and play them with MidiStreamPlayer.\n
     /// @version Maestro Pro 
     /// See example in TestMidiStream.cs and ExtStreamPlayerPro.cs
     /// </summary>
@@ -35,7 +36,7 @@ namespace MidiPlayerTK
         public int Tonic;
 
         /// <summary>@brief
-        /// Count of notes to compose the chord. Between 2 and 20.
+        /// Number of notes used to compose the chord. Between 2 and 20.
         /// </summary>
         public int Count;
 
@@ -53,37 +54,37 @@ namespace MidiPlayerTK
         public int Degree;
 
         /// <summary>@brief
-        /// Index of the chord in the libraries file ChordLib.csv in folder Resources/GeneratorTemplate.csv. To be used with MidiStreamPlayer.MPTK_PlayChordFromLib(MPTKChord chord)
+        /// Index of the chord in the library file `ChordLib.csv` in `Resources/GeneratorTemplate`. To be used with `MidiStreamPlayer.MPTK_PlayChordFromLib(MPTKChord chord)`.
         /// </summary>
         public int FromLib;
 
         /// <summary>@brief
-        /// Midi channel fom 0 to 15 (9 for drum)
+        /// MIDI channel from 0 to 15 (9 for drums).
         /// </summary>
         public int Channel;
 
         /// <summary>@brief
-        /// Velocity between 0 and 127
+        /// Velocity between 0 and 127.
         /// </summary>
         public int Velocity;
 
         /// <summary>@brief
-        /// Duration of the chord in millisecond. Set -1 to play indefinitely.
+        /// Duration of the chord in milliseconds. Set `-1` to play indefinitely.
         /// </summary>
         public long Duration;
 
         /// <summary>@brief
-        /// Delay in millisecond before playing the chord.
+        /// Delay in milliseconds before playing the chord.
         /// </summary>
         public long Delay;
 
         /// <summary>@brief
-        /// Delay in millisecond between each notes in the chord (play an arpeggio).
+        /// Delay in milliseconds between each note in the chord (plays an arpeggio).
         /// </summary>
         public long Arpeggio;
 
         /// <summary>@brief
-        /// List of midi events played for this chord. This list is build when call to MPTK_PlayChord or MPTK_PlayChordFromLib is done else null.
+        /// List of MIDI events played for this chord. This list is built when `MPTK_PlayChord` or `MPTK_PlayChordFromLib` is called; otherwise, null.
         /// </summary>
         public List<MPTKEvent> Events;
 
@@ -93,7 +94,7 @@ namespace MidiPlayerTK
         private bool logChord;
 
         /// <summary>@brief
-        /// Create a default chord: tonic=C4, degree=1, count note=3.
+        /// Creates a default chord: tonic=C4, degree=1, note count=3.
         /// </summary>
         /// <param name="log">True to display log</param>
         public MPTKChordBuilder(bool log = false)
@@ -115,8 +116,8 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Build a chord from the current selected range (MPTK_RangeSelected), Tonic and Degree are to be defined in parameter MPTKChord chord.
-        /// Major range is selected if no range defined. After the call, Events contains all notes for the chord.
+        /// Builds a chord from the current selected scale/range. Tonic and Degree must be defined in the `MPTKChordBuilder` instance.
+        /// The major scale is selected if no scale is defined. After the call, `Events` contains all notes for the chord.
         /// @version Maestro Pro 
         /// </summary>
         /// <param name="scale"></param>
@@ -124,7 +125,7 @@ namespace MidiPlayerTK
         {
             if (scale == null) scale = MPTKScaleLib.CreateScale(0, logChord);
             Tonic = Mathf.Clamp(Tonic, 0, 127);
-            Count = Mathf.Clamp(Count, 2, 20);
+            Count = Mathf.Clamp(Count, 2, 50);
             Degree = Mathf.Clamp(Degree, 1, 7);
             Velocity = Mathf.Clamp(Velocity, 0, 127);
             Duration = Clamp(Duration, -1, 999999);
@@ -159,20 +160,20 @@ namespace MidiPlayerTK
 
 
         /// <summary>@brief
-        /// Build a chord from the current chord in the lib ChordLib.csv in folder Resources/GeneratorTemplate.csv
+        /// Builds a chord from the current chord in the `ChordLib.csv` library in `Resources/GeneratorTemplate`.
         /// @version Maestro Pro 
         /// </summary>
-        /// <param name="chordName">NAme of the chord</param>
+        /// <param name="chordName">Name of the chord.</param>
         public void MPTK_BuildFromLib(MPTKChordName chordName)
         {
             MPTK_BuildFromLib((int)chordName);
         }
 
         /// <summary>@brief
-        /// Build a chord
+        /// Builds a chord.
         /// @version Maestro Pro 
         /// </summary>
-        /// <param name="pindex">position from 0 in ChordLib.csv</param>
+        /// <param name="pindex">Position starting from 0 in `ChordLib.csv`.</param>
         public void MPTK_BuildFromLib(int pindex)
         {
             int index = Mathf.Clamp(pindex, 0, MPTKChordLib.ChordCount - 1);

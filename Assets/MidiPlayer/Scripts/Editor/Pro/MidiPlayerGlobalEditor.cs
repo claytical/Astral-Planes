@@ -63,25 +63,13 @@ namespace MidiPlayerTK
                 string soundFontSelected = ".";
                 if (commonEditor == null) commonEditor = ScriptableObject.CreateInstance<MidiCommonEditor>();
                 commonEditor.DrawCaption(null, "Midi Player Global - Manage all global features.", "https://paxstellar.fr/midiplayerglobal/", "d7/dc4/class_midi_player_t_k_1_1_midi_player_global.html#details");
-
-                // Not efficient ... see more later
-                //string pathR = EditorGUILayout.TextField(new GUIContent("Path To Resources", ""), instance.PathToResources);
-                //if (pathR != instance.PathToResources)
-                //{
-                //    instance.PathToResources = pathR;
-                //    MidiPlayerGlobal.InitPath();
-                //}
-                //EditorGUILayout.BeginHorizontal();
-                //if (GUILayout.Button(new GUIContent("Set to default",""), EditorStyles.miniButtonRight))//, miniButtonWidth, GUILayout.Height(20f)))
-                //{
-                //    instance.PathToResources =null;
-                //    MidiPlayerGlobal.InitPath();
-                //}
-                //if (GUILayout.Button(new GUIContent("Delete", ""), EditorStyles.miniButtonRight))//, miniButtonWidth, GUILayout.Height(20f)))
-                //{
-                //}
-                //EditorGUILayout.EndHorizontal();
-
+                EditorGUILayout.HelpBox(
+                    "Even if multiple MidiPlayerGlobal components exist in the scene,\n" +
+                    "only one instance remains active at runtime.\n" +
+                    "Changing a setting on one component\n" +
+                    "affects all MidiPlayerGlobal components.",
+                    MessageType.Info
+                );
 
                 if (MidiPlayerGlobal.CurrentMidiSet != null && MidiPlayerGlobal.CurrentMidiSet.ActiveSounFontInfo != null)
                 {
@@ -90,7 +78,7 @@ namespace MidiPlayerTK
                     EditorGUILayout.Separator();
                     // Display popup to change SoundFont
                     EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField(new GUIContent("Current SoundFont", "SoundFont selected to play sound"), GUILayout.Width(150));
+                    EditorGUILayout.LabelField(new GUIContent("Current SoundFont", "SoundFont selected to play sound"));
 
                     soundFontSelected = sfi.Name;
                     // SF is loaded in a coroutine, forbidden in edit mode
@@ -106,15 +94,17 @@ namespace MidiPlayerTK
                     new GUIContent("Load SoundFont at startup (recommended)", "If enabled load the default SoundFont is loaded when application is started."),
                     instance.LoadSoundFontAtStartup);
 
+                instance.audioListener = (EditorGUILayout.ObjectField(
+                    new GUIContent("Audio Listener", "Audio Listener used to play Midi sounds. If null the first Audio Listener found will be used."),
+                    instance.audioListener, typeof(AudioListener), true) as AudioListener);
+
                 // deprecated v2.16
                 //instance.LoadWaveAtStartup = EditorGUILayout.Toggle(
                 //    new GUIContent("Load samples at startup (no core mode)", "Load all samples for non core mode when application is started else load when needed at playing."),
                 //    instance.LoadWaveAtStartup);
 
                 // new v2.16
-                instance.verboseGlobal= EditorGUILayout.Toggle(
-                new GUIContent("Verbose Global"),
-                    instance.verboseGlobal);
+                instance.verboseGlobal = EditorGUILayout.Toggle(new GUIContent("Verbose Global"), instance.verboseGlobal);
 
                 string helpuri = "Define an url (prefix with http:// or https:/) or a full path to a local file (prefix with file://).";
                 EditorGUILayout.LabelField(new GUIContent("SoundFont URL or file path:", helpuri));

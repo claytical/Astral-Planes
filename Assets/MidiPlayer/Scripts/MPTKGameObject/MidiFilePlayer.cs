@@ -1,4 +1,4 @@
-﻿#define MPTK_PRO
+#define MPTK_PRO
 #define DEBUG_START_MIDIx
 using System;
 using System.Collections.Generic;
@@ -8,12 +8,12 @@ namespace MidiPlayerTK
 {
 
     /// <summary>
-    /// Play a MIDI file from the MidiDB. This class must be used with the prefab MidiFilePlayer.\n
+    /// Plays a MIDI file from the MidiDB. This class must be used with the prefab MidiFilePlayer.\n
     /// See "Midi File Setup" in the Unity menu MPTK for adding MIDI in MidiDB.\n
     /// @attention 
-    ///     - MidiFilePlayer inherits of class MidiSynth. For clarity, only MidiFilePlayer attributes are provided here.\n 
+    ///     - MidiFilePlayer inherits from class MidiSynth. For clarity, only MidiFilePlayer attributes are provided here.\n 
     ///       Look at the class MidiSynth to discover all attributes available.
-    ///     - #MPTK_MidiLoaded is an important attribut for MidiFilePlayer class.\n 
+    ///     - #MPTK_MidiLoaded is an important attribute for MidiFilePlayer class.\n 
     ///       It contains an instance of the class MidiLoad with all detailed information about the MIDI loaded and/or which are playing. \n
     ///       Check that #MPTK_MidiLoaded is not null before using these attributes.
     /// 
@@ -59,6 +59,7 @@ namespace MidiPlayerTK
     /// 
     /// @endcode
     /// </summary>
+    /// @ingroup midifileplayer_management
     //[RequireComponent(typeof(MidiPlayerGlobal))] -- not possible. It's a singleton object, all gameobjects will be merge at run time
     [RequireComponent(typeof(AudioSource))]
     [RequireComponent(typeof(AudioReverbFilter))]
@@ -66,6 +67,9 @@ namespace MidiPlayerTK
     [HelpURL("https://paxstellar.fr/midi-file-player-detailed-view-2/")]
     public partial class MidiFilePlayer : MidiSynth
     {
+        /// @name MIDI Channels
+        /// @{
+
         /// <summary>@brief
         /// Description and list of MIDI Channels associated to the MIDI synth.\n
         /// Each MIDI synth has 16 channels that carry all the relevant MIDI information.
@@ -80,10 +84,16 @@ namespace MidiPlayerTK
         /// 
         /// @snippet TestMidiFilePlayerScripting.cs ExampleUsingChannelAPI_Full
         /// </summary>
+        /// @ingroup midifileplayer_channels
         public MPTKChannels MPTK_Channels
         {
             get { return Channels; }
         }
+        /// @}
+
+        #region Play and Stop MIDI
+        /// @name Play and Stop MIDI
+        /// @{
 
         /// <summary>@brief 
         /// Select a MIDI from the MIDIDB to play by its name.\n
@@ -95,6 +105,7 @@ namespace MidiPlayerTK
         /// midiFilePlayer.MPTK_Play();
         /// @endcode
         /// </summary>
+        /// @ingroup midifileplayer_selection
         virtual public string MPTK_MidiName
         {
             get
@@ -121,6 +132,7 @@ namespace MidiPlayerTK
         /// @endcode        
         /// </summary>
         /// <param name="index">Index of the MIDI, start from 0</param>
+        /// @ingroup midifileplayer_selection
         public int MPTK_MidiIndex
         {
             get
@@ -162,15 +174,16 @@ namespace MidiPlayerTK
         ///     - If enabled, there will be a difference between the real time of the MIDI and the theoretical duration.
         /// </summary>
         //[HideInInspector]
+        /// @ingroup midifileplayer_playback_controls
         public bool MPTK_StartPlayAtFirstNote;
 
         /// <summary>@brief 
         /// By default, the end of a MIDI file is not the last note. It is the last MIDI event.\n
         /// If this value is true, MIDI playback will stop at the last note found in the MIDI file \n
-        /// and the OnEventEndPlay will be triggered at the lats note.
+        /// and the OnEventEndPlay will be triggered at the last note.
         /// @note
         ///     - Does not affect the value of #MPTK_Duration, which remains the same.
-        ///     - If enabled, MIDI playback could stop before #MPTK_Duration. See bellow how get this real duration.
+        ///     - If enabled, MIDI playback could stop before #MPTK_Duration. See below how get this real duration.
         ///     - Get #MPTK_PositionLastNote for the duration at the last note.
         /// @code
         ///   // Build string with MIDI duration. 
@@ -183,6 +196,7 @@ namespace MidiPlayerTK
         /// @endcode
         /// </summary>
         //[HideInInspector]
+        /// @ingroup midifileplayer_playback_controls
         public bool MPTK_StopPlayOnLastNote;
 
         /// <summary>
@@ -196,17 +210,17 @@ namespace MidiPlayerTK
         public enum ModeStopPlay
         {
             /// <summary>
-            /// Stop immediately (a short delay could occurs related to the Unity FPS).
+            /// Stops immediately (a short delay could occur, depending on the Unity FPS).
             /// </summary>
             StopNoWaiting,
 
             /// <summary>
-            /// Stop when all notes enter in the release phase (when note-of occurs or the duration is reaches).
+            /// Stops when all notes enter the release phase (when a note-off occurs or the duration is reached).
             /// </summary>
             StopWhenAllVoicesReleased,
 
             /// <summary>
-            /// Stop when all notes are in the ended phase (after the release phase). This delay is dependent of the instrument.
+            /// Stops when all notes are in the ended phase (after the release phase). This delay is dependent of the instrument.
             /// A drum has a short release phase, a piano a medium delay, a tubular bells a very long delay. 
             /// </summary>
             StopWhenAllVoicesEnded,
@@ -226,6 +240,7 @@ namespace MidiPlayerTK
         ///     
         /// </summary>
         //[HideInInspector]
+        /// @ingroup midifileplayer_playback_controls
         public ModeStopPlay MPTK_ModeStopVoice;
 
 
@@ -237,17 +252,8 @@ namespace MidiPlayerTK
         /// Whether the MIDI playback starts when the application starts?
         /// </summary>
         //[HideInInspector]
+        /// @ingroup midifileplayer_playback_controls
         public bool MPTK_PlayOnStart { get { return playOnStart; } set { playOnStart = value; } }
-
-        /// <summary>@brief 
-        /// @deprecated with 2.10.0 MPTK_Loop is deprecated. Please investigate #MPTK_MidiRestart or #MPTK_InnerLoop (Pro) for a better looping accuracy.
-        /// </summary>
-        [HideInInspector]
-        public bool MPTK_Loop
-        {
-            get { Debug.LogWarning("MPTK_Loop is deprecated. Please investigate MPTK_MidiAutoRestart."); return false; }
-            set { Debug.LogWarning("MPTK_Loop is deprecated. Please investigate MPTK_MidiAutoRestart."); }
-        }
 
         /// <summary>@brief 
         /// When the value is true, the current MIDI playing is restarted when it reaches the end of the MIDI file or #MPTK_MidiLoaded.MPTK_TickEnd.\n
@@ -260,112 +266,322 @@ namespace MidiPlayerTK
         /// @snippet MidiLoop.c ExampleMidiLoop
         /// </summary>
         [HideInInspector]
+        /// @ingroup midifileplayer_playback_controls
         public bool MPTK_MidiAutoRestart { get { return midiAutoRestart; } set { midiAutoRestart = value; } }
 
+        [SerializeField]
+        [HideInInspector]
+        private float speed = 1f;
+
         /// <summary>@brief 
-        /// Get or change the current tempo played by the internal MIDI sequencer (independent from MPTK_Speed). \n
-        /// Return QuarterPerMinuteValue similar to BPM (Beat Per Measure).\n
+        /// Is MIDI file playing is paused ?
+        /// </summary>
+        /// @ingroup midifileplayer_playback_controls
+        public bool MPTK_IsPaused { get { return playPause; } }
+
+        /// <summary>@brief 
+        /// Is MIDI file is playing ?
+        /// </summary>
+        /// @ingroup midifileplayer_playback_controls
+        public bool MPTK_IsPlaying { get { return midiIsPlaying; } }
+
+
+        /// <summary>@brief
+        /// Plays the midi file defined with #MPTK_MidiName or #MPTK_MidiIndex.
+        /// In the most part of the case, just call midiFilePlayer.MPTK_Play() in your script.
+        /// But sometimes, you want to apply some changes on the MIDI file before playing it.
+        /// The script example below describes how to load a MIDI file, apply some changes and play it.
+        /// Thank to the parameter 'alreadyLoaded'. When true, the MIDI has been already loaded with #MPTK_Load()
         /// @note
-        ///     - Can be handle only when the MIDI is playing.
-        ///     - Changing the current tempo when playing has no impact on the calculated duration of the MIDI.
+        ///     - No effect when already playing, resume pause if playing. 
+        ///     - corrected v2.17.1 - When MIDI player is paused and not yet playing, 
+        ///       the player just resume pause and not playing ... now, resume pause and play!
         /// </summary>
-        public double MPTK_Tempo
+        /// @snippet LoadMidiAndPlay.cs LoadMidiAndPlay
+        /// <param name="alreadyLoaded">true: the MIDI has already been loaded (see #MPTK_Load() v2.9.0</param>
+        /// @ingroup midifileplayer_playback_controls
+        public virtual void MPTK_Play(bool alreadyLoaded = false)
         {
-            get
+            try
             {
-                if (midiLoaded != null) return midiLoaded.MPTK_CurrentTempo; else return 0d;
-            }
-            set
-            {
-                if (midiLoaded != null) midiLoaded.MPTK_CurrentTempo = value;
-            }
-        }
+                //Debug.Log($"MPTK_Play");
 
-        /// <summary>@brief 
-        /// Get sequence track name if defined in the MIDI file with  MIDI MetaEventType = SequenceTrackName\n
-        /// See detail here https://ccrma.stanford.edu/~craig/14q/midifile/MidiFileFormat.html \n
-        /// Can be used only when the MIDI is playing.
-        /// </summary>
-        public string MPTK_SequenceTrackName { get { return midiLoaded != null ? midiLoaded.SequenceTrackName : ""; } }
+                // V2.82 removed from here
+                //MPTK_InitSynth();
+                //MPTK_StartSequencerMidi();
 
-        /// <summary>@brief 
-        /// Get Program track name if defined in the MIDI file with  MIDI MetaEventType = ProgramName\n
-        /// See detail here https://ccrma.stanford.edu/~craig/14q/midifile/MidiFileFormat.html \n
-        /// Can be used only when the MIDI is playing.
-        /// </summary>
-        public string MPTK_ProgramName { get { return midiLoaded != null ? midiLoaded.ProgramName : ""; } }
-
-        /// <summary>@brief 
-        /// Get Instrument track name if defined in the MIDI file with  MIDI MetaEventType = TrackInstrumentName\n
-        /// See detail here https://ccrma.stanford.edu/~craig/14q/midifile/MidiFileFormat.html \n
-        /// Can be used only when the MIDI is playing.
-        /// </summary>
-        public string MPTK_TrackInstrumentName { get { return midiLoaded != null ? midiLoaded.TrackInstrumentName : ""; } }
-
-        /// <summary>@brief 
-        /// Get Text if defined in the MIDI file with  MIDI MetaEventType = TextEvent\n
-        /// See detail here https://ccrma.stanford.edu/~craig/14q/midifile/MidiFileFormat.html \n
-        /// Can be used only when the MIDI is playing.
-        /// </summary>
-        public string MPTK_TextEvent { get { return midiLoaded != null ? midiLoaded.TextEvent : ""; } }
-
-        /// <summary>@brief 
-        /// Get Copyright if defined in the MIDI file with  MIDI MetaEventType = Copyright\n
-        /// See detail here https://ccrma.stanford.edu/~craig/14q/midifile/MidiFileFormat.html \n
-        /// Can be used only when the MIDI is playing.
-        /// </summary>
-        public string MPTK_Copyright { get { return midiLoaded != null ? midiLoaded.Copyright : ""; } }
-
-        /// <summary>@brief 
-        /// Percentage of the default playback speed. Range  0.1 (10% of the current BPM) to 10 (1000%). Default is 1 for normal speed.\n
-        /// Speed also applied to the duration of the sample played at voice level (often multiple voices are played for one note).
-        /// @note:
-        ///     - MPTK_Pulse is modified, formula for pulse (60000000 /  MPTK_CurrentTempo) / MPTK_DeltaTicksPerQuarterNote / 1000 / Speed
-        ///     - Release time (time after the note-off) remain unchanged, so some traffic jam could occurs for the MIDI synth..
-        ///     - No MPTKEvent attributes are modified. Duration and RealTime remain unchanged.
-        ///     - Unlock the range from 0.0001 to 100 when the Unity script symbol MPTK_UNLOCK_SPEED is defined (experimental). 
-        ///        - Unity 2022/2023: https://docs.unity3d.com/2022.3/Documentation/Manual/CustomScriptingSymbols.html
-        ///        - Unity 6: https://docs.unity3d.com/6000.0/Documentation/Manual/custom-scripting-symbols.html
-        /// </summary>
-        public float MPTK_Speed
-        {
-            get
-            {
-                //Debug.Log("get speed " + speed );
-                return speed;
-            }
-            set
-            {
-                try
+                if (MPTK_SoundFont.IsReady)
                 {
-                    if (value != speed)
+                    // V2.82 playPause = false; UnPause if paused
+                    if (MPTK_IsPaused)
+                        MPTK_UnPause();
+                    // else - corrected v2.17.1 - remove else
+                    // start playing even if player was pausd because unpause do nothing if the player was not running before pause 
+                    if (!MPTK_IsPlaying)
                     {
-                        //Debug.Log("set speed " + value);
-                        if (value >= Constant.MIN_SPEED && value <= Constant.MAX_SPEED)
+                        // V2.82 moved here
+                        MPTK_InitSynth();
+                        MPTK_StartSequencerMidi();
+
+                        if (!alreadyLoaded)
                         {
-                            speed = value;
-                            if (midiLoaded != null)
-                                midiLoaded.ChangeSpeed(speed);
+
+                            // Load description of available soundfont
+                            if (MidiPlayerGlobal.ImSFCurrent != null && MidiPlayerGlobal.CurrentMidiSet != null && MidiPlayerGlobal.CurrentMidiSet.MidiFiles != null && MidiPlayerGlobal.CurrentMidiSet.MidiFiles.Count > 0)
+                            {
+                                //if (VerboseSynth) Debug.Log(MPTK_MidiName);
+                                if (string.IsNullOrEmpty(MPTK_MidiName))
+                                    MPTK_MidiName = MidiPlayerGlobal.CurrentMidiSet.MidiFiles[0];
+                                int selectedMidi = MidiPlayerGlobal.CurrentMidiSet.MidiFiles.FindIndex(s => s == MPTK_MidiName);
+                                if (selectedMidi < 0)
+                                {
+                                    Debug.LogWarning($"MidiFilePlayer - MidiFile '{MPTK_MidiName}' not found. Trying with the first in list.");
+                                    selectedMidi = 0;
+                                    MPTK_MidiName = MidiPlayerGlobal.CurrentMidiSet.MidiFiles[0];
+                                }
+                            }
+                            else
+                                Debug.LogWarning(MidiPlayerGlobal.ErrorNoMidiFile);
+                        }
+                        if (MPTK_CorePlayer)
+                        {
+                            //Debug.Log($"MPTK_Play ThreadCorePlay");
+                            if (Application.isPlaying)
+                                Routine.RunCoroutine(ThreadCorePlay(alreadyLoaded: alreadyLoaded).CancelWith(gameObject), Segment.RealtimeUpdate);
+                            else
+                                Routine.RunCoroutine(ThreadCorePlay(alreadyLoaded: alreadyLoaded), Segment.EditorUpdate);
                         }
                         else
-                            Debug.LogWarning("MidiFilePlayer - Set Speed value not valid : " + value);
+                        {
+                            //Debug.Log($"MPTK_Play ThreadLegacyPlay");
+                            Routine.RunCoroutine(ThreadLegacyPlay(alreadyLoaded: alreadyLoaded).CancelWith(gameObject), Segment.RealtimeUpdate);
+                        }
                     }
                 }
-                catch (System.Exception ex)
+            }
+            catch (System.Exception ex)
+            {
+                MidiPlayerGlobal.ErrorDetail(ex);
+            }
+        }
+        /// <summary>@brief
+        /// Stops MIDI playback and cancels all sounds. This operation is performed in background, so MIDI may really stop after this method returns.
+        /// </summary>
+        /// @ingroup midifileplayer_playback_controls
+        public void MPTK_Stop()
+        {
+            MPTK_Stop(stopAllSound: true, wait: -1f);
+        }
+        /// <summary>@brief
+        /// Stops MIDI playback and cancels all sounds. This operation is performed in background, so MIDI may really stop after this method returns.
+        /// </summary>
+        /// <param name="stopAllSound">Set to true to stop all sounds (default), otherwise currently playing notes will continue until they finish.</param>
+        /// <param name="wait">With Legacy mode and if greater than -1 (v2.16), waits until MIDI playback is fully stopped or the specified wait time (in milliseconds) is reached. Otherwise, returns immediately.</param>
+        /// @ingroup midifileplayer_playback_controls
+        public void MPTK_Stop(bool stopAllSound = true, float wait = -1f)
+        {
+            //Debug.Log($">>> MPTK_Stop stopAllSound:{stopAllSound} wait:{wait}");
+
+            if (midiLoaded != null)
+            {
+                midiLoaded.ReadyToPlay = false;
+                midiIsPlaying = false;
+                playPause = false;
+                stopMidi = true;
+            }
+
+            if (stopAllSound)
+            {
+                Routine.RunCoroutine(ThreadClearAllSound(true, IdSession), Application.isPlaying ? Segment.RealtimeUpdate : Segment.EditorUpdate);
+                if (!MPTK_CorePlayer)
+                    Routine.RunCoroutine(ThreadVoiceAudioSourceRemove(wait, IdSession), Application.isPlaying ? Segment.RealtimeUpdate : Segment.EditorUpdate);
+            }
+            //Debug.Log($"<<< MPTK_Stop");
+        }
+
+        /// <summary>@brief 
+        /// Restart playing of the current midi file
+        /// </summary>
+        /// @ingroup midifileplayer_playback_controls
+        public void MPTK_RePlay()
+        {
+            try
+            {
+                //Debug.Log($"MPTK_RePlay {Application.isPlaying} midiIsPlaying={midiIsPlaying}");
+                //if (Application.isPlaying) // v2.89.5 avoid replay from editor mode // check removed v.289.6, play like a charm!
                 {
-                    MidiPlayerGlobal.ErrorDetail(ex);
+                    playPause = false;
+                    try
+                    {
+                        if (midiIsPlaying)
+                        {
+                            ThreadClearAllSound(true, IdSession);
+                            replayMidi = true;
+                        }
+                        else
+                            MPTK_Play();
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new MaestroException($"MPTK_RePlay {ex}");
+                    }
                 }
+            }
+            catch (System.Exception ex)
+            {
+                MidiPlayerGlobal.ErrorDetail(ex);
             }
         }
 
         /// <summary>@brief 
-        /// Set or get the current position in the MIDI in milliseconds.\n
+        /// Should the MIDI playing must be paused when the application lost the focus?
+        /// </summary>
+        [HideInInspector]
+        /// @ingroup midifileplayer_playback_controls
+        public bool MPTK_PauseOnFocusLoss;
+
+        /// <summary>@brief 
+        /// Pause the current playing. Use MPTK_UnPause to continue playing.
+        /// </summary>
+        /// <param name="timeToPauseMS">time to pause in milliseconds. default or < 0 : indefinitely</param>
+        /// @ingroup midifileplayer_playback_controls
+        public void MPTK_Pause(float timeToPauseMS = -1f)
+        {
+            try
+            {
+                //Debug.Log($"MPTK_Pause {MPTK_IsSpatialSynthMaster} {MPTK_SpatialSynthIndex}");
+                if (MPTK_CorePlayer && timeToPauseMS > 0f)
+                {
+                    // Pause with time limit. The timer pauseMidi is used to un pause the MIDI after the delay
+                    pauseMidi.Reset();
+                    pauseMidi.Start();
+                }
+
+                timeToPauseMilliSeconde = timeToPauseMS;
+                watchMidi.Stop();
+                playPause = true;
+                if (Application.isPlaying)
+                    Routine.RunCoroutine(ThreadClearAllSound(), Segment.RealtimeUpdate);
+                else
+                    Routine.RunCoroutine(ThreadClearAllSound(), Segment.EditorUpdate);
+            }
+            catch (System.Exception ex)
+            {
+                MidiPlayerGlobal.ErrorDetail(ex);
+            }
+        }
+
+        /// <summary>@brief 
+        /// UnPause the current playing when MidiPlayer is paused with MPTK_Pause.
+        /// </summary>
+        /// @ingroup midifileplayer_playback_controls
+        public void MPTK_UnPause()
+        {
+            try
+            {
+                //Debug.Log($"MPTK_UnPause {MPTK_IsSpatialSynthMaster} {MPTK_SpatialSynthIndex}");
+                pauseWhenFocusLost = false;
+                if (MPTK_CorePlayer)
+                {
+                    if (timeMidiFromStartPlay <= 0d) watchMidi.Reset(); // V2.82
+                    watchMidi.Start();
+                    playPause = false;
+                }
+                else
+                {
+                    playPause = false;
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MidiPlayerGlobal.ErrorDetail(ex);
+            }
+        }
+
+
+        /// <summary>@brief 
+        /// Plays next MIDI from the list of midi defined in MPTK (see Unity menu Midi)
+        /// </summary>
+        /// @ingroup midifileplayer_playback_controls
+        public void MPTK_Next()
+        {
+            try
+            {
+                if (MidiPlayerGlobal.CurrentMidiSet.MidiFiles != null && MidiPlayerGlobal.CurrentMidiSet.MidiFiles.Count > 0)
+                {
+                    int selectedMidi = 0;
+                    //Debug.Log("Next search " + MPTK_MidiName);
+                    if (!string.IsNullOrEmpty(MPTK_MidiName))
+                        selectedMidi = MidiPlayerGlobal.CurrentMidiSet.MidiFiles.FindIndex(s => s == MPTK_MidiName);
+                    if (selectedMidi >= 0)
+                    {
+                        selectedMidi++;
+                        if (selectedMidi >= MidiPlayerGlobal.CurrentMidiSet.MidiFiles.Count)
+                            selectedMidi = 0;
+                        MPTK_MidiName = MidiPlayerGlobal.CurrentMidiSet.MidiFiles[selectedMidi];
+                        //Debug.Log("Next found " + MPTK_MidiName);
+                        nextMidi = true;
+                        MPTK_RePlay();
+                    }
+                }
+                else
+                    Debug.LogWarning(MidiPlayerGlobal.ErrorNoMidiFile);
+            }
+            catch (System.Exception ex)
+            {
+                MidiPlayerGlobal.ErrorDetail(ex);
+            }
+        }
+
+        /// <summary>@brief 
+        /// Plays previous MIDI from the list of midi defined in MPTK (see Unity menu Midi)
+        /// </summary>
+        /// @ingroup midifileplayer_playback_controls
+        public void MPTK_Previous()
+        {
+            try
+            {
+                if (MidiPlayerGlobal.CurrentMidiSet.MidiFiles != null && MidiPlayerGlobal.CurrentMidiSet.MidiFiles.Count > 0)
+                {
+                    int selectedMidi = 0;
+                    if (!string.IsNullOrEmpty(MPTK_MidiName))
+                        selectedMidi = MidiPlayerGlobal.CurrentMidiSet.MidiFiles.FindIndex(s => s == MPTK_MidiName);
+                    if (selectedMidi >= 0)
+                    {
+                        selectedMidi--;
+                        if (selectedMidi < 0)
+                            selectedMidi = MidiPlayerGlobal.CurrentMidiSet.MidiFiles.Count - 1;
+                        MPTK_MidiName = MidiPlayerGlobal.CurrentMidiSet.MidiFiles[selectedMidi];
+                        prevMidi = true;
+                        MPTK_RePlay();
+                    }
+                }
+                else
+                    Debug.LogWarning(MidiPlayerGlobal.ErrorNoMidiFile);
+            }
+            catch (System.Exception ex)
+            {
+                MidiPlayerGlobal.ErrorDetail(ex);
+            }
+        }
+
+
+        /// @}
+        #endregion
+
+        #region Position and Duration
+        /// @name Position and Duration
+        /// @{
+
+
+        /// <summary>@brief 
+        /// Gets or sets the current position in the MIDI in milliseconds.\n
         /// When a new position is set, the corresponding tick in the MIDI event list is searched for by comparing it with the MPTKEvent.RealTime value, and the current MIDI playback is moved to this new tick position.\n
         /// @note
         ///     - The search does not take #MPTK_Speed into account.
         ///     - Works only when the MIDI is playing.
         ///     - You can't set the position before or just after MPTK_Play() because MPTK_Play() reset the position at the start.
-        ///     - Rather, set the position when the event OnEventStartPlayMidi() is triggered. See example bellow.
+        ///     - Rather, set the position when the event OnEventStartPlayMidi() is triggered. See example below.
         ///     - Look also the properties #MPTK_TickCurrent to change the tick by MIDI ticks.
         ///     - When the MIDI is playing look at the inspector of the MidiFilePlayer prefab to read (or change) the current position in seconds and find the position you want.
         ///     - see also :
@@ -402,6 +618,7 @@ namespace MidiPlayerTK
         /// }
         /// @endcode
         /// </summary>
+        /// @ingroup midifileplayer_positioning
         public double MPTK_Position
         {
             get
@@ -425,26 +642,6 @@ namespace MidiPlayerTK
             }
         }
 
-        [SerializeField]
-        [HideInInspector]
-        private float speed = 1f;
-
-        /// <summary>@brief 
-        /// Is MIDI file playing is paused ?
-        /// </summary>
-        public bool MPTK_IsPaused { get { return playPause; } }
-
-        /// <summary>@brief 
-        /// Is MIDI file is playing ?
-        /// </summary>
-        public bool MPTK_IsPlaying { get { return midiIsPlaying; } }
-
-        /// <summary>@brief 
-        /// Get detailed information about the MIDI playing. This readonly properties is available only when a MIDI has been loaded.
-        /// </summary>
-        public MidiLoad MPTK_MidiLoaded { get { return midiLoaded; } }
-
-
         //! @cond NODOC
         /// <summary>@brief 
         /// Value updated only when playing in Unity (for inspector refresh)
@@ -457,18 +654,21 @@ namespace MidiPlayerTK
         /// If #MPTK_KeepEndTrack is false, the MIDI events End Track are not considered to calculate this time.\n
         /// The tempo changes are taken into account if #MPTK_EnableChangeTempo is set to true before loading the MIDI.
         /// </summary>
+        /// @ingroup midifileplayer_positioning
         public TimeSpan MPTK_Duration { get { try { if (midiLoaded != null) return midiLoaded.MPTK_Duration; } catch (System.Exception ex) { MidiPlayerGlobal.ErrorDetail(ex); } return TimeSpan.Zero; } }
 
         /// <summary>@brief 
-        /// Real duration expressed in milliseconds of the full midi from the first event (tick=0) to the last event.\n
+        /// Real duration expressed in milliseconds of the full MIDI from the first event (tick=0) to the last event.\n
         /// If #MPTK_KeepEndTrack is false, the MIDI events End Track are not considered to calculate this time.\n
         /// The tempo changes are taken into account if #MPTK_EnableChangeTempo is set to true before loading the MIDI.
         /// </summary>
+        /// @ingroup midifileplayer_positioning
         public float MPTK_DurationMS { get { try { if (midiLoaded != null) return midiLoaded.MPTK_DurationMS; } catch (System.Exception ex) { MidiPlayerGlobal.ErrorDetail(ex); } return 0f; } }
 
         /// <summary>@brief 
         /// Last tick tick in Midi: it's the value of the tick for the last MIDI event in sequence expressed in number of "ticks".\n
         /// </summary>
+        /// @ingroup midifileplayer_positioning
         public long MPTK_TickLast { get { return midiLoaded != null ? midiLoaded.MPTK_TickLast : 0; } }
 
         /// <summary>@brief 
@@ -477,6 +677,7 @@ namespace MidiPlayerTK
         /// Use this attribute to known the tick tick where the will start to play a sound.\n
         /// See also #MPTK_PositionFirstNote
         /// </summary>
+        /// @ingroup midifileplayer_positioning
         public long MPTK_TickFirstNote { get { return midiLoaded != null ? midiLoaded.MPTK_TickFirstNote : 0; } }
 
         /// <summary>@brief 
@@ -485,35 +686,39 @@ namespace MidiPlayerTK
         /// Use this attribute to known the tick tick time when all sound will be stop.\n
         /// See also the #MPTK_PositionLastNote which provides the last time of the MIDI.
         /// </summary>
+        /// @ingroup midifileplayer_positioning
         public long MPTK_TickLastNote { get { return midiLoaded != null ? midiLoaded.MPTK_TickLastNote : 0; } }
 
         /// <summary>@brief 
-        /// Real time tick in millisecond for the first note-on found.\n
+        /// Real time tick in milliseconds for the first note-on found.\n
         /// Most MIDI don't start playing a note immediately. There is often a delay.\n
-        /// Use this attribute to known the real time wich it will start.\n
+        /// Use this attribute to known the real time which it will start.\n
         /// See also #MPTK_TickFirstNote
         /// </summary>
+        /// @ingroup midifileplayer_positioning
         public double MPTK_PositionFirstNote { get { return midiLoaded != null ? midiLoaded.MPTK_PositionFirstNote : 0; } }
 
         /// <summary>@brief 
-        /// Real time tick in millisecond for the last note-on found in the MIDI.\n
+        /// Real time tick in milliseconds for the last note-on found in the MIDI.\n
         /// There is often other MIDI events after the last note-on: for example event track-end.\n
         /// Use this attribute to known the real time when all sound will be stop.\n
         /// See also the #MPTK_DurationMS which provides the full time of all MIDI events including track-end, control at the beginning and at the end, ....\n
         /// See also #MPTK_TickLastNote
         /// </summary>
+        /// @ingroup midifileplayer_positioning
         public double MPTK_PositionLastNote { get { return midiLoaded != null ? midiLoaded.MPTK_PositionLastNote : 0; } }
 
 
         /// <summary>@brief 
         /// Count of track read in the MIDI file
         /// </summary>
+        /// @ingroup midifileplayer_positioning
         public int MPTK_TrackCount { get { return midiLoaded != null ? midiLoaded.MPTK_TrackCount : 0; } }
 
 
         /// <summary>@brief 
-        /// Get the tick value of the last MIDI event played.\n
-        /// Set the tick value of the next MIDI event to played.\n
+        /// Gets the tick value of the last MIDI event played.\n
+        /// Sets the tick value of the next MIDI event to played.\n
         /// @details
         /// MIDI tick is an easy way to identify a position in a song independently of the time which could vary with tempo change event.\n
         /// The count of ticks by quarter is constant all along a MIDI, it's a properties of the whole MIDI. see #MPTK_DeltaTicksPerQuarterNote.\n
@@ -556,6 +761,7 @@ namespace MidiPlayerTK
         /// }
         /// @endcode
         /// </summary>
+        /// @ingroup midifileplayer_positioning
         public long MPTK_TickCurrent
         {
             get
@@ -596,6 +802,7 @@ namespace MidiPlayerTK
         ///     - This value resets to false (default) each time a MIDI file is loaded. You can use #MPTK_Load() to load the MIDI, adjust this parameter, and then play the MIDI using #MPTK_Play().
         /// 
         /// </summary>
+        /// @ingroup midifileplayer_positioning
         public bool MPTK_RawSeek
         {
             get
@@ -614,6 +821,7 @@ namespace MidiPlayerTK
         /// <summary>@brief 
         /// Last MIDI event played by the MIDI sequencer
         /// </summary>
+        /// @ingroup midifileplayer_positioning
         public MPTKEvent MPTK_LastEventPlayed
         {
             get
@@ -623,14 +831,15 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Lenght in millisecond of a MIDI tick. The pulse length is the minimum time in millisecond between two MIDI events.\n
+        /// Length in milliseconds of a MIDI tick. The pulse length is the minimum time in milliseconds between two MIDI events.\n
         /// It's like a definition of graphical resolution but for MIDI: the MIDI sequencer will not be able to play two separate MIDI events in a time below this value.\n
         /// @note
         ///     - Depends on the current tempo (#MPTK_CurrentTempo) and the #MPTK_DeltaTicksPerQuarterNote and Speed.
         ///     - Read Only.
-        ///     - Formula: PulseLenght = MPTK_CurrentTempo / MPTK_DeltaTicksPerQuarterNote / 1000 / Speed
+        ///     - Formula: PulseLength = MPTK_CurrentTempo / MPTK_DeltaTicksPerQuarterNote / 1000 / Speed
         /// 
         /// </summary>
+        /// @ingroup midifileplayer_positioning
         public double MPTK_Pulse { get { try { if (midiLoaded != null) return midiLoaded.MPTK_Pulse; } catch (System.Exception ex) { MidiPlayerGlobal.ErrorDetail(ex); } return 0d; } }
 
         public double MPTK_PulseLenght { get { Debug.LogWarning("MPTK_PulseLenght has been deprecated, please investigate MPTK_Pulse in place"); return 0d; } }
@@ -647,6 +856,7 @@ namespace MidiPlayerTK
         /// @note
         /// #MPTK_Tempo or #MPTK_Speed change have no direct impact on this value.
         /// </summary>
+        /// @ingroup midifileplayer_positioning
         public TimeSpan MPTK_PlayTime { get { try { return TimeSpan.FromMilliseconds(timeMidiFromStartPlay); } catch (System.Exception ex) { MidiPlayerGlobal.ErrorDetail(ex); } return TimeSpan.Zero; } }
 
         /// <summary>@brief 
@@ -654,62 +864,15 @@ namespace MidiPlayerTK
         /// @note
         /// #MPTK_Tempo or #MPTK_Speed change have no direct impact on this value.
         /// </summary>
+        /// @ingroup midifileplayer_positioning
         public double MPTK_RealTime { get { return timeMidiFromStartPlay; } }
 
+        /// @}
+        #endregion
 
-        /// <summary>@brief 
-        /// A MIDI file is a kind of keyboard simulation: in general, a key pressed generates a 'note-on' and a key release generates a 'note-off'.\n
-        /// But there is an other possibility in a MIDI file: create a 'note-on' with a velocity=0 wich must act as a 'midi-off'\n
-        /// By default, MPTK create only one MPTK event with the command NoteOn and a duration.\n
-        /// But in some cases, you could want to keep the note-off events if they exist in the MIDI file.\n
-        /// Set to false if there is no need (could greatly increases the MIDI list events).\n
-        /// Set to true to keep 'note-off' events.
-        /// </summary>
-        public bool MPTK_KeepNoteOff
-        {
-            get { return keepNoteOff; }
-            set { keepNoteOff = value; }
-        }
-
-        /// <summary>@brief 
-        /// When set to true, meta MIDI event End Track are keep. Default is false.\n
-        /// If set to true, the End Track Event are taken into account for calculate the full duration of the MIDI.\n
-        /// See #MPTK_DurationMS.
-        /// </summary>
-        public bool MPTK_KeepEndTrack
-        {
-            get { return keepEndTrack; }
-            set { keepEndTrack = value; }
-        }
-
-
-        /// <summary>@brief
-        /// If true display in console all midi events when a MIDI file is loaded.\n
-        /// @note Set to true will increase greatly the MIDI load time. To be used only for debug purpose.
-        /// @version 2.10.0
-        /// </summary>
-        [Tooltip("Warning: enabled will increase greatly the MIDI load time. To be used only for debug purpose.")]
-        public bool MPTK_LogLoadEvents;
-
-        /// <summary>@brief
-        /// If the value is true, text read from Text META (e.g. lyrics) will be read with UTF8 encoding. The default is false.\n
-        /// The MIDI standard only allows ASCII characters for this META, but with this extension you will be able to read and display\n
-        /// characters like Korean, Chinese, Japanese and even French accented letters ;-)
-        /// @version 2.11.3
-        /// </summary>
-        public bool MPTK_ExtendedText { get; set; }
-
-        /// <summary>@brief 
-        /// Status of the last midi loaded. The status is updated in a coroutine, so the status can change at each frame.
-        /// </summary>
-        [HideInInspector]
-        public LoadingStatusMidiEnum MPTK_StatusLastMidiLoaded;
-
-        /// <summary>@brief 
-        /// Contains the error from the web request when loading MIDI from an URL
-        /// </summary>
-        [HideInInspector]
-        public string MPTK_WebRequestError;
+        #region MIDI Events
+        /// @name MIDI Events
+        /// @{
 
         /// <summary>@brief 
         /// Method triggered for each MIDI event (or group of MIDI events) ready to be played by the MIDI synth. All these events are on same MIDI tick\n.
@@ -759,6 +922,7 @@ namespace MidiPlayerTK
         /// @endcode
         /// </summary>
         //[HideInInspector]
+        /// @ingroup midifileplayer_events
         public EventNotesMidiClass OnEventNotesMidi;
 
 
@@ -805,6 +969,7 @@ namespace MidiPlayerTK
         /// @endcode
         /// </summary>
         //[HideInInspector]
+        /// @ingroup midifileplayer_events
         public EventStartMidiClass OnEventStartPlayMidi;
 
         /// <summary>@brief 
@@ -814,7 +979,7 @@ namespace MidiPlayerTK
         ///       #MPTK_ModeStopVoice defined the behavior of the MIDI player when playback is stopped or restarted.\n
         ///       A good practice is to defined #MPTK_ModeStopVoice = ModeStopPlay.StopWhenAllVoicesReleased.
         ///     - By default, the end of playback of a MIDI file is not the last note. It is the last MIDI event.\n
-        ///       Set #MPTK_StopPlayOnLastNote to true to fire this event on the last note.
+        ///       Sets #MPTK_StopPlayOnLastNote to true to fire this event on the last note.
         ///     - Set #MPTK_KeepEndTrack or #MPTK_KeepNoteOff to true when loading the MIDI file to synchronise the end of playback with the real end of the MIDI file.
         /// @code
         /// 
@@ -845,42 +1010,11 @@ namespace MidiPlayerTK
         /// @endcode
         /// </summary>
         // [HideInInspector]
+        /// @ingroup midifileplayer_events
         public EventEndMidiClass OnEventEndPlayMidi;
 
-        /// <summary>@brief 
-        /// Level of quantization : 
-        ///     -      0 = None 
-        ///     -      1 = Beat Note
-        ///     -      2 = Eighth Note
-        ///     -      3 = 16th Note
-        ///     -      4 = 32th Note
-        ///     -      5 = 64th Note
-        ///     -      6 = 128th Note
-        /// </summary>
-        public int MPTK_Quantization
-        {
-            get { return quantization; }
-            set
-            {
-                try
-                {
-                    if (value >= 0 && value <= 6)
-                    {
-                        quantization = value;
-                        midiLoaded.ChangeQuantization(quantization);
-                    }
-                    else
-                        Debug.LogWarning("MidiFilePlayer - Set Quantization value not valid : " + value);
-                }
-                catch (System.Exception ex)
-                {
-                    MidiPlayerGlobal.ErrorDetail(ex);
-                }
-            }
-        }
-        [SerializeField]
-        [HideInInspector]
-        private int quantization = 0;
+        /// @}
+        #endregion
 
 
         [SerializeField]
@@ -913,44 +1047,6 @@ namespace MidiPlayerTK
 
         private double lastMidiTimePlayAS = 0d;
         protected double timeAtStartMidi = 0d;
-
-        /// <summary>@brief 
-        /// Get a list of all the MPTK MIDI events that are available in the MIDI.\n
-        /// @snippet TestMidiFilePlayerScripting.cs Example_GUI_PreloadAndAlterMIDI
-        /// </summary>
-        public List<MPTKEvent> MPTK_MidiEvents
-        {
-            get
-            {
-                return midiLoaded != null ? midiLoaded.MPTK_MidiEvents : null;
-            }
-        }
-
-        /// <summary>@brief 
-        /// Delta Ticks Per Beat Note. Indicate the duration time in "ticks" which make up a quarter-note.\n 
-        /// For instance, if 96, then a duration of an eighth-note in the file would be 48.\n
-        /// More info here https://paxstellar.fr/2020/09/11/midi-timing/\n
-        /// @code
-        /// Move forward one quarter
-        /// midiFilePlayer.MPTK_TickCurrent = midiFilePlayer.MPTK_TickCurrent + midiFilePlayer.MPTK_DeltaTicksPerQuarterNote;
-        /// @endcode
-        /// </summary>
-        public int MPTK_DeltaTicksPerQuarterNote
-        {
-            get
-            {
-                int DeltaTicksPerQuarterNote = 0;
-                try
-                {
-                    DeltaTicksPerQuarterNote = midiLoaded?.MPTK_DeltaTicksPerQuarterNote ?? 0;
-                }
-                catch (System.Exception ex)
-                {
-                    MidiPlayerGlobal.ErrorDetail(ex);
-                }
-                return DeltaTicksPerQuarterNote;
-            }
-        }
 
         [HideInInspector]
         protected bool distancePause;
@@ -1079,269 +1175,207 @@ namespace MidiPlayerTK
             MPTK_Play();
         }
 
-        /// <summary>@brief
-        /// Play the midi file defined with #MPTK_MidiName or #MPTK_MidiIndex.
-        /// In the most part of the case, just call midiFilePlayer.MPTK_Play() in your script.
-        /// But sometimes, you want to apply some changes on the MIDI file before playing it.
-        /// The script example bellow describes how to load a MIDI file, apply some changes and play it.
-        /// Thank to the parameter 'alreadyLoaded'. When true, the MIDI has been already loaded with #MPTK_Load()
-        /// </summary>
-        /// @snippet LoadMidiAndPlay.cs LoadMidiAndPlay
-        /// <param name="alreadyLoaded">true: the MIDI has already been loaded (see #MPTK_Load() v2.9.0</param>
-        public virtual void MPTK_Play(bool alreadyLoaded = false)
-        {
-            try
-            {
-                //Debug.Log($"MPTK_Play");
-
-                // V2.82 removed from here
-                //MPTK_InitSynth();
-                //MPTK_StartSequencerMidi();
-
-                if (MPTK_SoundFont.IsReady)
-                {
-                    // V2.82 playPause = false; UnPause if paused
-                    if (MPTK_IsPaused)
-                        MPTK_UnPause();
-                    else if (!MPTK_IsPlaying)
-                    {
-                        // V2.82 moved here
-                        MPTK_InitSynth();
-                        MPTK_StartSequencerMidi();
-
-                        if (!alreadyLoaded)
-                        {
-
-                            // Load description of available soundfont
-                            if (MidiPlayerGlobal.ImSFCurrent != null && MidiPlayerGlobal.CurrentMidiSet != null && MidiPlayerGlobal.CurrentMidiSet.MidiFiles != null && MidiPlayerGlobal.CurrentMidiSet.MidiFiles.Count > 0)
-                            {
-                                //if (VerboseSynth) Debug.Log(MPTK_MidiName);
-                                if (string.IsNullOrEmpty(MPTK_MidiName))
-                                    MPTK_MidiName = MidiPlayerGlobal.CurrentMidiSet.MidiFiles[0];
-                                int selectedMidi = MidiPlayerGlobal.CurrentMidiSet.MidiFiles.FindIndex(s => s == MPTK_MidiName);
-                                if (selectedMidi < 0)
-                                {
-                                    Debug.LogWarning($"MidiFilePlayer - MidiFile '{MPTK_MidiName}' not found. Trying with the first in list.");
-                                    selectedMidi = 0;
-                                    MPTK_MidiName = MidiPlayerGlobal.CurrentMidiSet.MidiFiles[0];
-                                }
-                            }
-                            else
-                                Debug.LogWarning(MidiPlayerGlobal.ErrorNoMidiFile);
-                        }
-                        if (MPTK_CorePlayer)
-                        {
-                            //Debug.Log($"MPTK_Play ThreadCorePlay");
-                            if (Application.isPlaying)
-                                Routine.RunCoroutine(ThreadCorePlay(alreadyLoaded: alreadyLoaded).CancelWith(gameObject), Segment.RealtimeUpdate);
-                            else
-                                Routine.RunCoroutine(ThreadCorePlay(alreadyLoaded: alreadyLoaded), Segment.EditorUpdate);
-                        }
-                        else
-                        {
-                            //Debug.Log($"MPTK_Play ThreadLegacyPlay");
-                            Routine.RunCoroutine(ThreadLegacyPlay(alreadyLoaded: alreadyLoaded).CancelWith(gameObject), Segment.RealtimeUpdate);
-                        }
-                    }
-                }
-            }
-            catch (System.Exception ex)
-            {
-                MidiPlayerGlobal.ErrorDetail(ex);
-            }
-        }
-        /// <summary>@brief
-        /// Stops MIDI playback and cancels all sounds. This operation is performed in background, so MIDI may really stop after this method returns.
-        /// </summary>
-        public void MPTK_Stop()
-        {
-            MPTK_Stop(stopAllSound: true, wait: -1f);
-        }
-        /// <summary>@brief
-        /// Stops MIDI playback and cancels all sounds. This operation is performed in background, so MIDI may really stop after this method returns.
-        /// </summary>
-        /// <param name="stopAllSound">Set to true to stop all sounds (default), otherwise currently playing notes will continue until they finish.</param>
-        /// <param name="wait">With Legacy mode and if greater than -1 (v2.16), waits until MIDI playback is fully stopped or the specified wait time (in milliseconds) is reached. Otherwise, returns immediately.</param>
-        public void MPTK_Stop(bool stopAllSound = true, float wait = -1f)
-        {
-            //Debug.Log($">>> MPTK_Stop stopAllSound:{stopAllSound} wait:{wait}");
-
-            if (midiLoaded != null)
-            {
-                midiLoaded.ReadyToPlay = false;
-                midiIsPlaying = false;
-                playPause = false;
-                stopMidi = true;
-            }
-
-            if (stopAllSound)
-            {
-                Routine.RunCoroutine(ThreadClearAllSound(true, IdSession), Application.isPlaying ? Segment.RealtimeUpdate : Segment.EditorUpdate);
-                if (!MPTK_CorePlayer)
-                    Routine.RunCoroutine(ThreadVoiceAudioSourceRemove(wait, IdSession), Application.isPlaying ? Segment.RealtimeUpdate : Segment.EditorUpdate);
-            }
-            //Debug.Log($"<<< MPTK_Stop");
-        }
+        #region MIDI Properties
+        /// @name MIDI Properties
 
         /// <summary>@brief 
-        /// Restart playing of the current midi file
+        /// Percentage of the default playback speed. Range  0.1 (10% of the current BPM) to 10 (1000%). Default is 1 for normal speed.\n
+        /// Speed also applied to the duration of the sample played at voice level (often multiple voices are played for one note).
+        /// @note:
+        ///     - MPTK_Pulse is modified, formula for pulse (60000000 /  MPTK_CurrentTempo) / MPTK_DeltaTicksPerQuarterNote / 1000 / Speed
+        ///     - Release time (time after the note-off) remains unchanged, so some traffic jam could occur for the MIDI synth.
+        ///     - No MPTKEvent attributes are modified. Duration and RealTime remain unchanged.
+        ///     - Unlock the range from 0.0001 to 100 when the Unity script symbol MPTK_UNLOCK_SPEED is defined (experimental). 
+        ///        - Unity 2022/2023: https://docs.unity3d.com/2022.3/Documentation/Manual/CustomScriptingSymbols.html
+        ///        - Unity 6: https://docs.unity3d.com/6000.0/Documentation/Manual/custom-scripting-symbols.html
         /// </summary>
-        public void MPTK_RePlay()
+        /// @ingroup midifileplayer_positioning
+        public float MPTK_Speed
         {
-            try
+            get
             {
-                //Debug.Log($"MPTK_RePlay {Application.isPlaying} midiIsPlaying={midiIsPlaying}");
-                //if (Application.isPlaying) // v2.89.5 avoid replay from editor mode // check removed v.289.6, play like a charm!
+                //Debug.Log("get speed " + speed );
+                return speed;
+            }
+            set
+            {
+                try
                 {
-                    playPause = false;
-                    try
+                    if (value != speed)
                     {
-                        if (midiIsPlaying)
+                        //Debug.Log("set speed " + value);
+                        if (value >= Constant.MIN_SPEED && value <= Constant.MAX_SPEED)
                         {
-                            ThreadClearAllSound(true, IdSession);
-                            replayMidi = true;
+                            speed = value;
+                            if (midiLoaded != null)
+                                midiLoaded.ChangeSpeed(speed);
                         }
                         else
-                            MPTK_Play();
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new MaestroException($"MPTK_RePlay {ex}");
+                            Debug.LogWarning("MidiFilePlayer - Set Speed value not valid : " + value);
                     }
                 }
-            }
-            catch (System.Exception ex)
-            {
-                MidiPlayerGlobal.ErrorDetail(ex);
+                catch (System.Exception ex)
+                {
+                    MidiPlayerGlobal.ErrorDetail(ex);
+                }
             }
         }
 
         /// <summary>@brief 
-        /// Should the MIDI playing must be paused when the application lost the focus?
+        /// @deprecated with 2.10.0 MPTK_Loop is deprecated. Please investigate #MPTK_MidiRestart or #MPTK_InnerLoop (Pro) for a better looping accuracy.
         /// </summary>
         [HideInInspector]
-        public bool MPTK_PauseOnFocusLoss;
-
-        /// <summary>@brief 
-        /// Pause the current playing. Use MPTK_UnPause to continue playing.
-        /// </summary>
-        /// <param name="timeToPauseMS">time to pause in milliseconds. default or < 0 : indefinitely</param>
-        public void MPTK_Pause(float timeToPauseMS = -1f)
+        public bool MPTK_Loop
         {
-            try
-            {
-                //Debug.Log($"MPTK_Pause {MPTK_IsSpatialSynthMaster} {MPTK_SpatialSynthIndex}");
-                if (MPTK_CorePlayer && timeToPauseMS > 0f)
-                {
-                    // Pause with time limit. The timer pauseMidi is used to un pause the MIDI after the delay
-                    pauseMidi.Reset();
-                    pauseMidi.Start();
-                }
-
-                timeToPauseMilliSeconde = timeToPauseMS;
-                watchMidi.Stop();
-                playPause = true;
-                if (Application.isPlaying)
-                    Routine.RunCoroutine(ThreadClearAllSound(), Segment.RealtimeUpdate);
-                else
-                    Routine.RunCoroutine(ThreadClearAllSound(), Segment.EditorUpdate);
-            }
-            catch (System.Exception ex)
-            {
-                MidiPlayerGlobal.ErrorDetail(ex);
-            }
-        }
-
-        /// <summary>@brief 
-        /// UnPause the current playing when MidiPlayer is paused with MPTK_Pause.
-        /// </summary>
-        public void MPTK_UnPause()
-        {
-            try
-            {
-                //Debug.Log($"MPTK_UnPause {MPTK_IsSpatialSynthMaster} {MPTK_SpatialSynthIndex}");
-                pauseWhenFocusLost = false;
-                if (MPTK_CorePlayer)
-                {
-                    if (timeMidiFromStartPlay <= 0d) watchMidi.Reset(); // V2.82
-                    watchMidi.Start();
-                    playPause = false;
-                }
-                else
-                {
-                    playPause = false;
-                }
-            }
-            catch (System.Exception ex)
-            {
-                MidiPlayerGlobal.ErrorDetail(ex);
-            }
+            get { Debug.LogWarning("MPTK_Loop is deprecated. Please investigate MPTK_MidiAutoRestart."); return false; }
+            set { Debug.LogWarning("MPTK_Loop is deprecated. Please investigate MPTK_MidiAutoRestart."); }
         }
 
 
         /// <summary>@brief 
-        /// Play next MIDI from the list of midi defined in MPTK (see Unity menu Midi)
+        /// Gets or sets the current tempo played by the internal MIDI sequencer (independent from MPTK_Speed). \n
+        /// Return QuarterPerMinuteValue similar to BPM (Beat Per Measure).\n
+        /// @note
+        ///     - Can be handle only when the MIDI is playing.
+        ///     - Changing the current tempo when playing has no impact on the calculated duration of the MIDI.
         /// </summary>
-        public void MPTK_Next()
+        public double MPTK_Tempo
         {
-            try
+            get
             {
-                if (MidiPlayerGlobal.CurrentMidiSet.MidiFiles != null && MidiPlayerGlobal.CurrentMidiSet.MidiFiles.Count > 0)
+                if (midiLoaded != null) return midiLoaded.MPTK_CurrentTempo; else return 0d;
+            }
+            set
+            {
+                if (midiLoaded != null) midiLoaded.MPTK_CurrentTempo = value;
+            }
+        }
+
+        /// <summary>@brief 
+        /// Gets sequence track name if defined in the MIDI file with  MIDI MetaEventType = SequenceTrackName\n
+        /// See detail here https://ccrma.stanford.edu/~craig/14q/midifile/MidiFileFormat.html \n
+        /// Can be used only when the MIDI is playing.
+        /// </summary>
+        public string MPTK_SequenceTrackName { get { return midiLoaded != null ? midiLoaded.SequenceTrackName : ""; } }
+
+        /// <summary>@brief 
+        /// Gets Program track name if defined in the MIDI file with  MIDI MetaEventType = ProgramName\n
+        /// See detail here https://ccrma.stanford.edu/~craig/14q/midifile/MidiFileFormat.html \n
+        /// Can be used only when the MIDI is playing.
+        /// </summary>
+        public string MPTK_ProgramName { get { return midiLoaded != null ? midiLoaded.ProgramName : ""; } }
+
+        /// <summary>@brief 
+        /// Gets Instrument track name if defined in the MIDI file with  MIDI MetaEventType = TrackInstrumentName\n
+        /// See detail here https://ccrma.stanford.edu/~craig/14q/midifile/MidiFileFormat.html \n
+        /// Can be used only when the MIDI is playing.
+        /// </summary>
+        public string MPTK_TrackInstrumentName { get { return midiLoaded != null ? midiLoaded.TrackInstrumentName : ""; } }
+
+        /// <summary>@brief 
+        /// Gets Text if defined in the MIDI file with  MIDI MetaEventType = TextEvent\n
+        /// See detail here https://ccrma.stanford.edu/~craig/14q/midifile/MidiFileFormat.html \n
+        /// Can be used only when the MIDI is playing.
+        /// </summary>
+        public string MPTK_TextEvent { get { return midiLoaded != null ? midiLoaded.TextEvent : ""; } }
+
+        /// <summary>@brief 
+        /// Gets Copyright if defined in the MIDI file with  MIDI MetaEventType = Copyright\n
+        /// See detail here https://ccrma.stanford.edu/~craig/14q/midifile/MidiFileFormat.html \n
+        /// Can be used only when the MIDI is playing.
+        /// </summary>
+        public string MPTK_Copyright { get { return midiLoaded != null ? midiLoaded.Copyright : ""; } }
+
+
+
+        /// <summary>@brief 
+        /// Force all notes to return to their original values before transposing.\n 
+        /// Useful when looping on a MIDI with a transpose value different than 0. 
+        /// When returning to 0 (no transpose) the note value can be reset to their original value.
+        /// @version V2.14.0
+        /// </summary>
+        public void MPTK_ResetTranspose()
+        {
+            if (midiLoaded == null || midiLoaded.MPTK_MidiEvents == null)
+                Debug.LogWarning("MidiFilePlayer - No MIDI loaded - MPTK_ResetTranpose canceled ");
+            else
+                foreach (MPTKEvent mPTKEvent in midiLoaded.MPTK_MidiEvents)
+                    if (mPTKEvent.Command == MPTKCommand.NoteOn)
+                        mPTKEvent.ResetTransposeValue();
+        }
+        /// <summary>@brief 
+        /// Gets a list of all the MPTK MIDI events that are available in the MIDI.\n
+        /// @snippet TestMidiFilePlayerScripting.cs Example_GUI_PreloadAndAlterMIDI
+        /// </summary>
+        public List<MPTKEvent> MPTK_MidiEvents
+        {
+            get
+            {
+                return midiLoaded != null ? midiLoaded.MPTK_MidiEvents : null;
+            }
+        }
+        /// <summary>@brief 
+        /// Level of quantization : 
+        ///     -      0 = None 
+        ///     -      1 = Beat Note
+        ///     -      2 = Eighth Note
+        ///     -      3 = 16th Note
+        ///     -      4 = 32th Note
+        ///     -      5 = 64th Note
+        ///     -      6 = 128th Note
+        /// </summary>
+        public int MPTK_Quantization
+        {
+            get { return quantization; }
+            set
+            {
+                try
                 {
-                    int selectedMidi = 0;
-                    //Debug.Log("Next search " + MPTK_MidiName);
-                    if (!string.IsNullOrEmpty(MPTK_MidiName))
-                        selectedMidi = MidiPlayerGlobal.CurrentMidiSet.MidiFiles.FindIndex(s => s == MPTK_MidiName);
-                    if (selectedMidi >= 0)
+                    if (value >= 0 && value <= 6)
                     {
-                        selectedMidi++;
-                        if (selectedMidi >= MidiPlayerGlobal.CurrentMidiSet.MidiFiles.Count)
-                            selectedMidi = 0;
-                        MPTK_MidiName = MidiPlayerGlobal.CurrentMidiSet.MidiFiles[selectedMidi];
-                        //Debug.Log("Next found " + MPTK_MidiName);
-                        nextMidi = true;
-                        MPTK_RePlay();
+                        quantization = value;
+                        midiLoaded.ChangeQuantization(quantization);
                     }
+                    else
+                        Debug.LogWarning("MidiFilePlayer - Set Quantization value not valid : " + value);
                 }
-                else
-                    Debug.LogWarning(MidiPlayerGlobal.ErrorNoMidiFile);
+                catch (System.Exception ex)
+                {
+                    MidiPlayerGlobal.ErrorDetail(ex);
+                }
             }
-            catch (System.Exception ex)
+        }
+        [SerializeField]
+        [HideInInspector]
+        private int quantization = 0;
+
+        /// <summary>@brief 
+        /// Delta Ticks Per Beat Note. Indicate the duration time in "ticks" which make up a quarter-note.\n 
+        /// For instance, if 96, then a duration of an eighth-note in the file would be 48.\n
+        /// More info here https://paxstellar.fr/2020/09/11/midi-timing/\n
+        /// @code
+        /// Move forward one quarter
+        /// midiFilePlayer.MPTK_TickCurrent = midiFilePlayer.MPTK_TickCurrent + midiFilePlayer.MPTK_DeltaTicksPerQuarterNote;
+        /// @endcode
+        /// </summary>
+        public int MPTK_DeltaTicksPerQuarterNote
+        {
+            get
             {
-                MidiPlayerGlobal.ErrorDetail(ex);
+                int DeltaTicksPerQuarterNote = 0;
+                try
+                {
+                    DeltaTicksPerQuarterNote = midiLoaded?.MPTK_DeltaTicksPerQuarterNote ?? 0;
+                }
+                catch (System.Exception ex)
+                {
+                    MidiPlayerGlobal.ErrorDetail(ex);
+                }
+                return DeltaTicksPerQuarterNote;
             }
         }
 
-        /// <summary>@brief 
-        /// Play previous MIDI from the list of midi defined in MPTK (see Unity menu Midi)
-        /// </summary>
-        public void MPTK_Previous()
-        {
-            try
-            {
-                if (MidiPlayerGlobal.CurrentMidiSet.MidiFiles != null && MidiPlayerGlobal.CurrentMidiSet.MidiFiles.Count > 0)
-                {
-                    int selectedMidi = 0;
-                    if (!string.IsNullOrEmpty(MPTK_MidiName))
-                        selectedMidi = MidiPlayerGlobal.CurrentMidiSet.MidiFiles.FindIndex(s => s == MPTK_MidiName);
-                    if (selectedMidi >= 0)
-                    {
-                        selectedMidi--;
-                        if (selectedMidi < 0)
-                            selectedMidi = MidiPlayerGlobal.CurrentMidiSet.MidiFiles.Count - 1;
-                        MPTK_MidiName = MidiPlayerGlobal.CurrentMidiSet.MidiFiles[selectedMidi];
-                        prevMidi = true;
-                        MPTK_RePlay();
-                    }
-                }
-                else
-                    Debug.LogWarning(MidiPlayerGlobal.ErrorNoMidiFile);
-            }
-            catch (System.Exception ex)
-            {
-                MidiPlayerGlobal.ErrorDetail(ex);
-            }
-        }
+
 
         /// <summary>@brief 
         /// Return note length as https://en.wikipedia.org/wiki/Note_value 
@@ -1355,8 +1389,16 @@ namespace MidiPlayerTK
             return MPTKEvent.EnumLength.Sixteenth;
         }
 
+        /// @}
+        #endregion
+
+        #region MIDI Loading and Reading
+
+        /// @name MIDI Loading and Reading
+        /// @{
+
         /// <summary>@brief 
-        /// Load the midi file defined with MPTK_MidiName or MPTK_MidiIndex. It's an optional action before playing a midi file with MPTK_Play()\n
+        /// Loads the midi file defined with MPTK_MidiName or MPTK_MidiIndex. It's an optional action before playing a midi file with MPTK_Play()\n
         /// Use this method to get all MIDI events before start playing.
         /// @note
         ///     - Logs are displayed in case of error.
@@ -1365,6 +1407,7 @@ namespace MidiPlayerTK
         /// @snippet LoadMidiAndPlay.cs LoadMidiAndPlay
         /// </summary>        
         /// <returns>MidiLoad to access all the properties of the midi loaded, null in case of error look at MPTK_StatusLastMidiLoaded </returns>
+        /// @ingroup midifileplayer_loading
         public MidiLoad MPTK_Load()
         {
 
@@ -1409,6 +1452,7 @@ namespace MidiPlayerTK
         /// <param name="fromTicks">ticks start, default 0</param>
         /// <param name="toTicks">ticks end, default end of MIDI file</param>
         /// <returns></returns>
+        /// @ingroup midifileplayer_loading
         public List<MPTKEvent> MPTK_ReadMidiEvents(long fromTicks = 0, long toTicks = long.MaxValue)
         {
             if (midiLoaded == null)
@@ -1424,20 +1468,84 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief 
-        /// Force all notes to return to their original values before transposing.\n 
-        /// Useful when looping on a MIDI with a transpose value different than 0. 
-        /// When returning to 0 (no transpose) the note value can be reset to their original value.
-        /// @version V2.14.0
+        /// Gets detailed information about MIDI playback. This readonly property is available only when a MIDI has been loaded.
         /// </summary>
-        public void MPTK_ResetTranspose()
+        /// @ingroup midifileplayer_loading
+        public MidiLoad MPTK_MidiLoaded { get { return midiLoaded; } }
+
+
+
+        /// <summary>@brief
+        /// MIDI list events must be sorted by ticks before playing. It's mandatory if the list is modified. 
+        /// @version 2.0.0 - Maestro Pro 
+        /// @snippet TestMidiFilePlayerScripting.cs Example_GUI_PreloadAndAlterMIDI
+        /// </summary>
+        /// @ingroup midifileplayer_loading
+        public void MPTK_SortEvents()
         {
-            if (midiLoaded == null || midiLoaded.MPTK_MidiEvents == null)
-                Debug.LogWarning("MidiFilePlayer - No MIDI loaded - MPTK_ResetTranpose canceled ");
+            if (MPTK_MidiEvents != null)
+                MPTK_MidiEvents.Sort((e1, e2) =>
+                {
+                    return e1.Compare(e2);
+                });
             else
-                foreach (MPTKEvent mPTKEvent in midiLoaded.MPTK_MidiEvents)
-                    if (mPTKEvent.Command == MPTKCommand.NoteOn)
-                        mPTKEvent.ResetTransposeValue();
+                Debug.LogWarning("MPTK_SortEvents: No MIDI loaded");
         }
+
+        /// <summary>@brief 
+        /// A MIDI file is a kind of keyboard simulation: in general, a key pressed generates a 'note-on' and a key release generates a 'note-off'.\n
+        /// But there is an other possibility in a MIDI file: create a 'note-on' with a velocity=0 which must act as a 'midi-off'\n
+        /// By default, MPTK create only one MPTK event with the command NoteOn and a duration.\n
+        /// But in some cases, you could want to keep the note-off events if they exist in the MIDI file.\n
+        /// Sets to false if there is no need (could greatly increases the MIDI list events).\n
+        /// Sets to true to keep 'note-off' events.
+        /// </summary>
+        public bool MPTK_KeepNoteOff
+        {
+            get { return keepNoteOff; }
+            set { keepNoteOff = value; }
+        }
+
+        /// <summary>@brief 
+        /// When set to true, meta MIDI event End Track are keep. Default is false.\n
+        /// If set to true, the End Track Event are taken into account for calculate the full duration of the MIDI.\n
+        /// See #MPTK_DurationMS.
+        /// </summary>
+        public bool MPTK_KeepEndTrack
+        {
+            get { return keepEndTrack; }
+            set { keepEndTrack = value; }
+        }
+        /// <summary>@brief
+        /// If the value is true, text read from Text META (e.g. lyrics) will be read with UTF8 encoding. The default is false.\n
+        /// The MIDI standard only allows ASCII characters for this META, but with this extension you will be able to read and display\n
+        /// characters like Korean, Chinese, Japanese and even French accented letters ;-)
+        /// @version 2.11.3
+        /// </summary>
+        public bool MPTK_ExtendedText { get; set; }
+
+        /// <summary>@brief
+        /// If true display in console all midi events when a MIDI file is loaded.\n
+        /// @note Set to true will increase greatly the MIDI load time. To be used only for debug purpose.
+        /// @version 2.10.0
+        /// </summary>
+        [Tooltip("Warning: enabled will increase greatly the MIDI load time. To be used only for debug purpose.")]
+        public bool MPTK_LogLoadEvents;
+
+        /// <summary>@brief 
+        /// Status of the last midi loaded. The status is updated in a coroutine, so the status can change at each frame.
+        /// </summary>
+        [HideInInspector]
+        /// @ingroup midifileplayer_loading
+        public LoadingStatusMidiEnum MPTK_StatusLastMidiLoaded;
+
+        /// <summary>@brief 
+        /// Contains the error from the web request when loading MIDI from an URL
+        /// </summary>
+        [HideInInspector]
+        public string MPTK_WebRequestError;
+        /// @}
+#endregion
 
         //protected IEnumerator<float> TestFrameDelay()
         //{
@@ -1539,8 +1647,6 @@ namespace MidiPlayerTK
                 lastMidiTimePlayAS = Time.realtimeSinceStartup;
                 timeMidiFromStartPlay = fromPosition;
 
-                SetSpatialization();
-
                 MPTK_ResetStat();
 
                 timeAtStartMidi = (System.DateTime.UtcNow.Ticks / 10000D);
@@ -1586,7 +1692,7 @@ namespace MidiPlayerTK
                     midiLoaded.MPTK_EnableChangeTempo = MPTK_EnableChangeTempo;
                     midiLoaded.endPlayAtLastNote = MPTK_StopPlayOnLastNote;
 
-                    if (MPTK_Spatialize)
+                    if (MPTK_DistanceAttenuation)
                     {
                         distanceToListener = MidiPlayerGlobal.MPTK_DistanceToListener(this.transform);
                         if (distanceToListener > MPTK_MaxDistance && MPTK_PauseOnMaxDistance)
@@ -1731,7 +1837,7 @@ namespace MidiPlayerTK
                 }
 
                 if ((MPTK_MidiAutoRestart || replayMidi) && !stopMidi)
-                    MPTK_Play();
+                    MPTK_Play(alreadyLoaded);
                 //stopMidiToPlay = false;
             }
             catch (System.Exception ex)
@@ -1787,9 +1893,9 @@ namespace MidiPlayerTK
                 }
             }
             if (Application.isPlaying)
-                Routine.RunCoroutine(ThreadInternalMidiPlaying(currentMidiName, fromPosition, toPosition).CancelWith(gameObject), Segment.RealtimeUpdate);
+                Routine.RunCoroutine(ThreadInternalMidiPlaying(currentMidiName, fromPosition, toPosition, alreadyLoaded).CancelWith(gameObject), Segment.RealtimeUpdate);
             else
-                Routine.RunCoroutine(ThreadInternalMidiPlaying(currentMidiName, fromPosition, toPosition), Segment.EditorUpdate);
+                Routine.RunCoroutine(ThreadInternalMidiPlaying(currentMidiName, fromPosition, toPosition, alreadyLoaded), Segment.EditorUpdate);
             yield return 0;
         }
 
@@ -1808,7 +1914,7 @@ namespace MidiPlayerTK
         // if timePosition is true, fromPosition and toPosition are used (if > 0)
         // else fromTick and toTick are used (if > 0)
         // MIDI must be already loaded
-        protected IEnumerator<float> ThreadInternalMidiPlaying(string currentMidiName, float fromPosition = 0, float toPosition = 0)
+        protected IEnumerator<float> ThreadInternalMidiPlaying(string currentMidiName, float fromPosition = 0, float toPosition = 0, bool alreadyLoaded = false)
         {
             if (midiLoaded != null && midiLoaded.MPTK_MidiEvents != null && midiLoaded.MPTK_MidiEvents.Count != 0)
             {
@@ -1835,7 +1941,8 @@ namespace MidiPlayerTK
                     MidiPlayerGlobal.ErrorDetail(ex);
                 }
 
-                SetSpatialization();
+                //SetSpatialization();
+                //SetAttenuationOnDistance();
 
                 MPTK_ResetStat();
                 timeAtStartMidi = (System.DateTime.UtcNow.Ticks / 10000D);
@@ -1886,7 +1993,7 @@ namespace MidiPlayerTK
                         midiLoaded.MPTK_EnableChangeTempo = MPTK_EnableChangeTempo;
                         midiLoaded.endPlayAtLastNote = MPTK_StopPlayOnLastNote;
 
-                        if (MPTK_Spatialize)
+                        if (MPTK_DistanceAttenuation)
                         {
                             distanceToListener = MidiPlayerGlobal.MPTK_DistanceToListener(this.transform);
                             bool pause = distanceToListener > MPTK_MaxDistance;
@@ -1946,7 +2053,8 @@ namespace MidiPlayerTK
                         if (midiLoaded.EndMidiEvent)
                         {
                             if (MPTK_ModeStopVoice == ModeStopPlay.StopNoWaiting ||
-                                (MPTK_ModeStopVoice == ModeStopPlay.StopWhenAllVoicesReleased && MPTK_StatVoiceCountPlaying <= 0) ||
+                                // 2.17.2 don't wait notes sustained
+                                (MPTK_ModeStopVoice == ModeStopPlay.StopWhenAllVoicesReleased && MPTK_StatVoiceCountPlaying == MPTK_StatVoiceCountSustained) ||
                                 (MPTK_ModeStopVoice == ModeStopPlay.StopWhenAllVoicesEnded && MPTK_StatVoiceCountActive <= 0))
                             {
                                 //Debug.Log($"EndMidiEvent MPTK_ModeStopVoice:{MPTK_ModeStopVoice} MPTK_StatVoiceCountPlaying:{MPTK_StatVoiceCountPlaying} MPTK_StatVoiceCountActive:{MPTK_StatVoiceCountActive}");
@@ -2060,7 +2168,7 @@ namespace MidiPlayerTK
                     Debug.LogException(ex);
                 }
 
-                if (replayMidi && !stopMidi) MPTK_Play();
+                if (replayMidi && !stopMidi) MPTK_Play(alreadyLoaded);
             }
             catch (System.Exception ex)
             {
@@ -2085,20 +2193,20 @@ namespace MidiPlayerTK
                         }
                         else
 #endif
-                        // Send to the midi reader
-                        if (OnEventNotesMidi != null)
-                        {
-                            try
+                            // Send to the midi reader
+                            if (OnEventNotesMidi != null)
                             {
-                                //Debug.Log($"OnEventNotesMidi tick:{midievents[midievents.Count - 1].Tick}");
-                                OnEventNotesMidi.Invoke(midievents);
+                                try
+                                {
+                                    //Debug.Log($"OnEventNotesMidi tick:{midievents[midievents.Count - 1].Tick}");
+                                    OnEventNotesMidi.Invoke(midievents);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.LogError("OnEventNotesMidi: exception detected. Check your callback function.");
+                                    Debug.LogException(ex);
+                                }
                             }
-                            catch (Exception ex)
-                            {
-                                Debug.LogError("OnEventNotesMidi: exception detected. Check your callback function.");
-                                Debug.LogException(ex);
-                            }
-                        }
                     }
                 }
             }

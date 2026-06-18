@@ -191,8 +191,9 @@ namespace MidiPlayerTK
                         serializedObject.ApplyModifiedProperties();
                         EditorGUI.indentLevel--;
                     }
-                    commonEditor.SynthParameters(instance, serializedObject);
                     commonEditor.MidiFileInfo(instance);
+                    commonEditor.SpacialParameters(instance);
+                    commonEditor.SynthParameters(instance, serializedObject);
 
 #if SHOWDEFAULT
                     instance.showDefault = EditorGUILayout.Foldout(instance.showDefault, "Show default editor");

@@ -1,25 +1,36 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace MidiPlayerTK
 {
 
+    /// @ingroup midi_event_object
     public partial class MPTKEvent : ICloneable
     {
 
-        /// <summary>@brief
-        /// List of generators modifier associated to the voices being played. Null if any modifier defined.
+        /// @name Real-Time Generator Modifiers
+        /// @brief Real-time SoundFont generator overrides at event level.
+        /// @details
+        /// These members and methods let you override generator values per event,
+        /// both before note start and while voices are already playing.
+        /// This enables expressive per-note timbre control in Maestro Pro.
+        /// Per-generator modifiers associated with this event.
+        /// Null when no modifier is defined.
         /// @version Maestro Pro 
+        /// @{
+
+        /// <summary>@brief
+        /// list of synth modifier available.
         /// </summary>
         public GenModifier[] GensModifier;
 
         /// <summary>@brief
-        /// Apply modification on default SoundFont generator value. Can be applied independently for each notes,\n
-        /// can be applied before the note is played and in <b>real time</b> when the note is playing.\n
-        /// Each generator has a specific range of value, <a href=" https://paxstellar.fr/wp-content/uploads/2021/01/GeneratorModulation.png"><b>see generators list here.</b></a>\n
-        /// Also the value used by this method is normalized (value between 0 and 1).
-        /// <a href="https://paxstellar.fr/class-mptkevent#Generator-List"><b>See here  for more details.</b></a>\n
+        /// Applies a modification to a SoundFont generator value.
+        /// The change can be applied per note before playback and in <b>real time</b> while the note is playing.\n
+        /// Each generator has a specific value range, <a href=" https://paxstellar.fr/wp-content/uploads/2021/01/GeneratorModulation.png"><b>see the generator list here.</b></a>\n
+        /// The input value for this method is normalized (between 0 and 1).
+        /// <a href="https://paxstellar.fr/class-mptkevent#Generator-List"><b>See here for more details.</b></a>\n
         /// @version Maestro Pro 
         /// @code
         /// // Create a midi event for a C5 note (60) with default value: infinite duration, channel = 0, and velocity = 127 (max)
@@ -34,7 +45,7 @@ namespace MidiPlayerTK
         /// midiStream.MPTK_PlayDirectEvent(mptkEvent);
         /// @endcode
         /// </summary>
-        /// <param name="genType">Type of generator to modify. Not all generators are authorized to real time modification.\n
+        /// <param name="genType">Type of generator to modify. Not all generators support real-time updates.\n
         /// @li  GEN_MODLFOTOPITCH	Modulation LFO to pitch
         /// @li  GEN_VIBLFOTOPITCH	Vibrato LFO to pitch
         /// @li  GEN_MODENVTOPITCH	Modulation envelope to pitch
@@ -67,16 +78,16 @@ namespace MidiPlayerTK
         /// @li  GEN_FINETUNE	Fine tuning
         /// </param>
         /// <param name="value">Normalized value for the generator between 0 and 1.\n
-        ///  <a href="https://paxstellar.fr/class-mptkevent#Generator-List"><b>See here real value for each parameters.</b></a>\n
-        /// @li  0 set the minimum value for the generator. For example, with an envelope parameter, 0 will set -12000 (min for this type of parameters.
-        /// @li  1 set the maximum value for the generator. For example, with an envelope parameter, 1 will set 12000 (max for this type of parameters.
+        ///  <a href="https://paxstellar.fr/class-mptkevent#Generator-List"><b>See the actual value range for each parameter here.</b></a>\n
+        /// @li  0 sets the minimum value for the generator. For example, with an envelope parameter, 0 sets -12000 (minimum for this type of parameter).
+        /// @li  1 sets the maximum value for the generator. For example, with an envelope parameter, 1 sets 12000 (maximum for this type of parameter).
         /// </param>
-        /// <param name="mode">Define how to apply the value\n
-        /// @li  Override: the SoundFont value is overridden.
-        /// @li  Reinforce: the value is added to the default value.
-        /// @li  Restaure: the default SoundFont value is used.
+        /// <param name="mode">Defines how the value is applied.\n
+        /// @li  Override: replaces the SoundFont value.
+        /// @li  Reinforce: adds to the default value.
+        /// @li  Restore: uses the default SoundFont value.
         /// </param>
-        /// <returns>true if change has been done</returns>
+        /// <returns>True when the change is accepted and applied; otherwise false.</returns>
         public bool ModifySynthParameter(fluid_gen_type genType, float value, MPTKModeGeneratorChange mode)
         {
             bool result = false;
@@ -110,21 +121,18 @@ namespace MidiPlayerTK
             return result;
         }
 
-        /// <summary>@brief 
-        /// If the MPTKEvent is a note-on then send a not-off event. Equivalent to send a note-off to the synth, the sound enters in the release phase.\n
-        /// Has an effect only on Note On event.
-        ///  v2.9.0 Pro. 
-        /// </summary>
-        public void StopEvent()
-        {
-            if (Command == MPTKCommand.NoteOn)
-            {
-                if (Voices != null && Voices.Count > 0)
-                    if (Voices[0].synth != null)
-                        Voices[0].synth.MPTK_PlayDirectEvent(new MPTKEvent() { Command = MPTKCommand.NoteOff, Channel = Channel, Value = Value });
 
-            }
+        /// <summary>@brief
+        /// Clears generator modifiers for this event and restores default SoundFont behavior.
+        /// @version Maestro Pro 
+        /// </summary>
+        public void ClearSynthParameter()
+        {
+            GensModifier = null;
         }
+
+
+        /// @}
 
         private static int ConvertIdToIndex(fluid_gen_type genType)
         {
@@ -137,14 +145,21 @@ namespace MidiPlayerTK
             return genId;
         }
 
+        /// @name Generator Query Utilities
+        /// @brief Read-only helpers for modifiable generator metadata and values.
+        /// @details
+        /// Provides access to default/current normalized generator values,
+        /// generator labels, and the list of generators that support runtime changes.
+        /// @{
+        
         /// <summary>@brief
-        /// Get the default soundfont value for the generator.\n
-        /// Each generator has a specific range of value, <a href=" https://paxstellar.fr/wp-content/uploads/2021/01/GeneratorModulation.png"><b>see generators list here.</b></a>\n
-        /// Also the value returned by this method is normalized (value between 0 and 1).
+        /// Gets the default value for a SoundFont generator.\n
+        /// Each generator has a specific value range, <a href=" https://paxstellar.fr/wp-content/uploads/2021/01/GeneratorModulation.png"><b>see the generator list here.</b></a>\n
+        /// The returned value is normalized (between 0 and 1).
         /// @version Maestro Pro 
         /// </summary>
-        /// <param name="genType">see #ModifySynthParameter</param>
-        /// <returns>Return the normalized value of the parameter</returns>
+        /// <param name="genType">Generator type. See #ModifySynthParameter.</param>
+        /// <returns>Normalized default value for the generator.</returns>
         public float GetSynthParameterDefaultValue(fluid_gen_type genType)
         {
             float result = 0f;
@@ -164,13 +179,13 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Get the current value for the generator.\n
-        /// Each generator has a specific range of value, <a href=" https://paxstellar.fr/wp-content/uploads/2021/01/GeneratorModulation.png"><b>see generators list here.</b></a>\n
-        /// Also the value returned by this method is normalized (value between 0 and 1).
+        /// Gets the current value for a generator on this event.\n
+        /// Each generator has a specific value range, <a href=" https://paxstellar.fr/wp-content/uploads/2021/01/GeneratorModulation.png"><b>see the generator list here.</b></a>\n
+        /// The returned value is normalized (between 0 and 1).
         /// @version Maestro Pro 
         /// </summary>
-        /// <param name="genType">see #ModifySynthParameter</param>
-        /// <returns>Return the normalized value of the parameter</returns>
+        /// <param name="genType">Generator type. See #ModifySynthParameter.</param>
+        /// <returns>Normalized current value, or -1 when no modifier is defined for this generator.</returns>
         public float GetSynthParameterCurrentValue(fluid_gen_type genType)
         {
             float result = 0f;
@@ -196,11 +211,11 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Get the label for the generator. 
+        /// Gets the display label for a generator.
         /// @version Maestro Pro 
         /// </summary>
-        /// <param name="genType">see #ModifySynthParameter</param>
-        /// <returns>Return the label of the generator</returns>
+        /// <param name="genType">Generator type. See #ModifySynthParameter.</param>
+        /// <returns>Generator label, or "not found" if unavailable.</returns>
         public static string GetSynthParameterLabel(fluid_gen_type genType)
         {
             int genId = ConvertIdToIndex(genType);
@@ -225,28 +240,49 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Get the list of modifiable generators.\n 
-        /// It's a list of MPTKListItem where the properties are:\n
-        /// @li  MPTKListItem#Index : generator Id
-        /// @li  MPTKListItem#Label : texte associated to the generator
-        /// @li  MPTKListItem#Position : position in the list from 0
+        /// Gets the list of modifiable generators.\n
+        /// Returns a list of MPTKListItem where:
+        /// @li  MPTKListItem#Index: generator ID
+        /// @li  MPTKListItem#Label: display text for the generator
+        /// @li  MPTKListItem#Position: position in the list, starting at 0
         /// @version Maestro Pro 
         /// </summary>
-        /// <param name="genType">see #ModifySynthParameter</param>
-        /// <returns>Return a list of modifiable generator (don't modify this list!)</returns>
+        /// <returns>List of modifiable generators (do not modify this list).</returns>
         public static List<MPTKListItem> GetSynthParameterListGenerator()
         {
             GenModifier.InitListGenerator();
             return GenModifier.RealTimeGenerator;
         }
 
-        /// <summary>@brief
-        /// Reset synth parameter to default soundfont value.
-        /// @version Maestro Pro 
+        /// @}
+
+
+        /// @name Event Playback Control
+        /// @brief Event-level playback actions for active notes.
+        /// @details
+        /// Contains direct control helpers such as `StopEvent`, which sends
+        /// a matching NoteOff for this event when applicable.
+        /// @{
+        
+        /// <summary>@brief 
+        /// If this event is a NoteOn, sends the corresponding NoteOff event.
+        /// This is equivalent to sending a note-off to the synth, so the sound enters its release phase.
+        /// Has an effect only for NoteOn events.
+        /// @version 2.9.0 Pro
         /// </summary>
-        public void ClearSynthParameter()
+        public void StopEvent()
         {
-            GensModifier = null;
+            if (Command == MPTKCommand.NoteOn)
+            {
+                if (Voices != null && Voices.Count > 0)
+                    if (Voices[0].synth != null)
+                        Voices[0].synth.MPTK_PlayDirectEvent(new MPTKEvent() { Command = MPTKCommand.NoteOff, Channel = Channel, Value = Value });
+
+            }
         }
+
+        /// @}
+
     }
 }
+

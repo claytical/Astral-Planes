@@ -355,7 +355,7 @@ public sealed class StarPool : MonoBehaviour
         _mineNodeResolved = false;
         _ejectedBurstWasEmpty = false;
 
-        currentEjectingStarId = !ReferenceEquals(star, null) ? star.GetInstanceID() : -1;
+        currentEjectingStarId = !ReferenceEquals(star, null) ? star.InstanceId : -1;
         BroadcastEjectionLockAcquired(currentEjectingStarId);
         BroadcastEjectionOwnerEnteredCooldownAndRelease(currentEjectingStarId);
 
@@ -671,7 +671,7 @@ public sealed class StarPool : MonoBehaviour
         OnEjectionLockAcquired?.Invoke(ownerId);
         foreach (var star in GetAllLiveStars())
         {
-            if (star.GetInstanceID() == ownerId) continue;
+            if (star.InstanceId == ownerId) continue;
             star.OnCoordinatorLockOwnedByAnotherStar();
         }
     }

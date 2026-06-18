@@ -5,16 +5,17 @@ using UnityEngine;
 namespace MidiPlayerTK
 {
 
+    /// @ingroup runtime_midi_loading
     public partial class MidiFileLoader : MonoBehaviour
     {
         /// <summary>@brief
-        /// Load a MIDI file from a local desktop file. Look at MPTK_MidiLoaded for detailed information about the MIDI loaded.\n
+        /// Loads a MIDI file from a local desktop file. See MPTK_MidiLoaded for detailed information about the loaded MIDI.\n
         /// Example of path for Mac "/Users/xxx/Desktop/WellTempered.mid"\n
         /// Example of path for Windows "C:\Users\xxx\Desktop\BIM\Sound\Midi\DreamOn.mid"\n
         /// @version Maestro Pro 
         /// </summary>
         /// <param name="filePath">Example for Windows: filePath= "C:\Users\xxx\Desktop\BIM\Sound\Midi\DreamOn.mid"</param>
-        /// <returns>true if loading succeed</returns>
+        /// <returns>true if loading succeeds</returns>
         public bool MPTK_Load(string filePath)
         {
             Debug.LogWarning("MidiFileLoader is deprecated, please use MidiFilePlayer prefab");
@@ -53,20 +54,20 @@ namespace MidiPlayerTK
         }
 
         /// <summary>@brief
-        /// Find a Midi in the Unity resources folder MidiDB which contains the name (case sensitive)\n
-        /// <b>Beware: name of this method is not appropriate because class MidiFileLoader is not able to play MIDI</b>. Rather use MidiFilePlayer class.\n
-        /// We keep it only for compatibility, could be removed with a major version.\n
+        /// Finds a MIDI in the Unity Resources folder `MidiDB` whose name contains the specified text (case-sensitive).\n
+        /// <b>Beware: the name of this method is not appropriate because MidiFileLoader cannot play MIDI</b>. Use MidiFilePlayer instead.\n
+        /// It is kept only for compatibility and may be removed in a future major version.\n
         /// @version Maestro Pro 
         /// @note
-        /// @li Add MIDI files to your project with the Unity menu MPTK or add it directly in the ressource folder and open MIDI File Setup to automatically integrate MIDI in MPTK.
-        /// @ par
+        /// @li Add MIDI files to your project with the Unity menu MPTK, or add them directly to the resource folder and open MIDI File Setup to integrate them automatically in MPTK.
+        /// @par
         /// @code
         /// // Find the first MIDI file name in MidiDB which contains "Adagio"
         /// midiLoadPlayer.MPTK_SearchMidiToPlay("Adagio");
         /// @endcode
         /// </summary>
-        /// <param name="name">case sensitive part of a MIDI file name</param>
-        /// <returns>true if found else false</returns>
+        /// <param name="name">Case-sensitive part of a MIDI file name.</param>
+        /// <returns>true if found; otherwise, false</returns>
         public bool MPTK_SearchMidiToPlay(string name)
         {
             int index = -1;

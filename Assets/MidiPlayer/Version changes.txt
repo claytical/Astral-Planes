@@ -7,21 +7,59 @@ Please, before updating:
 
 Thank for your comments and talks, that help a lot to make Maestro better.
 
-V2.16.1 2025-09-06
-	New Feature
-		MPTK_PauseOnMaxDistance: MIDI player automatically paused when the distance from the listener exceeds MPTK_MaxDistance.
-			- Default is true (pause)
-	Demo & MVP
-		Helper to migrate MPTK demos to Unity 6.
-		Remove some design not compliant to Unity 6 :
-			- Water in TestMidiFilePlayerMulti
-			- Shadow in TestMidiFilePlayerScripting
+V2.19.0 2026-03-28
+	New Feature Pro
+		Chord progression builder. 
+	Fixes
+		Guard against AudioSource being destroyed when MPTK_Stop() coroutine was waiting (thanks to Macias for pointing this out).
+		When MPTK Spatialization is disabled, the AudioSource spatial settings should stay untouched so the inspector values apply (thanks to CharleneAtlas for pointing this out). 
+		Huge review of the code and API documentation. Improve grammar, clarity, and consistency.
+		Full rebuild of the API documentation availabale on https://mptkapi.paxstellar.com/annotated.html. 
 
-V2.16.0 2025-06-16
+V2.18.1 2026-02-23
+	Fixes
+		Correct unexpexted using clause.
+		Correct wrong time definition in TestMidiGenerator demo.
+
+V2.18.0 2026-02-09
+	Version Pro
+		New Feature
+			Orientation-based audio behavior, including:
+				Smooth left/right stereo panning
+				Front/back volume attenuation
+				Subtle filtering when the sound source is behind the listener
+		New Attributes:
+			MPTK_Orientation: Enables orientation-based audio behavior (default: false).
+			MPTK_OrientationToListener: Returns the angle (in degrees) between the sound source and the listener.
+	Version All
+		New Attributes
+			Renamed MPTK_Spatialize to MPTK_DistanceAttenuation for clarity.
+			Added MPTK_AudioListener attribute to MidiPlayerGlobal to specify which AudioListener is used (default: first AudioListener found in the scene).
+			Added MPTK_StatVoiceCountSustained.
+	Fixes
+		Ensured the MIDI player stops correctly when notes remain sustained at the end of a MIDI file.
+	Demos & MVP
+		Updated demos to use the new orientation-based audio behavior.
+
+V2.17.0 2025-12-07
+	New Feature Pro
+		Added the ability to pause and resume voices with smooth transitions (especially useful for MidiStreamPlayer).
+	New Feature All
+		Improved spatialization with two new parameters:
+			MPTK_MinDistance: distance at which attenuation begins.
+			MPTK_MinSoundAttenuation: minimum volume applied at maximum distance.
+		The free Maestro edition is now based on the GS v2.0.2 SoundFont from Christian Collins � many thanks to him! Enjoy noticeably enhanced audio.
+	Fix: 
+		Correct spatialization calculation.
+		MPTK_Play: when MIDI player is paused and not yet playing, the player just resume pause and not playing ... now, resume pause and play!
+
+V2.16.2 2025-10-31
 	New Features
 		Official version compatible WebGL.
 		MPTK_Core set to false when Unity WebGL selected (legacy mode).
 		Added MPTK_ListPresetDrum, MPTK_PresetsNameDrum, MPTK_PresetsNumberDrum.
+		MPTK_PauseOnMaxDistance: MIDI player automatically paused when the distance from the listener exceeds MPTK_MaxDistance.
+			- Default is true (pause)
 
 	Demo & MVP
 		MidiChannel MVP: now displays channel information.
@@ -29,6 +67,10 @@ V2.16.0 2025-06-16
 		TestEuclideanRhythme: now working with WebGL (uses coroutine).
 		TestMidiExternalPlayer: now working with WebGL (uses coroutine).
 		TinyMidiSequencer: deprecated (source code still available).
+		Helper to migrate MPTK demos to Unity 6.
+		Remove some design not compliant to Unity 6 :
+			- Water in TestMidiFilePlayerMulti
+			- Shadow in TestMidiFilePlayerScripting
 
 	Fix
 		WebGL: all voices are now cleared when stopping a MIDI.
@@ -37,6 +79,7 @@ V2.16.0 2025-06-16
 		WebGL: MPTKWriter is now compliant (direct play only).
 		MPTK_CurrentTempo: get rounded to the nearest integer. Thanks to cihadturhan_unity.
 		Correct issue on quantization calculation. Thanks to cihadturhan_unity.
+		Parameter AlreadyLoaded was not used when MIDI Player is in autorestart mode.
 
 
 V2.15.0 2025-04-25

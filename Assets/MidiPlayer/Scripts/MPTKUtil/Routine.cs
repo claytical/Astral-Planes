@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine.Assertions;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -1347,7 +1348,7 @@ namespace MidiPlayerTK
         public static CoroutineHandle RunCoroutine(IEnumerator<float> coroutine, GameObject gameObj)
         {
             return coroutine == null ? new CoroutineHandle() : Instance.RunCoroutineInternal(coroutine, Segment.Update,
-                gameObj == null ? 0 : gameObj.GetInstanceID(), gameObj != null, null, new CoroutineHandle(Instance._instanceID), true);
+                gameObj == null ? 0 : RuntimeHelpers.GetHashCode(gameObj), gameObj != null, null, new CoroutineHandle(Instance._instanceID), true);
         }
 
         /// <summary>
@@ -1384,7 +1385,7 @@ namespace MidiPlayerTK
         public static CoroutineHandle RunCoroutine(IEnumerator<float> coroutine, GameObject gameObj, string tag)
         {
             return coroutine == null ? new CoroutineHandle() : Instance.RunCoroutineInternal(coroutine, Segment.Update,
-                gameObj == null ? 0 : gameObj.GetInstanceID(), gameObj != null, tag, new CoroutineHandle(Instance._instanceID), true);
+                gameObj == null ? 0 : RuntimeHelpers.GetHashCode(gameObj), gameObj != null, tag, new CoroutineHandle(Instance._instanceID), true);
         }
 
         /// <summary>
@@ -1422,7 +1423,7 @@ namespace MidiPlayerTK
         public static CoroutineHandle RunCoroutine(IEnumerator<float> coroutine, Segment segment, GameObject gameObj)
         {
             return coroutine == null ? new CoroutineHandle() : Instance.RunCoroutineInternal(coroutine, segment,
-                gameObj == null ? 0 : gameObj.GetInstanceID(), gameObj != null, null, new CoroutineHandle(Instance._instanceID), true);
+                gameObj == null ? 0 : RuntimeHelpers.GetHashCode(gameObj), gameObj != null, null, new CoroutineHandle(Instance._instanceID), true);
         }
 
         /// <summary>
@@ -1462,7 +1463,7 @@ namespace MidiPlayerTK
         public static CoroutineHandle RunCoroutine(IEnumerator<float> coroutine, Segment segment, GameObject gameObj, string tag)
         {
             return coroutine == null ? new CoroutineHandle() : Instance.RunCoroutineInternal(coroutine, segment,
-                gameObj == null ? 0 : gameObj.GetInstanceID(), gameObj != null, tag, new CoroutineHandle(Instance._instanceID), true);
+                gameObj == null ? 0 : RuntimeHelpers.GetHashCode(gameObj), gameObj != null, tag, new CoroutineHandle(Instance._instanceID), true);
         }
 
         /// <summary>
@@ -1499,7 +1500,7 @@ namespace MidiPlayerTK
         public CoroutineHandle RunCoroutineOnInstance(IEnumerator<float> coroutine, GameObject gameObj)
         {
             return coroutine == null ? new CoroutineHandle() : RunCoroutineInternal(coroutine, Segment.Update,
-                gameObj == null ? 0 : gameObj.GetInstanceID(), gameObj != null, null, new CoroutineHandle(_instanceID), true);
+                gameObj == null ? 0 : RuntimeHelpers.GetHashCode(gameObj), gameObj != null, null, new CoroutineHandle(_instanceID), true);
         }
 
         /// <summary>
@@ -1536,7 +1537,7 @@ namespace MidiPlayerTK
         public CoroutineHandle RunCoroutineOnInstance(IEnumerator<float> coroutine, GameObject gameObj, string tag)
         {
             return coroutine == null ? new CoroutineHandle() : RunCoroutineInternal(coroutine, Segment.Update,
-                gameObj == null ? 0 : gameObj.GetInstanceID(), gameObj != null, tag, new CoroutineHandle(_instanceID), true);
+                gameObj == null ? 0 : RuntimeHelpers.GetHashCode(gameObj), gameObj != null, tag, new CoroutineHandle(_instanceID), true);
         }
 
         /// <summary>
@@ -1574,7 +1575,7 @@ namespace MidiPlayerTK
         public CoroutineHandle RunCoroutineOnInstance(IEnumerator<float> coroutine, Segment segment, GameObject gameObj)
         {
             return coroutine == null ? new CoroutineHandle() : RunCoroutineInternal(coroutine, segment,
-                gameObj == null ? 0 : gameObj.GetInstanceID(), gameObj != null, null, new CoroutineHandle(_instanceID), true);
+                gameObj == null ? 0 : RuntimeHelpers.GetHashCode(gameObj), gameObj != null, null, new CoroutineHandle(_instanceID), true);
         }
 
         /// <summary>
@@ -1614,7 +1615,7 @@ namespace MidiPlayerTK
         public CoroutineHandle RunCoroutineOnInstance(IEnumerator<float> coroutine, Segment segment, GameObject gameObj, string tag)
         {
             return coroutine == null ? new CoroutineHandle() : RunCoroutineInternal(coroutine, segment,
-                gameObj == null ? 0 : gameObj.GetInstanceID(), gameObj != null, tag, new CoroutineHandle(_instanceID), true);
+                gameObj == null ? 0 : RuntimeHelpers.GetHashCode(gameObj), gameObj != null, tag, new CoroutineHandle(_instanceID), true);
         }
 
         /// <summary>
@@ -1678,7 +1679,7 @@ namespace MidiPlayerTK
         /// <returns>The newly created or existing handle.</returns>
         public static CoroutineHandle RunCoroutineSingleton(IEnumerator<float> coroutine, GameObject gameObj, SingletonBehavior behaviorOnCollision)
         {
-            return gameObj == null ? RunCoroutine(coroutine) : RunCoroutineSingleton(coroutine, gameObj.GetInstanceID(), behaviorOnCollision);
+            return gameObj == null ? RunCoroutine(coroutine) : RunCoroutineSingleton(coroutine, RuntimeHelpers.GetHashCode(gameObj), behaviorOnCollision);
         }
 
         /// <summary>
@@ -1780,7 +1781,7 @@ namespace MidiPlayerTK
         public static CoroutineHandle RunCoroutineSingleton(IEnumerator<float> coroutine, GameObject gameObj, string tag, SingletonBehavior behaviorOnCollision)
         {
             return gameObj == null ? RunCoroutineSingleton(coroutine, tag, behaviorOnCollision)
-                : RunCoroutineSingleton(coroutine, gameObj.GetInstanceID(), tag, behaviorOnCollision);
+                : RunCoroutineSingleton(coroutine, RuntimeHelpers.GetHashCode(gameObj), tag, behaviorOnCollision);
         }
 
         /// <summary>
@@ -1888,7 +1889,7 @@ namespace MidiPlayerTK
         public static CoroutineHandle RunCoroutineSingleton(IEnumerator<float> coroutine, Segment segment, GameObject gameObj,
             SingletonBehavior behaviorOnCollision)
         {
-            return gameObj == null ? RunCoroutine(coroutine, segment) : RunCoroutineSingleton(coroutine, segment, gameObj.GetInstanceID(), behaviorOnCollision);
+            return gameObj == null ? RunCoroutine(coroutine, segment) : RunCoroutineSingleton(coroutine, segment, RuntimeHelpers.GetHashCode(gameObj), behaviorOnCollision);
         }
 
         /// <summary>
@@ -1994,7 +1995,7 @@ namespace MidiPlayerTK
             SingletonBehavior behaviorOnCollision)
         {
             return gameObj == null ? RunCoroutineSingleton(coroutine, segment, tag, behaviorOnCollision)
-                : RunCoroutineSingleton(coroutine, segment, gameObj.GetInstanceID(), tag, behaviorOnCollision);
+                : RunCoroutineSingleton(coroutine, segment, RuntimeHelpers.GetHashCode(gameObj), tag, behaviorOnCollision);
         }
 
         /// <summary>
@@ -2099,7 +2100,7 @@ namespace MidiPlayerTK
         public CoroutineHandle RunCoroutineSingletonOnInstance(IEnumerator<float> coroutine, GameObject gameObj, SingletonBehavior behaviorOnCollision)
         {
             return gameObj == null ? RunCoroutineOnInstance(coroutine)
-                : RunCoroutineSingletonOnInstance(coroutine, gameObj.GetInstanceID(), behaviorOnCollision);
+                : RunCoroutineSingletonOnInstance(coroutine, RuntimeHelpers.GetHashCode(gameObj), behaviorOnCollision);
         }
 
         /// <summary>
@@ -2202,7 +2203,7 @@ namespace MidiPlayerTK
             SingletonBehavior behaviorOnCollision)
         {
             return gameObj == null ? RunCoroutineSingletonOnInstance(coroutine, tag, behaviorOnCollision)
-                : RunCoroutineSingletonOnInstance(coroutine, gameObj.GetInstanceID(), tag, behaviorOnCollision);
+                : RunCoroutineSingletonOnInstance(coroutine, RuntimeHelpers.GetHashCode(gameObj), tag, behaviorOnCollision);
         }
 
         /// <summary>
@@ -2271,7 +2272,7 @@ namespace MidiPlayerTK
             SingletonBehavior behaviorOnCollision)
         {
             return gameObj == null ? RunCoroutineOnInstance(coroutine, segment)
-                : RunCoroutineSingletonOnInstance(coroutine, segment, gameObj.GetInstanceID(), behaviorOnCollision);
+                : RunCoroutineSingletonOnInstance(coroutine, segment, RuntimeHelpers.GetHashCode(gameObj), behaviorOnCollision);
         }
 
         /// <summary>
@@ -2377,7 +2378,7 @@ namespace MidiPlayerTK
             SingletonBehavior behaviorOnCollision)
         {
             return gameObj == null ? RunCoroutineSingletonOnInstance(coroutine, segment, tag, behaviorOnCollision)
-                : RunCoroutineSingletonOnInstance(coroutine, segment, gameObj.GetInstanceID(), tag, behaviorOnCollision);
+                : RunCoroutineSingletonOnInstance(coroutine, segment, RuntimeHelpers.GetHashCode(gameObj), tag, behaviorOnCollision);
         }
 
         /// <summary>
@@ -3142,7 +3143,7 @@ namespace MidiPlayerTK
         /// <returns>The number of coroutines that were found and killed.</returns>
         public static int KillCoroutines(GameObject gameObj)
         {
-            return _instance == null ? 0 : _instance.KillCoroutinesOnInstance(gameObj.GetInstanceID());
+            return _instance == null ? 0 : _instance.KillCoroutinesOnInstance(RuntimeHelpers.GetHashCode(gameObj));
         }
 
         /// <summary> 
@@ -3152,7 +3153,7 @@ namespace MidiPlayerTK
         /// <returns>The number of coroutines that were found and killed.</returns>
         public int KillCoroutinesOnInstance(GameObject gameObj)
         {
-            return KillCoroutinesOnInstance(gameObj.GetInstanceID());
+            return KillCoroutinesOnInstance(RuntimeHelpers.GetHashCode(gameObj));
         }
 
         /// <summary>
@@ -3256,7 +3257,7 @@ namespace MidiPlayerTK
         /// <returns>The number of coroutines that were found and killed.</returns>
         public static int KillCoroutines(GameObject gameObj, string tag)
         {
-            return _instance == null ? 0 : _instance.KillCoroutinesOnInstance(gameObj.GetInstanceID(), tag);
+            return _instance == null ? 0 : _instance.KillCoroutinesOnInstance(RuntimeHelpers.GetHashCode(gameObj), tag);
         }
 
         /// <summary> 
@@ -3267,7 +3268,7 @@ namespace MidiPlayerTK
         /// <returns>The number of coroutines that were found and killed.</returns>
         public int KillCoroutinesOnInstance(GameObject gameObj, string tag)
         {
-            return KillCoroutinesOnInstance(gameObj.GetInstanceID(), tag);
+            return KillCoroutinesOnInstance(RuntimeHelpers.GetHashCode(gameObj), tag);
         }
 
         /// <summary>
@@ -3756,7 +3757,7 @@ namespace MidiPlayerTK
         /// <returns>The number of coroutines that were paused.</returns>
         public int PauseCoroutinesOnInstance(GameObject gameObj)
         {
-            return gameObj == null ? 0 : PauseCoroutinesOnInstance(gameObj.GetInstanceID());
+            return gameObj == null ? 0 : PauseCoroutinesOnInstance(RuntimeHelpers.GetHashCode(gameObj));
         }
 
         /// <summary>
@@ -3851,7 +3852,7 @@ namespace MidiPlayerTK
         /// <returns>The number of coroutines that were paused.</returns>
         public static int PauseCoroutines(GameObject gameObj, string tag)
         {
-            return _instance == null ? 0 : _instance.PauseCoroutinesOnInstance(gameObj.GetInstanceID(), tag);
+            return _instance == null ? 0 : _instance.PauseCoroutinesOnInstance(RuntimeHelpers.GetHashCode(gameObj), tag);
         }
 
         /// <summary>
@@ -3862,7 +3863,7 @@ namespace MidiPlayerTK
         /// <returns>The number of coroutines that were paused.</returns>
         public int PauseCoroutinesOnInstance(GameObject gameObj, string tag)
         {
-            return gameObj == null ? 0 : PauseCoroutinesOnInstance(gameObj.GetInstanceID(), tag);
+            return gameObj == null ? 0 : PauseCoroutinesOnInstance(RuntimeHelpers.GetHashCode(gameObj), tag);
         }
 
         /// <summary>
@@ -4099,7 +4100,7 @@ namespace MidiPlayerTK
         /// <returns>The number of coroutines that were resumed.</returns>
         public static int ResumeCoroutines(GameObject gameObj)
         {
-            return _instance == null ? 0 : _instance.ResumeCoroutinesOnInstance(gameObj.GetInstanceID());
+            return _instance == null ? 0 : _instance.ResumeCoroutinesOnInstance(RuntimeHelpers.GetHashCode(gameObj));
         }
 
         /// <summary>
@@ -4109,7 +4110,7 @@ namespace MidiPlayerTK
         /// <returns>The number of coroutines that were resumed.</returns>
         public int ResumeCoroutinesOnInstance(GameObject gameObj)
         {
-            return gameObj == null ? 0 : ResumeCoroutinesOnInstance(gameObj.GetInstanceID());
+            return gameObj == null ? 0 : ResumeCoroutinesOnInstance(RuntimeHelpers.GetHashCode(gameObj));
         }
 
         /// <summary>
@@ -4208,7 +4209,7 @@ namespace MidiPlayerTK
         /// <returns>The number of coroutines that were resumed.</returns>
         public static int ResumeCoroutines(GameObject gameObj, string tag)
         {
-            return _instance == null ? 0 : _instance.ResumeCoroutinesOnInstance(gameObj.GetInstanceID(), tag);
+            return _instance == null ? 0 : _instance.ResumeCoroutinesOnInstance(RuntimeHelpers.GetHashCode(gameObj), tag);
         }
 
         /// <summary>
@@ -4219,7 +4220,7 @@ namespace MidiPlayerTK
         /// <returns>The number of coroutines that were resumed.</returns>
         public int ResumeCoroutinesOnInstance(GameObject gameObj, string tag)
         {
-            return gameObj == null ? 0 : ResumeCoroutinesOnInstance(gameObj.GetInstanceID(), tag);
+            return gameObj == null ? 0 : ResumeCoroutinesOnInstance(RuntimeHelpers.GetHashCode(gameObj), tag);
         }
 
         /// <summary>
@@ -7095,7 +7096,7 @@ namespace MidiPlayerTK
         public static CoroutineHandle RunCoroutineSingleton(this IEnumerator<float> coroutine, GameObject gameObj, SingletonBehavior behaviorOnCollision)
         {
             return gameObj == null ? Routine.RunCoroutine(coroutine) :
-                Routine.RunCoroutineSingleton(coroutine, gameObj.GetInstanceID(), behaviorOnCollision);
+                Routine.RunCoroutineSingleton(coroutine, RuntimeHelpers.GetHashCode(gameObj), behaviorOnCollision);
         }
 
         /// <summary>
@@ -7137,7 +7138,7 @@ namespace MidiPlayerTK
         public static CoroutineHandle RunCoroutineSingleton(this IEnumerator<float> coroutine, GameObject gameObj, string tag, SingletonBehavior behaviorOnCollision)
         {
             return gameObj == null ? Routine.RunCoroutineSingleton(coroutine, tag, behaviorOnCollision)
-                : Routine.RunCoroutineSingleton(coroutine, gameObj.GetInstanceID(), tag, behaviorOnCollision);
+                : Routine.RunCoroutineSingleton(coroutine, RuntimeHelpers.GetHashCode(gameObj), tag, behaviorOnCollision);
         }
 
         /// <summary>
@@ -7183,7 +7184,7 @@ namespace MidiPlayerTK
             SingletonBehavior behaviorOnCollision)
         {
             return gameObj == null ? Routine.RunCoroutine(coroutine, segment) :
-                Routine.RunCoroutineSingleton(coroutine, segment, gameObj.GetInstanceID(), behaviorOnCollision);
+                Routine.RunCoroutineSingleton(coroutine, segment, RuntimeHelpers.GetHashCode(gameObj), behaviorOnCollision);
         }
 
         /// <summary>
@@ -7230,7 +7231,7 @@ namespace MidiPlayerTK
             SingletonBehavior behaviorOnCollision)
         {
             return gameObj == null ? Routine.RunCoroutineSingleton(coroutine, segment, tag, behaviorOnCollision)
-                : Routine.RunCoroutineSingleton(coroutine, segment, gameObj.GetInstanceID(), tag, behaviorOnCollision);
+                : Routine.RunCoroutineSingleton(coroutine, segment, RuntimeHelpers.GetHashCode(gameObj), tag, behaviorOnCollision);
         }
 
         /// <summary>
