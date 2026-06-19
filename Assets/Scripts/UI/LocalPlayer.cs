@@ -443,7 +443,8 @@ public class LocalPlayer : MonoBehaviour
 
     private void HandleConfirm()
     {
-        if (GameFlowManager.Instance != null &&
+        if (_isReady &&
+            GameFlowManager.Instance != null &&
             GameFlowManager.Instance.CurrentState == GameState.Selection &&
             ControlTutorialDirector.Instance != null &&
             ControlTutorialDirector.Instance.IsPrimaryTutorialRunning)

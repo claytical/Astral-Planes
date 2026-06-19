@@ -164,6 +164,22 @@ public partial class Vehicle : MonoBehaviour
         DestroyVehicleTether();
     }
 
+    private void DiscardCarriedCollectables()
+    {
+        foreach (var armed in _armedReleases)
+            armed.note.collectable?.OnManualReleaseDiscarded();
+        _armedReleases.Clear();
+
+        foreach (var pending in _pendingNotes)
+            pending.collectable?.OnManualReleaseDiscarded();
+        _pendingNotes.Clear();
+
+        _releaseButtonHeld = false;
+        _lastArmWasFromHold = false;
+        ReleaseTrackLock();
+        DestroyVehicleTether();
+    }
+
     private void DestroyVehicleTether()
     {
         if (_vehicleTether == null) return;
@@ -1343,6 +1359,7 @@ public partial class Vehicle : MonoBehaviour
             {
                 rb.linearVelocity = Vector2.zero;
                 rb.angularVelocity = 0f;
+                DiscardCarriedCollectables();
                     Explode explode = GetComponent<Explode>();
                     if (explode != null)
                     {
