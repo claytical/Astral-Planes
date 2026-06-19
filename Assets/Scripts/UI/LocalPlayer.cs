@@ -20,6 +20,13 @@ public class LocalPlayer : MonoBehaviour
     
     private Color _color;
     private bool _isReady, _confirmEnabled, _launchStarted, _launched, _suppressChoose = true;
+    private bool _isInContinueWindow;
+    private bool _isRespawning;
+    public bool IsInContinueWindow => _isInContinueWindow;
+    public bool IsRespawning => _isRespawning;
+    [SerializeField] private ContinueCountdown continueCountdownPrefab;
+    private ContinueCountdown _continueCountdown;
+    private const float ContinueWindowSeconds = 30f;
     private PlayerSelect _selection;
     private PlayerStatsTracking _playerStats;
     private PlayerStats _ui;
@@ -471,6 +478,30 @@ public class LocalPlayer : MonoBehaviour
                 GameFlowManager.Instance.CheckAllPlayersReady();
                 break;
 
+            case GameState.Playing:
+                if (_isInContinueWindow)
+                {
+                    _isInContinueWindow = false;
+                    if (_continueCountdown != null)
+                    {
+                        Destroy(_continueCountdown.gameObject);
+                        _continueCountdown = null;
+                    }
+                    _isRespawning = true;
+                    CreatePlayerSelect();
+                }
+                else if (_isRespawning)
+                {
+                    GetComponent<AudioSource>().PlayOneShot(confirmFx);
+                    playerVehicle = _selection.GetChosenPlane();
+                    _selection.Confirm();
+                    SetColor();
+                    _isRespawning = false;
+                    _isReady = true;
+                    Launch();
+                }
+                break;
+
             case GameState.GameOver:
                 GetComponent<AudioSource>().PlayOneShot(confirmFx);
                 Restart();
@@ -481,11 +512,60 @@ public class LocalPlayer : MonoBehaviour
     {
         _isReady = false;
         IsReady = false;
+        _isInContinueWindow = false;
+        _isRespawning = false;
     }
+    public void OnVehicleDied()
+    {
+        _isReady = false;
+        Hangar.Instance?.MarkVehiclePermanentlyUsed(playerVehicle);
+        plane = null;
+        _launched = false;
+        _launchStarted = false;
+
+        int playerCount = GameFlowManager.Instance?.SessionState.Players.Count ?? 1;
+        bool isMultiplayer = playerCount >= 2;
+        bool vehiclesAvailable = Hangar.Instance?.HasAvailableVehicles() ?? false;
+
+        if (isMultiplayer && vehiclesAvailable)
+            StartCoroutine(ContinueWindowRoutine());
+    }
+
+    private IEnumerator ContinueWindowRoutine()
+    {
+        _isInContinueWindow = true;
+        _playerInput.SwitchCurrentActionMap("Selection");
+
+        if (continueCountdownPrefab != null)
+        {
+            _continueCountdown = Instantiate(continueCountdownPrefab);
+            _continueCountdown.Show(ContinueWindowSeconds);
+        }
+
+        float remaining = ContinueWindowSeconds;
+        while (_isInContinueWindow && remaining > 0f)
+        {
+            remaining -= Time.deltaTime;
+            _continueCountdown?.UpdateCountdown(remaining);
+            yield return null;
+        }
+
+        if (_isInContinueWindow) // timer expired — player chose not to continue
+        {
+            _isInContinueWindow = false;
+            if (_continueCountdown != null)
+            {
+                Destroy(_continueCountdown.gameObject);
+                _continueCountdown = null;
+            }
+            GameFlowManager.Instance?.CheckAllPlayersOutOfEnergy();
+        }
+    }
+
     private void Restart()
     {
         _isReady = false;
-        
+
         if (_selection != null)
         {
             Destroy(_selection.gameObject);

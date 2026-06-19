@@ -37,7 +37,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 200, y: 16}
+  m_SizeDelta: {x: 200, y: 24}
   m_Pivot: {x: 1, y: 1}
 --- !u!114 &2999313036523370075
 MonoBehaviour:
@@ -55,7 +55,7 @@ MonoBehaviour:
   m_MinWidth: -1
   m_MinHeight: -1
   m_PreferredWidth: -1
-  m_PreferredHeight: 16
+  m_PreferredHeight: 24
   m_FlexibleWidth: 1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
@@ -72,11 +72,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   fuelFill: {fileID: 2134183413333702234}
-  capacityBar: {fileID: 0}
-  burnRateText: {fileID: 0}
-  accelBar: {fileID: 0}
-  speedBar: {fileID: 0}
-  boostBar: {fileID: 0}
 --- !u!1 &2367632968449217036
 GameObject:
   m_ObjectHideFlags: 0

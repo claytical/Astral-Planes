@@ -195,6 +195,8 @@ MonoBehaviour:
   clickFx: {fileID: 8300000, guid: 53ecfd42442a5de49ab20834c2e97578, type: 3}
   confirmFx: {fileID: 8300000, guid: 8b8f15883716b5e4083a06bb420f9fad, type: 3}
   friction: 0.5
+  continueCountdownPrefab: {fileID: 3691977681868119762, guid: acd3a3bb043034196899e448536479a0,
+    type: 3}
   releaseActionName: ReleaseNote
   mouseSensitivity: 0.008
   stickMax: 1

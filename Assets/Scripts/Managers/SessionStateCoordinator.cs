@@ -87,7 +87,7 @@ public sealed class SessionStateCoordinator
     {
         if (_hasGameOverStarted || _ghostCycleInProgress) return false;
 
-        if (_players.Where(p => p != null).All(p => !p.IsReady || p.GetVehicleEnergy() <= 0f))
+        if (_players.Where(p => p != null).All(p => !p.IsReady && !p.IsInContinueWindow && !p.IsRespawning))
         {
             _hasGameOverStarted = true;
             return true;
@@ -98,6 +98,7 @@ public sealed class SessionStateCoordinator
 
     public void ResetForTrackSelection()
     {
+        Hangar.Instance?.ResetForNewSession();
         SetCurrentState(GameState.Selection);
         _hasGameOverStarted = false;
 

@@ -20,8 +20,11 @@ public class PlayerSelect : MonoBehaviour
     void Start()
     {
         _hangar = FindAnyObjectByType<Hangar>();
-        transform.SetParent(_hangar.planeSelection.transform);
-        transform.localScale = Vector3.one;
+        if (_hangar?.planeSelection != null)
+        {
+            transform.SetParent(_hangar.planeSelection.transform);
+            transform.localScale = Vector3.one;
+        }
 
         if (_hangar)
         {
