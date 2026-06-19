@@ -1365,6 +1365,7 @@ public partial class Vehicle : MonoBehaviour
                     {
                         explode.Permanent();
                     }
+                    playerStats?.GetComponent<LocalPlayer>()?.OnVehicleDied();
                     gfm?.CheckAllPlayersOutOfEnergy();
 //                }
 
