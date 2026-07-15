@@ -79,7 +79,7 @@ MonoBehaviour:
   minImpactSpeed: 1.5
   ascendLoopsOverride: 3
   dustFadeSeconds: 0.15
-  dustRegrowDelay: 0.5
+  dustRegrowDelay: -1
   faceTurnRate: 420
   wobbleDeg: 12
   wobbleHzRange: {x: 2.5, y: 4.5}

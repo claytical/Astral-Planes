@@ -170,13 +170,23 @@ public class LocalPlayer : MonoBehaviour
     );
         
     if (GameFlowManager.VerboseLogging) Debug.Log("[CRASH TEST] Track Ready");
-        
+
+    if (playerVehicle == null)
+    {
+        // Nothing to launch with (e.g. hangar exhausted out from under us).
+        _launchStarted = false;
+        yield break;
+    }
+
     var gfm = GameFlowManager.Instance;
 
-    // --- UI: player stats card under the grid
+    // --- UI: player stats card under the grid (created once, reused across respawns)
     var grid = gfm.PlayerStatsGrid;
-    var statsUI = Instantiate(playerStatsUI, grid);
-    _ui = statsUI.GetComponent<PlayerStats>();
+    if (_ui == null)
+    {
+        var statsUI = Instantiate(playerStatsUI, grid);
+        _ui = statsUI.GetComponent<PlayerStats>();
+    }
     int w = gfm.spawnGrid.gridWidth;
 
 // pick a row near the bottom; tweak as you want
@@ -492,8 +502,23 @@ public class LocalPlayer : MonoBehaviour
                 }
                 else if (_isRespawning)
                 {
-                    GetComponent<AudioSource>().PlayOneShot(confirmFx);
                     playerVehicle = _selection.GetChosenPlane();
+                    if (playerVehicle == null)
+                    {
+                        // No vehicle left to claim (hangar exhausted, or lost the
+                        // race for the last one against another player's continue).
+                        // End this gamepad's run instead of launching with nothing.
+                        _isRespawning = false;
+                        if (_selection != null)
+                        {
+                            Destroy(_selection.gameObject);
+                            _selection = null;
+                        }
+                        GameFlowManager.Instance?.CheckAllPlayersOutOfEnergy();
+                        break;
+                    }
+
+                    GetComponent<AudioSource>().PlayOneShot(confirmFx);
                     _selection.Confirm();
                     SetColor();
                     _isRespawning = false;
@@ -536,9 +561,17 @@ public class LocalPlayer : MonoBehaviour
         _isInContinueWindow = true;
         _playerInput.SwitchCurrentActionMap("Selection");
 
-        if (continueCountdownPrefab != null)
+        if (continueCountdownPrefab != null && _ui != null)
         {
-            _continueCountdown = Instantiate(continueCountdownPrefab);
+            _continueCountdown = Instantiate(continueCountdownPrefab, _ui.transform);
+            var rect = _continueCountdown.GetComponent<RectTransform>();
+            if (rect != null)
+            {
+                rect.anchorMin = Vector2.zero;
+                rect.anchorMax = Vector2.one;
+                rect.offsetMin = Vector2.zero;
+                rect.offsetMax = Vector2.zero;
+            }
             _continueCountdown.Show(ContinueWindowSeconds);
         }
 

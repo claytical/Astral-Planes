@@ -3,11 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using MidiPlayerTK;
-using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Debug = UnityEngine.Debug;
-using Object = UnityEngine.Object;
 
 public enum GameState { Begin, Selection, Playing, GameOver }
 
@@ -362,7 +360,10 @@ public partial class GameFlowManager : MonoBehaviour
         }
 
         yield return new WaitForSeconds(2f);
-        StartCoroutine(TransitionToScene("TrackFinished"));
+
+        yield return StartCoroutine(SceneFlow.FadeScreenToBlack());
+        yield return TransitionToScene("TrackFinished");
+        yield return StartCoroutine(SceneFlow.FadeScreenFromBlack());
     }
     
     /// <summary>

@@ -234,7 +234,7 @@ public class MineNodeDustInteractor : MonoBehaviour
         Color roleColor = prof.GetBaseColor();
         roleColor.a = 1f;
         dust.ApplyRoleAndCharge(role, roleColor, 1f, prof.maxEnergyUnits);
-        dust.clearing.drainResistance01 = prof.GetDrainResistance01();
+        dust.clearing.drainResistance01 = prof.drainResistance01;
 
         gen.PaintDustExhaust(cell, role, 1f);
     }

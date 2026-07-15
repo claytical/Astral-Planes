@@ -205,6 +205,20 @@ public partial class PhaseStar : MonoBehaviour
         _chargeModel ??= new PhaseStarChargeModel(_starCharge);
         _chargeModel.AddCharge(role, energyUnitsDelivered, behaviorProfile != null ? behaviorProfile.dustToStarChargeMul : 1f, _attunedRole);
     }
+
+    // Cells drained via ZapClearCellHeld since the last node spawn. The next MineNode
+    // "holds" this batch; it regrows when that node dies. Released directly if the star
+    // is destroyed before a node spawns.
+    private readonly List<Vector2Int> _heldDrainCells = new();
+
+    public void RegisterHeldDrainCell(Vector2Int cell) => _heldDrainCells.Add(cell);
+
+    private void ReleaseUnassignedDrainCells()
+    {
+        if (_heldDrainCells.Count == 0) return;
+        ResolveGameFlowManager()?.dustGenerator?.ReleaseHeldCells(_heldDrainCells);
+        _heldDrainCells.Clear();
+    }
     /// <summary>
     /// Returns 0..1 hunger for a specific role: 1 = starving (zero charge), 0 = fully charged.
     /// Used by the navigator to weight density steering toward under-charged roles.
@@ -1393,6 +1407,7 @@ public partial class PhaseStar : MonoBehaviour
     private void OnDestroy()
     {
         _isDisposing = true;
+        ReleaseUnassignedDrainCells();
         SafeUnsubscribeAll();
         CleanupManagedCoroutines();
     }

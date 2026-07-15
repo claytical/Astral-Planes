@@ -446,7 +446,7 @@ public partial class CosmicDustGenerator
                 {
                     if (rolesList[ri2] == role) continue;
                     var prof = MusicalRoleProfileLibrary.GetProfile(rolesList[ri2]);
-                    float r = prof != null ? prof.GetCarveResistance01() : 0.5f;
+                    float r = prof != null ? prof.carveResistance01 : 0.5f;
                     if (r < softestResistance) { softestResistance = r; softRole = rolesList[ri2]; }
                 }
 

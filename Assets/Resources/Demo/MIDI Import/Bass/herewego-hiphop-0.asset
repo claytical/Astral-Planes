@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 38900ff6f42443408966805961f41bc7, type: 3}
+  m_Name: herewego-hiphop-0
+  m_EditorClassIdentifier: Assembly-CSharp::RiffAsset
+  riff:
+    id: herewego-hiphop-0
+    authoredRootMidi: 61
+    loopSteps: 16
+    events:
+    - step: 0
+      midiNote: 61
+      durSteps: 2
+      velocity01: 0.48031497
+    - step: 4
+      midiNote: 61
+      durSteps: 2
+      velocity01: 0.6535433
+    - step: 8
+      midiNote: 61
+      durSteps: 2
+      velocity01: 0.78740156
+    - step: 11
+      midiNote: 64
+      durSteps: 1
+      velocity01: 0.33070865
+    - step: 12
+      midiNote: 66
+      durSteps: 2
+      velocity01: 0.6535433
+    - step: 14
+      midiNote: 64
+      durSteps: 2
+      velocity01: 0.5511811
+    overlapPolicy: 1
+    octaveShift: 0

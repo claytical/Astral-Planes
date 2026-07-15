@@ -12,13 +12,10 @@ public struct TransportFrame
     public int playheadBin;
     public int boundarySerial;
 }
-public enum NoteCommitMode { Performance, Composition }
-
 public class InstrumentTrackController : MonoBehaviour
 {
     [Header("Config")]
     [SerializeField] public InstrumentTrackControllerConfig config;
-    public NoteCommitMode noteCommitMode => config != null ? config.noteCommitMode : NoteCommitMode.Performance;
     public InstrumentTrack[] tracks;
     public NoteVisualizer noteVisualizer;
     private readonly Dictionary<InstrumentTrack, int> _loopHash = new();

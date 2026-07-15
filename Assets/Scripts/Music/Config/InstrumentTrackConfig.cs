@@ -15,10 +15,4 @@ public class InstrumentTrackConfig : ScriptableObject
     [Header("Capacity")]
     [Tooltip("Maximum number of bins this track can expand to.")]
     public int maxLoopMultiplier = 4;
-
-    [Header("Spawn")]
-    public int spawnPickMaxTries = 80;
-    [Range(0f, 1f)]
-    [Tooltip("Fraction of grid width to search per step column band.")]
-    public float spawnColumnBandFraction = 0.25f;
 }

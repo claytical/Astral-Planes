@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
+  m_Name: HereWeGo
+  m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
+  motifId: herewego
+  displayName: herewego
+  keyRootMidi: 61
+  entryDrumLoops:
+  - {fileID: 8300000, guid: b7c3aed6a3db04dc8bd9183cf9be1935, type: 3}
+  intensityDrumLoops:
+  - {fileID: 8300000, guid: b65a895d1f8dc4d039cc4b8b10069829, type: 3}
+  - {fileID: 8300000, guid: 4a85485e48c7a4c61ae85501bf08d36b, type: 3}
+  - {fileID: 8300000, guid: 20a81122eb435432cb1086a932a44d5c, type: 3}
+  - {fileID: 8300000, guid: b278c9e5108ad49279c6c2bdf1e1097f, type: 3}
+  - {fileID: 8300000, guid: 068b2e5c637654f4b80c89b0e1eeaaf0, type: 3}
+  intensityThresholds: []
+  entryLoopCount: 16
+  bpm: 100
+  stepsPerLoop: 16
+  nodesPerStar: 4
+  starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
+  mazePattern: {fileID: 11400000, guid: dc7bcb920eadd40139a254499c81741c, type: 2}
+  roleGeoConfigs: []
+  chordProgression: {fileID: 11400000, guid: 874324c48423a4416a080b72af67574b, type: 2}
+  alternateChordProgressionProfile: {fileID: 11400000, guid: 83ee4248a89074b5cbd9eb62015f0abf,
+    type: 2}
+  roleNoteConfigs:
+  - {fileID: 11400000, guid: 159ab0c2d88ce4bd4b317abc54a46688, type: 2}
+  selectionWeight: 1
+  beatIntroCount: 0
+  driveBeatsFromEnergy: 1
+  spawnVehicleTrap: 1
+  trapShape: 0
+  trapRadius: 3
+  trapGrowSeconds: 0.4
+  trapRole: 0

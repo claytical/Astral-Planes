@@ -40,7 +40,6 @@ public class PlayerSelect : MonoBehaviour
     private void AssignFirstAvailablePlane()
     {
         _chosenPlane = _hangar.FirstAvailablePlane();
-        SetCurrentShipName(_chosenPlane.name.Replace("(Clone)", "").Trim());
 
         if (_chosenPlane == null)
         {
@@ -48,6 +47,7 @@ public class PlayerSelect : MonoBehaviour
             return;
         }
 
+        SetCurrentShipName(_chosenPlane.name.Replace("(Clone)", "").Trim());
         ApplyVisuals();
         _hangar.MarkPlaneInUse(_chosenPlane, true);
     }

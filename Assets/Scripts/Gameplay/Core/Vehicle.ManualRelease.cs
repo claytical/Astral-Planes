@@ -147,22 +147,16 @@ public partial class Vehicle
         }
 
         ResolvePlaybackNote(p, targetAbsStep, out int chosenMidi, out int resolvedDurationTicks);
-        bool compositionMode = p.track.controller != null &&
-                               p.track.controller.noteCommitMode == NoteCommitMode.Composition;
 
         int spawnBin  = p.track.BinIndexForStep(p.authoredAbsStep);
         int targetBin = p.track.BinIndexForStep(targetAbsStep);
-        bool crossBinComposition = compositionMode && spawnBin != targetBin;
+        bool crossBinComposition = spawnBin != targetBin;
 
-        // Performance mode: always quantize so SFX and loop commit use the same final pitch.
-        // Composition cross-bin: use the authored note for the target step — quantizing the
-        // collected note isn't enough because the collected note can be a chord tone of the
-        // target chord (e.g. C in F major) and pass IsNoteInChord unchanged, sounding like
-        // the wrong bin. Using the authored note ensures each step gets its intended melody.
-        // Same-bin Composition: keep the raw collected note (already a chord tone of that bin).
-        if (!compositionMode)
-            chosenMidi = p.track.QuantizeNoteForStep(targetAbsStep, chosenMidi, p.authoredRootMidi);
-        else if (crossBinComposition)
+        // Cross-bin: use the authored note for the target step — the collected note was
+        // authored for a different bin's chord, so quantizing it can land on a plausible
+        // but wrong pitch. Using the authored note ensures each step gets its intended melody.
+        // Same-bin: keep the raw collected note (already a chord tone of that bin).
+        if (crossBinComposition)
             chosenMidi = p.track.GetAuthoredNoteAtAbsStep(targetAbsStep);
 
         bool occupied = p.track.IsPersistentStepOccupied(targetAbsStep);
@@ -191,7 +185,7 @@ public partial class Vehicle
             authoredRootMidi: commitAuthoredRoot,
             burstId: p.burstId,
             lightMarkerNow: true,
-            skipChordQuantize: true   // already quantized above (Composition mode: octave-fit only regardless)
+            skipChordQuantize: true   // pitch resolved above; octave-fit only
         );
 
         p.track.PlayOneShotMidi(chosenMidi, commitVel, resolvedDurationTicks);

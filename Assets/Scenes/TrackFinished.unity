@@ -604,7 +604,6 @@ GameObject:
   - component: {fileID: 1014060962}
   - component: {fileID: 1014060966}
   - component: {fileID: 1014060965}
-  - component: {fileID: 1014060967}
   m_Layer: 5
   m_Name: Quote Text
   m_TagString: Untagged
@@ -732,22 +731,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1014060961}
   m_CullTransparentMesh: 1
---- !u!114 &1014060967
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1014060961}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ee14a14ab5c93428e8714f28b7b3dfa0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  minGlow: 0.1
-  maxGlow: 1
-  speed: 1
-  glowProperty: _GlowPower
 --- !u!1 &1333517154
 GameObject:
   m_ObjectHideFlags: 0
@@ -904,7 +887,7 @@ MonoBehaviour:
   recordScale: 1
   maxRecordRadius: 0.5
   ringConfig: {fileID: 11400000, guid: 12b97f17125134b98b3adf0f6c52dc75, type: 2}
-  lineMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  lineMaterial: {fileID: 2100000, guid: 1912c3ee744c4e02937a03888f15925a, type: 2}
   wobbleTiltMin: 60
   wobbleTiltMax: 65
   wobbleSpeed: 0.1

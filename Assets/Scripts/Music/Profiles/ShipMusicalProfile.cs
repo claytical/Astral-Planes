@@ -1,6 +1,27 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+[System.Serializable]
+public sealed class RoleRegrowDelayMultipliers
+{
+    [Min(0.05f)] public float bass = 1f;
+    [Min(0.05f)] public float harmony = 1f;
+    [Min(0.05f)] public float lead = 1f;
+    [Min(0.05f)] public float groove = 1f;
+    [Min(0.05f)] public float rhythm = 1f;
+    [Min(0.05f)] public float gray = 1f;   // cells with no resolvable prospective role
+
+    public float GetFor(MusicalRole role) => role switch
+    {
+        MusicalRole.Bass    => bass,
+        MusicalRole.Harmony => harmony,
+        MusicalRole.Lead    => lead,
+        MusicalRole.Groove  => groove,
+        MusicalRole.Rhythm  => rhythm,
+        _                   => gray,
+    };
+}
+
 [CreateAssetMenu(fileName = "ShipMusicalProfile", menuName = "Astral Planes/Ship Musical Profile")]
 public class ShipMusicalProfile : ScriptableObject
 {
@@ -53,6 +74,11 @@ public class ShipMusicalProfile : ScriptableObject
     [Tooltip("HP removed per plow tick (before resistance). Higher values chip through thick cells faster " +
              "and reduce the number of passes needed to earn a role-capture.")]
     public int plowChipAmount = 1;
+
+    [Header("Regrowth Modifier")]
+    [Tooltip("Per-role multipliers on the regrow delay of dust THIS ship carves. " +
+             "1 = neutral, 0.75 = accelerator (an 8s cell regrows in 6s), >1 = slows regrowth.")]
+    public RoleRegrowDelayMultipliers regrowDelayMultipliers = new();
 
     [Header("Plow — Carving Feel")]
     [Tooltip("Fraction of a cell's carve resistance this vehicle ignores. 0 = fully resisted, 1 = punches through anything below resistance=1.")]

@@ -10,6 +10,7 @@ public partial class Vehicle : MonoBehaviour
     private static int _nextId;
     private readonly int _id = System.Threading.Interlocked.Increment(ref _nextId);
 
+    private bool  _isDead;
     private bool  _isActivePlow;
     private float _plowVelocityDrain;
     private float _lastPressureFactor;
@@ -208,6 +209,11 @@ public partial class Vehicle : MonoBehaviour
     // ------------------------------------------------------------
     // Manual-release cue (visual guidance)
     // ------------------------------------------------------------
+    private void Awake()
+    {
+        baseSprite = GetComponent<SpriteRenderer>();
+    }
+
     void Start()
         {
             rb = GetComponent<Rigidbody2D>();
@@ -220,8 +226,7 @@ public partial class Vehicle : MonoBehaviour
                 $"rb={(rb ? rb.bodyType.ToString() : "NULL")}",
                 this
             );
-       
-            baseSprite = GetComponent<SpriteRenderer>();
+
             if (baseSprite != null)
                 _vehicleDefaultColor = baseSprite.color;
 
@@ -286,6 +291,8 @@ public partial class Vehicle : MonoBehaviour
             }
         }
     void FixedUpdate() {
+
+        if (_isDead) return;
 
         float dt = Time.fixedDeltaTime;
 
@@ -519,9 +526,7 @@ public partial class Vehicle : MonoBehaviour
 
     private void ResolvePlaybackNote(PendingCollectedNote p, int atStep, out int midi, out int dur)
     {
-        bool compositionMode = p.track.controller != null &&
-                               p.track.controller.noteCommitMode == NoteCommitMode.Composition;
-        midi = compositionMode ? p.collectedMidi : p.track.GetAuthoredNoteAtAbsStep(atStep);
+        midi = p.collectedMidi;
         dur  = p.durationTicks;
         int binSize   = Mathf.Max(1, p.track.BinSize());
         int localStep = ((atStep % binSize) + binSize) % binSize;
@@ -1357,8 +1362,19 @@ public partial class Vehicle : MonoBehaviour
             _cumulativeEnergySpent += Mathf.Max(0f, amount);
             if (energyLevel <= 0)
             {
+                _isDead = true;
                 rb.linearVelocity = Vector2.zero;
                 rb.angularVelocity = 0f;
+                rb.simulated = false;
+
+                // Hide the vehicle immediately so the explosion VFX (a separate, independently
+                // timed object) reads as the vehicle being destroyed, not as it surviving and
+                // flying off while the explosion happens to its name.
+                if (baseSprite != null) baseSprite.enabled = false;
+                if (soulSprite != null) soulSprite.enabled = false;
+                var ownCollider = GetComponent<Collider2D>();
+                if (ownCollider != null) ownCollider.enabled = false;
+
                 DiscardCarriedCollectables();
                     Explode explode = GetComponent<Explode>();
                     if (explode != null)
@@ -1466,7 +1482,7 @@ public partial class Vehicle : MonoBehaviour
                 if (!canCarve) continue;
 
                 gen.DisableCellCollider(cell);
-                gen.ChipDustByVehicle(cell, chipAmount, fade, profile.carveResistanceBypass01);
+                gen.ChipDustByVehicle(cell, chipAmount, fade, profile.carveResistanceBypass01, profile);
                 _isActivePlow = true;
             }
         }
@@ -1686,4 +1702,9 @@ public partial class Vehicle : MonoBehaviour
     if (GameFlowManager.VerboseLogging) Debug.Log($"[RELEASE_BLOCKED] target={targetAbsStep} rawAbs={rawAbs:F2} fwd={fwdToTarget:F2} window={effectiveArmSteps:F1} PASS=False commitSkipped=True");
     return false;
 }
+
+    public Sprite GetBaseSprite()
+    {
+        return baseSprite.sprite;
+    }
 }

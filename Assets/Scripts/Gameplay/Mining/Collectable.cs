@@ -27,12 +27,34 @@ public partial class Collectable : MonoBehaviour
     public float dustCollisionStayForce = 2.25f;
 // ---- Spawn Arrival Intro ----
     [Header("Spawn Arrival")]
-    [SerializeField] private float spawnArrivalSeconds = 5.0f;
-    [SerializeField] private AnimationCurve spawnArrivalEase = null;
-    [SerializeField] private float spawnArrivalConeAngleDeg = 25f;
-    [SerializeField] private float spawnArrivalNoiseStrength = 3.2f;
-    [SerializeField] private float spawnArrivalNoiseFrequency = 1.2f;
+    [Tooltip("Fade time for dust cells carved along the arrival flight path.")]
+    [SerializeField] private float arrivalCarveFadeSeconds = 0.15f;
     private Coroutine _spawnArrivalRoutine;
+    private bool _inSpawnArrival;              // in protected flight: vehicles pass through, no collection
+    private Collider2D[] _solidColliders;      // non-trigger colliders, disabled during flight
+
+    /// <summary>
+    /// The spawn flight is the note's protected first statement: it sounds at launch
+    /// and streaks to its cell untouchable — vehicles pass through (solid colliders off)
+    /// and OnTriggerEnter2D refuses collection until it lands.
+    /// </summary>
+    private void SetSpawnArrivalProtection(bool on)
+    {
+        _inSpawnArrival = on;
+
+        if (_solidColliders == null)
+        {
+            var all = GetComponents<Collider2D>();
+            int solid = 0;
+            for (int i = 0; i < all.Length; i++) if (!all[i].isTrigger) solid++;
+            _solidColliders = new Collider2D[solid];
+            for (int i = 0, j = 0; i < all.Length; i++)
+                if (!all[i].isTrigger) _solidColliders[j++] = all[i];
+        }
+
+        for (int i = 0; i < _solidColliders.Length; i++)
+            if (_solidColliders[i] != null) _solidColliders[i].enabled = !on;
+    }
 // ---- Deposit timing knobs ----
     [Header("Deposit Timing")]
     [Tooltip("How long the tether travel should take under normal circumstances (seconds).")]
@@ -102,8 +124,8 @@ public partial class Collectable : MonoBehaviour
         => _s_liveByTrack.TryGetValue(track, out var count) && count > 0;
 
     // Guards against double-decrementing _s_liveByTrack when a collectable is removed from
-    // play via a non-Destroy path (e.g. DarkTimeoutRoutine) and later actually destroyed
-    // (e.g. ForceDestroyCollectablesInFlight / FreezeGameplayForBridge).
+    // play and later actually destroyed (e.g. ForceDestroyCollectablesInFlight /
+    // FreezeGameplayForBridge).
     private bool _countedAsLive;
     private void MarkNoLongerLive()
     {
@@ -114,30 +136,8 @@ public partial class Collectable : MonoBehaviour
     }
     private DustClaimManager _dustClaims;
     private DustClaimManager GetDustClaims() => _dustClaims != null ? _dustClaims : (_dustClaims = FindObjectOfType<DustClaimManager>());
-    private static readonly Collider2D[] _dustProbeHits = new Collider2D[16];
     Vector2Int _currentCell;
     Vector2Int _reservedCell;
-    // ---- Autonomy (Loop Boundary "Idea") ----
-    [Header("Autonomy (Loop Boundary Idea)")]
-    [SerializeField] private bool useLoopBoundaryIdea = true;
-
-    [Tooltip("How many grid cells ahead we evaluate when choosing an idea direction.")]
-    [SerializeField] private int ideaLookaheadCells = 5;
-
-    [Tooltip("Idea direction bias strength as a fraction of base move speed.")]
-    [Range(0f, 1.5f)]
-    [SerializeField] private float ideaBiasStrength = 0.55f;
-
-    [Tooltip("How quickly the note turns toward its new idea direction.")]
-    [SerializeField] private float ideaTurnLerp = 6.0f;
-
-    [Tooltip("Small turbulence layered on top of idea bias.")]
-    [Range(0f, 1f)]
-    [SerializeField] private float microTurbulenceStrength = 0.20f;
-
-    private Vector2 _ideaDir = Vector2.zero;
-    private Vector2 _ideaDirSmoothed = Vector2.zero;
-    private DrumTrack _boundDrumTrack;
 
 // ---- Carry Orbit ----
     [Header("Carry Orbit")]
@@ -208,34 +208,40 @@ public partial class Collectable : MonoBehaviour
     [Header("Sequencer Link")]
     [Tooltip("Candidate step anchors this collectable may resolve to when attaching to the track ribbon.")]
     public List<int> sharedTargetSteps = new List<int>();
-    // --- Movement (grid-aware, dust-adjacent) ---
-    [Header("Movement")]
-    [SerializeField] private float minSpeed = 0.8f;     // world units/sec for longest notes
-    [SerializeField] private float maxSpeed = 3.5f;     // world units/sec for shortest notes
-    [SerializeField] private float dustAdjacencyProbe = 0.42f; // radius used to detect nearby dust
+    // --- Movement (intent-driven velocity steering) ---
+    [NonSerialized] public float spawnVelocity127 = 100f; // authored MIDI velocity from the riff template; additive speed on top of the role's base
 
     private Camera _cam;
     private Rigidbody2D _rb;
-    private float _speed;
+    private float _speed;                   // base + velocity additive, resolved at Initialize
     private System.Random _rng;
     private MusicalRole _role = MusicalRole.None;
     private MusicalRoleProfile _roleProfile;
     private float _orbitalChirality = 1f;   // +1 CCW, -1 CW — locked per instance
-    private float _leadRefreshTimer = 0f;
     private bool _grooveBurstActive = true;
     private float _groovePhaseTimer = 0f;
-    private float _openSpaceRelocateTimer = 0f;
-    private bool  _isSprinting = false;
-    private float _sprintTimer = 0f;
+    private Vector2 _intentDir = Vector2.zero; // current directional intent (unit)
+    private float _intentTimer;                // counts down to the next intent pick
+    private float _intentInterval = 1f;        // seconds; the note's duration in musical time
+    private float _bounceRecoverTimer;         // > 0 right after a dust hit — steering weakened
+    private int _bassChargeSign = 1;           // +1 up / -1 down, alternates per intent
+    private float _harmonyHeadingDeg;          // persistent orbital heading
+    private Vector2 _homeWorld;                // arrival position — the note's gravitational anchor
+    private float _homeFreeRadius;             // world units of pull-free movement around home
+    private float _fleeRadiusWorld;            // vehicle distance that triggers fleeing (0 = fearless)
+    private bool _isFleeing;                   // hysteresis: fleeing until 1.5× the trigger radius
+    private DrumTrack _boundStepDrums;         // OnStepChanged subscription for the timeline ghost pulse
+    private Vector2 _moveBoundsMin;            // play-area clamp (bottom sits above the ascension-line UI band)
+    private Vector2 _moveBoundsMax;
+    private bool _hasMoveBounds;
 
     public int GetNote() => assignedNote;
-    public bool IsDark { get; private set; } = false;
 
     public void ApplyTrackVisuals(InstrumentTrack track)
     {
         if (track == null) return;
         if (TryGetComponent(out CollectableParticles particleScript))
-            particleScript.ConfigureByDuration(1, track);
+            particleScript.ConfigureByDuration(noteDurationTicks, track);
 
         if (energySprite != null)
         {
@@ -279,12 +285,47 @@ public partial class Collectable : MonoBehaviour
         if (assignedInstrumentTrack == null)
             Debug.LogError($"Collectable {gameObject.name} - assignedInstrumentTrack is NULL on initialization!");
 
-        StartCoroutine(DarkTimeoutRoutine(track));
         if (_rb == null) TryGetComponent(out _rb);
         _rng ??= new System.Random(StableSeed());
+
+        // Speed: role base + authored MIDI velocity additive.
+        float baseSpd = _roleProfile != null ? _roleProfile.collectableBaseSpeed : 1.2f;
+        float velAdd  = _roleProfile != null ? _roleProfile.collectableVelocitySpeedAdd : 1.5f;
+        _speed = baseSpd + Mathf.Clamp01(spawnVelocity127 / 127f) * velAdd;
+
+        // Intent interval: the note's duration in musical time (ticks @ 480/quarter).
+        var drums = assignedInstrumentTrack != null ? assignedInstrumentTrack.drumTrack : null;
+        float bpm = (drums != null && drums.drumLoopBPM > 1f) ? drums.drumLoopBPM : 120f;
+        _intentInterval = Mathf.Clamp(noteDurationTicks * 60f / (bpm * 480f), 0.25f, 6f);
+        _intentTimer = 0f; // rest until the playhead first crosses this note's step
+
+        // Timeline ghost pulse: when the playhead crosses this note's step, it sounds
+        // softly and dances for its duration. Unbound at pickup and on destroy/disable.
+        if (drums != null)
+        {
+            _boundStepDrums = drums;
+            drums.OnStepChanged += HandleTimelineStep;
+        }
+
+        // Home tether: the arrival position (the deterministic step/pitch cell) anchors the note.
+        _homeWorld = _rb != null ? _rb.position : (Vector2)transform.position;
+        float cellSize = drums != null ? Mathf.Max(0.001f, drums.GetCellWorldSize()) : 1f;
+        float homeRadiusCells = _roleProfile != null ? _roleProfile.collectableHomeRadiusCells : 1.5f;
+        _homeFreeRadius = homeRadiusCells * cellSize;
+        float fleeRadiusCells = _roleProfile != null ? _roleProfile.collectableFleeRadiusCells : 2f;
+        _fleeRadiusWorld = fleeRadiusCells * cellSize;
+
+        // Movement stays inside the play area (its bottom is above the ascension-line band),
+        // cached once — TryGetPlayAreaWorld can allocate, and the area is stable in-session.
+        if (drums != null && drums.TryGetPlayAreaWorld(out var playArea))
+        {
+            const float boundsPad = 0.4f;
+            _moveBoundsMin = new Vector2(playArea.left + boundsPad, playArea.bottom + boundsPad);
+            _moveBoundsMax = new Vector2(playArea.right - boundsPad, playArea.top - boundsPad);
+            _hasMoveBounds = _moveBoundsMax.x > _moveBoundsMin.x && _moveBoundsMax.y > _moveBoundsMin.y;
+        }
+
         StartCoroutine(MovementRoutine());
-        TryBindLoopBoundary();
-        HandleLoopBoundaryIdea();
 
         ClearReservation();
 
@@ -319,7 +360,7 @@ public partial class Collectable : MonoBehaviour
     {
         MarkNoLongerLive();
         ClearReservation();
-        UnbindLoopBoundary();
+        UnbindTimelineStep();
         UnregisterOccupant();
         UnregisterCarryOrbit();
         GetDustClaims()?.ReleaseOwner($"Collectable#{_id}");
@@ -329,7 +370,7 @@ public partial class Collectable : MonoBehaviour
     private void OnDisable()
     {
         ClearReservation();
-        UnbindLoopBoundary();
+        UnbindTimelineStep();
         UnregisterOccupant();
         GetDustClaims()?.ReleaseOwner($"Collectable Released");
         NotifyDestroyedOnce();

@@ -15,150 +15,6 @@ public partial class Collectable
         new Vector2Int(-1,-1),
     };
 
-    private void TryBindLoopBoundary()
-    {
-        if (!useLoopBoundaryIdea) return;
-        if (assignedInstrumentTrack == null) return;
-
-        var dt = assignedInstrumentTrack.drumTrack;
-        if (dt == null) return;
-
-        if (_boundDrumTrack == dt) return;
-
-        if (_boundDrumTrack != null)
-            _boundDrumTrack.OnLoopBoundary -= HandleLoopBoundaryIdea;
-
-        _boundDrumTrack = dt;
-        _boundDrumTrack.OnLoopBoundary += HandleLoopBoundaryIdea;
-    }
-
-    private void UnbindLoopBoundary()
-    {
-        if (_boundDrumTrack != null)
-            _boundDrumTrack.OnLoopBoundary -= HandleLoopBoundaryIdea;
-
-        _boundDrumTrack = null;
-    }
-
-    private void HandleLoopBoundaryIdea()
-    {
-        if (!useLoopBoundaryIdea) return;
-        if (_inCarry) return;
-
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var dustGen = (_gfm != null) ? _gfm.dustGenerator : null;
-        var dt = (assignedInstrumentTrack != null) ? assignedInstrumentTrack.drumTrack : null;
-        if (dustGen == null || dt == null) return;
-
-        Vector2 cur = (_rb != null) ? _rb.position : (Vector2)transform.position;
-
-        _ideaDir = ChooseIdeaDirection(cur, dt, dustGen, Mathf.Max(1, ideaLookaheadCells));
-        if (_ideaDir.sqrMagnitude < 0.0001f)
-            _ideaDir = UnityEngine.Random.insideUnitCircle.normalized;
-    }
-
-    private Vector2 ChooseIdeaDirection(Vector2 worldPos, DrumTrack dt, CosmicDustGenerator dustGen, int lookaheadCells)
-    {
-        int w = dt.GetSpawnGridWidth();
-        int h = dt.GetSpawnGridHeight();
-        if (w <= 0 || h <= 0) return Vector2.zero;
-
-        Vector2Int c = dt.WorldToGridPosition(worldPos);
-        c.x = Mathf.Clamp(c.x, 0, w - 1);
-        c.y = Mathf.Clamp(c.y, 0, h - 1);
-
-        float bestScore = float.NegativeInfinity;
-        Vector2Int best = Vector2Int.zero;
-
-        for (int d = 0; d < kDirs8.Length; d++)
-        {
-            var dir = kDirs8[d];
-            float score = 0f;
-
-            for (int i = 1; i <= lookaheadCells; i++)
-            {
-                var gp = c + dir * i;
-                if (gp.x < 0 || gp.y < 0 || gp.x >= w || gp.y >= h)
-                    break;
-
-                bool hasDust = dustGen.HasDustAt(gp);
-                // Reward open space; penalize dust.
-                score += hasDust ? -2.0f : +1.0f;
-
-                // Immediate wall is especially bad (jail ring effect).
-                if (i == 1 && hasDust)
-                    score -= 2.0f;
-            }
-
-            // Lead: bonus for directions that have dust walls on either flank — hugs maze edges.
-            if (_role == MusicalRole.Lead)
-            {
-                var probe1 = c + dir;
-                var perp1 = new Vector2Int(-dir.y, dir.x);
-                var perp2 = new Vector2Int(dir.y, -dir.x);
-                if (dustGen.HasDustAt(probe1 + perp1)) score += 1.5f;
-                if (dustGen.HasDustAt(probe1 + perp2)) score += 1.5f;
-            }
-
-            // Harmony: prefer directions that continue the orbital arc (chirality-locked turn bias).
-            if (_role == MusicalRole.Harmony && _ideaDirSmoothed.sqrMagnitude > 0.01f)
-            {
-                Vector2 perpCCW = new Vector2(-_ideaDirSmoothed.y, _ideaDirSmoothed.x).normalized;
-                Vector2 wdir2 = new Vector2(dir.x, dir.y).normalized;
-                float alignment = Vector2.Dot(wdir2, perpCCW) * _orbitalChirality;
-                float orbBias = _roleProfile != null ? _roleProfile.orbitalTurnBias : 0.6f;
-                score += alignment * orbBias;
-            }
-
-            // Tiny randomness breaks ties and makes behavior feel "alive".
-            score += UnityEngine.Random.Range(-0.15f, +0.15f);
-
-            if (score > bestScore)
-            {
-                bestScore = score;
-                best = dir;
-            }
-        }
-
-        Vector2 wdir = new Vector2(best.x, best.y);
-        if (wdir.sqrMagnitude > 0f) wdir.Normalize();
-        return wdir;
-    }
-
-    private bool IsInsideDustStable(Vector2 worldPos, DrumTrack dt, CosmicDustGenerator dustGen)
-    {
-        if (dt == null || dustGen == null) return IsPositionInsideDust(worldPos);
-        Vector2Int gp = dt.WorldToGridPosition(worldPos);
-        return dustGen.HasDustAt(gp);
-    }
-
-    private bool IsPositionInsideDust(Vector2 worldPos)
-    {
-        int count = Physics2D.OverlapCircleNonAlloc(worldPos, dustAdjacencyProbe, _dustProbeHits);
-        for (int i = 0; i < count; i++)
-        {
-            var dust = _dustProbeHits[i] ? _dustProbeHits[i].GetComponent<CosmicDust>() : null;
-            if (!dust) continue;
-            Vector2 cp = _dustProbeHits[i].ClosestPoint(worldPos);
-            if ((cp - worldPos).sqrMagnitude < 1e-6f) return true;
-        }
-        return false;
-    }
-
-    private float Duration01()
-    {
-        float t = Mathf.Clamp(noteDurationTicks, 1, 16);
-        return (t - 1f) / 15f;
-    }
-
-    private float ComputeMoveSpeed()
-    {
-        float d = Duration01();
-        float base_ = Mathf.Lerp(maxSpeed, minSpeed, d);
-        float roleMul = _roleProfile != null ? _roleProfile.collectableDriftSpeedMultiplier : 1f;
-        return base_ * roleMul;
-    }
-
     private int StableSeed()
     {
         unchecked
@@ -170,138 +26,284 @@ public partial class Collectable
         }
     }
 
+    /// <summary>
+    /// Intent-driven velocity steering. The rigidbody stays Dynamic so dust collisions
+    /// genuinely deflect it; steering pulls back toward the role pattern's desired velocity.
+    /// The directional intent is held for _intentInterval (the note's duration in musical
+    /// time) before being re-picked.
+    /// </summary>
     private IEnumerator MovementRoutine()
     {
         if (!_rb && !TryGetComponent(out _rb)) yield break;
-
-        _speed = ComputeMoveSpeed();
-        const float TRAPPED_DRIFT_MUL = 0.35f;
-
         _rng ??= new System.Random(StableSeed());
-        float seedA = (float)_rng.NextDouble() * 1000f;
-        float seedB = (float)_rng.NextDouble() * 1000f;
 
         while (true)
         {
             yield return new WaitForFixedUpdate();
-            if (_rb == null) continue;
+            if (_rb == null || !_rb.simulated) continue;
             if (_inCarry) continue;
+            // Spawn arrival (Kinematic) and deposit/carry paths own the body.
+            if (_rb.bodyType != RigidbodyType2D.Dynamic) continue;
+
             if (_gfm == null) _gfm = GameFlowManager.Instance;
             var dustGen = (_gfm != null) ? _gfm.dustGenerator : null;
-            var dt = (assignedInstrumentTrack != null) ? assignedInstrumentTrack.drumTrack : null;
+            var drums = (assignedInstrumentTrack != null) ? assignedInstrumentTrack.drumTrack : null;
+            float fdt = Time.fixedDeltaTime;
 
             Vector2 cur = _rb.position;
 
-            bool insideDust = false;
-            if (dustGen != null && dt != null)
-                insideDust = IsInsideDustStable(cur, dt, dustGen);
-            else
-                insideDust = IsPositionInsideDust(cur);
-            if (isTrappedInDust && insideDust)
+            // Only a collectable with dust on its own cell AND all 8 neighbors is trapped;
+            // anything less keeps moving (and bouncing) so it never reads as stuck.
+            if (IsFullyTrapped(cur, drums, dustGen))
+            {
+                _rb.linearVelocity = Vector2.MoveTowards(_rb.linearVelocity, Vector2.zero, SteerAccel() * fdt);
                 continue;
-
-            Vector2 step = Vector2.zero;
-
-            // Lead: re-evaluate idea direction more frequently for darting wall-racing.
-            if (_role == MusicalRole.Lead && dt != null && dustGen != null)
-            {
-                _leadRefreshTimer -= Time.fixedDeltaTime;
-                if (_leadRefreshTimer <= 0f)
-                {
-                    _leadRefreshTimer = dt.GetLoopLengthInSeconds() * 0.25f;
-                    HandleLoopBoundaryIdea();
-                }
             }
 
-            // Open-space relocation: periodically re-evaluate idea and sprint toward it.
-            if (!insideDust && _roleProfile != null && _roleProfile.collectableOpenSpaceRelocateInterval > 0f)
+            // The intent window is armed by HandleTimelineStep when the playhead crosses
+            // this note's step; between pulses the note rests near home.
+            _intentTimer = Mathf.Max(0f, _intentTimer - fdt);
+
+            Vector2 desired;
+            if (TryGetFleeThreat(cur, out Vector2 threatPos))
             {
-                _openSpaceRelocateTimer -= Time.fixedDeltaTime;
-                if (_openSpaceRelocateTimer <= 0f)
-                {
-                    _openSpaceRelocateTimer = _roleProfile.collectableOpenSpaceRelocateInterval;
-                    HandleLoopBoundaryIdea();
-                    if (_roleProfile.collectableOpenSpaceSprintDuration > 0f)
-                    {
-                        _isSprinting = true;
-                        _sprintTimer = _roleProfile.collectableOpenSpaceSprintDuration;
-                    }
-                }
+                // Flee overrides the pattern AND the home tether until the vehicle
+                // is a safe distance away; then the tether reels the note back.
+                Vector2 awayDir = cur - threatPos;
+                awayDir = awayDir.sqrMagnitude > 0.0001f
+                    ? awayDir.normalized
+                    : UnityEngine.Random.insideUnitCircle.normalized;
+                desired = awayDir * (_speed * FleeSpeedMul());
             }
-
-            if (_isSprinting)
-            {
-                _sprintTimer -= Time.fixedDeltaTime;
-                if (_sprintTimer <= 0f) _isSprinting = false;
-            }
-
-            float effectiveSpeed = _speed;
-            if (_isSprinting && _roleProfile != null)
-                effectiveSpeed *= _roleProfile.collectableOpenSpaceSprintMultiplier;
-
-            if (_isSprinting)
-                _ideaDirSmoothed = _ideaDir;
             else
-                _ideaDirSmoothed = Vector2.Lerp(_ideaDirSmoothed, _ideaDir, Mathf.Clamp01(Time.fixedDeltaTime * ideaTurnLerp));
-
-            if (_ideaDirSmoothed.sqrMagnitude > 0.0001f)
-                step += _ideaDirSmoothed.normalized * (effectiveSpeed * ideaBiasStrength * Time.fixedDeltaTime);
-
-            if (!_isSprinting)
             {
-                float nt = Time.time;
-                float nx = Mathf.PerlinNoise(seedA, nt * 0.35f) * 2f - 1f;
-                float ny = Mathf.PerlinNoise(seedB, nt * 0.35f) * 2f - 1f;
-                Vector2 turb = new Vector2(nx, ny);
-                if (turb.sqrMagnitude > 0.0001f)
-                    step += turb.normalized * (microTurbulenceStrength * effectiveSpeed * Time.fixedDeltaTime);
+                desired = _intentTimer > 0f ? ComputeDesiredVelocity(fdt) : Vector2.zero;
+
+                // Elastic home tether: no pull inside the free radius; beyond it the inward
+                // pull grows with distance until it overpowers the pattern speed.
+                Vector2 toHome = _homeWorld - cur;
+                float homeDist = toHome.magnitude;
+                float excess = homeDist - _homeFreeRadius;
+                if (excess > 0f && homeDist > 0.001f)
+                    desired += (toHome / homeDist) * (excess * HomePullPerUnit());
             }
 
-            // Bass: BPM-synced vertical bob.
-            if (_role == MusicalRole.Bass && dt != null)
+            // Right after a dust hit, steer weakly so the bounce visibly plays out
+            // before the intent reasserts itself.
+            _bounceRecoverTimer = Mathf.Max(0f, _bounceRecoverTimer - fdt);
+            float steer = SteerAccel() * (_bounceRecoverTimer > 0f ? 0.25f : 1f);
+
+            _rb.linearVelocity = Vector2.MoveTowards(_rb.linearVelocity, desired, steer * fdt);
+
+            ClampToViewportRb();
+        }
+    }
+
+    private float SteerAccel() => _roleProfile != null ? _roleProfile.collectableSteerAccel : 6f;
+
+    /// <summary>
+    /// Timeline ghost pulse: fired by DrumTrack.OnStepChanged (absolute step on the
+    /// expanded leader loop). When the playhead crosses this note's step, the drifting
+    /// collectable sounds its note softly (half authored velocity) and dances in a
+    /// fresh direction for the note's duration.
+    /// </summary>
+    private void HandleTimelineStep(int step, int leaderSteps)
+    {
+        if (_handled || _inCarry) return;
+        if (step != intendedStep) return;
+
+        if (assignedInstrumentTrack != null)
+            assignedInstrumentTrack.PlayOneShotMidi(assignedNote, spawnVelocity127 * 0.5f, noteDurationTicks);
+
+        PickIntent();
+        _intentTimer = _intentInterval;
+    }
+
+    private void UnbindTimelineStep()
+    {
+        if (_boundStepDrums != null)
+        {
+            _boundStepDrums.OnStepChanged -= HandleTimelineStep;
+            _boundStepDrums = null;
+        }
+    }
+
+    private float HomePullPerUnit() => _roleProfile != null ? _roleProfile.collectableHomePullPerUnit : 1.5f;
+
+    private float FleeSpeedMul() => _roleProfile != null ? _roleProfile.collectableFleeSpeedMul : 1.3f;
+
+    private bool TryGetFleeThreat(Vector2 cur, out Vector2 threatPos)
+    {
+        threatPos = default;
+        if (_fleeRadiusWorld <= 0f) { _isFleeing = false; return false; }
+        var vehicles = _gfm != null ? _gfm.GetVehicles() : null;
+        if (vehicles == null || vehicles.Count == 0) { _isFleeing = false; return false; }
+
+        // Hysteresis: once fleeing, stay fleeing until the vehicle is 1.5× the trigger away.
+        float trigger = _isFleeing ? _fleeRadiusWorld * 1.5f : _fleeRadiusWorld;
+        float bestSq = trigger * trigger;
+        bool found = false;
+        for (int i = 0; i < vehicles.Count; i++)
+        {
+            var v = vehicles[i];
+            if (v == null) continue;
+            float dsq = ((Vector2)v.transform.position - cur).sqrMagnitude;
+            if (dsq < bestSq)
             {
-                float beatsPerSec = dt.drumLoopBPM / 60f;
-                float bob = Mathf.Sin((float)(AudioSettings.dspTime * beatsPerSec * Mathf.PI * 2.0));
-                step.y += bob * 0.012f;
+                bestSq = dsq;
+                threatPos = v.transform.position;
+                found = true;
+            }
+        }
+        _isFleeing = found;
+        return found;
+    }
+
+    private void PickIntent()
+    {
+        _rng ??= new System.Random(StableSeed());
+        switch (_role)
+        {
+            case MusicalRole.Bass:
+                _bassChargeSign = -_bassChargeSign;
+                _intentDir = new Vector2(0f, _bassChargeSign);
+                break;
+
+            case MusicalRole.Groove:
+                _intentDir = (_rng.Next(2) == 0) ? Vector2.left : Vector2.right;
+                _grooveBurstActive = true;
+                _groovePhaseTimer = _roleProfile != null ? _roleProfile.burstDuration : 0.4f;
+                break;
+
+            case MusicalRole.Harmony:
+                _harmonyHeadingDeg = (float)_rng.NextDouble() * 360f;
+                break;
+
+            default: // Lead and fallback: fresh heading from the full 360°.
+                float a = (float)_rng.NextDouble() * Mathf.PI * 2f;
+                _intentDir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+                break;
+        }
+    }
+
+    private Vector2 ComputeDesiredVelocity(float fdt)
+    {
+        switch (_role)
+        {
+            case MusicalRole.Bass:
+            {
+                float chargeMul = _roleProfile != null ? _roleProfile.collectableChargeSpeedMul : 1.6f;
+                return _intentDir * (_speed * chargeMul);
             }
 
-            // Groove: beat-snapped burst/pause.
-            if (_role == MusicalRole.Groove && dt != null)
+            case MusicalRole.Groove:
             {
                 float burst = _roleProfile != null ? _roleProfile.burstDuration : 0.4f;
                 float pause = _roleProfile != null ? _roleProfile.pauseDuration : 0.35f;
-                _groovePhaseTimer -= Time.fixedDeltaTime;
+                _groovePhaseTimer -= fdt;
                 if (_groovePhaseTimer <= 0f)
                 {
                     _grooveBurstActive = !_grooveBurstActive;
                     _groovePhaseTimer = _grooveBurstActive ? burst : pause;
                 }
-                if (!_grooveBurstActive)
-                    step = Vector2.zero;
+                return _grooveBurstActive ? _intentDir * _speed : Vector2.zero;
             }
 
-            if (insideDust)
-                step *= TRAPPED_DRIFT_MUL;
+            case MusicalRole.Harmony:
+            {
+                float turnDegPerSec = 90f * (_roleProfile != null ? _roleProfile.orbitalTurnBias : 0.6f);
+                _harmonyHeadingDeg += _orbitalChirality * turnDegPerSec * fdt;
+                float rad = _harmonyHeadingDeg * Mathf.Deg2Rad;
+                _intentDir = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
+                return _intentDir * _speed;
+            }
 
-            float maxStep = effectiveSpeed * Time.fixedDeltaTime;
-            if (step.sqrMagnitude > maxStep * maxStep)
-                step = step.normalized * maxStep;
-
-            Vector2 nextPos = cur + step;
-            ClampToViewport(ref nextPos);
-            _rb.MovePosition(nextPos);
+            default: // Lead and fallback: straight dart on the current heading.
+                return _intentDir * _speed;
         }
     }
 
-    private void ClampToViewport(ref Vector2 pos)
+    private bool IsFullyTrapped(Vector2 worldPos, DrumTrack drums, CosmicDustGenerator dustGen)
     {
-        if (_cam == null) _cam = Camera.main;
-        if (_cam == null) return;
-        const float pad = 0.4f;
-        Vector2 mn = _cam.ViewportToWorldPoint(Vector3.zero);
-        Vector2 mx = _cam.ViewportToWorldPoint(Vector3.one);
-        pos.x = Mathf.Clamp(pos.x, mn.x + pad, mx.x - pad);
-        pos.y = Mathf.Clamp(pos.y, mn.y + pad, mx.y - pad);
+        if (drums == null || dustGen == null) return false;
+        Vector2Int c = drums.WorldToGridPosition(worldPos);
+        if (!dustGen.HasDustAt(c)) return false;
+        for (int i = 0; i < kDirs8.Length; i++)
+        {
+            // Any open neighbor (or off-grid edge) is an escape route.
+            if (!dustGen.HasDustAt(c + kDirs8[i]))
+                return false;
+        }
+        return true;
+    }
+
+    private void ClampToViewportRb()
+    {
+        if (_rb == null) return;
+
+        Vector2 mn, mx;
+        if (_hasMoveBounds)
+        {
+            mn = _moveBoundsMin;
+            mx = _moveBoundsMax;
+        }
+        else
+        {
+            if (_cam == null) _cam = Camera.main;
+            if (_cam == null) return;
+            const float pad = 0.4f;
+            mn = (Vector2)_cam.ViewportToWorldPoint(Vector3.zero) + new Vector2(pad, pad);
+            mx = (Vector2)_cam.ViewportToWorldPoint(Vector3.one) - new Vector2(pad, pad);
+        }
+
+        Vector2 pos = _rb.position;
+        Vector2 vel = _rb.linearVelocity;
+        bool clamped = false;
+
+        if (pos.x < mn.x)
+        {
+            pos.x = mn.x; clamped = true;
+            if (vel.x < 0f) vel.x = 0f;
+            if (_intentDir.x < 0f) ReflectIntentHorizontal();
+        }
+        else if (pos.x > mx.x)
+        {
+            pos.x = mx.x; clamped = true;
+            if (vel.x > 0f) vel.x = 0f;
+            if (_intentDir.x > 0f) ReflectIntentHorizontal();
+        }
+
+        if (pos.y < mn.y)
+        {
+            pos.y = mn.y; clamped = true;
+            if (vel.y < 0f) vel.y = 0f;
+            if (_intentDir.y < 0f) ReflectIntentVertical();
+        }
+        else if (pos.y > mx.y)
+        {
+            pos.y = mx.y; clamped = true;
+            if (vel.y > 0f) vel.y = 0f;
+            if (_intentDir.y > 0f) ReflectIntentVertical();
+        }
+
+        if (clamped)
+        {
+            _rb.position = pos;
+            _rb.linearVelocity = vel;
+        }
+    }
+
+    private void ReflectIntentHorizontal()
+    {
+        _intentDir.x = -_intentDir.x;
+        _harmonyHeadingDeg = 180f - _harmonyHeadingDeg;
+    }
+
+    private void ReflectIntentVertical()
+    {
+        _intentDir.y = -_intentDir.y;
+        _bassChargeSign = _intentDir.y >= 0f ? 1 : -1;
+        _harmonyHeadingDeg = -_harmonyHeadingDeg;
     }
 
     public static bool IsCellFreeStatic(Vector2Int cell)
@@ -345,12 +347,35 @@ public partial class Collectable
         _hasReservation = false;
     }
 
+    // While a timeline-armed movement intent is live, the note plows through dust
+    // instead of bouncing — the ghost pulse opens temporary gray corridors.
+    private bool IsPlowWindowActive() => _intentTimer > 0f && !_inCarry && !_handled;
+
+    private void TryPlowDustCell(CosmicDust dust)
+    {
+        if (dust == null) return;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen = _gfm != null ? _gfm.dustGenerator : null;
+        var drums = assignedInstrumentTrack != null ? assignedInstrumentTrack.drumTrack : null;
+        if (gen == null || drums == null) return;
+
+        Vector2Int cell = drums.WorldToGridPosition(dust.transform.position);
+        gen.CarveCellPreserveGray(cell, arrivalCarveFadeSeconds, DustClearSource.CollectablePlow);
+    }
+
     private void OnCollisionEnter2D(Collision2D coll)
     {
         if (_rb == null && !TryGetComponent(out _rb)) return;
 
-        if (coll.collider != null && coll.collider.GetComponent<CosmicDust>() != null)
+        var dust = coll.collider != null ? coll.collider.GetComponent<CosmicDust>() : null;
+        if (dust != null)
         {
+            if (IsPlowWindowActive())
+            {
+                TryPlowDustCell(dust);
+                return;
+            }
+
             Vector2 away = Vector2.zero;
 
             if (coll.contactCount > 0)
@@ -362,6 +387,7 @@ public partial class Collectable
 
             away.Normalize();
             _rb.AddForce(away * dustCollisionEnterImpulse, ForceMode2D.Impulse);
+            _bounceRecoverTimer = _roleProfile != null ? _roleProfile.collectableBounceRecoverSeconds : 0.45f;
         }
     }
 
@@ -369,7 +395,15 @@ public partial class Collectable
     {
         if (_rb == null) return;
         if (coll.collider == null) return;
-        if (coll.collider.GetComponent<CosmicDust>() == null) return;
+        var dust = coll.collider.GetComponent<CosmicDust>();
+        if (dust == null) return;
+
+        if (IsPlowWindowActive())
+        {
+            // Drive through the wall instead of being pushed out of it.
+            TryPlowDustCell(dust);
+            return;
+        }
 
         Vector2 n = Vector2.zero;
         if (coll.contactCount > 0) n = coll.GetContact(0).normal;

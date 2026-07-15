@@ -128,17 +128,6 @@
                 },
                 {
                     "name": "",
-                    "id": "57676fc6-1eee-4a74-9b80-6ad3a07a214f",
-                    "path": "<Gamepad>/buttonEast",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": ";Switch;Generic Gamepad;Xbox;Playstation",
-                    "action": "Choose",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
                     "id": "3cb25328-95fa-45b9-b8aa-0ab87770bb02",
                     "path": "<Keyboard>/enter",
                     "interactions": "",
@@ -502,17 +491,6 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Choose",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "f5d33ed8-cbf0-482d-a906-07f8d8403607",
-                    "path": "<Gamepad>/buttonEast",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": ";Generic Gamepad;Xbox;Playstation",
                     "action": "Choose",
                     "isComposite": false,
                     "isPartOfComposite": false

@@ -22,13 +22,6 @@ public struct DustColorSet
 [CreateAssetMenu(menuName = "Astral Planes/Musical Role Profile", fileName = "NewMusicalRoleProfile")]
 public class MusicalRoleProfile : ScriptableObject
 {
-    [System.Serializable]
-    public struct MineNodeArchetypeVariant
-    {
-        public string variantId;
-        public string archetypeId;
-    }
-
     public MusicalRole role;
 
     [Header("Visuals & Styling")]
@@ -57,23 +50,7 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("Direct locomotion profile override for this role.")]
     public MineNodeLocomotionProfile mineNodeLocomotionProfile;
 
-    [Header("MineNode Decision Archetype")]
-    [Tooltip("Default decision archetype id (e.g. Steady, Aggressive, Skittish, Darting).")]
-    public string defaultMineNodeArchetypeId = "Steady";
-
-    [Tooltip("Optional role-specific variant overrides (e.g. Lead_A, Lead_B).")]
-    public MineNodeArchetypeVariant[] mineNodeArchetypeVariants;
-
     [Header("MineNode Behavior Modifiers")]
-    [Tooltip("Scales base speed within this role's behavioral category. 1.0 = default. Electronic Bass ~1.3, Acoustic Bass ~0.7.")]
-    [Range(0.3f, 2.5f)] public float behaviorSpeedMultiplier = 1.0f;
-
-    [Tooltip("Deliberate (Bass): strength of territory affinity bias in corridor scoring.")]
-    [Range(0f, 1f)] public float territoryAffinity01 = 0.3f;
-
-    [Tooltip("Deliberate (Bass): multiplier on pathCommitmentDuration. Higher = slower to change direction.")]
-    [Range(0.5f, 3f)] public float commitDurationScale = 1.0f;
-
     [Tooltip("Orbital (Harmony): weight added to perpendicular-curve directions in corridor scoring. 0 = no orbital bias.")]
     [Range(0f, 1.5f)] public float orbitalTurnBias = 0.6f;
 
@@ -83,24 +60,36 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("Rhythmic (Groove): seconds at near-standstill after each burst.")]
     [Min(0.05f)] public float pauseDuration = 0.35f;
 
-    [Tooltip("Rhythmic (Groove): speed multiplier during burst phase relative to base driftSpeedMultiplier.")]
-    [Range(1f, 3f)] public float burstSpeedMultiplier = 2.0f;
-
     [Tooltip("Darting (Lead): grid-cell radius within which a Vehicle triggers directional evasion. Keep small (2–4) for 1v1 pursuit — fires only on close approach.")]
     [Range(0f, 10f)] public float evasionCells = 3f;
 
-    [Header("Collectable Behavior")]
-    [Tooltip("Multiplies the duration-derived drift speed for autonomous collectables. 1 = default. Does not affect MineNode speed.")]
-    [Range(0.3f, 3.0f)] public float collectableDriftSpeedMultiplier = 1.0f;
+    [Header("Collectable Movement")]
+    [Tooltip("Base drift speed (world units/sec) before the MIDI-velocity additive. Does not affect MineNode speed.")]
+    [Min(0f)] public float collectableBaseSpeed = 1.2f;
 
-    [Tooltip("Seconds between open-space idea re-evaluations (relocation desire). -1 = only at loop boundary (default). Lower = more restless.")]
-    [Min(-1f)] public float collectableOpenSpaceRelocateInterval = -1f;
+    [Tooltip("Speed added at MIDI velocity 127: speed = base + (vel/127) × this.")]
+    [Min(0f)] public float collectableVelocitySpeedAdd = 1.5f;
 
-    [Tooltip("Speed multiplier applied immediately after the collectable commits to a new open-space idea direction. 1 = no sprint.")]
-    [Range(1f, 5f)] public float collectableOpenSpaceSprintMultiplier = 1.0f;
+    [Tooltip("Steering acceleration (units/sec²) toward the current intent velocity. Lower = floatier; collision bounces persist longer.")]
+    [Min(0.5f)] public float collectableSteerAccel = 6f;
 
-    [Tooltip("How long (seconds) the sprint lasts before returning to normal drift speed. 0 = no sprint.")]
-    [Min(0f)] public float collectableOpenSpaceSprintDuration = 0f;
+    [Tooltip("Seconds of reduced steering after a dust collision so the bounce reads before the collectable re-charges.")]
+    [Min(0f)] public float collectableBounceRecoverSeconds = 0.45f;
+
+    [Tooltip("Bass only: speed multiplier while charging vertically.")]
+    [Range(1f, 3f)] public float collectableChargeSpeedMul = 1.6f;
+
+    [Tooltip("Free-move radius around the spawn destination, in grid cells. Outside it the home pull ramps up. Smaller = tighter cage (Lead).")]
+    [Min(0f)] public float collectableHomeRadiusCells = 1.5f;
+
+    [Tooltip("Inward pull speed gained per world unit beyond the free radius (u/s per u). Higher = snappier return; the pattern can stray ~patternSpeed/this beyond the radius.")]
+    [Min(0f)] public float collectableHomePullPerUnit = 1.5f;
+
+    [Tooltip("Vehicle distance (grid cells) that triggers fleeing. Flee ends at 1.5× this distance, then the home tether pulls the note back. 0 = never flees.")]
+    [Min(0f)] public float collectableFleeRadiusCells = 2f;
+
+    [Tooltip("Speed multiplier while fleeing a vehicle (× the note's normal speed).")]
+    [Range(1f, 3f)] public float collectableFleeSpeedMul = 1.3f;
 
     [Header("Chord Voices")]
     [Tooltip("ByBin: configs rotate by bin index (default for all roles). ByVoice: configs are pinned by voiceIndex — voice 0 always uses config[0], voice 1 uses config[1], etc.")]
@@ -156,23 +145,5 @@ public class MusicalRoleProfile : ScriptableObject
         var c = dustColors.shadowColor;
         c.a = baseAlpha;
         return c;
-    }
-    public float GetCarveResistance01() => Mathf.Clamp01(carveResistance01);
-    public float GetDrainResistance01() => Mathf.Clamp01(drainResistance01);
-
-    public string ResolveMineNodeArchetypeId(string variantId)
-    {
-        if (!string.IsNullOrWhiteSpace(variantId) && mineNodeArchetypeVariants != null)
-        {
-            for (int i = 0; i < mineNodeArchetypeVariants.Length; i++)
-            {
-                var candidate = mineNodeArchetypeVariants[i];
-                if (string.Equals(candidate.variantId, variantId, System.StringComparison.OrdinalIgnoreCase) &&
-                    !string.IsNullOrWhiteSpace(candidate.archetypeId))
-                    return candidate.archetypeId;
-            }
-        }
-
-        return string.IsNullOrWhiteSpace(defaultMineNodeArchetypeId) ? "Steady" : defaultMineNodeArchetypeId;
     }
 }

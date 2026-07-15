@@ -166,6 +166,11 @@ public partial class PhaseStar
         _activeNode = node;
         _ejectionInFlight = false;
 
+        // The node now holds the dust energy drained to build it; those cells regrow
+        // when the node resolves or is destroyed.
+        node.AttachHeldDustBatch(_heldDrainCells);
+        _heldDrainCells.Clear();
+
         bool handledResolve = false;
 
         node.OnResolved += (_, outcome) =>

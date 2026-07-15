@@ -123,7 +123,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
         {
             next    |= gp.dpad.right.wasPressedThisFrame;
             prev    |= gp.dpad.left.wasPressedThisFrame;
-            confirm |= gp.buttonSouth.wasPressedThisFrame || gp.buttonEast.wasPressedThisFrame;
+            confirm |= gp.buttonSouth.wasPressedThisFrame;
         }
 
         var kb = Keyboard.current;

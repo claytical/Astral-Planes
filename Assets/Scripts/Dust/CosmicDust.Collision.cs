@@ -44,7 +44,7 @@ public partial class CosmicDust
 
         if (effectiveResistance >= 1f) return;
 
-        gen.CarveDustByVehicle(gp, _timings.clearFadeOutSeconds);
+        gen.CarveDustByVehicle(gp, _timings.clearFadeOutSeconds, vehicle.profile);
         TriggerChargeTintPulse();
     }
 

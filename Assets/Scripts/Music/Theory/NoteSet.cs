@@ -126,5 +126,13 @@ public class NoteSet
 
     public List<int> GetNoteList() => _notes;
 
+    public bool TryGetNoteRange(out int minNote, out int maxNote)
+    {
+        if (_notes.Count == 0) { minNote = maxNote = rootMidi; return false; }
+        minNote = _notes[0];
+        maxNote = _notes[_notes.Count - 1];
+        return true;
+    }
+
     public List<int> GetStepList() => _allowedSteps;
 }

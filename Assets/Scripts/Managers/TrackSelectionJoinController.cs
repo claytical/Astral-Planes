@@ -23,7 +23,10 @@ using UnityEngine.SceneManagement;
 ///      virtual devices and have the wrong button layout for the game's action maps.
 ///   2. Global 500ms join cooldown: after any device joins, all other devices are blocked for
 ///      GraceSeconds, catching delayed mirrors from the Steam Deck built-in.
-///   3. Only buttonSouth and startButton are accepted as join triggers.
+///   3. buttonSouth, buttonEast, and startButton are accepted as join triggers.
+///      - With Steam: physical-A maps to buttonSouth (Xbox remapping) → joins on south.
+///      - Without Steam (editor / raw HID): physical-A maps to buttonEast → joins on east.
+///      Both paths land the player in the same flow; confirm (Choose) is south-only everywhere.
 ///
 /// Requires PlayerInputManager.joinBehavior = JoinPlayersManually in the TrackSelection scene.
 /// Self-installs via RuntimeInitializeOnLoadMethod — no scene setup needed.
@@ -115,15 +118,16 @@ public class TrackSelectionJoinController : MonoBehaviour
                 assignedIds.Add(dev.deviceId);
         }
 
-        // Only non-HID gamepads (Steam Virtuals, built-in) are candidates.
-        // Only buttonSouth and startButton are valid join triggers — buttonEast is excluded
-        // because it corresponds to physical-A on raw HID devices (already excluded above) and
-        // physical-B on Steam Virtual remapping, neither of which should trigger a join.
+        // buttonSouth, buttonEast, and startButton are valid join triggers.
+        // With Steam remapping, physical-A → buttonSouth; without Steam (editor/raw HID),
+        // physical-A → buttonEast. Accepting both ensures joining works in either context.
+        // Confirm (Choose action) remains south-only so east never fires a premature confirm.
         var candidates = InputSystem.devices
             .OfType<Gamepad>()
             .Where(gp => !assignedIds.Contains(gp.deviceId) &&
                          !_excludedIds.Contains(gp.deviceId) &&
                          (gp.buttonSouth.wasPressedThisFrame ||
+                          gp.buttonEast.wasPressedThisFrame  ||
                           gp.startButton.wasPressedThisFrame))
             .OrderBy(g => g.deviceId)
             .ToList();
@@ -141,6 +145,7 @@ public class TrackSelectionJoinController : MonoBehaviour
         {
             string btn = null;
             if      (gp.buttonSouth.wasPressedThisFrame && usedButtons.Add("south")) btn = "south";
+            else if (gp.buttonEast.wasPressedThisFrame  && usedButtons.Add("east"))  btn = "east";
             else if (gp.startButton.wasPressedThisFrame && usedButtons.Add("start")) btn = "start";
 
             if (btn == null) continue;

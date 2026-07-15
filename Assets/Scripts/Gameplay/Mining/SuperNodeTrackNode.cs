@@ -50,7 +50,8 @@ public class SuperNodeTrackNode : MonoBehaviour
 
     [Header("Dust Carving")]
     [SerializeField] private float dustFadeSeconds = 0.15f;
-    [SerializeField] private float dustRegrowDelay = 0.5f;
+    [Tooltip("-1 = use the maze pattern's superNodeRegrowDelay; >= 0 overrides it.")]
+    [SerializeField] private float dustRegrowDelay = -1f;
 
     [Header("Visual")]
     [SerializeField] private float         faceTurnRate  = 420f;
@@ -404,7 +405,7 @@ public class SuperNodeTrackNode : MonoBehaviour
         if (dust == null) return;
         if (AssignedTrack != null && dust.Role != AssignedTrack.assignedRole) return;
         Vector2Int cell = _drum.WorldToGridPosition(dust.transform.position);
-        _dustGen.CarveCellPreserveGray(cell, dustFadeSeconds, dustRegrowDelay);
+        _dustGen.CarveCellPreserveGray(cell, dustFadeSeconds, DustClearSource.SuperNode, dustRegrowDelay);
     }
 
     private void Collect()
