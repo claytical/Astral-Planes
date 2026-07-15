@@ -79,20 +79,10 @@ public class Explode : MonoBehaviour
         var main = ps.main;
         var visibleTint = tint;
         visibleTint.a = 1f;
-        main.startColor = visibleTint;
+        main.startColor = TintMinMaxGradient(main.startColor, visibleTint, multiplyWithAuthoredColor);
         var col = ps.colorOverLifetime;
         if (col.enabled)
-        {
-            // Build a predictable white-to-transparent fade.
-            // startColor already carries the role tint; colorOverLifetime only needs to
-            // control the alpha fade so particles are always visible and always dissipate.
-            var fadeGrad = new Gradient();
-            fadeGrad.SetKeys(
-                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
-                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) }
-            );
-            col.color = new ParticleSystem.MinMaxGradient(fadeGrad);
-        }
+            col.color = TintMinMaxGradient(col.color, tint, multiplyWithAuthoredColor);
 
         if (tintTrails)
         {
@@ -241,11 +231,7 @@ public class Explode : MonoBehaviour
 
     public void Permanent(bool permanent = true)
     {
-        if (GetComponent<Vehicle>())
-        { 
-            Destroy(gameObject, 1);
-            return;
-        }
+        bool isVehicle = GetComponent<Vehicle>() != null;
 
         if (GetComponent<Rigidbody2D>())
         {
@@ -260,11 +246,17 @@ public class Explode : MonoBehaviour
                 ApplyDirectionToInstance(go, _burstDir);
         }
 
+        if (!permanent) return;
 
-        if (permanent)
+        if (isVehicle)
         {
-            Destroy(this.gameObject);
+            // Delay destroying the vehicle itself; the explosion above is a separate
+            // instantiated GameObject and keeps playing for its own duration regardless.
+            Destroy(gameObject, 1);
+            return;
         }
+
+        Destroy(this.gameObject);
     }
 
 

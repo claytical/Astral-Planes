@@ -42,7 +42,7 @@ public partial class InstrumentTrack
     //                             burst collected/total accounting, AdvanceBinCursor,
     //                             AdvanceOtherTrackCursors
     //   CommitManualReleasedNote — nothing extra
-    //   NotifyNoteDiscarded     — bin rollback on 0-note discard, _gateReleasedBurstIds cleanup
+    //   NotifyNoteDiscarded     — bin rollback on 0-note discard
     private void CompleteBurst(int burstId, int filledBin, bool hadNotes, int ascendBinCount, bool removePlaceholders = false)
     {
         if (hadNotes)

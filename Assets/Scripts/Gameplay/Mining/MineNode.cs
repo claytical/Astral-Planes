@@ -25,7 +25,6 @@ public class MineNode : MonoBehaviour
     [SerializeField] private MineNodeLocomotionProfile[] locomotionArchetypeProfiles = new MineNodeLocomotionProfile[4];
     [SerializeField] private MineNodeLocomotionProfile defaultLocomotionProfile;
     [SerializeField] private MineNodeDecisionArchetypeLibrary decisionArchetypeLibrary;
-    [SerializeField] private string locomotionVariantOverride;
 
     [Header("Flee Boundary Targeting")]
     [Tooltip("How strongly fleeing node steers toward the nearest horizontal screen edge.")]
@@ -144,7 +143,7 @@ public class MineNode : MonoBehaviour
         var prof = MusicalRoleProfileLibrary.GetProfile(_role);
         if (prof != null) _speed = prof.mineNodeSpeed;  // category speed is applied in FixedUpdateDrifting
         _activeLocomotionProfile = ResolveLocomotionProfile(prof);
-        ResolveDecisionArchetype(prof);
+        ResolveDecisionArchetype();
         _roleProfile = prof;
         _behaviorCategory = _role.GetBehaviorCategory();
         _orbitSign = UnityEngine.Random.value < 0.5f ? 1 : -1;
@@ -326,7 +325,7 @@ public class MineNode : MonoBehaviour
         if (_behaviorCategory == MineNodeBehaviorCategory.Rhythmic)
         {
             UpdateBurstPause();
-            burstMult = _isInBurst ? (_roleProfile?.burstSpeedMultiplier ?? 2f) : 0.05f;
+            burstMult = _isInBurst ? 2f : 0.05f;
         }
 
         // Skip direction decisions during Groove pause — node is nearly stationary
@@ -339,7 +338,7 @@ public class MineNode : MonoBehaviour
             MineNodeBehaviorCategory.Darting    => 1.5f,
             _                                   => 1.0f,
         };
-        ApplyLocomotion(0f, driftSpeedMultiplier * burstMult * catSpeedMult * (_roleProfile?.behaviorSpeedMultiplier ?? 1f));
+        ApplyLocomotion(0f, driftSpeedMultiplier * burstMult * catSpeedMult);
 
         // Groove pause: actively damp velocity; kMinSpeedFloor inside ApplyLocomotion prevents a true stop otherwise
         if (_behaviorCategory == MineNodeBehaviorCategory.Rhythmic && !_isInBurst)
@@ -595,17 +594,17 @@ public class MineNode : MonoBehaviour
                 }
                 float riskBias = Mathf.Lerp(-0.7f, 0.7f, _decisionArchetype.dustRiskTolerance);
                 score += riskBias * Mathf.Clamp01(score / 3f);
-                // Territory affinity — strength driven by profile (Bass defaults high)
+                // Territory affinity
                 if (_dustGenerator != null)
                 {
-                    float affinityWeight = _roleProfile?.territoryAffinity01 ?? 0.3f;
+                    const float affinityWeight = 0.3f;
                     var affinityProbe = myCell + new Vector2Int(Mathf.RoundToInt(dir.x * 2), Mathf.RoundToInt(dir.y * 2));
                     if (_dustGenerator.GetZoneRole(affinityProbe) == _role) score += affinityWeight;
                 }
                 // Orbital bias (Harmony): 2.0 base + profile fine-tune; competes meaningfully with clearance scores
                 if (_behaviorCategory == MineNodeBehaviorCategory.Orbital)
                 {
-                    float orbitalBias = 2.0f + (_roleProfile?.orbitalTurnBias ?? 0f);
+                    float orbitalBias = 2.0f + (_roleProfile?.orbitalTurnBias ?? 0.6f);
                     var perp = new Vector2(-_carveDir.y * _orbitSign, _carveDir.x * _orbitSign).normalized;
                     score += orbitalBias * Mathf.Max(0f, Vector2.Dot(dir.normalized, perp));
                 }
@@ -633,11 +632,11 @@ public class MineNode : MonoBehaviour
     }
 
     // Returns the commit-duration multiplier for this category.
-    // Deliberate (Bass): 2.5x base * profile fine-tune. Darting (Lead): 0.35x base. Others: 1x.
+    // Deliberate (Bass): 2.5x base. Darting (Lead): 0.35x base. Others: 1x.
     private float CategoryCommitScale()
     {
         return _behaviorCategory switch {
-            MineNodeBehaviorCategory.Deliberate => 2.5f * (_roleProfile?.commitDurationScale ?? 1f),
+            MineNodeBehaviorCategory.Deliberate => 2.5f,
             MineNodeBehaviorCategory.Darting    => 0.35f,
             _                                   => 1f,
         };
@@ -759,7 +758,7 @@ public class MineNode : MonoBehaviour
         _rb.linearVelocity *= 0.5f;
     }
 
-    private void ResolveDecisionArchetype(MusicalRoleProfile roleProfile)
+    private void ResolveDecisionArchetype()
     {
         _decisionArchetype = default;
         if (decisionArchetypeLibrary == null)
@@ -774,10 +773,7 @@ public class MineNode : MonoBehaviour
             return;
         }
 
-        string variantId = string.IsNullOrWhiteSpace(locomotionVariantOverride) ? null : locomotionVariantOverride;
-        string archetypeId = roleProfile != null ? roleProfile.ResolveMineNodeArchetypeId(variantId) : "Steady";
-        if (!decisionArchetypeLibrary.TryGet(archetypeId, out _decisionArchetype))
-            decisionArchetypeLibrary.TryGet("Steady", out _decisionArchetype);
+        decisionArchetypeLibrary.TryGet("Steady", out _decisionArchetype);
     }
 
     private void RunBoundaryClamp(bool clampX, bool clampY)
@@ -956,10 +952,31 @@ public class MineNode : MonoBehaviour
     {
         if (_resolvedFired) return;
         _resolvedFired = true;
+        ReleaseHeldDustOnce();
         var outcome = WasCaptured ? MineNodeOutcome.Captured
                     : WasEscaped  ? MineNodeOutcome.Escaped
                                   : MineNodeOutcome.Expired;
         OnResolved?.Invoke(this, outcome);
+    }
+
+    // Star-drained dust cells whose energy built this node; they regrow when it dies.
+    private List<Vector2Int> _heldDustCells;
+    private bool _heldDustReleased;
+
+    public void AttachHeldDustBatch(List<Vector2Int> cells)
+    {
+        if (cells == null || cells.Count == 0) return;
+        _heldDustCells ??= new List<Vector2Int>();
+        _heldDustCells.AddRange(cells);
+    }
+
+    private void ReleaseHeldDustOnce()
+    {
+        if (_heldDustReleased) return;
+        _heldDustReleased = true;
+        if (_heldDustCells == null || _heldDustCells.Count == 0) return;
+        GameFlowManager.Instance?.dustGenerator?.ReleaseHeldCells(_heldDustCells);
+        _heldDustCells.Clear();
     }
 
     private IEnumerator ScaleSmoothly(Vector3 targetScale, float duration)
@@ -1002,6 +1019,7 @@ public class MineNode : MonoBehaviour
 
     private void OnDestroy()
     {
+        ReleaseHeldDustOnce();
         if (_drumTrack != null) _drumTrack.OnLoopBoundary -= HandleLoopBoundary;
         if (_drumTrack != null) _drumTrack.activeMineNodes.Remove(this);
     }

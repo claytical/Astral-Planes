@@ -32,7 +32,24 @@ public partial class GameFlowManager
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        if (scene.name == "TrackSelection" && CurrentState != GameState.Selection)
+        if (scene.name != "TrackSelection") return;
+
+        if (CurrentState != GameState.Selection)
             StartShipSelectionPhase();
+
+        // Reset plane availability so the Hangar's persisting (DontDestroyOnLoad) state
+        // doesn't block ship selection with planes marked in-use from the previous session.
+        Hangar.Instance?.ResetForNewSession();
+
+        // Any LocalPlayers that persisted from a prior scene (e.g. joined during the
+        // main menu) won't have a ship-selection UI because their Start() ran while
+        // the scene name was "Main". Recreate it now so they land in a ready state.
+        SessionState.CleanupDestroyedPlayers();
+        foreach (var player in SessionState.Players)
+        {
+            if (player == null) continue;
+            player.ResetReady();
+            player.CreatePlayerSelect();
+        }
     }
 }

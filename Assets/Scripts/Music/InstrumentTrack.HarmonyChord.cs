@@ -116,19 +116,6 @@ public partial class InstrumentTrack
         return best;
     }
 
-    private static bool IsNoteInChord(int midiNote, Chord chord)
-    {
-        if (chord.intervals == null || chord.intervals.Count == 0) return false;
-        int notePc = ((midiNote       % 12) + 12) % 12;
-        int rootPc = ((chord.rootNote % 12) + 12) % 12;
-        for (int i = 0; i < chord.intervals.Count; i++)
-        {
-            int ivPc = ((chord.intervals[i] % 12) + 12) % 12;
-            if (notePc == ((rootPc + ivPc) % 12)) return true;
-        }
-        return false;
-    }
-
     private int QuantizeNoteToBinChord(int stepIndex, int midiNote, int authoredRootMidi = int.MinValue) {
     // Resolve which bin this step belongs to
     int bin = BinIndexForStep(stepIndex);
@@ -158,20 +145,17 @@ public partial class InstrumentTrack
         if (!hd.TryGetChordAt(0, out baseChord)) baseChord = chord;
     }
 
-    // rootDelta: authored note's root → target chord's root
+    // rootDelta: authored note's root → target chord's root. Roots are exact MIDI
+    // registers (a ♭III authored an octave below I yields a large negative delta by
+    // design), so the delta is applied unconditionally — a pitch-class match with the
+    // target chord must not skip it, or the progression's octave is discarded.
     int rootDelta = (authoredRootMidi != int.MinValue)
         ? chord.rootNote - authoredRootMidi
         : chord.rootNote - baseChord.rootNote;
 
-    if (Mathf.Abs(rootDelta) > 3)
-        Debug.LogWarning($"[QUANTIZE:DELTA] track={name} step={stepIndex} note={midiNote} chord.root={chord.rootNote} authoredRoot={authoredRootMidi} rootDelta={rootDelta}");
-
-    bool noteAlreadyInTargetChord = IsNoteInChord(midiNote, chord);
-
-    // If note already fits this chord, preserve it and only octave-fit into track range.
-    // Otherwise apply root-delta transposition for bin/chord movement.
-        int shifted = noteAlreadyInTargetChord ? midiNote : (midiNote + rootDelta);
-        shifted = ShiftByOctavesIntoTrackRange(shifted);
+        // Hybrid rule: keep the exact transposed note when playable; octave-fit only
+        // when it falls outside the track range.
+        int shifted = ShiftByOctavesIntoTrackRange(midiNote + rootDelta);
 
         var allowed = BuildChordTones(chord, lowestAllowedNote, highestAllowedNote);
         if (allowed.Count == 0) return shifted;
@@ -179,9 +163,6 @@ public partial class InstrumentTrack
 
         return ShiftByOctavesIntoTrackRange(SnapToNearestChordTone(shifted, allowed));
 }
-
-    public int QuantizeNoteForStep(int stepIndex, int rawMidi, int authoredRootMidi)
-        => QuantizeNoteToBinChord(stepIndex, rawMidi, authoredRootMidi);
 
     public void PlayQuantizedNoteForStep(int stepIndex, int rawMidi, int durationTicks, float velocity)
     {
@@ -193,7 +174,7 @@ public partial class InstrumentTrack
         if (_binNoteSets != null && binIdx >= 0 && binIdx < _binNoteSets.Length && _binNoteSets[binIdx] != null)
             authoredRoot = _binNoteSets[binIdx].GetAuthoredRootMidi(localStep);
         if (authoredRoot == int.MinValue)
-            authoredRoot = GetAuthoredRootMidiInRegister(rawMidi);
+            authoredRoot = GetAuthoredRootMidiExact();
 
         PlayNote127(QuantizeNoteToBinChord(stepIndex, rawMidi, authoredRoot), durationTicks, velocity);
     }

@@ -18,6 +18,10 @@ public class Hangar : MonoBehaviour
     {
         if (Instance != null && Instance != this)
         {
+            // The scene reloaded — refresh the scene-specific planeSelection reference on
+            // the persisting instance before discarding this duplicate.
+            if (planeSelection != null)
+                Instance.planeSelection = planeSelection;
             Destroy(gameObject);
             return;
         }

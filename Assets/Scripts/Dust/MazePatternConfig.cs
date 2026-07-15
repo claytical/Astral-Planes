@@ -16,8 +16,43 @@ public enum MazePatternType
 public sealed class DustTimingParams
 {
     [FormerlySerializedAs("regrowDelay")]
-    [Tooltip("Base seconds before a cleared cell regrows dust.")]
+    [Tooltip("Base seconds before a cleared cell regrows dust. Fallback for all sources.")]
     public float regrowDelay = 8f;
+
+    [Header("Per-Source Overrides (-1 = use base)")]
+    public float vehiclePlowRegrowDelay = -1f;
+    public float collectableArrivalRegrowDelay = -1f;
+    public float collectablePlowRegrowDelay = -1f;
+    public float jailRegrowDelay = -1f;
+    public float superNodeRegrowDelay = -1f;
+    public float zapRegrowDelay = -1f;
+    [Tooltip("Delay applied when a MineNode dies and releases the star-drained cells it was holding.")]
+    public float starDrainReleaseDelay = -1f;
+
+    /// <summary>Per-source delay, or -1 to fall back to the base regrowDelay.</summary>
+    public float GetDelayFor(DustClearSource source) => source switch
+    {
+        DustClearSource.VehiclePlow        => vehiclePlowRegrowDelay,
+        DustClearSource.StarDrain          => starDrainReleaseDelay,
+        DustClearSource.Zap                => zapRegrowDelay,
+        DustClearSource.CollectableArrival => collectableArrivalRegrowDelay,
+        DustClearSource.CollectablePlow    => collectablePlowRegrowDelay,
+        DustClearSource.Jail               => jailRegrowDelay,
+        DustClearSource.SuperNode          => superNodeRegrowDelay,
+        _                                  => -1f,
+    };
+
+    public void Validate()
+    {
+        regrowDelay = Mathf.Max(0f, regrowDelay);
+        vehiclePlowRegrowDelay        = Mathf.Max(-1f, vehiclePlowRegrowDelay);
+        collectableArrivalRegrowDelay = Mathf.Max(-1f, collectableArrivalRegrowDelay);
+        collectablePlowRegrowDelay    = Mathf.Max(-1f, collectablePlowRegrowDelay);
+        jailRegrowDelay               = Mathf.Max(-1f, jailRegrowDelay);
+        superNodeRegrowDelay          = Mathf.Max(-1f, superNodeRegrowDelay);
+        zapRegrowDelay                = Mathf.Max(-1f, zapRegrowDelay);
+        starDrainReleaseDelay         = Mathf.Max(-1f, starDrainReleaseDelay);
+    }
 }
 
 [System.Serializable]
@@ -173,7 +208,7 @@ public class MazePatternConfig : ScriptableObject
         tunnels ??= new TunnelsParams();
         porousBorder ??= new PorousBorderParams();
 
-        dustTiming.regrowDelay = Mathf.Max(0f, dustTiming.regrowDelay);
+        dustTiming.Validate();
         clearBoxes.Validate();
         cellularAutomata.Validate();
         ring.Validate();

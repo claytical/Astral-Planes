@@ -31,7 +31,7 @@ public static class MusicalRoleProfileLibrary
         {
             return profile;
         }
-;
+
         return null;
     }
 }

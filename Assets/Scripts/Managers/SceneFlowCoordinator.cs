@@ -5,6 +5,7 @@ using System.Linq;
 using MidiPlayerTK;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 using Debug = UnityEngine.Debug;
 
 /// <summary>
@@ -24,6 +25,8 @@ public sealed class SceneFlowCoordinator
     private const float IntroFadeInDuration  = 1.0f;
     private const float IntroHoldDuration    = 2.0f;
     private const float IntroFadeOutDuration = 0.8f;
+
+    private CanvasGroup _screenFadeOverlay;
 
     public SceneFlowCoordinator(GameFlowManager gameFlow, SessionStateCoordinator session, BridgeCoordinator bridge)
     {
@@ -73,6 +76,64 @@ public sealed class SceneFlowCoordinator
 
         if (_sceneHandlers.TryGetValue(sceneName, out var handler))
             handler?.Invoke();
+    }
+
+    // Lives under GameFlowManager's DontDestroyOnLoad object, so it survives the
+    // LoadSceneMode.Single swap and can cover both the fade-out and fade-in around it.
+    private void EnsureScreenFadeOverlay()
+    {
+        if (_screenFadeOverlay != null) return;
+
+        var go = new GameObject("ScreenFadeOverlay", typeof(RectTransform), typeof(Canvas), typeof(CanvasGroup), typeof(Image));
+        go.transform.SetParent(_gameFlow.transform, worldPositionStays: false);
+
+        var canvas = go.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = short.MaxValue;
+
+        var image = go.GetComponent<Image>();
+        image.color = Color.black;
+        image.raycastTarget = false;
+
+        var rect = (RectTransform)go.transform;
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+
+        _screenFadeOverlay = go.GetComponent<CanvasGroup>();
+        _screenFadeOverlay.alpha = 0f;
+        go.SetActive(false);
+    }
+
+    public IEnumerator FadeScreenToBlack(float duration = 0.6f)
+    {
+        EnsureScreenFadeOverlay();
+        _screenFadeOverlay.gameObject.SetActive(true);
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            _screenFadeOverlay.alpha = Mathf.Clamp01(elapsed / duration);
+            yield return null;
+        }
+        _screenFadeOverlay.alpha = 1f;
+    }
+
+    public IEnumerator FadeScreenFromBlack(float duration = 0.6f)
+    {
+        EnsureScreenFadeOverlay();
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            _screenFadeOverlay.alpha = 1f - Mathf.Clamp01(elapsed / duration);
+            yield return null;
+        }
+        _screenFadeOverlay.alpha = 0f;
+        _screenFadeOverlay.gameObject.SetActive(false);
     }
 
     public void RegisterPlayerStatsGrid(Transform grid)

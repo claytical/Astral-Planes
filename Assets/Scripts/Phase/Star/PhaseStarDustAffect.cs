@@ -102,8 +102,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     private MusicalRole _attunedRole = MusicalRole.None;
 
     [Header("Zap Stagger")]
-    [Tooltip("Minimum seconds between successive tentacle activations. Set to 0 to disable stagger (old batch behavior).")]
-    [SerializeField, Min(0f)] private float interTentacleStartInterval = 1.5f;
+    [Tooltip("Optional pacing between successive tentacle activations. 0 (default) = every available carved cell grows a tentacle immediately, up to the node payload; > 0 = one activation per interval.")]
+    [SerializeField, Min(0f)] private float interTentacleStartInterval = 0f;
 
     private bool _tentaclesActive;
     private bool _acquisitionEnabled = true;
@@ -114,7 +114,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     private float _keepClearTimer;
     private readonly Dictionary<Vector2Int, Tentacle> _reservedCells = new();
     private readonly HashSet<Vector2Int> _zappedThisCycle = new();
-    private readonly List<Vector2Int> _coloredCellsScratch = new(512);
 
     public void Initialize(PhaseStarBehaviorProfile profile, PhaseStar star)
     {
@@ -307,6 +306,31 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Tentacles currently holding a slot of the zap budget: growing/draining toward a
+    /// cell, or retracting with a confirmed zap not yet consumed by the star.
+    /// </summary>
+    private int CountZapBudgetInFlight()
+    {
+        int n = 0;
+        foreach (var tentacle in _tentacles)
+        {
+            if (tentacle.role != _attunedRole) continue;
+            switch (tentacle.state)
+            {
+                case TentacleState.Growing:
+                case TentacleState.Draining:
+                    n++;
+                    break;
+                case TentacleState.Retracting:
+                case TentacleState.Dissolving:
+                    if (tentacle.hasPendingZap) n++;
+                    break;
+            }
+        }
+        return n;
+    }
+
     private void AssignIdleTentacleTargets()
     {
         if (!_acquisitionEnabled || _navigator == null || _attunedRole == MusicalRole.None)
@@ -315,7 +339,14 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         var drum = _gfm?.activeDrumTrack;
         if (drum == null) return;
 
-        // Stagger: only activate one tentacle per interval so zaps are spread out over time.
+        // Zap budget: one live tentacle per note still missing from the node payload.
+        // Each available carved cell grows a tentacle immediately, up to that cap —
+        // carve 3 bass cells against a 5-note payload and 3 tentacles grow at once.
+        int remainingZaps = _star != null ? _star.RemainingZapCount : int.MaxValue;
+        int budget = remainingZaps - CountZapBudgetInFlight();
+        if (budget <= 0) return;
+
+        // Optional pacing between successive activations (0 = immediate).
         if (interTentacleStartInterval > 0f && Time.time - _lastTentacleStartTime < interTentacleStartInterval)
             return;
 
@@ -328,15 +359,17 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         if (idleTentacles.Count == 0) return;
 
         var excluded = BuildExcludedCells(requester: null);
-        var seededTargets = new List<Vector2Int>(1);
-        if (_navigator.TryGetTargetsForRole(_attunedRole, 1, excluded, out var targetCells) && targetCells != null)
+        var seededTargets = new List<Vector2Int>(budget);
+        if (_navigator.TryGetTargetsForRole(_attunedRole, budget, excluded, out var targetCells) && targetCells != null)
             seededTargets.AddRange(targetCells);
 
         int targetCursor = 0;
         foreach (var tentacle in idleTentacles)
         {
+            if (budget <= 0) break;
+
             Vector2Int cell;
-            bool hasCell = false;
+            bool activated = false;
 
             while (targetCursor < seededTargets.Count)
             {
@@ -347,20 +380,25 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                     continue;
                 BeginGrowingTentacle(tentacle, cell, drum, transform.position);
                 _lastTentacleStartTime = Time.time;
-                hasCell = true;
+                activated = true;
                 break;
             }
 
-            if (hasCell) break; // Only one activation per interval
-
-            if (_navigator.TryGetTargetForRole(tentacle.role, out cell) &&
+            if (!activated &&
+                _navigator.TryGetTargetForRole(tentacle.role, out cell) &&
                 IsTargetValid(cell, tentacle.role, tentacle, out _) &&
                 TryReserveCell(tentacle, cell))
             {
                 BeginGrowingTentacle(tentacle, cell, drum, transform.position);
                 _lastTentacleStartTime = Time.time;
-                break; // Only one activation per interval
+                activated = true;
             }
+
+            if (!activated) break;           // no valid target left anywhere
+            budget--;
+
+            if (interTentacleStartInterval > 0f)
+                break;                       // paced mode: one activation per interval
         }
     }
 
@@ -527,7 +565,12 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             {
                 tentacle.pendingZapUnits = dust.ChipEnergy(1);
                 if (tentacle.pendingZapUnits > 0)
-                    gen.ZapClearCell(tentacle.targetCell);
+                {
+                    // Drained energy is held by the MineNode the star builds from it;
+                    // the cell regrows when that node dies (or the star is destroyed first).
+                    gen.ZapClearCellHeld(tentacle.targetCell);
+                    _star?.RegisterHeldDrainCell(tentacle.targetCell);
+                }
             }
         }
 
@@ -569,15 +612,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             tentacle.clearDuration = 0f;
             tentacle.targetCell = default;
         }
-    }
-
-    private static bool TryZapAndConfirmClear(CosmicDustGenerator gen, Vector2Int cell)
-    {
-        if (gen == null) return false;
-        gen.ZapClearCell(cell);
-        if (!gen.TryGetCellState(cell, out var state))
-            return false;
-        return state != DustCellState.Solid;
     }
 
     // ---------------------------------------------------------------------------
@@ -1014,24 +1048,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private int DetermineDesiredTentacleCount()
     {
-        int desiredByZap = Mathf.Max(1, _star != null ? _star.GetDesiredTentacleCount() : fallbackTentaclesPerRole);
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var gen = _gfm?.dustGenerator;
-        if (gen == null || _attunedRole == MusicalRole.None)
-            return desiredByZap;
-
-        gen.GetColoredDustCells(_coloredCellsScratch);
-        int matchingDust = 0;
-        for (int i = 0; i < _coloredCellsScratch.Count; i++)
-        {
-            var cell = _coloredCellsScratch[i];
-            if (!gen.TryGetDustAt(cell, out var dust) || dust == null) continue;
-            if (dust.Role != _attunedRole) continue;
-            if (dust.currentEnergyUnits <= 0) continue;
-            matchingDust++;
-        }
-
-        return Mathf.Max(desiredByZap, matchingDust);
+        // Pool = the node payload: one tentacle per note the next MineNode will carry.
+        // Concurrency below the cap is governed by AssignIdleTentacleTargets' zap budget.
+        return Mathf.Max(1, _star != null ? _star.GetDesiredTentacleCount() : fallbackTentaclesPerRole);
     }
 
     private int CountTentaclesInGrowthOrDrain()

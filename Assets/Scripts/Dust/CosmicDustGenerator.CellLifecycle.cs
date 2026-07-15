@@ -64,7 +64,7 @@ public partial class CosmicDustGenerator
         return go;
     }
 
-    public void CarveDustByVehicle(Vector2Int cell, float fadeSeconds)
+    public void CarveDustByVehicle(Vector2Int cell, float fadeSeconds, ShipMusicalProfile shipProfile = null)
     {
         if (!IsInBounds(cell)) return;
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
@@ -72,10 +72,10 @@ public partial class CosmicDustGenerator
         var cellDust = _gridState.CellDust?[cell.x, cell.y];
         if (cellDust != null) SetDustCollision(cellDust, false);
 
-        FinalizeVehicleCarve(cell, fadeSeconds);
+        FinalizeVehicleCarve(cell, fadeSeconds, shipProfile);
     }
 
-    public void ChipDustByVehicle(Vector2Int cell, int energyAmount, float fadeSeconds, float resistanceBypass01 = 0f)
+    public void ChipDustByVehicle(Vector2Int cell, int energyAmount, float fadeSeconds, float resistanceBypass01 = 0f, ShipMusicalProfile shipProfile = null)
     {
         if (!IsInBounds(cell)) return;
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
@@ -100,11 +100,11 @@ public partial class CosmicDustGenerator
         if (dust.currentEnergyUnits <= 0)
         {
             _carveAccumulator.Remove(cell);
-            FinalizeVehicleCarve(cell, fadeSeconds);
+            FinalizeVehicleCarve(cell, fadeSeconds, shipProfile);
         }
     }
 
-    private void FinalizeVehicleCarve(Vector2Int cell, float fadeSeconds)
+    private void FinalizeVehicleCarve(Vector2Int cell, float fadeSeconds, ShipMusicalProfile shipProfile = null)
     {
         _imprints ??= new Dictionary<Vector2Int, DustImprint>();
         if (!RestoreVoronoiImprint(cell))
@@ -115,14 +115,57 @@ public partial class CosmicDustGenerator
         bool wasVoidCell = ClearCellFlag(cell, CellFlags.VoidGrow);
         if (wasVoidCell) _imprints?.Remove(cell);
 
-        CarveCell(cell, fadeSeconds, scheduleRegrow: true, runPreExplode: true);
+        // The carving ship is a growth agent: its per-role multiplier scales the resolved
+        // delay, so a Bass-accelerator ship makes Bass dust regrow sooner. Resolved after
+        // the role promotion above so the multiplier keys off the role the cell regrows as.
+        float delay = ResolveRegrowDelay(cell, DustClearSource.VehiclePlow, -1f);
+        if (shipProfile != null && shipProfile.regrowDelayMultipliers != null)
+            delay *= shipProfile.regrowDelayMultipliers.GetFor(GetProspectiveRegrowRole(cell));
 
-        if (_imprints != null && _imprints.TryGetValue(cell, out var carveImp) && carveImp.hiddenRole != MusicalRole.None)
+        CarveCell(cell, fadeSeconds, scheduleRegrow: true, source: DustClearSource.VehiclePlow, regrowDelaySeconds: delay, runPreExplode: true);
+    }
+
+    /// <summary>
+    /// Regrow-delay precedence:
+    /// 1. Explicit per-call override (>= 0).
+    /// 2. VehiclePlow only: the carved cell's role profile regrowthDelay (>= 0).
+    /// 3. Active maze pattern's per-source delay (>= 0).
+    /// 4. Active maze pattern's base regrowDelay.
+    /// 5. Hard fallback 8s (no active pattern).
+    /// </summary>
+    private float ResolveRegrowDelay(Vector2Int cell, DustClearSource source, float explicitOverride)
+    {
+        if (explicitOverride >= 0f)
+            return explicitOverride;
+
+        if (source == DustClearSource.VehiclePlow &&
+            _imprints != null && _imprints.TryGetValue(cell, out var imp) && imp.hiddenRole != MusicalRole.None)
         {
-            var roleProfile = MusicalRoleProfileLibrary.GetProfile(carveImp.hiddenRole);
+            var roleProfile = MusicalRoleProfileLibrary.GetProfile(imp.hiddenRole);
             if (roleProfile != null && roleProfile.regrowthDelay >= 0f)
-                RequestRegrowCellAt(cell, roleProfile.regrowthDelay, refreshIfPending: true);
+                return roleProfile.regrowthDelay;
         }
+
+        var timing = _activeMazePattern != null ? _activeMazePattern.dustTiming : null;
+        if (timing == null)
+            return 8f;
+
+        float perSource = timing.GetDelayFor(source);
+        return perSource >= 0f ? perSource : Mathf.Max(0f, timing.regrowDelay);
+    }
+
+    /// <summary>
+    /// Cheap pre-commit guess of the role a cell will regrow as: imprint role, else hidden
+    /// Voronoi role, else None (gray). Commit-time ResolveRegrowRole stays authoritative.
+    /// </summary>
+    private MusicalRole GetProspectiveRegrowRole(Vector2Int gp)
+    {
+        if (_imprints != null && _imprints.TryGetValue(gp, out var imp))
+        {
+            if (imp.role != MusicalRole.None) return imp.role;
+            if (imp.hiddenRole != MusicalRole.None) return imp.hiddenRole;
+        }
+        return MusicalRole.None;
     }
 
     public void CreateJailCenterForCollectable(
@@ -133,7 +176,7 @@ public partial class CosmicDustGenerator
         float fadeSeconds = 0.10f,
         float regrowDelaySeconds = -1f)
     {
-        ClearCell(gpCenter, mode, fadeSeconds, scheduleRegrow: true, regrowDelaySeconds: regrowDelaySeconds);
+        ClearCell(gpCenter, mode, fadeSeconds, scheduleRegrow: true, source: DustClearSource.Jail, regrowDelaySeconds: regrowDelaySeconds);
 
         if (dustClaims != null && holdSeconds > 0f)
         {
@@ -141,14 +184,13 @@ public partial class CosmicDustGenerator
             dustClaims.ClaimCell(owner, gpCenter, DustClaimType.TemporaryCarve, seconds: holdSeconds, refresh: true);
         }
 
-        float neighborRegrow = regrowDelaySeconds >= 0f ? regrowDelaySeconds : holdSeconds;
         var neighbors = new Vector2Int[] { new(1,0), new(-1,0), new(0,1), new(0,-1) };
         foreach (var n in neighbors)
         {
             var np = gpCenter + n;
             if (!IsInBounds(np)) continue;
             if (!HasDustAt(np)) continue;
-            ClearCell(np, mode, fadeSeconds, scheduleRegrow: true, regrowDelaySeconds: neighborRegrow);
+            ClearCell(np, mode, fadeSeconds, scheduleRegrow: true, source: DustClearSource.Jail, regrowDelaySeconds: regrowDelaySeconds);
         }
     }
 
@@ -187,6 +229,11 @@ public partial class CosmicDustGenerator
             }
             return;
         }
+
+        // Held by a MineNode's energy economy: only ReleaseHeldCells may schedule regrow
+        // (it removes the cell from the set before requesting).
+        if (_heldRegrowCells.Contains(gridPos))
+            return;
 
         bool shouldSchedule = !_permanentClearCells.Contains(gridPos);
 

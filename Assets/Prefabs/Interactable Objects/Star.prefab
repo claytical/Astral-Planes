@@ -110,10 +110,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bba0079a903794a8a837947d21c08145, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarDustAffect
-  minContactTime: 0.1
-  colorTransitionTime: 0.5
-  tentacleGrowSpeed: 0.25
-  tentacleRetractSpeed: 3
+  minContactTime: 0.3
+  colorTransitionTime: 0.3
+  tentacleGrowSpeed: 2
+  tentacleRetractSpeed: 4
   tentacleFlowSpeed: 0.2
   tentacleWidth: 0.08
   dissolveDuration: 1
@@ -135,7 +135,7 @@ MonoBehaviour:
   shimmerLifetime: 0.35
   shimmerSize: 0.04
   shimmerAlpha: 0.45
-  interTentacleStartInterval: 1.5
+  interTentacleStartInterval: 0
 --- !u!114 &6224665215610089654
 MonoBehaviour:
   m_ObjectHideFlags: 0

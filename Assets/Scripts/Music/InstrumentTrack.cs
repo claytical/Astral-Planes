@@ -149,7 +149,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     private int _lastBarIndex  = -1;
     private int _nextBurstId = 0;
     private readonly Dictionary<int, float> _noteCommitTimes = new(); // stepIndex -> Time.time at commit
-    private readonly HashSet<int> _gateReleasedBurstIds = new();
     private bool _pendingCollapse;
     private int  _collapseTargetMultiplier = 1;
     private bool _hookedBoundaryForCollapse;
@@ -183,6 +182,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         public int absStep;
         public int note;
         public int duration;
+        public float velocity127;
         public Vector3 originWorld;
         public Vector3 targetWorld;
         public Vector2Int targetCell;
@@ -890,7 +890,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (chordIdx >= 0 && _gfm?.harmony != null && _gfm.harmony.TryGetChordAt(chordIdx, out var chord))
             return chord.rootNote;
 
-        return GetAuthoredRootMidiInRegister(note);
+        return GetAuthoredRootMidiExact();
     }
 
     private void FinalizeAutoCollect(Collectable collectable, int targetBin)
@@ -1004,7 +1004,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         // Anchor authoredRootMidi to the chord that was active at the authored bin.
         // Prefer the bin-specific NoteSet's stored authoredRootMidi (set by NoteSetFactory to
         // the exact bin chord root), so QuantizeNoteToBinChord sees rootDelta = 0.
-        // Fall back to HarmonyDirector nudging only when no bin-specific NoteSet is available.
+        // Fall back to the HarmonyDirector chord root only when no bin-specific NoteSet is available.
         int rootInRegister = int.MinValue;
         if (authoredAbs >= 0)
         {
@@ -1021,16 +1021,11 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
                 int authoredBin = BinIndexForStep(authoredAbs);
                 int authoredChordIdx = Harmony_GetChordIndexForBin(authoredBin);
                 if (authoredChordIdx >= 0 && hd.TryGetChordAt(authoredChordIdx, out var authoredChord))
-                {
-                    int chordRoot = authoredChord.rootNote;
-                    while (chordRoot < collectedMidi - 6) chordRoot += 12;
-                    while (chordRoot > collectedMidi + 6) chordRoot -= 12;
-                    rootInRegister = Mathf.Clamp(chordRoot, lowestAllowedNote, highestAllowedNote);
-                }
+                    rootInRegister = authoredChord.rootNote; // exact register; no nudge, no clamp
             }
         }
         if (rootInRegister == int.MinValue)
-            rootInRegister = GetAuthoredRootMidiInRegister(collectedMidi);
+            rootInRegister = GetAuthoredRootMidiExact();
 
         var pending = new Vehicle.PendingCollectedNote
         {
@@ -1110,7 +1105,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         });
 
         bool hadNotes = state.wroteBin >= 0;
-        _gateReleasedBurstIds.Remove(burstId);
 
         if (hadNotes)
         {
@@ -1126,19 +1120,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             }
             CompleteBurst(burstId, filledBin: 0, hadNotes: false, ascendBinCount: BinSize(), removePlaceholders: true);
         }
-    }
-
-    /// <summary>
-    /// Releases the StarPool spawn gate for a burst without decrementing its remaining count.
-    /// Called by DarkTimeoutRoutine when a collectable's TTL expires but the GO lives on.
-    /// The gate fires once per burst (idempotent); remaining is decremented only when
-    /// the player actually places or discards each note via the normal commit path.
-    /// </summary>
-    public void ReleaseSpawnGate(int burstId)
-    {
-        if (burstId == 0) return;
-        if (!_gateReleasedBurstIds.Add(burstId)) return; // already released
-        OnCollectableBurstCleared?.Invoke(this, burstId, false);
     }
 
     /// <summary>
@@ -1221,17 +1202,16 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         return -1;
     }
 
-    private int GetAuthoredRootMidiInRegister(int referenceMidi)
+    /// <summary>
+    /// Authored-root fallback with its exact register preserved (set to the motif key
+    /// root by PhaseTransitionManager). Never normalized toward a reference note or
+    /// clamped to the track range — the playable range applies to the final note, not
+    /// the chord root. Returns int.MinValue when unset so quantization falls back to
+    /// progression-relative deltas.
+    /// </summary>
+    private int GetAuthoredRootMidiExact()
     {
-        int root = authoredRootMidi;
-        if (root <= 0) root = referenceMidi; // defensive fallback
-
-        // bring root close to reference register
-        while (root < referenceMidi - 6) root += 12;
-        while (root > referenceMidi + 6) root -= 12;
-
-        root = Mathf.Clamp(root, lowestAllowedNote, highestAllowedNote);
-        return root;
+        return authoredRootMidi > 0 ? authoredRootMidi : int.MinValue;
     }
     public void PlayOneShotMidi(int midiNote, float velocity127, int durationTicks = -1)
     {
@@ -1417,8 +1397,10 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             allowed.Sort();
 
             int rootDelta = (authoredRoot != int.MinValue) ? chord.rootNote - authoredRoot : chord.rootNote - baseChord.rootNote;
-            int shifted   = IsNoteInChord(note, chord) ? note : (note + rootDelta);
-            shifted = ShiftByOctavesIntoTrackRange(shifted);
+            // Exact-register transposition: always apply the root delta. A pitch-class
+            // match with the target chord must not skip it — that discards the octave
+            // encoded in the progression. Octave-fit only if the result is unplayable.
+            int shifted = ShiftByOctavesIntoTrackRange(note + rootDelta);
             int retuned = ShiftByOctavesIntoTrackRange(SnapToNearestChordTone(shifted, allowed));
             modified.Add((step, retuned, dur, vel, authoredRoot));
         }
@@ -1684,17 +1666,9 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_NOW track={name} burstId={burstId} targetBin={targetBin} loopMul={loopMultiplier} binSize={binSize} maxToSpawn={maxToSpawn}");
 
-        // --- Composition mode: step-sequenced spawning ---
-        if (controller != null && controller.noteCommitMode == NoteCommitMode.Composition)
-        {
-            EnqueueCompositionSpawns(noteSet, localSteps, targetBin, binSize, maxToSpawn,
-                originWorld, spawnJitterRadius, burstId);
-            return;
-        }
-
-        // --- Immediate spawn ---
-        ExecuteImmediateSpawn(noteSet, localSteps, stepList.Count, targetBin, binSize, maxToSpawn, burstId,
-            originWorld, repelFromWorld, spawnJitterRadius, placementMode, trapSearchRadiusCells, trapBufferCells);
+        // --- Step-sequenced spawning (the only spawn path) ---
+        EnqueueCompositionSpawns(noteSet, localSteps, targetBin, binSize, maxToSpawn,
+            originWorld, spawnJitterRadius, burstId);
     }
 
     // Spawns a collectable for each preceding empty bin so they don't stay silent after ascension.
@@ -1717,170 +1691,19 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         }
     }
 
-    // The SPAWN_NOW path: places collectables into the world for each step in localSteps.
-    private void ExecuteImmediateSpawn(
-        NoteSet noteSet, List<int> localSteps, int rawStepCount,
-        int targetBin, int binSize, int maxToSpawn, int burstId,
-        Vector3? originWorld, Vector3? repelFromWorld,
-        float spawnJitterRadius, BurstPlacementMode placementMode,
-        int trapSearchRadiusCells, int trapBufferCells)
-    {
-        int gridW = drumTrack != null ? drumTrack.GetSpawnGridWidth() : 0;
-        int gridH = drumTrack != null ? drumTrack.GetSpawnGridHeight() : 0;
-
-        if (gridW <= 0 || gridH <= 0)
-        {
-            _currentBurstArmed = false;
-            _currentBurstRemaining = 0;
-            Debug.LogWarning($"[TRK:BURST] OUTCOME=ABORT track={name} burstId={burstId} reason=grid_invalid gridW={gridW} gridH={gridH}");
-            return;
-        }
-
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var dustGen = _gfm?.dustGenerator;
-        var nv = controller.noteVisualizer;
-
-        // Build trapped candidate list if placement mode requires it
-        if (placementMode == BurstPlacementMode.TrappedInDustNearOrigin &&
-            dustGen != null && drumTrack != null && originWorld.HasValue)
-        {
-            List<Vector2Int> trappedCandidates = BuildTrappedCandidatesNearOrigin(
-                dustGen, drumTrack, originWorld.Value, gridW, gridH, trapSearchRadiusCells, trapBufferCells);
-
-            if ((trappedCandidates == null || trappedCandidates.Count == 0) && trapBufferCells > 0)
-            {
-                trappedCandidates = BuildTrappedCandidatesNearOrigin(
-                    dustGen, drumTrack, originWorld.Value, gridW, gridH, trapSearchRadiusCells, trapBufferCells - 1);
-            }
-        }
-
-        int originX = -1;
-        if (originWorld.HasValue && drumTrack != null)
-        {
-            var og = drumTrack.WorldToGridPosition(originWorld.Value);
-            if (og.x >= 0 && og.x < gridW) originX = og.x;
-        }
-
-        int imprintX = -1;
-        if (repelFromWorld.HasValue && drumTrack != null)
-        {
-            var ig = drumTrack.WorldToGridPosition(repelFromWorld.Value);
-            if (ig.x >= 0 && ig.x < gridW) imprintX = ig.x;
-        }
-
-        Vector2Int anchor = new Vector2Int(gridW / 2, gridH / 2);
-        if (originWorld.HasValue && drumTrack != null)
-        {
-            var og = drumTrack.WorldToGridPosition(originWorld.Value);
-            if (og.x >= 0 && og.x < gridW && og.y >= 0 && og.y < gridH) anchor = og;
-        }
-        else if (repelFromWorld.HasValue && drumTrack != null)
-        {
-            var ig = drumTrack.WorldToGridPosition(repelFromWorld.Value);
-            if (ig.x >= 0 && ig.x < gridW && ig.y >= 0 && ig.y < gridH) anchor = ig;
-        }
-
-        var usedAbsSteps = new HashSet<int>();
-        var usedCellsThisBurst = new HashSet<Vector2Int>();
-        int spawnedCount = 0;
-
-        foreach (int step in localSteps)
-        {
-            if (maxToSpawn > 0 && spawnedCount >= maxToSpawn) break;
-
-            int note = noteSet.GetNoteForPhaseAndRole(this, step);
-            int dur;
-            if (!noteSet.TryGetTemplateTimingAtStep(step, out dur, out _))
-                dur = 480;
-
-            int absStep = targetBin * binSize + step;
-            if (!usedAbsSteps.Add(absStep))
-            {
-                Debug.LogWarning($"[SPAWN:STEP-COLLISION] track={name} burstId={burstId} targetBin={targetBin} binSize={binSize} step={step} -> absStep={absStep}");
-                continue;
-            }
-
-            if (dustGen == null || drumTrack == null) continue;
-
-            int fullSteps = BinSize() * maxLoopMultiplier;
-            float stepNorm = fullSteps > 0 ? Mathf.Clamp01((float)absStep / fullSteps) : -1f;
-
-            Vector2Int chosenCell;
-            if (!TryPickRandomSpawnCell(dustGen, drumTrack, usedCellsThisBurst, out chosenCell, stepNorm))
-                continue;
-
-            usedCellsThisBurst.Add(chosenCell);
-            Vector3 spawnPos = drumTrack.GridToWorldPosition(chosenCell);
-
-            bool cellHasDust = dustGen.HasDustAt(chosenCell);
-            // Jail the landing cell for the collectable's arrival window to prevent dust-depenetration
-            if (dustGen != null)
-            {
-                const float jailHoldSeconds = 10f;
-                dustGen.CreateJailCenterForCollectable(chosenCell, jailHoldSeconds, ownerId: burstId);
-            }
-
-            if (originWorld.HasValue && spawnJitterRadius > 0f)
-                spawnPos += (Vector3)(UnityEngine.Random.insideUnitCircle * spawnJitterRadius);
-
-            Vector3 spawnOrigin = originWorld ?? transform.position;
-            var go = Instantiate(collectablePrefab, spawnOrigin, Quaternion.identity, collectableParent);
-            if (!go) continue;
-
-            if (!go.TryGetComponent(out Collectable c))
-            {
-                Destroy(go);
-                continue;
-            }
-
-            c.burstId = burstId;
-            c.intendedStep = absStep;
-            c.intendedBin = targetBin;
-            c.assignedInstrumentTrack = this;
-            c.isTrappedInDust = cellHasDust;
-
-            _scratchSteps.Clear();
-            _scratchSteps.Add(absStep);
-
-            HookCollectableDestroyHandler(c);
-            PlaceAndBindPlaceholderMarker(nv, c, absStep, burstId);
-
-            c.ApplyTrackVisuals(this);
-            c.BeginSpawnArrival(spawnOrigin, spawnPos, note, dur, this, noteSet, _scratchSteps);
-
-            spawnedCollectables.Add(go);
-            _currentBurstRemaining++;
-            spawnedCount++;
-        }
-
-        // Empty burst — nothing spawned
-        if (spawnedCount <= 0)
-        {
-            _currentBurstArmed = false;
-            _currentBurstRemaining = 0;
-            controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
-            OnCollectableBurstCleared?.Invoke(this, burstId, false);
-            Debug.LogWarning($"[TRK:BURST] OUTCOME=SPAWN_EMPTY_CLEARED track={name} burstId={burstId} targetBin={targetBin} binSize={binSize} steps={rawStepCount} gridW={gridW}");
-            return;
-        }
-
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST] OUTCOME=SPAWN_OK track={name} burstId={burstId} spawnedCount={spawnedCount} targetBin={targetBin} binSize={binSize} loopMul={loopMultiplier}");
-
-        _bursts[burstId] = new BurstState { remaining = spawnedCount, totalSpawned = spawnedCount, targetBin = targetBin };
-
-        SetBinAllocated(targetBin, true);
-
-        // Advance cursor past the allocated bin (ByVoice tracks suppress — cursor moves on chord-group fill)
-        AdvanceCursorPastBin(targetBin);
-
-        controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
-    }
-    private bool TryPickRandomSpawnCell(
-        CosmicDustGenerator dustGen,
+    /// <summary>
+    /// Deterministic destination: absStep maps to the X column (0 = left edge, finalStep = right edge),
+    /// pitch maps to the Y row across the NoteSet's note range (lowest = bottom, highest = top).
+    /// Dust does not block — landing in dust is the intentional trapped-spawn case.
+    /// </summary>
+    private bool TryResolveSpawnDestinationCell(
         DrumTrack drumTrack,
         HashSet<Vector2Int> usedCellsThisBurst,
-        out Vector2Int chosenCell,
-        float preferredXNorm = -1f)
+        int absStep,
+        int finalStep,
+        int note,
+        NoteSet noteSet,
+        out Vector2Int chosenCell)
     {
         chosenCell = default;
 
@@ -1891,54 +1714,43 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         float cellWorld = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
         Vector2 halfExtents = Vector2.one * (cellWorld * 0.45f);
 
-        int xBandCenter = -1;
-        int xBandHalf   = 0;
-        bool useBand = preferredXNorm >= 0f && config.spawnColumnBandFraction > 0f;
-        if (useBand)
+        float xNorm = finalStep > 0 ? Mathf.Clamp01((float)absStep / finalStep) : 0f;
+        int cx = Mathf.Clamp(Mathf.RoundToInt(xNorm * (w - 1)), 0, w - 1);
+
+        float yNorm = 0.5f;
+        if (noteSet != null && noteSet.TryGetNoteRange(out int minNote, out int maxNote) && maxNote > minNote)
+            yNorm = Mathf.InverseLerp(minNote, maxNote, note);
+        int cy = Mathf.Clamp(Mathf.RoundToInt(yNorm * (h - 1)), 0, h - 1);
+
+        bool IsHardBlocked(Vector2Int gp)
         {
-            xBandCenter = Mathf.Clamp(Mathf.RoundToInt(preferredXNorm * (w - 1)), 0, w - 1);
-            xBandHalf   = Mathf.Max(1, Mathf.RoundToInt(config.spawnColumnBandFraction * 0.5f * w));
-        }
-
-        int maxTries = Mathf.Max(8, config.spawnPickMaxTries);
-
-        // First pass: constrained to step column band (skipped if no band preference).
-        if (useBand)
-        {
-            int xMin = Mathf.Max(0, xBandCenter - xBandHalf);
-            int xMax = Mathf.Min(w - 1, xBandCenter + xBandHalf);
-            for (int attempt = 0; attempt < maxTries; attempt++)
-            {
-                var gp = new Vector2Int(UnityEngine.Random.Range(xMin, xMax + 1), UnityEngine.Random.Range(0, h));
-                if (usedCellsThisBurst != null && usedCellsThisBurst.Contains(gp)) continue;
-                if (!Collectable.IsCellFreeStatic(gp)) continue;
-                Vector2 wp = (Vector2)drumTrack.GridToWorldPosition(gp);
-                if (Physics2D.OverlapBox(wp, halfExtents * 2f, 0f, spawnBlockedMask) != null) continue;
-                chosenCell = gp;
-                return true;
-            }
-        }
-
-        // Fallback (or default): unconstrained pick across full grid.
-        for (int attempt = 0; attempt < maxTries; attempt++)
-        {
-            var gp = new Vector2Int(UnityEngine.Random.Range(0, w), UnityEngine.Random.Range(0, h));
-
-            if (usedCellsThisBurst != null && usedCellsThisBurst.Contains(gp))
-                continue;
-
-            // Avoid stacking collectables.
-            if (!Collectable.IsCellFreeStatic(gp))
-                continue;
-
-            // Avoid PhaseStar / Vehicle (or any other blockers you include in the mask).
+            if (usedCellsThisBurst != null && usedCellsThisBurst.Contains(gp)) return true;
+            if (!Collectable.IsCellFreeStatic(gp)) return true;
             Vector2 wp = (Vector2)drumTrack.GridToWorldPosition(gp);
-            Collider2D hit = Physics2D.OverlapBox(wp, halfExtents * 2f, 0f, spawnBlockedMask);
-            if (hit != null)
-                continue;
+            return Physics2D.OverlapBox(wp, halfExtents * 2f, 0f, spawnBlockedMask) != null;
+        }
 
-            chosenCell = gp;
-            return true;
+        // Scan outward from the exact cell; every same-column candidate beats any
+        // one-column-away candidate so repeated notes stack vertically before drifting sideways.
+        for (int adx = 0; adx < w; adx++)
+        {
+            for (int sx = 0; sx < (adx == 0 ? 1 : 2); sx++)
+            {
+                int x = cx + (sx == 0 ? adx : -adx);
+                if (x < 0 || x >= w) continue;
+                for (int ady = 0; ady < h; ady++)
+                {
+                    for (int sy = 0; sy < (ady == 0 ? 1 : 2); sy++)
+                    {
+                        int y = cy + (sy == 0 ? ady : -ady);
+                        if (y < 0 || y >= h) continue;
+                        var gp = new Vector2Int(x, y);
+                        if (IsHardBlocked(gp)) continue;
+                        chosenCell = gp;
+                        return true;
+                    }
+                }
+            }
         }
 
         return false;
@@ -1980,8 +1792,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         var usedAbsSteps = new HashSet<int>();
         int queued = 0;
 
-        int fullSteps = BinSize() * maxLoopMultiplier;
-
         foreach (int step in localSteps)
         {
             if (maxToSpawn > 0 && queued >= maxToSpawn) break;
@@ -1991,13 +1801,17 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
             int note = noteSet.GetNoteForPhaseAndRole(this, step);
             int dur;
-            if (!noteSet.TryGetTemplateTimingAtStep(step, out dur, out _))
+            float vel127;
+            if (!noteSet.TryGetTemplateTimingAtStep(step, out dur, out vel127))
+            {
                 dur = 480;
+                vel127 = 100f;
+            }
 
-            float stepNorm = fullSteps > 0 ? Mathf.Clamp01((float)absStep / fullSteps) : -1f;
+            int finalStep = (targetBin + 1) * binSize;
 
             Vector2Int cell;
-            if (!TryPickRandomSpawnCell(dustGen, drumTrack, usedCells, out cell, stepNorm)) continue;
+            if (!TryResolveSpawnDestinationCell(drumTrack, usedCells, absStep, finalStep, note, noteSet, out cell)) continue;
             usedCells.Add(cell);
 
             bool hasDust = dustGen.HasDustAt(cell);
@@ -2016,6 +1830,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
                 absStep     = absStep,
                 note        = note,
                 duration    = dur,
+                velocity127 = vel127,
                 originWorld = originWorld ?? transform.position,
                 targetWorld = targetWorld,
                 targetCell  = cell,
@@ -2088,6 +1903,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             c.intendedBin            = _bursts.TryGetValue(launch.burstId, out var bs) ? bs.targetBin : 0;
             c.assignedInstrumentTrack = this;
             c.isTrappedInDust        = launch.cellHasDust;
+            c.spawnVelocity127       = launch.velocity127;
 
             HookCollectableDestroyHandler(c);
             PlaceAndBindPlaceholderMarker(nv, c, launch.absStep, launch.burstId);
@@ -2095,7 +1911,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             c.ApplyTrackVisuals(this);
 
             // SFX: play the authored note as the collectable launches (one-time MIDI playthrough).
-            PlayOneShotMidi(launch.note, 100f, launch.duration);
+            PlayOneShotMidi(launch.note, launch.velocity127, launch.duration);
 
             // Begin intro flight from origin to grid cell.
             _scratchSteps.Clear();

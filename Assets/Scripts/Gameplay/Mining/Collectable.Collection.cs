@@ -51,8 +51,11 @@ public partial class Collectable
 
     private void OnTriggerEnter2D(Collider2D coll)
     {
+        // Protected flight: the note is untouchable until it lands on its cell.
+        if (_inSpawnArrival || _handled) return;
+
         var vehicle = coll.GetComponent<Vehicle>();
-        if (vehicle == null || _handled) return;
+        if (vehicle == null) return;
 
         if (!vehicle.CanAcceptCollectable(assignedInstrumentTrack)) return;
 
@@ -96,11 +99,13 @@ public partial class Collectable
         }
 
         _handled = true;
+        UnbindTimelineStep(); // carried notes go silent until committed
 
         if (_spawnArrivalRoutine != null)
         {
             StopCoroutine(_spawnArrivalRoutine);
             _spawnArrivalRoutine = null;
+            SetSpawnArrivalProtection(false);
             if (_rb != null && _rb.bodyType == RigidbodyType2D.Kinematic)
                 _rb.bodyType = RigidbodyType2D.Dynamic;
         }

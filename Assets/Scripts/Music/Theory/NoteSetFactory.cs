@@ -75,8 +75,12 @@ public class NoteSetFactory : MonoBehaviour
 
     if (motifChordCount > 0)
     {
+        // The progression's rootNote register is authoritative: re-key to the motif's
+        // keyRootMidi only. Never octave-fit chord roots to the track range — the
+        // playable range applies to final notes, not chord roots.
         int authoredFirst = motif.chordProgression.chordSequence[0].rootNote;
-        int chordDelta = rootMidi - authoredFirst;
+        int keyRoot = motif.keyRootMidi > 0 ? motif.keyRootMidi : rootMidi;
+        int chordDelta = keyRoot - authoredFirst;
 
         chordSeq = new List<Chord>(motifChordCount);
         for (int i = 0; i < motifChordCount; i++)
@@ -154,14 +158,12 @@ public class NoteSetFactory : MonoBehaviour
     const int ticksPerQuarter = 480;
     int ticksPerStep = ticksPerQuarter / (stepsPerBar / beatsPerBar);
 
-    int authoredAnchor = riff.authoredRootMidi > 0 ? riff.authoredRootMidi : rootMidi;
-    int targetRoot = (chordSeq != null && chordSeq.Count > 0)
-        ? chordSeq[binIndex % chordSeq.Count].rootNote
-        : rootMidi;
-    int normalizedTarget = targetRoot;
-    while (normalizedTarget > authoredAnchor + 11) normalizedTarget -= 12;
-    while (normalizedTarget < authoredAnchor)       normalizedTarget += 12;
-    int delta = normalizedTarget - authoredAnchor + riff.octaveShift * 12;
+    int authoredAnchor = riff.authoredRootMidi > 0 ? riff.authoredRootMidi : chordSeq[0].rootNote;
+    int targetRoot = chordSeq[binIndex % chordSeq.Count].rootNote;
+    // Exact-register transposition: the chord root's octave is authoritative.
+    // No nearest-register normalization — a ♭III authored an octave below I
+    // must pull the riff down with it.
+    int delta = targetRoot - authoredAnchor + riff.octaveShift * 12;
 
     if (GameFlowManager.VerboseLogging) Debug.Log(
         $"[NoteSetFactory] RIFF TRANSPOSE bin={binIndex} authoredAnchor={authoredAnchor} " +
@@ -171,30 +173,16 @@ public class NoteSetFactory : MonoBehaviour
     var ordered = riff.events.OrderBy(e => e.step).ToList();
     var riffPersistent = new List<(int step, int note, int duration, float vel, int authoredRootMidi)>(ordered.Count);
 
-    // Pre-pass: find the highest transposed note and compute a uniform octave
-    // shift so it fits within the track range. Applying the same shift to every
-    // note preserves the relative intervals inside the riff; per-note ShiftIntoRange
-    // below is kept as a safety net for extreme cases.
-    int maxTransposed = int.MinValue;
-    for (int i = 0; i < ordered.Count; i++)
-    {
-        var e = ordered[i];
-        if (e.step >= 0 && e.step < totalSteps && e.midiNote + delta > maxTransposed)
-            maxTransposed = e.midiNote + delta;
-    }
-    int blockShift = (maxTransposed > int.MinValue)
-        ? ShiftIntoRange(maxTransposed, track.lowestAllowedNote, track.highestAllowedNote) - maxTransposed
-        : 0;
-
     for (int i = 0; i < ordered.Count; i++)
     {
         var e = ordered[i];
 
         int step = e.step;
         if (step < 0 || step >= totalSteps) continue;
-        int midi = e.midiNote + delta + blockShift;
 
-        midi = ShiftIntoRange(midi, track.lowestAllowedNote, track.highestAllowedNote);
+        // Hybrid rule: the exact transposed note wins whenever it is playable;
+        // only out-of-range notes get octave-shifted (per note, final note only).
+        int midi = ShiftIntoRange(e.midiNote + delta, track.lowestAllowedNote, track.highestAllowedNote);
 
         int durTicks = Mathf.Max(ticksPerStep, e.durSteps * ticksPerStep);
         float vel127 = Mathf.Clamp01(e.velocity01) * 127f;

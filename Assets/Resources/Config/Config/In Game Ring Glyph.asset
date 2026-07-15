@@ -16,7 +16,7 @@ MonoBehaviour:
   ringThickness: 0.03
   ringSpacing: 0.3
   fitPaddingFraction: 0.05
-  ringMeshMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  ringMeshMaterial: {fileID: 2100000, guid: db6f88bb6fd04da5bdaac2167f76440b, type: 2}
   ringAlpha: 0.339
   lineWidth: 0.02
   segments: 256

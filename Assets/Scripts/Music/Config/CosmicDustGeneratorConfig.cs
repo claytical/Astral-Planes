@@ -35,7 +35,7 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     [Header("Zap Clear")]
     [Tooltip("Visual fade duration when a star zap clears a dust cell.")]
     public float zapFadeSeconds = 1.5f;
-    [Tooltip("Delay before a zapped cell is queued for regrow. -1 uses the role/default timing.")]
+    [Tooltip("Explicit override for zapped-cell regrow delay. -1 defers to the maze pattern's zapRegrowDelay / base regrowDelay.")]
     public float zapRegrowDelaySeconds = -1f;
 
     [Header("Mine Node Erosion")]

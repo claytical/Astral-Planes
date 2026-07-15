@@ -3,10 +3,6 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "InstrumentTrackControllerConfig", menuName = "Astral Planes/Instrument Track Controller Config")]
 public class InstrumentTrackControllerConfig : ScriptableObject
 {
-    [Header("Note Commit")]
-    [Tooltip("Performance: all collectables spawn at once; root-note fallback on mistimed release. Composition: collectables spawn step-by-step; collected note always placed at the release step.")]
-    public NoteCommitMode noteCommitMode = NoteCommitMode.Performance;
-
     [Header("SFX: Collection")]
     [Range(0f, 2f)] public float pickupTickVolume = 1.15f;
     [Range(0f, 0.15f)] public float pickupTickPitchJitter = 0.03f;

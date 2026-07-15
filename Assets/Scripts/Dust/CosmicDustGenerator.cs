@@ -84,6 +84,9 @@ public partial class CosmicDustGenerator : MonoBehaviour
     private List<Vector2Int> _reservedVehicleCells = new List<Vector2Int>(64);
 
     private HashSet<Vector2Int> _permanentClearCells = new HashSet<Vector2Int>();
+    // Cells drained by a PhaseStar whose energy is "held" by a MineNode: no regrow
+    // until ReleaseHeldCells (node death) or a maze flush supersedes them.
+    private readonly HashSet<Vector2Int> _heldRegrowCells = new HashSet<Vector2Int>();
     private Dictionary<Vector2Int, float> _carveAccumulator = new();
     // Ripeness: cells currently showing their true role color after a player carve.
     private readonly Dictionary<Vector2Int, float> _ripenessByCell = new();
@@ -149,15 +152,17 @@ public partial class CosmicDustGenerator : MonoBehaviour
         public readonly DustClearMode ClearMode;
         public readonly float FadeSeconds;
         public readonly bool ScheduleRegrow;
+        public readonly DustClearSource Source;
         public readonly float RegrowDelaySeconds;
         public readonly bool RunPreExplode;
 
-        public DustClearRequest(DustInteractionMode interactionMode, DustClearMode clearMode, float fadeSeconds, bool scheduleRegrow, float regrowDelaySeconds, bool runPreExplode)
+        public DustClearRequest(DustInteractionMode interactionMode, DustClearMode clearMode, float fadeSeconds, bool scheduleRegrow, DustClearSource source, float regrowDelaySeconds, bool runPreExplode)
         {
             InteractionMode = interactionMode;
             ClearMode = clearMode;
             FadeSeconds = fadeSeconds;
             ScheduleRegrow = scheduleRegrow;
+            Source = source;
             RegrowDelaySeconds = regrowDelaySeconds;
             RunPreExplode = runPreExplode;
         }
@@ -168,18 +173,18 @@ public partial class CosmicDustGenerator : MonoBehaviour
         FadeAndHide,
         HideInstant
     }
-    public void ClearCell(Vector2Int gp, DustClearMode mode, float fadeSeconds, bool scheduleRegrow, float regrowDelaySeconds = -1f, bool runPreExplode = false) {
+    public void ClearCell(Vector2Int gp, DustClearMode mode, float fadeSeconds, bool scheduleRegrow, DustClearSource source = DustClearSource.System, float regrowDelaySeconds = -1f, bool runPreExplode = false) {
         if (!TryGetCellState(gp, out var st)) return;
         if (st == DustCellState.Empty || st == DustCellState.Clearing || st == DustCellState.PendingRegrow) {
             // Optionally refresh regrow timer even if already empty.
             if (scheduleRegrow)
-                RequestRegrowCellAt(gp, regrowDelaySeconds, refreshIfPending: true);
+                RequestRegrowCellAt(gp, ResolveRegrowDelay(gp, source, regrowDelaySeconds), refreshIfPending: true);
             return;
         }
         if (!TryGetCellGo(gp, out var go) || go == null) {
             SetCellState(gp, DustCellState.Empty);
             if (scheduleRegrow)
-                RequestRegrowCellAt(gp, regrowDelaySeconds, refreshIfPending: true);
+                RequestRegrowCellAt(gp, ResolveRegrowDelay(gp, source, regrowDelaySeconds), refreshIfPending: true);
             return;
         }
 
@@ -229,7 +234,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
          if (scheduleRegrow)
          {
-             RequestRegrowCellAt(gp, regrowDelaySeconds, refreshIfPending: true);
+             RequestRegrowCellAt(gp, ResolveRegrowDelay(gp, source, regrowDelaySeconds), refreshIfPending: true);
              // TODO: density conservation — fill a frontier cell when one is eroded so total
              // coverage stays constant. Deferred: TryQueueFrontierCompensation() interfered with
              // role-assignment logic when multiple stars were active. Re-enable only after
@@ -255,6 +260,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
     public void HardStopRegrowthForBridge(bool hideTransientDust = true)
     {
         _regrowthSuppressed = true;
+        // The regenerated maze supersedes any node-held drain batches.
+        _heldRegrowCells.Clear();
 
         // Stop maze-growth/stagger routines tied to the outgoing motif.
         if (_spawnRoutine != null)
@@ -1213,8 +1220,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
             _imprints[gp] = new DustImprint
             {
                 color               = regrowTint,
-                carveResistance01   = roleProfile != null ? roleProfile.GetCarveResistance01() : 0f,
-                drainResistance01   = roleProfile != null ? roleProfile.GetDrainResistance01() : 0f,
+                carveResistance01   = roleProfile != null ? roleProfile.carveResistance01 : 0f,
+                drainResistance01   = roleProfile != null ? roleProfile.drainResistance01 : 0f,
                 maxEnergyUnits      = roleProfile != null ? roleProfile.maxEnergyUnits : 1,
                 role                = regrowRole,
                 healDelay           = 0f,
@@ -1406,16 +1413,16 @@ public partial class CosmicDustGenerator : MonoBehaviour
     // - Regrow is normally scheduled, except for permanent clear systems that explicitly disable it.
     // - Void-grown exception applies: vehicle carve removes void-grow imprint so regrow can re-resolve role.
     // - Visual fade duration is caller-provided (resistance/tuning aware).
-    public void CarveCellPreserveGray(Vector2Int cell, float fadeSeconds, float regrowDelaySeconds = 2f)
+    public void CarveCellPreserveGray(Vector2Int cell, float fadeSeconds, DustClearSource source, float regrowDelaySeconds = -1f)
     {
         if (!IsInBounds(cell)) return;
         SetCellFlag(cell, CellFlags.ForceGrayRegrow);
-        CarveCell(cell, fadeSeconds, scheduleRegrow: true, regrowDelaySeconds: regrowDelaySeconds, runPreExplode: false);
+        CarveCell(cell, fadeSeconds, scheduleRegrow: true, source: source, regrowDelaySeconds: regrowDelaySeconds, runPreExplode: false);
     }
 
-    public void CarveCell(Vector2Int cell, float fadeSeconds, bool scheduleRegrow = true, float regrowDelaySeconds = -1f, bool runPreExplode = true)
+    public void CarveCell(Vector2Int cell, float fadeSeconds, bool scheduleRegrow = true, DustClearSource source = DustClearSource.VehiclePlow, float regrowDelaySeconds = -1f, bool runPreExplode = true)
     {
-        var req = new DustClearRequest(DustInteractionMode.Carve, DustClearMode.FadeAndHide, fadeSeconds, scheduleRegrow, regrowDelaySeconds, runPreExplode);
+        var req = new DustClearRequest(DustInteractionMode.Carve, DustClearMode.FadeAndHide, fadeSeconds, scheduleRegrow, source, regrowDelaySeconds, runPreExplode);
         ClearCellByInteraction(cell, req);
     }
 
@@ -1427,7 +1434,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
     public void ZapCell(Vector2Int cell)
     {
         SetCellFlag(cell, CellFlags.ZapForceGray);
-        var req = new DustClearRequest(DustInteractionMode.Zap, DustClearMode.FadeAndHide, config.zapFadeSeconds, true, config.zapRegrowDelaySeconds, true);
+        var req = new DustClearRequest(DustInteractionMode.Zap, DustClearMode.FadeAndHide, config.zapFadeSeconds, true, DustClearSource.Zap, config.zapRegrowDelaySeconds, true);
         ClearCellByInteraction(cell, req);
     }
 
@@ -1441,6 +1448,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             request.ClearMode,
             request.FadeSeconds,
             request.ScheduleRegrow,
+            source: request.Source,
             regrowDelaySeconds: request.RegrowDelaySeconds,
             runPreExplode: request.RunPreExplode);
     }
@@ -1451,6 +1459,36 @@ public partial class CosmicDustGenerator : MonoBehaviour
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
 
         ZapCell(cell);
+    }
+
+    /// <summary>
+    /// Zap-clear a cell whose energy is being consumed by a PhaseStar: no regrow is
+    /// scheduled and the cell is held empty until <see cref="ReleaseHeldCells"/>.
+    /// </summary>
+    public void ZapClearCellHeld(Vector2Int cell)
+    {
+        if (!IsInBounds(cell)) return;
+        if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
+
+        SetCellFlag(cell, CellFlags.ZapForceGray);
+        var req = new DustClearRequest(DustInteractionMode.Zap, DustClearMode.FadeAndHide, config.zapFadeSeconds, false, DustClearSource.StarDrain, -1f, true);
+        ClearCellByInteraction(cell, req);
+        _heldRegrowCells.Add(cell);
+    }
+
+    /// <summary>
+    /// Release cells previously held by <see cref="ZapClearCellHeld"/> and schedule their
+    /// regrow (StarDrain delay unless delayOverride >= 0). Cells not currently held are skipped.
+    /// </summary>
+    public void ReleaseHeldCells(IReadOnlyList<Vector2Int> cells, float delayOverride = -1f)
+    {
+        if (cells == null) return;
+        for (int i = 0; i < cells.Count; i++)
+        {
+            var c = cells[i];
+            if (!_heldRegrowCells.Remove(c)) continue;
+            RequestRegrowCellAt(c, ResolveRegrowDelay(c, DustClearSource.StarDrain, delayOverride), refreshIfPending: true);
+        }
     }
 
     
@@ -1525,8 +1563,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
             if (roleProfile != null)
                 return ValidateResistanceProfile(new DustResistanceProfile
                 {
-                    carveResistance01 = roleProfile.GetCarveResistance01(),
-                    drainResistance01 = roleProfile.GetDrainResistance01()
+                    carveResistance01 = roleProfile.carveResistance01,
+                    drainResistance01 = roleProfile.drainResistance01
                 }, $"{context}:live:{role}");
         }
 
@@ -1664,20 +1702,26 @@ public partial class CosmicDustGenerator : MonoBehaviour
         {
             if (existingImp.role == MusicalRole.None)
             {
-                // Gray-start cell: consult hidden imprint before giving up,
-                // unless a non-vehicle carve has requested the cell stay gray.
-                if (!HasCellFlag(gp, CellFlags.ForceGrayRegrow))
-                {
-                    if (existingImp.hiddenRole != MusicalRole.None && IsRoleActive(existingImp.hiddenRole))
-                        return existingImp.hiddenRole;
-                }
-                // No active hidden imprint (or force-gray suppressed it) — fall through to neighbor/density logic.
+                // A non-vehicle carve requested the cell stay gray: regrow gray, full stop.
+                // Falling through to neighbor/density here would re-tint (and re-charge)
+                // cells the player never earned, feeding stars from untouched dust.
+                if (HasCellFlag(gp, CellFlags.ForceGrayRegrow))
+                    return MusicalRole.None;
+
+                // Gray-start cell: consult hidden imprint before giving up.
+                if (existingImp.hiddenRole != MusicalRole.None && IsRoleActive(existingImp.hiddenRole))
+                    return existingImp.hiddenRole;
+                // No active hidden imprint — fall through to neighbor/density logic.
             }
             else if (IsRoleActive(existingImp.role))
                 return existingImp.role;
         }
 
         // No imprint or imprint role is inactive: fall back to neighbor plurality / least dense.
+        // Force-gray cells never take a fallback role.
+        if (HasCellFlag(gp, CellFlags.ForceGrayRegrow))
+            return MusicalRole.None;
+
         var neighborRole = GetPluralityNeighborRole(gp, excludedRole);
         return neighborRole != MusicalRole.None ? neighborRole : GetLeastDenseRoleExcluding(excludedRole);
     }
@@ -1884,6 +1928,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 }
             }
             _permanentClearCells.Clear();
+            _heldRegrowCells.Clear();
         }
         finally
         {
@@ -2333,8 +2378,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
         {
             role               = role,
             color              = color,
-            carveResistance01  = profile.GetCarveResistance01(),
-            drainResistance01  = profile.GetDrainResistance01(),
+            carveResistance01  = profile.carveResistance01,
+            drainResistance01  = profile.drainResistance01,
             maxEnergyUnits     = maxUnits
         };
 
