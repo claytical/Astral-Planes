@@ -241,10 +241,9 @@ public sealed class StarPool : MonoBehaviour
 
         foreach (var role in roles)
         {
-            // Every live star and any mine sequence in flight will consume one ejection if
-            // harvested — spawn only while unreserved budget remains so the total number of
-            // node sequences can't overshoot nodesPerStar.
-            if (_remainingEjectionsTotal - ReservedEjections() <= 0) break;
+            // Budget is committed at EJECT time (CanStarCommitEjection), not at spawn —
+            // every role with dust gets a star so the player chooses which roles spend the
+            // nodesPerStar total. Leftover stars despawn when the budget hits zero.
 
             // Only block this role's slot if its own MineNode sequence is pending.
             if (role == _lastEjectedRole && (_mineNodePending || HasUnresolvedMineNodeSequence())) continue;
@@ -265,17 +264,16 @@ public sealed class StarPool : MonoBehaviour
         }
     }
 
-    // Live stars (active or paused) plus an in-flight mine sequence each hold a claim on one
-    // ejection from _remainingEjectionsTotal. Expired/escaped/SuperNode outcomes release the
-    // claim without spending it (star destroyed + _mineNodePending cleared), so refunds keep
-    // working.
-    private int ReservedEjections()
-    {
-        int live = 0;
-        foreach (var s in _activeStars.Values)
-            if (s != null) live++;
-        return live + (_mineNodePending ? 1 : 0);
-    }
+    // Stars query this at poke time — budget is committed at ejection, not spawn, so every
+    // role with dust keeps a star while the total number of harvests can't overshoot
+    // nodesPerStar. Only ONE sequence (of any kind) may be in flight at a time: the
+    // burst-identification state (_lastEjectedRole/_mineNodeResolved) is single-slot, and
+    // overlapping sequences overwrite it, losing harvest decrements. Mine ejections
+    // additionally need unspent budget; SuperNode ejections never spend any. Expired/
+    // escaped/empty-burst outcomes clear _mineNodePending without spending, so refunds
+    // keep working.
+    private bool CanStarCommitEjection(bool isSuperNode)
+        => !_mineNodePending && (isSuperNode || _remainingEjectionsTotal > 0);
 
     // ── Star spawning ─────────────────────────────────────────────────────────
 
@@ -328,6 +326,7 @@ public sealed class StarPool : MonoBehaviour
         // Wire events before Initialize so subscriptions are in place.
         star.OnEjected += OnStarEjected;
         star.OnMineNodeResolved += OnStarMineNodeResolved;
+        star.CanCommitEjection = (_, isSuperNode) => CanStarCommitEjection(isSuperNode);
 
         // Initialize and enter in-maze (already at target position, invisible, tentacles will grow).
         star.Initialize(_drum, _tracks, _behaviorProfile, _activeMotif);
@@ -392,6 +391,19 @@ public sealed class StarPool : MonoBehaviour
 
         // Destroy the ejecting Star after a short exit animation.
         StartCoroutine(DestroyStarAfterDelay(star));
+
+        // SuperNode with no shard tracks resolves synchronously inside SpawnSuperNodeCommon,
+        // firing OnMineNodeResolved BEFORE OnEjected — the clear branch there sees
+        // _mineNodePending=false and skips. Clear the gate now, mirroring that branch.
+        if (_mineNodePending && !ReferenceEquals(star, null)
+            && star.LastNodeWasSuperNode && !star.HasLiveEjectionNode)
+        {
+            if (GameFlowManager.VerboseLogging) Debug.Log("[StarPool] OnStarEjected: SuperNode already resolved synchronously — clearing gate now.");
+            _mineNodePending = false;
+            _mineNodeResolved = false;
+            ResumeAll();
+            CheckBridgeGate();
+        }
     }
 
     private IEnumerator DestroyStarAfterDelay(PhaseStar star)
@@ -538,6 +550,12 @@ public sealed class StarPool : MonoBehaviour
             {
                 _remainingEjectionsTotal = Mathf.Max(0, _remainingEjectionsTotal - 1);
                 if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] Harvest complete — remainingHarvests={_remainingEjectionsTotal}");
+
+                // Budget is committed at eject time, so stars for every dusty role may still
+                // be live when the last harvest lands. CheckBridgeGate requires no live stars —
+                // clear them out now that no further ejection could ever spend budget.
+                if (_remainingEjectionsTotal == 0)
+                    DespawnLeftoverStars();
             }
             else
             {
@@ -569,6 +587,31 @@ public sealed class StarPool : MonoBehaviour
             ResumeAll();
             CheckBridgeGate();
         }
+    }
+
+    // Explodes all remaining stars (active + paused) once the harvest budget is spent, so
+    // CheckBridgeGate's no-live-stars requirement can pass. Mirrors ExplodeAndClearAll's star
+    // teardown but leaves the gate/budget state alone — callers are mid-gate-clear.
+    private void DespawnLeftoverStars()
+    {
+        foreach (var star in _activeStars.Values)
+        {
+            if (star == null) continue;
+            var explode = star.GetComponent<Explode>();
+            if (explode != null) explode.Permanent();
+            else Destroy(star.gameObject);
+        }
+        _activeStars.Clear();
+
+        foreach (var star in _pausedStars)
+        {
+            if (star == null) continue;
+            var explode = star.GetComponent<Explode>();
+            if (explode != null) explode.Permanent();
+            else Destroy(star.gameObject);
+        }
+        _pausedStars.Clear();
+        if (GameFlowManager.VerboseLogging) Debug.Log("[StarPool] DespawnLeftoverStars: budget spent — cleared remaining stars for bridge.");
     }
 
     private bool AnyCollectablesInFlight()

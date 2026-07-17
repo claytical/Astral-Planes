@@ -141,7 +141,7 @@ public partial class PhaseStar
         visuals?.FlashReject();
     }
 
-    void SpawnNodeCommon(Vector2 contactPoint, InstrumentTrack usedTrack)
+    bool SpawnNodeCommon(Vector2 contactPoint, InstrumentTrack usedTrack)
     {
         LastNodeWasSuperNode = false;
         LastNodeWasExpired   = false;
@@ -159,8 +159,8 @@ public partial class PhaseStar
         {
             _ejectionInFlight = false;
             _activeNode = null;
-            Disarm(PhaseStarDisarmReason.NodeResolving, spawnTint);
-            return;
+            Debug.LogWarning($"[PhaseStar] MineNode spawn failed (no free grid cell) — recovering for retry. star={name} role={usedTrack.assignedRole}");
+            return false;
         }
 
         _activeNode = node;
@@ -205,6 +205,7 @@ public partial class PhaseStar
         CollectionSoundManager.Instance?.PlayPhaseStarImpact(usedTrack, usedTrack.GetCurrentNoteSet(), 0.8f);
         PrepareNextDirective();
         Trace("SpawnNodeCommon: end");
+        return true;
     }
 
     void EjectActivePreviewShardAndFlow(Collision2D coll)
@@ -221,6 +222,16 @@ public partial class PhaseStar
         if (ejectedTrack == null)
         {
             Debug.LogError($"[PhaseStar] Missing track for ejected role={ejectedRole} (cannot spawn node).");
+            return;
+        }
+
+        bool isSuperNodeEjection = ShouldSpawnSuperNodeForTrack(ejectedTrack);
+        if (CanCommitEjection != null && !CanCommitEjection(ejectedRole, isSuperNodeEjection))
+        {
+            // Another sequence is still unresolved (or the harvest budget is spent). Keep
+            // the charge and stay armed — the poke retries once that sequence resolves.
+            visuals?.FlashReject();
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar] Eject deferred — sequence in flight or no harvest budget (role={ejectedRole}).");
             return;
         }
 
@@ -241,26 +252,35 @@ public partial class PhaseStar
 
         if (GameFlowManager.VerboseLogging) Debug.Log($"[MNDBG] EjectActive: contact={contact}, role={ejectedTrack.assignedRole}");
         TransitionZapState(ZapProgressState.Ejecting, ejectedRole, "spawn-start");
-        if (ShouldSpawnSuperNodeForTrack(ejectedTrack))
-            SpawnSuperNodeCommon(contact, ejectedTrack);
-        else
-            SpawnNodeCommon(contact, ejectedTrack);
-        if (_activeNode != null || _activeSuperNode != null)
+        bool spawned = isSuperNodeEjection
+            ? SpawnSuperNodeCommon(contact, ejectedTrack)
+            : SpawnNodeCommon(contact, ejectedTrack);
+
+        if (!spawned)
         {
-            TransitionZapState(ZapProgressState.Seeking, ejectedRole, "ejection-succeeded");
-            dust?.SetAcquisitionEnabled(true, "post-eject-new-cycle");
+            // Refund the charge deducted above and re-latch so the next poke retries.
+            // OnEjected must NOT fire — StarPool would set _mineNodePending with no node
+            // to ever resolve it, permanently reserving an ejection slot.
+            _starCharge[ejectedRole] = rawCharge;
+            TransitionZapState(ZapProgressState.ReadyLatched, ejectedRole, "spawn-failed-relatch");
+            ArmNext();
+            Trace("EjectActive: node spawn failed — star recovered, no OnEjected");
+            return;
         }
+
+        TransitionZapState(ZapProgressState.Seeking, ejectedRole, "ejection-succeeded");
+        dust?.SetAcquisitionEnabled(true, "post-eject-new-cycle");
 
         OnEjected?.Invoke(this, ejectedRole);
     }
 
-    private void SpawnSuperNodeCommon(Vector2 contactWorld, InstrumentTrack targetTrack)
+    private bool SpawnSuperNodeCommon(Vector2 contactWorld, InstrumentTrack targetTrack)
     {
         LastNodeWasSuperNode = true;
         if (superNodePrefab == null)
         {
             Debug.LogError("[PhaseStar] superNodePrefab is null.");
-            return;
+            return false;
         }
 
         if (soloVoice == null)
@@ -269,7 +289,7 @@ public partial class PhaseStar
             if (soloVoice == null)
             {
                 Debug.LogError("[PhaseStar] SoloVoice not found.");
-                return;
+                return false;
             }
         }
 
@@ -279,7 +299,8 @@ public partial class PhaseStar
         if (sn == null)
         {
             Debug.LogError("[PhaseStar] SuperNode prefab missing SuperNode component.");
-            return;
+            Destroy(go);
+            return false;
         }
         Color spawnTint = targetTrack != null ? targetTrack.DisplayColor : Color.white;
 
@@ -356,10 +377,20 @@ public partial class PhaseStar
         sn.Initialize(soloVoice, _drum, targetTrack, shardTracks, alternateProg, difficulty01);
 
         PrepareNextDirective();
+        return true;
     }
 
     void EjectCachedDirectiveAndFlow(Collision2D coll)
     {
+        if (CanCommitEjection != null && !CanCommitEjection(_attunedRole, _cachedIsSuperNode))
+        {
+            // Another sequence is still unresolved (or the harvest budget is spent). Keep
+            // the cached directive and stay armed — the poke retries once it resolves.
+            visuals?.FlashReject();
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar] Cached eject deferred — sequence in flight or no harvest budget (role={_attunedRole}).");
+            return;
+        }
+
         var contact = coll.GetContact(0).point;
         var starPos = (Vector2)transform.position;
         var vehiclePos = coll.rigidbody != null ? coll.rigidbody.position : contact;
@@ -369,16 +400,21 @@ public partial class PhaseStar
 
         Disarm(PhaseStarDisarmReason.NodeResolving, _cachedTrack.DisplayColor);
         ActivateSafetyBubble();
-        if (_cachedIsSuperNode)
-            SpawnSuperNodeCommon(contact, _cachedTrack);
-        else
-            SpawnNodeCommon(contact, _cachedTrack);
+        bool spawned = _cachedIsSuperNode
+            ? SpawnSuperNodeCommon(contact, _cachedTrack)
+            : SpawnNodeCommon(contact, _cachedTrack);
 
-        if (_activeNode != null || _activeSuperNode != null)
+        if (!spawned)
         {
-            TransitionZapState(ZapProgressState.Seeking, _attunedRole, "ejection-succeeded");
-            dust?.SetAcquisitionEnabled(true, "post-eject-new-cycle");
+            // Re-latch and re-arm so the next poke retries (ArmNext also deactivates the
+            // safety bubble). OnEjected must NOT fire — see EjectActivePreviewShardAndFlow.
+            TransitionZapState(ZapProgressState.ReadyLatched, _attunedRole, "spawn-failed-relatch");
+            ArmNext();
+            return;
         }
+
+        TransitionZapState(ZapProgressState.Seeking, _attunedRole, "ejection-succeeded");
+        dust?.SetAcquisitionEnabled(true, "post-eject-new-cycle");
 
         OnEjected?.Invoke(this, _attunedRole);
     }

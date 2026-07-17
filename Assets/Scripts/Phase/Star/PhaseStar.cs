@@ -176,11 +176,17 @@ public partial class PhaseStar : MonoBehaviour
     public bool LastNodeWasExpired   { get; private set; }
     public bool LastNodeWasEscaped   { get; private set; }
     public bool LastNodeWasCaptured  { get; private set; }
+    public bool HasLiveEjectionNode => _activeNode != null || _activeSuperNode != null;
     [SerializeField] private MotifProfile _assignedMotif; // optional: motif this star represents (motif system)
 
     public event Action<PhaseStar> OnArmed;
     public event Action<PhaseStar> OnDisarmed;
     public event Action<PhaseStar, MusicalRole> OnEjected;
+    // Wired by StarPool: asked at poke time (role, isSuperNode) whether this ejection may
+    // start. Only one sequence may be in flight at a time — StarPool's burst-identification
+    // state is single-slot — and mine ejections additionally need unspent harvest budget.
+    // Null (unmanaged star) means always allowed.
+    public Func<MusicalRole, bool, bool> CanCommitEjection;
     public event Action<PhaseStar> OnBurstRolledBack;
     // Fired when the Vehicle destroys the MineNode/SuperNode — the burst is now spawning.
     // Safe to fire from a destroyed star (C# delegate, not Unity message).
