@@ -16,15 +16,14 @@ public partial class PhaseStar
         }
 
         _missingDescriptorWarned = false;
-        return _zapProgressState == ZapProgressState.ReadyLatched && HasDominantRoleEjectable();
+        return _zapProgressState == ZapProgressState.ReadyLatched;
     }
 
     private NoteSet ResolvePlannedNoteSet(InstrumentTrack track)
     {
         if (track == null) return null;
         ResolveGameFlowManager();
-        int entropy = CurrentEntropyForSelection();
-        return _gfm != null ? _gfm.GenerateNotes(track, entropy) : null;
+        return _gfm != null ? _gfm.GenerateNotes(track, 0) : null;
     }
 
     private static bool PlannedDescriptorEquals(in PlannedEjectionDescriptor a, in PlannedEjectionDescriptor b)
@@ -77,12 +76,7 @@ public partial class PhaseStar
         else
         {
             if (!TryResolveAuthoritativeZapCount(role, track, out noteCount))
-            {
-                int persistentTemplateCount = planned.persistentTemplate != null ? planned.persistentTemplate.Count : 0;
-                int distinctStepCount = planned.GetStepList()?.Distinct().Count() ?? 0;
-                int noteListCount = planned.GetNoteList()?.Count ?? 0;
-                noteCount = Mathf.Max(persistentTemplateCount, Mathf.Max(distinctStepCount, noteListCount));
-            }
+                noteCount = GetNoteSetNoteCount(planned);
         }
 
         if (_currentBurstRequiredZaps > 0)
@@ -124,8 +118,7 @@ public partial class PhaseStar
             _zapProgressState == ZapProgressState.Zapping;
         bool globallyGatedOrDisarmed =
             _disarmReason != PhaseStarDisarmReason.None ||
-            _state != PhaseStarState.Dormant ||
-            _coordinatorLockOwnedByOtherStar;
+            _state != PhaseStarState.Dormant;
         return zapStateAllowsAcquire && !globallyGatedOrDisarmed;
     }
 
@@ -145,53 +138,4 @@ public partial class PhaseStar
         if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar:ZapState] {prev}->{next} role={role} zappedCount={zappedCount} requiredZapCount={requiredZapCount} acquisitionEnabled={acquisitionEnabled} reason={reason} interaction=({_interactionState.ToDebugString()})");
     }
 
-    public void OnCoordinatorLockOwnedByAnotherStar()
-    {
-        if (allowConcurrentDormantCharging)
-            return;
-
-        if (_state != PhaseStarState.Dormant)
-            return;
-
-        bool canSuspend =
-            _zapProgressState == ZapProgressState.Seeking ||
-            _zapProgressState == ZapProgressState.Zapping ||
-            _zapProgressState == ZapProgressState.WaitingForRetract ||
-            _zapProgressState == ZapProgressState.ReadyLatched;
-
-        if (!canSuspend)
-            return;
-
-        _coordinatorLockOwnedByOtherStar = true;
-        _preservedZapProgressStateBeforeCoordinatorLock = _zapProgressState;
-        TransitionZapState(ZapProgressState.DormantNotSeeking, _requiredZapRole, "coordinator-lock-owned-by-other");
-    }
-
-    public void OnCoordinatorLockReleasedAfterOwnerCooldown()
-    {
-        if (allowConcurrentDormantCharging)
-            return;
-
-        _coordinatorLockOwnedByOtherStar = false;
-
-        if (_state != PhaseStarState.Dormant)
-            return;
-
-        if (_zapProgressState == ZapProgressState.ReadyLatched)
-        {
-            TransitionDormantToActive();
-            return;
-        }
-
-        if (_zapProgressState != ZapProgressState.DormantNotSeeking)
-            return;
-
-        var restore = _preservedZapProgressStateBeforeCoordinatorLock;
-        bool wasPreservedReady = restore == ZapProgressState.ReadyLatched || restore == ZapProgressState.WaitingForRetract;
-        var next = wasPreservedReady ? ZapProgressState.WaitingForRetract : ZapProgressState.Seeking;
-        TransitionZapState(next, _requiredZapRole, "coordinator-lock-released-owner-cooldown");
-
-        if (next == ZapProgressState.WaitingForRetract)
-            TransitionDormantToActive();
-    }
 }

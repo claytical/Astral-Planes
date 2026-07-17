@@ -13,8 +13,6 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class StarPool : MonoBehaviour
 {
-    public static StarPool Instance { get; private set; }
-
     // ── Serialized ────────────────────────────────────────────────────────────
     [Tooltip("How many seconds after ejection before the exiting Star GameObject is destroyed.")]
     [SerializeField, Min(0f)] private float starExitDuration = 0.4f;
@@ -45,10 +43,8 @@ public sealed class StarPool : MonoBehaviour
     // Stars that are paused while a sibling's MineNode is active.
     private readonly List<PhaseStar> _pausedStars = new();
 
-    // The most recent ejecting Star — routes gravity void safety bubble calls.
+    // The most recent ejecting Star — kept alive briefly for its exit animation.
     private PhaseStar _lastEjectingStar;
-    // Authoritative owner of the ejection lock. -1 means unlocked.
-    private int currentEjectingStarId = -1;
     // Role of the most recent ejecting Star — used for rollback when a burst had no notes.
     private MusicalRole _lastEjectedRole = MusicalRole.None;
     // True from ejection until the burst fully clears; blocks new star spawning.
@@ -68,21 +64,7 @@ public sealed class StarPool : MonoBehaviour
     // collects and deactivates notes would incorrectly look like an empty burst.
     private bool _ejectedBurstWasEmpty;
 
-    public event Action<int> OnEjectionLockAcquired;
-    public event Action<int> OnEjectionOwnerEnteredCooldown;
-    public event Action<int> OnEjectionLockReleased;
-
     // ── Lifecycle ─────────────────────────────────────────────────────────────
-    private void Awake()
-    {
-        Instance = this;
-    }
-
-    private void OnDestroy()
-    {
-        if (Instance == this) Instance = null;
-    }
-
     private void Update()
     {
         if (_drum == null) return;
@@ -119,31 +101,6 @@ public sealed class StarPool : MonoBehaviour
         if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] Initialized — total ejections={_remainingEjectionsTotal}");
     }
 
-    public void DespawnAll()
-    {
-        foreach (var star in _activeStars.Values)
-        {
-            if (star != null) Destroy(star.gameObject);
-        }
-        _activeStars.Clear();
-
-        foreach (var star in _pausedStars)
-        {
-            if (star != null) Destroy(star.gameObject);
-        }
-        _pausedStars.Clear();
-
-        _lastEjectingStar = null;
-        currentEjectingStarId = -1;
-        _lastEjectedRole = MusicalRole.None;
-        _mineNodePending = false;
-        _mineNodeResolved = false;
-        _pendingGateCheck = false;
-        _ejectedBurstWasEmpty = false;
-        _remainingEjectionsTotal = 0;
-        if (GameFlowManager.VerboseLogging) Debug.Log("[StarPool] DespawnAll complete.");
-    }
-
     public void ExplodeAndClearAll()
     {
         foreach (var star in _activeStars.Values)
@@ -165,7 +122,6 @@ public sealed class StarPool : MonoBehaviour
         _pausedStars.Clear();
 
         _lastEjectingStar = null;
-        currentEjectingStarId = -1;
         _lastEjectedRole = MusicalRole.None;
         _mineNodePending = false;
         _mineNodeResolved = false;
@@ -173,42 +129,6 @@ public sealed class StarPool : MonoBehaviour
         _ejectedBurstWasEmpty = false;
         _remainingEjectionsTotal = 0;
         if (GameFlowManager.VerboseLogging) Debug.Log("[StarPool] ExplodeAndClearAll complete.");
-    }
-
-    // ── Safety bubble (replaces PhaseStar static) ────────────────────────────
-
-    public static bool IsPointInsideAnySafetyBubble(Vector2 pos)
-    {
-        var inst = Instance;
-        if (inst == null) return PhaseStar.IsPointInsideSafetyBubble(pos); // fallback
-
-        foreach (var star in inst._activeStars.Values)
-        {
-            if (star != null && star.IsPointInsideMyBubble(pos)) return true;
-        }
-        if (inst._lastEjectingStar != null && inst._lastEjectingStar.IsPointInsideMyBubble(pos))
-            return true;
-
-        return false;
-    }
-
-    // ── Gravity void routing (ITC → last ejecting star) ──────────────────────
-
-    public void SetGravityVoidSafetyBubbleActive(bool active, Vector3 center = default)
-    {
-        var target = _lastEjectingStar;
-        if (target == null && _activeStars.Count > 0)
-            target = _activeStars.Values.FirstOrDefault(s => s != null);
-        target?.SetGravityVoidSafetyBubbleActive(active, center);
-    }
-
-    public int GetSafetyBubbleRadiusCells()
-    {
-        var target = _lastEjectingStar;
-        if (target == null && _activeStars.Count > 0)
-            target = _activeStars.Values.FirstOrDefault(s => s != null);
-        if (target != null) return target.GetSafetyBubbleRadiusCells();
-        return _behaviorProfile != null ? _behaviorProfile.safetyBubbleRadiusCells : 4;
     }
 
     public List<MusicalRole> GetAnyActiveStarMotifRoles()
@@ -370,10 +290,6 @@ public sealed class StarPool : MonoBehaviour
         _mineNodePending = true;
         _mineNodeResolved = false;
         _ejectedBurstWasEmpty = false;
-
-        currentEjectingStarId = !ReferenceEquals(star, null) ? star.InstanceId : -1;
-        BroadcastEjectionLockAcquired(currentEjectingStarId);
-        BroadcastEjectionOwnerEnteredCooldownAndRelease(currentEjectingStarId);
 
         // Remove from active dict so the slot can be refilled.
         if (_activeStars.TryGetValue(role, out var active) && active == star)
@@ -617,27 +533,8 @@ public sealed class StarPool : MonoBehaviour
     private bool AnyCollectablesInFlight()
     {
         if (_gfm == null) _gfm = GameFlowManager.Instance;
-        bool unified = _gfm != null && _gfm.AnyCollectablesInFlightGlobal();
-        bool legacy = LegacyAnyCollectablesInFlight();
-        if (legacy != unified)
-            Debug.LogWarning($"[ASSERT:CIF] StarPool mismatch legacy={legacy} unified={unified}");
-        return unified;
+        return _gfm != null && _gfm.AnyCollectablesInFlightGlobal();
     }
-
-    private bool LegacyAnyCollectablesInFlight()
-    {
-        if (_tracks == null) return false;
-        foreach (var t in _tracks)
-        {
-            if (t == null) continue;
-            t.PruneSpawnedCollectables();
-            if (t.spawnedCollectables == null) continue;
-            foreach (var go in t.spawnedCollectables)
-                if (go != null && go.activeInHierarchy) return true;
-        }
-        return false;
-    }
-
 
     private bool AnyVehicleCapturedCollectablesPendingRelease()
     {
@@ -703,52 +600,6 @@ public sealed class StarPool : MonoBehaviour
     private void OnDisable()
     {
         UnsubscribeFromTracks();
-    }
-
-    private IEnumerable<PhaseStar> GetAllLiveStars()
-    {
-        var seen = new HashSet<PhaseStar>();
-
-        foreach (var star in _activeStars.Values)
-        {
-            if (ReferenceEquals(star, null) || !seen.Add(star)) continue;
-            yield return star;
-        }
-
-        foreach (var star in _pausedStars)
-        {
-            if (ReferenceEquals(star, null) || !seen.Add(star)) continue;
-            yield return star;
-        }
-
-        if (!ReferenceEquals(_lastEjectingStar, null) && seen.Add(_lastEjectingStar))
-            yield return _lastEjectingStar;
-    }
-
-    private void BroadcastEjectionLockAcquired(int ownerId)
-    {
-        if (ownerId < 0) return;
-        OnEjectionLockAcquired?.Invoke(ownerId);
-        foreach (var star in GetAllLiveStars())
-        {
-            if (star.InstanceId == ownerId) continue;
-            star.OnCoordinatorLockOwnedByAnotherStar();
-        }
-    }
-
-    private void BroadcastEjectionOwnerEnteredCooldownAndRelease(int ownerId)
-    {
-        if (ownerId < 0) return;
-
-        OnEjectionOwnerEnteredCooldown?.Invoke(ownerId);
-        foreach (var star in GetAllLiveStars())
-        {
-            if (star == null) continue;
-            star.OnCoordinatorLockReleasedAfterOwnerCooldown();
-        }
-
-        OnEjectionLockReleased?.Invoke(ownerId);
-        currentEjectingStarId = -1;
     }
 
     // ── Nested: destroy relay ─────────────────────────────────────────────────

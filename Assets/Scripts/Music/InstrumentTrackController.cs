@@ -50,8 +50,6 @@ public class InstrumentTrackController : MonoBehaviour
     private Color _gravityVoidDustImprintTint;
     private float _gravityVoidGrowSecondsRuntime = -1f;
     private int   _gravityVoidMaxRadiusRuntime   = -1;
-    // Inner radius (cells) where void ring growth begins — set to safety bubble radius so rings grow outward from the bubble perimeter.
-    private int   _gravityVoidBubbleInnerR       = 0;
     private double _lastTransportDsp;
     private int _lastPlayheadBin;
 // ------------------------------------------------------------
@@ -225,28 +223,13 @@ public class InstrumentTrackController : MonoBehaviour
         {
             if (_gfm == null) _gfm = GameFlowManager.Instance;
             var pool = _gfm?.activeDrumTrack?._starPool;
-            if (pool != null)
-            {
-                if (GameFlowManager.VerboseLogging) Debug.Log($"[BUBBLE] BeginGravityVoid → activating bubble at pos={_gravityVoidCenterWorld}");
-                pool.SetGravityVoidSafetyBubbleActive(true, _gravityVoidCenterWorld);
-                _gravityVoidBubbleInnerR = pool.GetSafetyBubbleRadiusCells();
-            }
-            else
-            {
-                if (GameFlowManager.VerboseLogging) Debug.Log("[BUBBLE] BeginGravityVoid → no active StarPool found; bubble skipped");
-                _gravityVoidBubbleInnerR = 0;
-            }
-
-            // Clear any existing dust inside the bubble refuge zone.
-            if (_gravityVoidHasCenterGP && _gravityVoidBubbleInnerR > 0)
-                gfm?.dustGenerator?.ClearBubbleZone(_gravityVoidCenterGP, _gravityVoidBubbleInnerR);
 
             // Compute max outer radius from ring formula so VFX sizes correctly.
             var motifRoles = pool?.GetAnyActiveStarMotifRoles();
             int roleCount = (motifRoles != null && motifRoles.Count > 0) ? motifRoles.Count : 4;
             int ringsPerSubseq = Mathf.Max(1, roleCount / 2);
             int totalRings = roleCount + (Mathf.Max(1, _gravityVoidOwner.loopMultiplier) - 1) * ringsPerSubseq;
-            _gravityVoidMaxRadiusRuntime = _gravityVoidBubbleInnerR + totalRings * config.voidRingWidthCells;
+            _gravityVoidMaxRadiusRuntime = totalRings * config.voidRingWidthCells;
         }
 
         _gravityVoidRoutine = StartCoroutine(GravityVoidGrowAndImprintRoutine());
@@ -265,12 +248,6 @@ public class InstrumentTrackController : MonoBehaviour
         {
             StopCoroutine(_gravityVoidRoutine);
             _gravityVoidRoutine = null;
-        }
-        // Safety bubble: deactivate when the void resolves.
-        {
-            if (_gfm == null) _gfm = GameFlowManager.Instance;
-            var pool = _gfm?.activeDrumTrack?._starPool;
-            pool?.SetGravityVoidSafetyBubbleActive(false);
         }
         if (_gravityVoidInstance == null) return;
         var explode = _gravityVoidInstance.GetComponent<Explode>();
@@ -314,7 +291,7 @@ public class InstrumentTrackController : MonoBehaviour
                 ImprintVoidRings(activeRoles, N, W, ringsThisBin, completedRings, growIn);
 
                 completedRings           += ringsThisBin;
-                _gravityVoidCurrentOuterR = _gravityVoidBubbleInnerR + completedRings * W;
+                _gravityVoidCurrentOuterR = completedRings * W;
             }
 
             yield return new WaitForSeconds(tick);
@@ -345,7 +322,7 @@ public class InstrumentTrackController : MonoBehaviour
         for (int r = 0; r < ringsThisBin; r++)
         {
             int globalRingIdx = completedRingsBefore + r;
-            int innerR        = _gravityVoidBubbleInnerR + globalRingIdx * W;
+            int innerR        = globalRingIdx * W;
             int outerR        = innerR + W;
             var ringRole      = activeRoles[globalRingIdx % N];
             var roleProfile   = MusicalRoleProfileLibrary.GetProfile(ringRole);

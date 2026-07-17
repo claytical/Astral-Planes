@@ -31,31 +31,23 @@ public class GardenRecord
 public enum PhaseStarState
 {
     Dormant        = -1,    // on-screen but inert, waiting for colored dust
-    WaitingForPoke   = 0,
-    Completed        = 2,
-    BridgeInProgress
+    WaitingForPoke   = 0
 }
 public partial class PhaseStar : MonoBehaviour
 {
-    private static int _nextId;
-    internal readonly int InstanceId = System.Threading.Interlocked.Increment(ref _nextId);
-
     // -------------------- Serialized config --------------------
     [Header("Profiles & Prefs")]
 
     [SerializeField] private PhaseStarBehaviorProfile behaviorProfile;
-    [SerializeField, Range(0f, 1f)] private float shardReadyThreshold = 0.5f;
 
     // -------------------- Profile-driven tuning (authoring surface) --------------------
     // PhaseStar no longer owns duplicated serialized fields for these knobs; they come from PhaseStarBehaviorProfile.
     // Defaults here are used only if behaviorProfile is missing.
     [SerializeField] private GameObject superNodePrefab;  // rainbow shard prefab (collider + visual)
-    [SerializeField] private SoloVoice soloVoice;         // assign in inspector or find at runtime
+    private SoloVoice soloVoice;                          // runtime cache, resolved via FindAnyObjectByType
     [Tooltip("Accumulator rotation speed multiplier when charge is ready (diamonds merged → faster spin).")]
     [SerializeField, Min(1f)] private float readyRotSpeedMul = 2.5f;
-    [Header("Charge Readiness")]
-    private bool _cachedIsSuperNode = false;
-    
+
     private int CollectableClearTimeoutLoops => behaviorProfile ? behaviorProfile.collectableClearTimeoutLoops : 2;
 
     private float CollectableClearTimeoutSeconds =>
@@ -109,7 +101,7 @@ public partial class PhaseStar : MonoBehaviour
     }
 
     // True while the star is parked off-screen during a collectable burst.
-    // Cleared in OnBurstNotesReleased() when all burst notes have been committed.
+    // Cleared in TryExitBurstHidden() when all burst notes have been committed.
     // All mutations should go through TryEnterBurstHidden() / TryExitBurstHidden()
     // so the coordinator is the single write path. The one exception is the hard
     // reset in EnterInMaze(), which resets all interaction state together.
@@ -118,11 +110,8 @@ public partial class PhaseStar : MonoBehaviour
 
     [SerializeField] private bool _tracePhaseStar = true;
 
-    private readonly Dictionary<MusicalRole, float> _starCharge = new();
-    private IPhaseStarChargeModel _chargeModel;
     private IPhaseStarStateController _stateController;
     private IPhaseStarBurstCoordinator _burstCoordinator;
-    [SerializeField] private bool allowConcurrentDormantCharging = true;
 
     [Header("Shard Visuals (Charge-Alpha)")]
     [Tooltip("Minimum alpha for a shard with zero charge — keeps it ghost-visible.")]
@@ -179,7 +168,6 @@ public partial class PhaseStar : MonoBehaviour
     public bool HasLiveEjectionNode => _activeNode != null || _activeSuperNode != null;
     [SerializeField] private MotifProfile _assignedMotif; // optional: motif this star represents (motif system)
 
-    public event Action<PhaseStar> OnArmed;
     public event Action<PhaseStar> OnDisarmed;
     public event Action<PhaseStar, MusicalRole> OnEjected;
     // Wired by StarPool: asked at poke time (role, isSuperNode) whether this ejection may
@@ -187,29 +175,18 @@ public partial class PhaseStar : MonoBehaviour
     // state is single-slot — and mine ejections additionally need unspent harvest budget.
     // Null (unmanaged star) means always allowed.
     public Func<MusicalRole, bool, bool> CanCommitEjection;
-    public event Action<PhaseStar> OnBurstRolledBack;
     // Fired when the Vehicle destroys the MineNode/SuperNode — the burst is now spawning.
     // Safe to fire from a destroyed star (C# delegate, not Unity message).
     public event Action<PhaseStar, MusicalRole> OnMineNodeResolved;
-    public event Action<PhaseStar, MusicalRole, Vector2Int> OnTentacleZapResolvedEvent;
     private bool _isArmed { get => _interactionState.Interaction.IsArmed; set => _interactionState.Interaction.IsArmed = value; }
     private int _baseSortingOrder;
-
-    public List<MusicalRole> GetMotifActiveRoles() =>
-        _assignedMotif != null ? _assignedMotif.GetActiveRoles() : null;
 
     // -------------------- Lifecycle --------------------
     void Start()
     {
-        _chargeModel ??= new PhaseStarChargeModel(_starCharge);
         _stateController ??= new PhaseStarStateController();
         _burstCoordinator ??= new PhaseStarBurstCoordinator();
         EnsurePreviewRing();
-    }
-    public void AddCharge(MusicalRole role, float energyUnitsDelivered)
-    {
-        _chargeModel ??= new PhaseStarChargeModel(_starCharge);
-        _chargeModel.AddCharge(role, energyUnitsDelivered, behaviorProfile != null ? behaviorProfile.dustToStarChargeMul : 1f, _attunedRole);
     }
 
     // Cells drained via ZapClearCellHeld since the last node spawn. The next MineNode
@@ -225,20 +202,6 @@ public partial class PhaseStar : MonoBehaviour
         ResolveGameFlowManager()?.dustGenerator?.ReleaseHeldCells(_heldDrainCells);
         _heldDrainCells.Clear();
     }
-    /// <summary>
-    /// Returns 0..1 hunger for a specific role: 1 = starving (zero charge), 0 = fully charged.
-    /// Used by the navigator to weight density steering toward under-charged roles.
-    /// </summary>
-    public float GetRoleHunger(MusicalRole role)
-    {
-        _chargeModel ??= new PhaseStarChargeModel(_starCharge);
-        return _chargeModel.GetRoleHunger(role);
-    }
-
-    public static bool IsPointInsideSafetyBubble(Vector2 worldPos) => false;
-
-    public bool IsPointInsideMyBubble(Vector2 worldPos) => false;
-
     public void EnterInMaze(Vector2 worldPos)
     {
         EnsureSubcomponents();
@@ -257,7 +220,6 @@ public partial class PhaseStar : MonoBehaviour
         _disarmReason = PhaseStarDisarmReason.None;
         _burstOffScreen = false;
         _awaitingCollectableClear = false;
-        _starCharge.Clear();
         _displayedCharge01 = 0f;
         TransitionZapState(ZapProgressState.Seeking, _previewRole, "phase-reset-enter-maze");
 
@@ -273,15 +235,6 @@ public partial class PhaseStar : MonoBehaviour
         LogState("EnterInMaze+Dormant");
     }
     
-    private Vector2 ComputeDormantRestPosition()
-    {
-        var drum = TryResolveContext(out var resolvedDrum, out _) ? resolvedDrum : null;
-        if (drum == null) return transform.position;
-        int gw = drum.GetSpawnGridWidth();
-        int gh = drum.GetSpawnGridHeight();
-        return drum.GridToWorldPosition(new Vector2Int(gw / 2, gh / 2));
-    }
-
     private void EnterDormantWaitState()
     {
         _entryInProgress = false;
@@ -289,7 +242,6 @@ public partial class PhaseStar : MonoBehaviour
         _isArmed = false;
         _disarmReason = PhaseStarDisarmReason.None;
 
-        visuals?.HideSafetyBubble();
         visuals?.ToggleShardRenderers(true);
 
         float seedScale = Mathf.Max(0f, dormantSeedScale);
@@ -378,11 +330,10 @@ public partial class PhaseStar : MonoBehaviour
 
             bool hasDust = HasColoredDustAvailable();
             bool hasDelivery = _hasReceivedEnergy;
-            bool hasEjectable = HasDominantRoleEjectable();
 
             if (_tracePhaseStar)
             {
-                if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar] Dormant wait precheck hasDust={hasDust} hasDelivery={hasDelivery} hasEjectable={hasEjectable}", this);
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar] Dormant wait precheck hasDust={hasDust} hasDelivery={hasDelivery} zapped={zappedCount}/{RequiredZapCount}", this);
             }
 
             // Wake on stable acquisition preconditions only.
@@ -451,49 +402,6 @@ public partial class PhaseStar : MonoBehaviour
         return changed;
     }
 
-    private float GetTotalCharge()
-    {
-        _chargeModel ??= new PhaseStarChargeModel(_starCharge);
-        return _chargeModel.GetTotalCharge();
-    }
-
-    // Returns 0-1: how close a role's charge is to its ready threshold.
-    // Used for visual lerps and hunger calculations. Normalizes against role's maxEnergyUnits.
-    private float GetChargeNormalized01(MusicalRole role)
-    {
-        _starCharge.TryGetValue(role, out float c);
-        var rp = MusicalRoleProfileLibrary.GetProfile(role);
-        float threshold = shardReadyThreshold * (rp != null ? rp.maxEnergyUnits : 1);
-        return Mathf.Clamp01(c / Mathf.Max(0.001f, threshold));
-    }
-
-    private bool GetDominantRoleRaw(out MusicalRole role, out float rawCharge, out float threshold)
-    {
-        role = MusicalRole.None;
-        rawCharge = 0f;
-        threshold = 1f;
-
-        float bestCharge = 0f;
-        foreach (var kv in _starCharge)
-        {
-            if (kv.Value > bestCharge)
-            {
-                bestCharge = kv.Value;
-                role = kv.Key;
-            }
-        }
-
-        if (role == MusicalRole.None)
-            return false;
-
-        rawCharge = bestCharge;
-        var rp = MusicalRoleProfileLibrary.GetProfile(role);
-        threshold = shardReadyThreshold * (rp != null ? rp.maxEnergyUnits : 1f);
-        return true;
-    }
-
-    private bool HasDominantRoleEjectable() =>
-        GetDominantRoleRaw(out _, out float rawCharge, out float threshold) && rawCharge >= threshold;
     private struct PlannedEjectionDescriptor
     {
         public MusicalRole role;
@@ -513,17 +421,12 @@ public partial class PhaseStar : MonoBehaviour
 
     // Zap progress state machine.
     // Seeking          → star has no zaps yet and is accumulating.
-    // DormantNotSeeking → a sibling star holds the coordinator lock; this star suspends
-    //                    progression without losing its counters. Enters only when
-    //                    allowConcurrentDormantCharging is false.
     // Zapping          → at least one zap delivered, still accumulating toward threshold.
     // WaitingForRetract → threshold met; tentacles are retracting before readiness is latched.
     // ReadyLatched      → all zaps confirmed + tentacles retracted; poke can now eject a node.
     // Ejecting          → node spawn in flight.
-    private enum ZapProgressState { Seeking, DormantNotSeeking, Zapping, WaitingForRetract, ReadyLatched, Ejecting }
+    private enum ZapProgressState { Seeking, Zapping, WaitingForRetract, ReadyLatched, Ejecting }
     private ZapProgressState _zapProgressState = ZapProgressState.Seeking;
-    private ZapProgressState _preservedZapProgressStateBeforeCoordinatorLock = ZapProgressState.Seeking;
-    private bool _coordinatorLockOwnedByOtherStar;
 
     // Zap count authority chain (highest to lowest priority):
     //   1. _currentBurstRequiredZaps — set by DirectSpawnMineNode() from the actual node payload;
@@ -546,7 +449,6 @@ public partial class PhaseStar : MonoBehaviour
     }
     private MusicalRole _requiredZapRole = MusicalRole.None;
     private bool _requiredZapNoteSetAvailable;
-    private Vector2Int _lastResolvedZapCell;
     private MusicalRole _lastResolvedZapRole = MusicalRole.None;
 
 
@@ -594,7 +496,6 @@ public partial class PhaseStar : MonoBehaviour
         // Canonical zap progress path: increment exactly once per confirmed dust clear.
         zappedCount++;
         _lastResolvedZapRole = role;
-        _lastResolvedZapCell = targetCell;
 
         if (!_requiredZapNoteSetAvailable || !_plannedEjectionDescriptor.IsValid)
         {
@@ -620,11 +521,10 @@ public partial class PhaseStar : MonoBehaviour
             dust?.SetAcquisitionEnabled(false, "waiting-for-retract-threshold-met");
             dust?.BeginRetractionForActiveTentacles();
 
-            if (_state == PhaseStarState.Dormant && !_pendingDormantActivation && !_coordinatorLockOwnedByOtherStar)
+            if (_state == PhaseStarState.Dormant && !_pendingDormantActivation)
                 TransitionDormantToActive();
         }
 
-        OnTentacleZapResolvedEvent?.Invoke(this, role, targetCell);
         if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar:ZapResolved] role={role} targetCell={targetCell} requiredZaps={requiredZapCount} currentZaps={zappedCount} ready={readyNow}");
     }
 
@@ -633,8 +533,7 @@ public partial class PhaseStar : MonoBehaviour
         if (_pendingDormantActivation)
             FinalizeDormantToActiveAfterRetract();
         else if (_state == PhaseStarState.Dormant &&
-                 _zapProgressState == ZapProgressState.WaitingForRetract &&
-                 !_coordinatorLockOwnedByOtherStar)
+                 _zapProgressState == ZapProgressState.WaitingForRetract)
             FinalizeDormantToActiveAfterRetract(force: true);
 
         if (_zapProgressState != ZapProgressState.WaitingForRetract)
@@ -744,8 +643,7 @@ public partial class PhaseStar : MonoBehaviour
         // Reset attunement so the star can re-attune to the new phase's roles.
         _attunedRole = MusicalRole.None;
 
-        // Clear charge state for this new star.
-        _starCharge.Clear();
+        // Reset zap-progress display for this new star.
         _displayedCharge01 = 0f;
         TransitionZapState(ZapProgressState.Seeking, _previewRole, "phase-reset-initialize");
 
@@ -797,7 +695,7 @@ public partial class PhaseStar : MonoBehaviour
     {
         if (_previewRole == MusicalRole.None) return Color.gray;
 
-        float ready01 = _zapProgressState == ZapProgressState.ReadyLatched ? 1f : GetChargeNormalized01(_previewRole);
+        float ready01 = _zapProgressState == ZapProgressState.ReadyLatched ? 1f : ZapProgress01;
         Color gray = Color.Lerp(Color.gray, Color.lightGray, 0.65f);
         Color c = Color.Lerp(gray, _previewColor, ready01);
         c.a = 1f;
@@ -845,8 +743,7 @@ public partial class PhaseStar : MonoBehaviour
     {
         if (_state == PhaseStarState.Dormant &&
             _zapProgressState == ZapProgressState.ReadyLatched &&
-            !_pendingDormantActivation &&
-            !_coordinatorLockOwnedByOtherStar)
+            !_pendingDormantActivation)
         {
             TransitionDormantToActive();
         }
@@ -855,30 +752,30 @@ public partial class PhaseStar : MonoBehaviour
             FinalizeDormantToActiveAfterRetract();
     }
 
-    // Tracks which role currently has the highest charge, refreshes the planned ejection
-    // descriptor when the dominant role or its track changes, and updates the charge display lerp.
+    // Keeps the preview role/track pinned to the star's attuned role, refreshes the planned
+    // ejection descriptor when the track changes, and updates the charge display lerp.
     private void UpdateDominantRole(float dt)
     {
-        if (GetDominantRoleRaw(out var dominantRole, out _, out _))
+        if (_attunedRole != MusicalRole.None)
         {
-            if (dominantRole != _previewRole)
+            if (_attunedRole != _previewRole)
             {
-                _previewRole = dominantRole;
-                _cachedTrack = FindTrackByRole(dominantRole);
-                _previewColor = ResolveRoleColor(dominantRole, _cachedTrack);
+                _previewRole = _attunedRole;
+                _cachedTrack = FindTrackByRole(_attunedRole);
+                _previewColor = ResolveRoleColor(_attunedRole, _cachedTrack);
                 if (zappedCount == 0)
-                    TryRefreshRequiredZapCountForPlannedRole(dominantRole, _cachedTrack, resetCurrentZapCount: false, reason: "dominant-role-switch");
+                    TryRefreshRequiredZapCountForPlannedRole(_attunedRole, _cachedTrack, resetCurrentZapCount: false, reason: "attuned-role-switch");
                 visuals?.ResetDualDiamondVisualState();
             }
             else
             {
-                InstrumentTrack latestTrack = FindTrackByRole(dominantRole);
+                InstrumentTrack latestTrack = FindTrackByRole(_attunedRole);
                 bool trackChanged = !ReferenceEquals(latestTrack, _plannedEjectionDescriptor.track);
                 if (trackChanged)
                 {
                     _cachedTrack = latestTrack;
                     if (zappedCount == 0)
-                        TryRefreshRequiredZapCountForPlannedRole(dominantRole, latestTrack, resetCurrentZapCount: false, reason: "track-availability-change");
+                        TryRefreshRequiredZapCountForPlannedRole(_attunedRole, latestTrack, resetCurrentZapCount: false, reason: "track-availability-change");
                 }
             }
 
@@ -1016,13 +913,7 @@ public partial class PhaseStar : MonoBehaviour
     private bool AnyCollectablesInFlightGlobal()
     {
         var gfm = ResolveGameFlowManager();
-        bool unified = gfm != null && gfm.AnyCollectablesInFlightGlobal();
-        bool legacy = LegacyAnyCollectablesInFlightGlobal(gfm);
-
-        if (legacy != unified)
-            Debug.LogWarning($"[ASSERT:CIF] PhaseStar mismatch legacy={legacy} unified={unified} star={name}");
-
-        return unified;
+        return gfm != null && gfm.AnyCollectablesInFlightGlobal();
     }
 
     // Returns true only when THIS star's own InstrumentTrack has live collectables,
@@ -1035,21 +926,6 @@ public partial class PhaseStar : MonoBehaviour
         return track.spawnedCollectables != null && track.spawnedCollectables.Count > 0;
     }
 
-    private static bool LegacyAnyCollectablesInFlightGlobal(GameFlowManager gfm)
-    {
-        if (gfm == null || gfm.controller == null || gfm.controller.tracks == null)
-            return false;
-        foreach (var t in gfm.controller.tracks)
-        {
-            if (t == null) continue;
-            if (t.spawnedCollectables != null)
-                t.spawnedCollectables.RemoveAll(go => go == null || !go.activeInHierarchy);
-            if (t.spawnedCollectables != null && t.spawnedCollectables.Count > 0)
-                return true;
-        }
-        return false;
-    }
-    
     private void ArmNext()
     {
         _stateController ??= new PhaseStarStateController();
@@ -1075,8 +951,6 @@ public partial class PhaseStar : MonoBehaviour
         _disarmReason = PhaseStarDisarmReason.None;
         _isArmed = true;
 
-        DeactivateSafetyBubble();
-
         EnableColliders();
         dust?.SetTentaclesActive(false);
 
@@ -1086,7 +960,6 @@ public partial class PhaseStar : MonoBehaviour
         if (visuals != null && ZapProgress01 >= 1f)
             visuals.transform.localScale = Vector3.one;
         SetVisual(VisualMode.Bright, ResolvePreviewColorByReadiness());
-        OnArmed?.Invoke(this);
     }
     public void Pause()
     {
@@ -1159,16 +1032,6 @@ public partial class PhaseStar : MonoBehaviour
         if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar] Burst in flight — hidden in place at {transform.position}");
     }
     
-    private void RelocateToAvailableCell()
-    {
-        var drum = TryResolveContext(out var resolvedDrum, out _) ? resolvedDrum : null;
-        if (drum == null) return;
-        Vector2Int cell = drum.GetRandomAvailableCell();
-        if (cell.x < 0) return;
-        Vector2 worldPos = drum.GridToWorldPosition(cell);
-        transform.position = (Vector3)worldPos + Vector3.forward * transform.position.z;
-    }
-    
     private void Disarm(PhaseStarDisarmReason reason, Color? tintOverride = null)
     {
         _isArmed = false;
@@ -1185,7 +1048,7 @@ public partial class PhaseStar : MonoBehaviour
         dust?.SetTentaclesActive(false);
 
         // Suppress the dim visual when the star is parked off-screen.
-        // NodeResolving / AwaitBridge: star is hidden (MineNode is alive); use Hidden.
+        // NodeResolving: star is hidden (MineNode is alive); use Hidden.
         // Also hide completely if a MineNode/SuperNode is still live, regardless of reason
         // (e.g. ExpansionPending fires on a loop boundary while a node is active).
         // All other reasons: show dim so the star is faintly visible while waiting.
@@ -1193,7 +1056,6 @@ public partial class PhaseStar : MonoBehaviour
         {
             bool nodeIsAlive = _activeNode != null || _activeSuperNode != null;
             bool hideCompletely = reason == PhaseStarDisarmReason.NodeResolving
-                               || reason == PhaseStarDisarmReason.AwaitBridge
                                || nodeIsAlive;
             SetVisual(hideCompletely ? VisualMode.Hidden : VisualMode.Dim,
                       tintOverride ?? ResolvePreviewColorByReadiness());
@@ -1304,10 +1166,8 @@ public partial class PhaseStar : MonoBehaviour
 
         if (shouldDisarmForGate)
         {
-            if (anyCollectables)
-                if (GameFlowManager.VerboseLogging) Debug.Log($"[PS:LB] OwnTrackCollectablesInFlight True");
-            else
-                if (GameFlowManager.VerboseLogging) Debug.Log($"[PS:LB] AnyExpansionPending True");
+            if (GameFlowManager.VerboseLogging)
+                Debug.Log(anyCollectables ? "[PS:LB] OwnTrackCollectablesInFlight True" : "[PS:LB] AnyExpansionPending True");
 
             Disarm(anyCollectables ? PhaseStarDisarmReason.CollectablesInFlight : PhaseStarDisarmReason.ExpansionPending, _lockedTint);
             return true;
@@ -1370,12 +1230,12 @@ public partial class PhaseStar : MonoBehaviour
         }
         else
         {
-            // If thresholds changed (e.g. motif/phase swap) while this star stayed armed,
-            // we can end up armed-but-not-ejectable with tentacles off, which deadlocks poke flow.
-            // Drop back into dormant so charge collection can resume.
-            if (!HasDominantRoleEjectable())
+            // If the zap requirement changed (e.g. motif/phase swap) while this star stayed
+            // armed, we can end up armed-but-not-latched with tentacles off, which deadlocks
+            // poke flow. Drop back into dormant so zap acquisition can resume.
+            if (_zapProgressState != ZapProgressState.ReadyLatched)
             {
-                DBG("[PS:LB] armed but dominant role not ejectable -> returning to dormant");
+                DBG("[PS:LB] armed but not ready-latched -> returning to dormant");
                 Disarm(PhaseStarDisarmReason.None, _lockedTint);
                 EnterDormantWaitState();
                 return;
@@ -1430,8 +1290,7 @@ public partial class PhaseStar : MonoBehaviour
         Trace("PrepareNextDirective() begin");
 
         _cachedTrack = null;
-        _cachedIsSuperNode = false;
-        
+
         if (_drum == null) return;
 
         MusicalRole role = GetPlannedRoleForHighlightedShard();
@@ -1440,12 +1299,6 @@ public partial class PhaseStar : MonoBehaviour
         if (track == null) return;
 
         _cachedTrack = track;
-
-        // --- Decide what NoteSet a "normal" node would use ---
-        NoteSet planned = ResolvePlannedNoteSet(track);
-        
-        // SuperNode only when the track is fully expanded AND repeating the same NoteSet adds no new coverage.
-        _cachedIsSuperNode = (planned != null && _cachedTrack != null) && ShouldSpawnSuperNodeForTrack(_cachedTrack);
         PrimeZapRequirementForRole(role, track);
     }
     void BuildPreviewRing()
@@ -1495,7 +1348,7 @@ public partial class PhaseStar : MonoBehaviour
     sr.color = new Color(0.45f, 0.45f, 0.45f, shardMinAlpha);
     sr.sortingOrder = _baseSortingOrder;
 
-    if (!_isArmed && (_disarmReason == PhaseStarDisarmReason.NodeResolving || _disarmReason == PhaseStarDisarmReason.AwaitBridge))
+    if (!_isArmed && _disarmReason == PhaseStarDisarmReason.NodeResolving)
         sr.enabled = false;
 
     _previewVisual = go.transform;
@@ -1511,7 +1364,7 @@ public partial class PhaseStar : MonoBehaviour
     srB.color = new Color(0.45f, 0.45f, 0.45f, shardMinAlpha);
     srB.sortingOrder = _baseSortingOrder;
 
-    if (!_isArmed && (_disarmReason == PhaseStarDisarmReason.NodeResolving || _disarmReason == PhaseStarDisarmReason.AwaitBridge))
+    if (!_isArmed && _disarmReason == PhaseStarDisarmReason.NodeResolving)
         srB.enabled = false;
 
     _previewVisualB = goB.transform;
@@ -1583,27 +1436,15 @@ public partial class PhaseStar : MonoBehaviour
 
         return MusicalRole.None;
     }
-    public void SetGravityVoidSafetyBubbleActive(bool active, Vector3 center = default)
-    {
-        // Safety bubble visuals/gameplay removed.
-    }
-
-    public int GetSafetyBubbleRadiusCells() => 0;
-
     /// <summary>
-    /// 0 = satiated (at least one shard is above shardReadyThreshold).
-    /// 1 = starving (no shard has crossed the threshold).
+    /// 0 = satiated (zap requirement met). 1 = starving (no zaps yet).
     /// Used by PhaseStarMotion2D to scale drift speed.
     /// </summary>
     public float GetHungerLevel()
     {
         if (_previewRole == MusicalRole.None) return 1f;
-        return 1f - GetChargeNormalized01(_previewRole);
+        return 1f - ZapProgress01;
     }
-    private int CurrentEntropyForSelection() {
-        return 0;
-    }
-
     private void Trace(string msg)
     {
         if (_tracePhaseStar)
@@ -1617,11 +1458,9 @@ public partial class PhaseStar : MonoBehaviour
         string targetRole = _previewRole != MusicalRole.None ? _previewRole.ToString() : "-";
         if (GameFlowManager.VerboseLogging) Debug.Log(
             $"[PhaseStar][{where}] state={_state} interaction=({_interactionState.ToDebugString()}) " +
-            $"role={targetRole} attunedRole={_attunedRole} charge={GetTotalCharge():0.00}");
+            $"role={targetRole} attunedRole={_attunedRole} zapped={zappedCount}/{RequiredZapCount}");
     }
 
-    private void ActivateSafetyBubble(Vector3 center = default) { }
-    private void DeactivateSafetyBubble() { }
 }
     
 

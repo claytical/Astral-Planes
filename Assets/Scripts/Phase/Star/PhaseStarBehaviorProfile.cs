@@ -16,12 +16,6 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Tooltip("Radius in grid cells for the keep-clear pocket when the star is idle/armed.")]
     public int starKeepClearRadiusCells = 2;
 
-    [Header("Safety Bubble (gravity void only)")]
-    [Tooltip("If enabled, the star can display a temporary refuge bubble during gravity void expansion.")]
-    public bool enableSafetyBubble = true;
-    [Min(0)]
-    [Tooltip("Bubble radius in grid cells for the gravity-void refuge zone.")]
-    public int safetyBubbleRadiusCells = 4;
     [Header("Self-heal / Deadlock Recovery")]
     [Min(0)]
     [Tooltip("If waiting for collectables to clear but nothing is in flight, re-arm/advance after this many loop boundaries. 0 disables.")]
@@ -29,13 +23,6 @@ public class PhaseStarBehaviorProfile : ScriptableObject
 
     [Tooltip("Secondary timeout in seconds (DSP time). Used if loop counter is unavailable. <= 0 disables.")]
     public float collectableClearTimeoutSeconds = 0f;
-
-    // =====================================================================
-    // Dust -> Zap progression (PhaseStar.cs)
-    // =====================================================================
-    [Header("Dust -> Zap Progression (PhaseStar.cs)")]
-    [Tooltip("Multiplier applied to delivered dust energy before zap progress is evaluated.")]
-    [Min(0f)] public float dustToStarChargeMul = 1.0f;
 
     // =====================================================================
     // Star body motion (PhaseStarMotion2D)
@@ -78,7 +65,6 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Min(0.5f)] public float entrySettleInset = 2.5f;
 
     [Header("Charge Readiness (PhaseStar)")]
-    [Range(0f, 1f)] public float shardReadyThreshold = 0.5f;
     [Tooltip("Accumulator rotation speed multiplier when charge is ready.")]
     [Min(1f)] public float readyRotSpeedMul = 2.5f;
 

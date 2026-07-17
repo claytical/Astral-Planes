@@ -84,7 +84,6 @@ public partial class DrumTrack : MonoBehaviour
     private AudioClip _currentDrumClip;
 
     public event System.Action OnLoopBoundary; // fire in LoopRoutines()
-    public event System.Action<PhaseStarBehaviorProfile> OnPhaseStarSpawned;
     public event System.Action<int, int> OnStepChanged; // (stepIndex, leaderSteps)
 
     private int _lastStepIdx = -1;
@@ -1126,7 +1125,6 @@ public partial class DrumTrack : MonoBehaviour
         _starPool = poolGo.AddComponent<StarPool>();
         _starPool.Initialize(this, motif, profileAsset, targets);
 
-        OnPhaseStarSpawned?.Invoke(profileAsset);
         if (GameFlowManager.VerboseLogging) Debug.Log("[DrumTrack] StarPool created and initialized.");
     }
 

@@ -28,6 +28,10 @@ public class RingGlyphConfig : ScriptableObject
              "on top of each other without fully obscuring what is behind.")]
     public float ringAlpha = 0.45f;
 
+    [Range(0f, 1f)]
+    [Tooltip("Alpha for the contour LineRenderer. 1 = fully opaque track color.")]
+    public float contourAlpha = 1f;
+
     [Header("Line")]
     [Tooltip("LineRenderer width in local units.")]
     public float lineWidth = 0.003f;
@@ -59,39 +63,17 @@ public class RingGlyphConfig : ScriptableObject
     [Tooltip("Maximum rotation speed cap in degrees/sec.")]
     public float rotSpeedMax = 300f;
 
-    [Tooltip("Seconds for all rings to fade out when the bridge ends.")]
-    public float fadeOutDuration = 0.75f;
-
     [Tooltip("Radius of the mini-ring dot that travels from note marker to tug point (in ring-local units).")]
     public float noteDotRadius = 0.02f;
 
     [Tooltip("Duration in seconds for each note-to-tug travel animation.")]
     public float noteTravelDuration = 0.35f;
 
-    [Header("Ring Hold / Bounce")]
-    [Tooltip("Scale rings hold at after the bounce and during the roll-off exit.")]
-    [Range(0.05f, 1f)]
-    public float ringHoldScale = 0.25f;
-
-    [Tooltip("How far the ring compresses during the press phase (fraction of full size). " +
-             "Lower = more dramatic press.")]
-    [Range(0.01f, 0.5f)]
-    public float bouncePressScale = 0.12f;
-
-    [Tooltip("Seconds for the initial press-down.")]
-    public float bouncePressDuration = 0.10f;
-
-    [Tooltip("Seconds for the spring-back and settle to ringHoldScale.")]
-    public float bounceSettleDuration = 0.22f;
-
     [Tooltip("Seconds for the ring to slide from center to off the left edge at the second loop boundary.")]
     public float rollOffDuration = 1.5f;
 
     [Tooltip("Duration for the quick ring appear animation (dipped contour drawn in fast).")]
     public float ringAppearDuration = 0.1f;
-
-    [Tooltip("Steps before the note's beat to launch the travel dot, so it arrives at the dip on the beat.")]
-    public int noteLaunchLeadSteps = 2;
 
     [Tooltip("Percussive AudioClip played when a note travel dot launches.")]
     public AudioClip launchSfx;
@@ -107,18 +89,12 @@ public class RingGlyphConfig : ScriptableObject
     [Tooltip("Volume for the impact SFX.")]
     public float impactSfxVolume = 0.6f;
 
-    [Tooltip("Additional degrees/sec applied to the ring's rotation during the spin-off exit.")]
-    public float spinOffExtraDegPerSec = 720f;
-
     [Tooltip("Duration of the spin-off exit in seconds (replaces rollOffDuration for gameplay rings).")]
     public float spinOffDuration = 0.45f;
 
     [Header("Tilt Exit")]
     [Tooltip("Target X-axis rotation (degrees) for the tilt-exit phase.")]
     public float tiltXDegrees = 75f;
-
-    [Tooltip("Duration (seconds) for the ring to rotate from 0° to tiltXDegrees.")]
-    public float tiltXDuration = 1.0f;
 
     [Tooltip("Duration (seconds) for the ring to scale from its current size to zero after the tilt.")]
     public float scaleDownDuration = 0.5f;

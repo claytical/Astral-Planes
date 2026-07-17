@@ -39,8 +39,6 @@ public enum PhaseStarDisarmReason
     NodeResolving,
     CollectablesInFlight,
     ExpansionPending,
-    AwaitBridge,
-    Bridge,
     SiblingActive
 }
 

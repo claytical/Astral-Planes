@@ -23,7 +23,6 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 20a81122eb435432cb1086a932a44d5c, type: 3}
   - {fileID: 8300000, guid: b278c9e5108ad49279c6c2bdf1e1097f, type: 3}
   - {fileID: 8300000, guid: 068b2e5c637654f4b80c89b0e1eeaaf0, type: 3}
-  intensityThresholds: []
   entryLoopCount: 16
   resetFirstCarryOnStart: 0
   bpm: 100

@@ -91,13 +91,11 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         public int lineIndexInRole;
         public int invalidTargetFrames;
         public float invalidTargetMs;
-        public bool hasPendingZap;
-        public Vector2Int pendingZapCell;
         public bool clearStarted;
         public float clearTimer;
         public float clearDuration;
-        public int pendingZapUnits;
         public bool buildupStarted;
+        public float effectiveBuildupSeconds; // drainBuildupSeconds × cell HP, set at buildup start
         public bool siphonActive;
         public float siphonT; // 1 = at tip, 0 = arrived at star root
     }
@@ -164,11 +162,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     public void BeginRetractionForActiveTentacles()
     {
-        BeginRetractAllTentacles();
-    }
-
-    public void BeginRetractAllTentacles()
-    {
         SetAcquisitionEnabled(false, "begin-retract-all");
         _isRetractAllInProgress = true;
 
@@ -192,8 +185,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         _lastTentacleStartTime = 0f;
         TryNotifyAllTentaclesRetracted();
     }
-    
-    public bool AreAllTentaclesRetracted => !HasActiveTentacles;
 
     public bool HasActiveTentacles
     {
@@ -319,7 +310,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     /// <summary>
     /// Tentacles currently holding a slot of the zap budget: growing/draining toward a
-    /// cell, or retracting with a confirmed zap not yet consumed by the star.
+    /// cell. Retracting/dissolving tentacles hold nothing — their zap was already
+    /// credited at drain-clear time, so RemainingZapCount reflects it.
     /// </summary>
     private int CountZapBudgetInFlight()
     {
@@ -327,17 +319,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         foreach (var tentacle in _tentacles)
         {
             if (tentacle.role != _attunedRole) continue;
-            switch (tentacle.state)
-            {
-                case TentacleState.Growing:
-                case TentacleState.Draining:
-                    n++;
-                    break;
-                case TentacleState.Retracting:
-                case TentacleState.Dissolving:
-                    if (tentacle.hasPendingZap) n++;
-                    break;
-            }
+            if (tentacle.state == TentacleState.Growing || tentacle.state == TentacleState.Draining)
+                n++;
         }
         return n;
     }
@@ -488,12 +471,20 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                     if (!tentacle.buildupStarted)
                     {
                         tentacle.buildupStarted = true;
-                        if (drainBuildupSeconds > 0f && gen != null &&
+                        // Cell HP is drain-time flavor: harder cells take proportionally
+                        // longer to drain, but every cell still counts as exactly one zap.
+                        tentacle.effectiveBuildupSeconds = drainBuildupSeconds;
+                        if (gen != null &&
                             gen.TryGetDustAt(tentacle.targetCell, out var buildupDust) && buildupDust != null)
-                            buildupDust.BeginDrainBuildup(drainBuildupSeconds);
+                        {
+                            tentacle.effectiveBuildupSeconds =
+                                drainBuildupSeconds * Mathf.Max(1, buildupDust.maxEnergyUnits);
+                            if (tentacle.effectiveBuildupSeconds > 0f)
+                                buildupDust.BeginDrainBuildup(tentacle.effectiveBuildupSeconds);
+                        }
                     }
 
-                    if (tentacle.contactTimer >= minContactTime + drainBuildupSeconds)
+                    if (tentacle.contactTimer >= minContactTime + tentacle.effectiveBuildupSeconds)
                         HandleDrainContactAndClear(tentacle, dt, starPos);
                 }
 
@@ -508,7 +499,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
                 if (Vector2.Distance(tentacle.tipPos, starPos) < 0.05f)
                 {
-                    TryConsumePendingZap(tentacle, gen);
                     TransitionTentacleState(tentacle, TentacleState.Idle, "fully retracted");
                     tentacle.line.enabled = false;
                     TryNotifyAllTentaclesRetracted();
@@ -560,8 +550,8 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.clearStarted = false;
         tentacle.clearTimer = 0f;
         tentacle.clearDuration = 0f;
-        tentacle.pendingZapUnits = 0;
         tentacle.buildupStarted = false;
+        tentacle.effectiveBuildupSeconds = 0f;
         tentacle.siphonActive = false;
         tentacle.siphonT = 0f;
 
@@ -599,17 +589,16 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             tentacle.clearStarted = true;
             tentacle.clearTimer = 0f;
             tentacle.clearDuration = Mathf.Max(0.01f, dissolveDuration);
-            tentacle.hasPendingZap = true;
-            tentacle.pendingZapCell = tentacle.targetCell;
-            tentacle.pendingZapUnits = 0;
 
             if (gen != null && gen.TryGetDustAt(tentacle.targetCell, out var dust) && dust != null)
             {
                 // Capture the vivid role tint BEFORE ChipEnergy lerps it toward gray,
                 // so the clear explosion fires in the cell's true color.
                 Color preDrainTint = dust.CurrentTint;
-                tentacle.pendingZapUnits = dust.ChipEnergy(1);
-                if (tentacle.pendingZapUnits > 0)
+                // Drain the cell's full remaining energy — one cell = one zap; the cell's
+                // HP already paid its cost as drain time.
+                int drainedUnits = dust.ChipEnergy(dust.maxEnergyUnits);
+                if (drainedUnits > 0)
                 {
                     // Drained energy is held by the MineNode the star builds from it;
                     // the cell regrows when that node dies (or the star is destroyed first).
@@ -618,6 +607,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
                     _star?.RegisterHeldDrainCell(tentacle.targetCell);
                     tentacle.siphonActive = true;
                     tentacle.siphonT = 1f;
+                    CreditZap(tentacle, drainedUnits);
                 }
             }
         }
@@ -627,39 +617,25 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             BeginRetractingTentacle(tentacle, starPos, "dust faded out");
     }
 
-    private void TryConsumePendingZap(Tentacle tentacle, CosmicDustGenerator gen)
+    // Credits the zap the moment the cell is consumed. The siphon/retraction that follows
+    // is purely visual — a disarm or dissolve mid-siphon can no longer lose a paid-for zap.
+    private void CreditZap(Tentacle tentacle, int drainedUnits)
     {
-        if (!tentacle.hasPendingZap) return;
-        tentacle.hasPendingZap = false;
-
-        int actualUnits = Mathf.Max(0, tentacle.pendingZapUnits);
-        tentacle.pendingZapUnits = 0;
-        if (actualUnits <= 0)
-            return;
-
         if (_star != null)
         {
-            bool wasUnattned = _star.AttunedRole == MusicalRole.None;
-            _star.AddCharge(tentacle.role, actualUnits);
-            onDelivery?.Invoke(tentacle.role, actualUnits);
-            if (wasUnattned)
+            bool wasUnattuned = _star.AttunedRole == MusicalRole.None;
+            onDelivery?.Invoke(tentacle.role, drainedUnits);
+            if (wasUnattuned)
                 OnAttuned?.Invoke(tentacle.role);
         }
 
         tentacle.drainFlashTimer = DrainFlashDuration;
-        Vector2Int zappedCell = tentacle.pendingZapCell;
+        Vector2Int zappedCell = tentacle.targetCell;
         _zappedThisCycle.Add(zappedCell);
         _navigator?.NotifyCellZappedThisCycle(zappedCell);
+        _navigator?.ClearLockOn(zappedCell);
+        tentacle.notifiedDrainLock = false;
         _star?.OnTentacleZapResolved(tentacle.role, zappedCell);
-        if (gen != null)
-        {
-            _navigator?.ClearLockOn(zappedCell);
-            tentacle.notifiedDrainLock = false;
-            tentacle.clearStarted = false;
-            tentacle.clearTimer = 0f;
-            tentacle.clearDuration = 0f;
-            tentacle.targetCell = default;
-        }
     }
 
     // ---------------------------------------------------------------------------
@@ -1095,7 +1071,6 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.clearStarted = false;
         tentacle.clearTimer = 0f;
         tentacle.clearDuration = 0f;
-        tentacle.pendingZapUnits = 0;
     }
 
     private void RebuildTentaclesForRole(MusicalRole role)
@@ -1153,13 +1128,11 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.dissolveTimer = 0f;
         tentacle.alphaScale   = 1f;
         tentacle.drainFlashTimer = 0f;
-        tentacle.hasPendingZap = false;
-        tentacle.pendingZapCell = default;
         tentacle.clearStarted = false;
         tentacle.clearTimer = 0f;
         tentacle.clearDuration = 0f;
-        tentacle.pendingZapUnits = 0;
         tentacle.buildupStarted = false;
+        tentacle.effectiveBuildupSeconds = 0f;
         tentacle.siphonActive = false;
         tentacle.siphonT = 0f;
 
