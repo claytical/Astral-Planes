@@ -16,5 +16,5 @@ MonoBehaviour:
   roleProfile: {fileID: 11400000, guid: 63e9675dcbfd24e678536c2e715ee834, type: 2}
   riff: {fileID: 11400000, guid: 61b2c220ddb1242efa091910a806bbcf, type: 2}
   mineNodeTintBudget: 20
-  mineNodeExpireAfterLoops: 3
+  mineNodeExpireAfterLoops: 8
   ascendLoops: 8

@@ -32,6 +32,18 @@ public class RingGlyphConfig : ScriptableObject
     [Tooltip("Alpha for the contour LineRenderer. 1 = fully opaque track color.")]
     public float contourAlpha = 1f;
 
+    [Header("Remaining Progress Ring Appearance")]
+    [Tooltip("Fill/contour color for gray placeholder rings representing motif progress not yet completed.")]
+    public Color remainingRingColor = new Color(0.6f, 0.6f, 0.6f, 1f);
+
+    [Range(0f, 1f)]
+    [Tooltip("Fill alpha for remaining-progress placeholder rings. Kept low so they read as diminished/incomplete.")]
+    public float remainingRingAlpha = 0.12f;
+
+    [Range(0f, 1f)]
+    [Tooltip("Contour alpha for remaining-progress placeholder rings.")]
+    public float remainingContourAlpha = 0.25f;
+
     [Header("Line")]
     [Tooltip("LineRenderer width in local units.")]
     public float lineWidth = 0.003f;
