@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f8571c45382984a839a6b50b6bbc8220, type: 3}
+  m_Name: Waiting-Groove-NoteSetConfig-3
+  m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
+  id: waiting-whistle-3
+  roleProfile: {fileID: 11400000, guid: 63e9675dcbfd24e678536c2e715ee834, type: 2}
+  riff: {fileID: 11400000, guid: f2036b9aa6fbf4fb4a743fef5e6c4b45, type: 2}
+  mineNodeTintBudget: 15
+  mineNodeExpireAfterLoops: 8
+  ascendLoops: 4

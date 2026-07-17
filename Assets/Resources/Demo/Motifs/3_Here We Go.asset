@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
-  m_Name: Here We Go
+  m_Name: 3_Here We Go
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: herewego
   displayName: herewego
@@ -27,7 +27,7 @@ MonoBehaviour:
   resetFirstCarryOnStart: 0
   bpm: 100
   stepsPerLoop: 16
-  nodesPerStar: 4
+  nodesPerStar: 8
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
   mazePattern: {fileID: 11400000, guid: dc7bcb920eadd40139a254499c81741c, type: 2}
   roleGeoConfigs: []
@@ -43,11 +43,13 @@ MonoBehaviour:
   - {fileID: 11400000, guid: b0672200bb25b42a890d32a2a4692035, type: 2}
   - {fileID: 11400000, guid: 7f44af1a2bd9344eb9ee6ebc2fc3a8f6, type: 2}
   - {fileID: 11400000, guid: 28b0a42b3ed54413e9d452bcb202f454, type: 2}
-  - {fileID: 11400000, guid: 19984b241c1bc4c939b7665e79d208bc, type: 2}
   - {fileID: 11400000, guid: 3f0591112c002422ca224855788268f9, type: 2}
+  - {fileID: 11400000, guid: 19984b241c1bc4c939b7665e79d208bc, type: 2}
   - {fileID: 11400000, guid: 40d253705d5424d2daf8320638abb40a, type: 2}
+  - {fileID: 11400000, guid: 4bbaeece5e66448bfa4d80134f7d1272, type: 2}
+  - {fileID: 11400000, guid: 6f9a282ea6b5e497d9a0881c9b5a2ed3, type: 2}
   selectionWeight: 1
-  beatIntroCount: 0
+  beatIntroCount: 1
   driveBeatsFromEnergy: 1
   spawnVehicleTrap: 0
   trapShape: 0

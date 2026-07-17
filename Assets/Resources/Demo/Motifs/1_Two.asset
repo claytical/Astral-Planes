@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
-  m_Name: Intro
+  m_Name: 1_Two
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
-  motifId: intro
-  displayName: intro
-  keyRootMidi: 46
+  motifId: two
+  displayName: two
+  keyRootMidi: 45
   entryDrumLoops:
   - {fileID: 8300000, guid: a6b537cd91fc44bc2a4357aa1a154bea, type: 3}
   intensityDrumLoops:
@@ -23,19 +23,22 @@ MonoBehaviour:
   resetFirstCarryOnStart: 0
   bpm: 75
   stepsPerLoop: 16
-  nodesPerStar: 2
+  nodesPerStar: 4
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
-  mazePattern: {fileID: 11400000, guid: e33ec23797f8442308d50f9624f2d657, type: 2}
+  mazePattern: {fileID: 11400000, guid: a6ec550cd7f5743ea8637890719fdde7, type: 2}
   roleGeoConfigs: []
-  chordProgression: {fileID: 11400000, guid: b956b0bff50d748d88897368376e5eeb, type: 2}
+  chordProgression: {fileID: 11400000, guid: b7b45c18f038e45059a5b37c3cd2d7e6, type: 2}
   alternateChordProgressionProfile: {fileID: 11400000, guid: 04a688fc570cd408bb4261ed5647fa97,
     type: 2}
   roleNoteConfigs:
-  - {fileID: 11400000, guid: 4ec45572f751b490bb622b7f3ec15e63, type: 2}
+  - {fileID: 11400000, guid: 99296c8e0649a4e0189ccd019d25bca2, type: 2}
+  - {fileID: 11400000, guid: b07bf2e04dd874f48bcaf040b75e08fd, type: 2}
+  - {fileID: 11400000, guid: 3a1a260ea77db4067b236c35b0c48d53, type: 2}
+  - {fileID: 11400000, guid: 1aa280d63d8ee4f57af0c4b759071080, type: 2}
   selectionWeight: 1
   beatIntroCount: 0
   driveBeatsFromEnergy: 1
-  spawnVehicleTrap: 1
+  spawnVehicleTrap: 0
   trapShape: 0
   trapRadius: 3
   trapGrowSeconds: 0.4

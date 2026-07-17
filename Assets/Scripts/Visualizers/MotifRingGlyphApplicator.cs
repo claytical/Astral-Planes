@@ -62,8 +62,9 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         public MusicalRole   Role;
     }
 
-    private readonly List<RingEntry> _gameplayRings = new();
-    private readonly List<RingEntry> _recordRings   = new();
+    private readonly List<RingEntry> _gameplayRings  = new();
+    private readonly List<RingEntry> _recordRings    = new();
+    private readonly List<RingEntry> _remainingRings = new(); // gray placeholders for motif progress not yet completed
 
     private bool    _recordFadingOut;
     private bool    _gameplayFadingOut;    // stops rotation coroutines; set when spin animation begins
@@ -141,7 +142,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         if (transform.localScale.sqrMagnitude < 0.0001f)
             _pendingDeformationCount = 0;
 
-        RefreshPlayAreaFit(_gameplayRings.Count);
+        RefreshPlayAreaFit(_gameplayRings.Count + _remainingRings.Count);
     }
 
     /// <summary>
@@ -254,6 +255,49 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Show gray/diminished placeholder rings for motif progress not yet completed.
+    /// Rebuilds the placeholder stack each call (called once per Collectable set
+    /// finishing its landing on the timeline), stacked just outside the current
+    /// completed (_gameplayRings) count.
+    /// </summary>
+    public void SetRemainingProgressRings(int remainingCount)
+    {
+        if (config == null) return;
+
+        DestroyList(_remainingRings);
+        _remainingRings.Clear();
+
+        remainingCount = Mathf.Max(0, remainingCount);
+        int segs = Mathf.Max(16, config.segments);
+
+        for (int i = 0; i < remainingCount; i++)
+        {
+            int   idx    = _gameplayRings.Count + i;
+            float innerR = RingInnerRadius(idx);
+            float outerR = innerR + config.ringThickness;
+
+            var entry = BuildRingEntry($"RemainingRing_{i}", innerR, outerR, segs,
+                config.remainingRingColor, default, -1,
+                new List<MotifSnapshot.NoteEntry>(), 0,
+                config.remainingRingAlpha, config.remainingContourAlpha);
+            _remainingRings.Add(entry);
+
+            StartCoroutine(AnimateMeshFill(
+                entry.Fill.GetComponent<MeshFilter>().sharedMesh,
+                entry.FullTris, segs, delay: i * config.ringStaggerDelay, config.ringAppearDuration));
+
+            StartCoroutine(AnimateSingleRing(
+                entry.Contour, entry.ContourPoints,
+                i * config.ringStaggerDelay, config.ringAppearDuration,
+                entry.Root.transform, 0f,
+                new List<NoteAnimInfo>(), null,
+                shouldStop: () => _gameplayFadingOut));
+        }
+
+        RefreshPlayAreaFit(_gameplayRings.Count + _remainingRings.Count);
+    }
+
     /// <summary>Destroy all gameplay rings immediately and hide the record.</summary>
     public void ClearGameplayRings()
     {
@@ -264,6 +308,8 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         _spinOffPending          = false;
         _pendingDeformationCount = 0;
         DestroyList(_gameplayRings);
+        DestroyList(_remainingRings);
+        _remainingRings.Clear();
         _gameplayFadingOut       = false;
         _clearingGameplayRings   = false;
         transform.localScale     = Vector3.zero;
@@ -286,6 +332,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             Destroy(child.gameObject);
         _recordRings.Clear();
         _gameplayRings.Clear();
+        _remainingRings.Clear();
 
         if (snapshot == null || config == null) return;
 
@@ -722,7 +769,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         float   speedBase     = config != null ? config.rotSpeedMax       : 300f;
         Vector3 originalScale = transform.localScale;
 
-        var rings      = _gameplayRings.ToArray();
+        var rings      = _gameplayRings.Concat(_remainingRings).ToArray();
         var ringZRots  = new float[rings.Length];
         var ringSpeeds = new float[rings.Length];
         for (int i = 0; i < rings.Length; i++)
@@ -764,6 +811,8 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         }
 
         DestroyList(_gameplayRings);
+        DestroyList(_remainingRings);
+        _remainingRings.Clear();
         _gameplayFadingOut       = false;
         _spinOffPending          = false;
         _superNodeMode           = false;
@@ -788,6 +837,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         foreach (Transform child in transform) Destroy(child.gameObject);
         _recordRings.Clear();
         _gameplayRings.Clear();
+        _remainingRings.Clear();
     }
 
     public void FitToPlayArea(float width, float height, float cx, float cy)
@@ -839,7 +889,8 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     private RingEntry BuildRingEntry(
         string goName, float innerR, float outerR, int segs,
         Color color, MusicalRole role, int binIndex,
-        List<MotifSnapshot.NoteEntry> notes, int totalSteps)
+        List<MotifSnapshot.NoteEntry> notes, int totalSteps,
+        float? fillAlphaOverride = null, float? contourAlphaOverride = null)
     {
         var root = new GameObject(goName);
         root.transform.SetParent(transform, worldPositionStays: false);
@@ -861,7 +912,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         mr.receiveShadows    = false;
 
         var mpb = new MaterialPropertyBlock();
-        SetFillColor(mr, new Color(color.r, color.g, color.b, config.ringAlpha), mpb);
+        SetFillColor(mr, new Color(color.r, color.g, color.b, fillAlphaOverride ?? config.ringAlpha), mpb);
 
         // ── Contour ───────────────────────────────────────────────────────────
         var contourGo = new GameObject("Contour");
@@ -876,7 +927,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         lr.useWorldSpace     = false;
         lr.loop              = false;
         lr.widthMultiplier   = config.lineWidth;
-        var contourColor     = new Color(color.r, color.g, color.b, config.contourAlpha);
+        var contourColor     = new Color(color.r, color.g, color.b, contourAlphaOverride ?? config.contourAlpha);
         lr.startColor        = contourColor;
         lr.endColor          = contourColor;
         lr.positionCount     = 0;
