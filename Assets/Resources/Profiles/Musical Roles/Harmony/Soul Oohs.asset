@@ -23,24 +23,25 @@ MonoBehaviour:
   mineNodeSpeed: 0.85
   mineNodeLocomotionProfile: {fileID: 11400000, guid: 11624763ef95c447b9cf6c2e6fcadda7,
     type: 2}
-  defaultMineNodeArchetypeId: Steady
-  mineNodeArchetypeVariants: []
-  behaviorSpeedMultiplier: 1
-  territoryAffinity01: 0.3
-  commitDurationScale: 1
   orbitalTurnBias: 0.6
   burstDuration: 0.4
   pauseDuration: 0.35
-  burstSpeedMultiplier: 2
   evasionCells: 3
-  collectableDriftSpeedMultiplier: 1
-  collectableOpenSpaceRelocateInterval: 4
-  collectableOpenSpaceSprintMultiplier: 1.5
-  collectableOpenSpaceSprintDuration: 1
+  collectableSpeed: 1
+  collectableAccelSeconds: 0.12
+  collectableBounceRecoverSeconds: 0.45
+  collectableTravelRadiiPerNote: 1.5
+  collectableHomeRadiusCells: 1.5
+  collectableHomePullPerUnit: 1.5
+  collectableSwerveDegrees: 65
+  collectableSwerveCyclesPerNote: 1.5
+  collectableOrbitArcDegreesPerNote: 240
+  collectableOrbitRestSpeedMul: 0.35
+  collectableFleeRadiusCells: 2
+  collectableFleeSpeedMul: 1.3
   configSelectionMode: 0
   chordVoiceColors: []
   midiPreset: 17
   lowestNote: 48
   highestNote: 96
-  ripeDuration: 256
   regrowthDelay: 0.2

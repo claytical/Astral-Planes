@@ -500,7 +500,6 @@ public sealed class NoteAscensionDirector : MonoBehaviour
     /// </summary>
     /// <param name="track">The InstrumentTrack whose markers should ascend.</param>
     /// <param name="burstId">Only markers tagged with this burstId will be animated.</param>
-    /// <param name="totalSeconds">Total real-time duration for the ascension.</param>
     /// <param name="markerLookup">
     ///     Delegate that returns the live marker GameObjects for (track, burstId).
     ///     NoteVisualizer supplies this so the director never needs to know about
@@ -514,7 +513,6 @@ public sealed class NoteAscensionDirector : MonoBehaviour
     public void TriggerBurstAscend(
         InstrumentTrack track,
         int burstId,
-        float totalSeconds,
         Func<InstrumentTrack, int, IEnumerable<GameObject>> markerLookup,
         int ascendLoopsOverride = -1,
         Func<InstrumentTrack, GameObject, int> committedStepResolver = null)
@@ -523,7 +521,7 @@ public sealed class NoteAscensionDirector : MonoBehaviour
         if (_drum == null) return;
 
         float loopLen = _drum.GetLoopLengthInSeconds();
-        if (loopLen <= 0f) return;
+        if (loopLen <= 0f) return; // drum transport not ready yet
 
         int loops = Mathf.Max(1, ascendLoopsOverride > 0 ? ascendLoopsOverride : ascendLoops);
         float targetY = GetAscendTargetWorldY();

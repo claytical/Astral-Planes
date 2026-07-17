@@ -60,30 +60,39 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("Rhythmic (Groove): seconds at near-standstill after each burst.")]
     [Min(0.05f)] public float pauseDuration = 0.35f;
 
-    [Tooltip("Darting (Lead): grid-cell radius within which a Vehicle triggers directional evasion. Keep small (2–4) for 1v1 pursuit — fires only on close approach.")]
+    [Tooltip("MineNode only (Darting/Lead corridor scoring): grid-cell radius within which a Vehicle biases direction away. Collectables never use this — their evasion is collectableFleeRadiusCells.")]
     [Range(0f, 10f)] public float evasionCells = 3f;
 
     [Header("Collectable Movement")]
-    [Tooltip("Base drift speed (world units/sec) before the MIDI-velocity additive. Does not affect MineNode speed.")]
-    [Min(0f)] public float collectableBaseSpeed = 1.2f;
+    [Tooltip("Global speed multiplier for this role's collectable motion — scales drift, role pulses (bass slam, lead pulse, harmony surge), and flee. 1 = baseline feel (2.4 u/s drift). MIDI velocity still modulates drift ±25%. Does not affect MineNode speed.")]
+    [Min(0f)] public float collectableSpeed = 1f;
 
-    [Tooltip("Speed added at MIDI velocity 127: speed = base + (vel/127) × this.")]
-    [Min(0f)] public float collectableVelocitySpeedAdd = 1.5f;
-
-    [Tooltip("Steering acceleration (units/sec²) toward the current intent velocity. Lower = floatier; collision bounces persist longer.")]
-    [Min(0.5f)] public float collectableSteerAccel = 6f;
+    [Tooltip("Seconds to ramp from rest to full drift speed. Lower = snappier direction changes; also governs glide-to-rest and tether correction.")]
+    [Range(0.02f, 1f)] public float collectableAccelSeconds = 0.12f;
 
     [Tooltip("Seconds of reduced steering after a dust collision so the bounce reads before the collectable re-charges.")]
     [Min(0f)] public float collectableBounceRecoverSeconds = 0.45f;
 
-    [Tooltip("Bass only: speed multiplier while charging vertically.")]
-    [Range(1f, 3f)] public float collectableChargeSpeedMul = 1.6f;
+    [Tooltip("Lead only: straight-line reach per pulse, in home-radius units. 1 = each pulse sweeps about one radius (before swerve curl); higher = bolder excursions.")]
+    [Range(0.25f, 3f)] public float collectableTravelRadiiPerNote = 1.5f;
 
     [Tooltip("Free-move radius around the spawn destination, in grid cells. Outside it the home pull ramps up. Smaller = tighter cage (Lead).")]
     [Min(0f)] public float collectableHomeRadiusCells = 1.5f;
 
     [Tooltip("Inward pull speed gained per world unit beyond the free radius (u/s per u). Higher = snappier return; the pattern can stray ~patternSpeed/this beyond the radius.")]
     [Min(0f)] public float collectableHomePullPerUnit = 1.5f;
+
+    [Tooltip("Lead only: peak swerve angle (deg) off the base heading for the serpentine weave.")]
+    [Range(0f, 90f)] public float collectableSwerveDegrees = 65f;
+
+    [Tooltip("Lead only: S-cycles completed over one note duration. Short notes flick quickly; long notes trace lazy curves.")]
+    [Min(0.25f)] public float collectableSwerveCyclesPerNote = 1.5f;
+
+    [Tooltip("Harmony only: arc (deg) swept around the home ring over one note duration during the pulse. Short notes dart; long chords sweep slowly.")]
+    [Range(30f, 720f)] public float collectableOrbitArcDegreesPerNote = 240f;
+
+    [Tooltip("Harmony only: fraction of role speed while orbiting between pulses (0 = rest still).")]
+    [Range(0f, 1f)] public float collectableOrbitRestSpeedMul = 0.35f;
 
     [Tooltip("Vehicle distance (grid cells) that triggers fleeing. Flee ends at 1.5× this distance, then the home tether pulls the note back. 0 = never flees.")]
     [Min(0f)] public float collectableFleeRadiusCells = 2f;
@@ -105,10 +114,7 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("Highest MIDI note this role's preset can play musically. Notes above this are octave-shifted down.")]
     public int highestNote = 84;
 
-    [Header("Ripeness / Decay")]
-    [Tooltip("How long (seconds) the revealed role color stays visible before fading back to gray. Must be > 0.")]
-    public float ripeDuration = 8f;
-
+    [Header("Regrowth")]
     [Tooltip("Seconds before this cell regrows after being carved. −1 = use the active maze pattern's default.")]
     public float regrowthDelay = -1f;
 

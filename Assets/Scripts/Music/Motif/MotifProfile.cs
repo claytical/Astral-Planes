@@ -25,20 +25,18 @@ public class MotifProfile : ScriptableObject
     [Tooltip("Intensity loops: index maps to intensity (0 = B / low, last = E / high).")]
     public List<AudioClip> intensityDrumLoops = new();
 
-    [Tooltip("Absolute burn-rate thresholds (tanks/sec) that gate intensity clip steps. " +
-             "Provide exactly (intensityDrumLoops.Count - 1) ascending values. " +
-             "If empty, falls back to the adaptive EMA-ratio path.")]
-    public List<float> intensityThresholds = new();
-
     [Min(0), Tooltip("How many full drum loops to stay in the entry loop(s) before mapping intensity.")]
     public int entryLoopCount = 1;
+
+    [Tooltip("When this motif starts, re-arm the first-carry hold: the entry loop plays until a vehicle carries a collectable again. If false, a session's first carry keeps intensity mapping active through this motif.")]
+    public bool resetFirstCarryOnStart = false;
 
     [Header("Timing")]
     public float bpm = 120f;
     public int stepsPerLoop = 16;
 
     [Header("Star Structure")]
-    [Min(1), Tooltip("Total shards this PhaseStar ejects. Distribute roles across shards via round-robin.")]
+    [Min(1), Tooltip("Total successful node harvests for this motif, shared across all active roles. Stars spawn reactively per role but never beyond this budget; expired/escaped/SuperNode outcomes refund their slot. The bridge unlocks once this many mine bursts have been collected.")]
     public int nodesPerStar = 4;
 
     [Tooltip("Star behavior profile for this motif (speed, drift, keep-clear, safety bubble, etc.). Overrides the phase-level personality registry.")]
@@ -87,11 +85,7 @@ public class MotifProfile : ScriptableObject
         if (beatIntroCount < 0) beatIntroCount = 0;
         if (entryDrumLoops == null) entryDrumLoops = new List<AudioClip>();
         if (intensityDrumLoops == null) intensityDrumLoops = new List<AudioClip>();
-        if (intensityThresholds == null) intensityThresholds = new List<float>();
         if (beatIntroCount > entryDrumLoops.Count) beatIntroCount = entryDrumLoops.Count;
-        if (intensityThresholds.Count > 0 && intensityThresholds.Count != intensityDrumLoops.Count - 1)
-            Debug.LogWarning($"[MotifProfile] {motifId}: intensityThresholds.Count ({intensityThresholds.Count}) " +
-                             $"should be intensityDrumLoops.Count-1 ({Mathf.Max(0, intensityDrumLoops.Count - 1)})");
     }
 
     /// <summary>

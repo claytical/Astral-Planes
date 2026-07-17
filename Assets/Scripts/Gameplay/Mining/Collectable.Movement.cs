@@ -77,21 +77,32 @@ public partial class Collectable
             }
             else
             {
-                desired = _intentTimer > 0f ? ComputeDesiredVelocity(fdt) : Vector2.zero;
+                // Harmony never fully rests — it keeps a slow anchored orbit between pulses.
+                bool resting = _intentTimer <= 0f;
+                desired = (resting && _role != MusicalRole.Harmony)
+                    ? Vector2.zero
+                    : ComputeDesiredVelocity(cur, fdt, resting);
 
                 // Elastic home tether: no pull inside the free radius; beyond it the inward
                 // pull grows with distance until it overpowers the pattern speed.
-                Vector2 toHome = _homeWorld - cur;
-                float homeDist = toHome.magnitude;
-                float excess = homeDist - _homeFreeRadius;
-                if (excess > 0f && homeDist > 0.001f)
-                    desired += (toHome / homeDist) * (excess * HomePullPerUnit());
+                // Harmony's ring spring already anchors it home; stacking the tether on top
+                // would distort the circle.
+                if (_role != MusicalRole.Harmony)
+                {
+                    Vector2 toHome = _homeWorld - cur;
+                    float homeDist = toHome.magnitude;
+                    float excess = homeDist - _homeFreeRadius;
+                    if (excess > 0f && homeDist > 0.001f)
+                        desired += (toHome / homeDist) * (excess * HomePullPerUnit());
+                }
             }
 
             // Right after a dust hit, steer weakly so the bounce visibly plays out
-            // before the intent reasserts itself.
+            // before the intent reasserts itself. Accel scales with the desired speed so
+            // duration-derived slams/surges still reach full speed in _accelSeconds.
             _bounceRecoverTimer = Mathf.Max(0f, _bounceRecoverTimer - fdt);
-            float steer = SteerAccel() * (_bounceRecoverTimer > 0f ? 0.25f : 1f);
+            float steer = Mathf.Max(SteerAccel(), desired.magnitude / _accelSeconds)
+                          * (_bounceRecoverTimer > 0f ? 0.25f : 1f);
 
             _rb.linearVelocity = Vector2.MoveTowards(_rb.linearVelocity, desired, steer * fdt);
 
@@ -99,7 +110,7 @@ public partial class Collectable
         }
     }
 
-    private float SteerAccel() => _roleProfile != null ? _roleProfile.collectableSteerAccel : 6f;
+    private float SteerAccel() => _steerAccel;
 
     /// <summary>
     /// Timeline ghost pulse: fired by DrumTrack.OnStepChanged (absolute step on the
@@ -165,9 +176,18 @@ public partial class Collectable
         switch (_role)
         {
             case MusicalRole.Bass:
+            {
+                // Piston: each charge spans from the current position to the opposite
+                // cage edge in exactly one note duration at multiplier 1 — short notes
+                // slam, long notes press. The cage (home radius) sets the reach;
+                // collectableSpeed scales the whole charge.
                 _bassChargeSign = -_bassChargeSign;
                 _intentDir = new Vector2(0f, _bassChargeSign);
+                float curY = _rb != null ? _rb.position.y : transform.position.y;
+                float targetY = _homeWorld.y + _bassChargeSign * _homeFreeRadius;
+                _bassChargeSpeed = Mathf.Max(_speed, _profileSpeedMul * Mathf.Abs(targetY - curY) / _intentInterval);
                 break;
+            }
 
             case MusicalRole.Groove:
                 _intentDir = (_rng.Next(2) == 0) ? Vector2.left : Vector2.right;
@@ -176,25 +196,30 @@ public partial class Collectable
                 break;
 
             case MusicalRole.Harmony:
-                _harmonyHeadingDeg = (float)_rng.NextDouble() * 360f;
+                // Nothing to re-pick: the orbit angle derives from position around home
+                // every tick; the pulse merely surges the orbit speed via _intentTimer.
                 break;
 
-            default: // Lead and fallback: fresh heading from the full 360°.
+            case MusicalRole.Lead:
+                // Meander: turn the base heading up to ±120° instead of teleport-turning,
+                // and start the weave swinging in a fresh direction.
+                _leadHeadingDeg += (float)(_rng.NextDouble() * 240.0 - 120.0);
+                _leadSwervePhase = _rng.Next(2) == 0 ? 0f : Mathf.PI;
+                break;
+
+            default: // Fallback (None/Rhythm): fresh heading from the full 360°.
                 float a = (float)_rng.NextDouble() * Mathf.PI * 2f;
                 _intentDir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
                 break;
         }
     }
 
-    private Vector2 ComputeDesiredVelocity(float fdt)
+    private Vector2 ComputeDesiredVelocity(Vector2 cur, float fdt, bool resting)
     {
         switch (_role)
         {
             case MusicalRole.Bass:
-            {
-                float chargeMul = _roleProfile != null ? _roleProfile.collectableChargeSpeedMul : 1.6f;
-                return _intentDir * (_speed * chargeMul);
-            }
+                return _intentDir * Mathf.Max(_bassChargeSpeed, _speed);
 
             case MusicalRole.Groove:
             {
@@ -211,14 +236,49 @@ public partial class Collectable
 
             case MusicalRole.Harmony:
             {
-                float turnDegPerSec = 90f * (_roleProfile != null ? _roleProfile.orbitalTurnBias : 0.6f);
-                _harmonyHeadingDeg += _orbitalChirality * turnDegPerSec * fdt;
-                float rad = _harmonyHeadingDeg * Mathf.Deg2Rad;
-                _intentDir = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
-                return _intentDir * _speed;
+                // Anchored ring orbit: tangential drive around home plus a radial spring
+                // toward the ring. Deriving the angle from position (not an integrated
+                // heading) is what keeps the circle legible after bounces and flees.
+                Vector2 fromHome = cur - _homeWorld;
+                if (fromHome.sqrMagnitude < 0.0001f)
+                    fromHome = new Vector2(0.01f, 0f);
+                float ringRadius = Mathf.Max(_homeFreeRadius, 0.5f);
+                float dist = fromHome.magnitude;
+                Vector2 radialDir = fromHome / dist;
+                Vector2 tangentDir = _orbitalChirality * new Vector2(-radialDir.y, radialDir.x);
+
+                // Pulse: sweep the configured arc in exactly one note duration, so long
+                // chords glide slowly and short notes dart. Rest: slow crawl.
+                float arcDeg = _roleProfile != null ? _roleProfile.collectableOrbitArcDegreesPerNote : 240f;
+                float restMul = _roleProfile != null ? _roleProfile.collectableOrbitRestSpeedMul : 0.35f;
+                float surgeSpeed = _profileSpeedMul * (arcDeg * Mathf.Deg2Rad * ringRadius) / _intentInterval;
+                float restSpeed = _speed * restMul;
+                float speedNow = resting ? restSpeed : Mathf.Max(surgeSpeed, restSpeed);
+
+                Vector2 desired = tangentDir * speedNow
+                                + radialDir * ((ringRadius - dist) * HomePullPerUnit());
+                _intentDir = tangentDir;
+                return Vector2.ClampMagnitude(desired, Mathf.Max(speedNow, _speed) * 1.5f);
             }
 
-            default: // Lead and fallback: straight dart on the current heading.
+            case MusicalRole.Lead:
+            {
+                // Serpentine weave: sinusoidal swerve across a drifting base heading,
+                // paced so one note duration spans a fixed number of S-cycles. The pulse
+                // speed is derived from the cage so each pulse sweeps a real excursion
+                // (travelRadii × radius per note) instead of speed × duration crumbs.
+                float swerveDeg = _roleProfile != null ? _roleProfile.collectableSwerveDegrees : 65f;
+                float cycles = _roleProfile != null ? _roleProfile.collectableSwerveCyclesPerNote : 1.5f;
+                float travelRadii = _roleProfile != null ? _roleProfile.collectableTravelRadiiPerNote : 1.5f;
+                float period = _intentInterval / Mathf.Max(0.25f, cycles);
+                _leadSwervePhase += (2f * Mathf.PI / period) * fdt;
+                float ang = (_leadHeadingDeg + swerveDeg * Mathf.Sin(_leadSwervePhase)) * Mathf.Deg2Rad;
+                _intentDir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
+                float pulseSpeed = Mathf.Max(_speed, _profileSpeedMul * travelRadii * _homeFreeRadius / _intentInterval);
+                return _intentDir * pulseSpeed;
+            }
+
+            default: // Fallback (None/Rhythm): straight dart on the current heading.
                 return _intentDir * _speed;
         }
     }
@@ -296,14 +356,14 @@ public partial class Collectable
     private void ReflectIntentHorizontal()
     {
         _intentDir.x = -_intentDir.x;
-        _harmonyHeadingDeg = 180f - _harmonyHeadingDeg;
+        _leadHeadingDeg = 180f - _leadHeadingDeg;
     }
 
     private void ReflectIntentVertical()
     {
         _intentDir.y = -_intentDir.y;
         _bassChargeSign = _intentDir.y >= 0f ? 1 : -1;
-        _harmonyHeadingDeg = -_harmonyHeadingDeg;
+        _leadHeadingDeg = -_leadHeadingDeg;
     }
 
     public static bool IsCellFreeStatic(Vector2Int cell)

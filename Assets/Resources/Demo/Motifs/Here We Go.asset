@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
-  m_Name: HereWeGo
+  m_Name: Here We Go
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: herewego
   displayName: herewego
@@ -25,6 +25,7 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 068b2e5c637654f4b80c89b0e1eeaaf0, type: 3}
   intensityThresholds: []
   entryLoopCount: 16
+  resetFirstCarryOnStart: 0
   bpm: 100
   stepsPerLoop: 16
   nodesPerStar: 4
@@ -36,10 +37,20 @@ MonoBehaviour:
     type: 2}
   roleNoteConfigs:
   - {fileID: 11400000, guid: 159ab0c2d88ce4bd4b317abc54a46688, type: 2}
+  - {fileID: 11400000, guid: 8d03f08b6e3394089b355f8a2d2af0fb, type: 2}
+  - {fileID: 11400000, guid: 9e87d1d5afb3149acbed1dbd7b75a972, type: 2}
+  - {fileID: 11400000, guid: 7cbe9acb24d494b54bf0d30b3a15e876, type: 2}
+  - {fileID: 11400000, guid: 66dc4448408d24054a816d4b6942e46d, type: 2}
+  - {fileID: 11400000, guid: b0672200bb25b42a890d32a2a4692035, type: 2}
+  - {fileID: 11400000, guid: 7f44af1a2bd9344eb9ee6ebc2fc3a8f6, type: 2}
+  - {fileID: 11400000, guid: 28b0a42b3ed54413e9d452bcb202f454, type: 2}
+  - {fileID: 11400000, guid: 19984b241c1bc4c939b7665e79d208bc, type: 2}
+  - {fileID: 11400000, guid: 3f0591112c002422ca224855788268f9, type: 2}
+  - {fileID: 11400000, guid: 40d253705d5424d2daf8320638abb40a, type: 2}
   selectionWeight: 1
   beatIntroCount: 0
   driveBeatsFromEnergy: 1
-  spawnVehicleTrap: 1
+  spawnVehicleTrap: 0
   trapShape: 0
   trapRadius: 3
   trapGrowSeconds: 0.4

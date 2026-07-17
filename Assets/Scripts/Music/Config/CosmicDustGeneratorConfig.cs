@@ -37,6 +37,8 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     public float zapFadeSeconds = 1.5f;
     [Tooltip("Explicit override for zapped-cell regrow delay. -1 defers to the maze pattern's zapRegrowDelay / base regrowDelay.")]
     public float zapRegrowDelaySeconds = -1f;
+    [Tooltip("Sprite scale-out duration when a star drain clears a cell. Shorter = punchier.")]
+    [Min(0.01f)] public float zapScaleOutSeconds = 0.12f;
 
     [Header("Mine Node Erosion")]
     public int mineNodeErodePerTick = 10;

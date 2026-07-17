@@ -64,19 +64,17 @@ public partial class InstrumentTrack
             controller?.AllowAdvanceNextBurst(this);
         }
 
-        float ascendSeconds = drumTrack != null
-            ? drumTrack.GetLoopLengthInSeconds() * ComputeEffectiveAscendLoops(ascendBinCount)
-            : 0f;
+        int ascendLoops = ComputeEffectiveAscendLoops(ascendBinCount);
         int capturedBurstId = burstId;
         bool capturedRemove = removePlaceholders;
-        float capturedSec = ascendSeconds;
+        int capturedLoops = ascendLoops;
         EnqueueNextFrame(() =>
         {
             if (controller?.noteVisualizer != null)
             {
                 if (capturedRemove)
                     controller.noteVisualizer.RemoveAllPlaceholdersForBurst(this, capturedBurstId);
-                controller.noteVisualizer.TriggerBurstAscend(this, capturedBurstId, capturedSec);
+                controller.noteVisualizer.TriggerBurstAscend(this, capturedBurstId, capturedLoops);
             }
         });
 

@@ -119,6 +119,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     public int voiceIndex { get; private set; }
     public void SetVoiceIndex(int index) => voiceIndex = index;
     private MusicalRoleProfile _activeProfile;
+    public MusicalRoleProfile ActiveProfile => _activeProfile;
     public int lowestAllowedNote => _activeProfile?.lowestNote ?? MusicalRoleProfileLibrary.GetProfile(assignedRole)?.lowestNote ?? 36;
     public int highestAllowedNote => _activeProfile?.highestNote ?? MusicalRoleProfileLibrary.GetProfile(assignedRole)?.highestNote ?? 84;
     public InstrumentTrackController controller; // 🎛️ Reference to main controller
@@ -1082,6 +1083,21 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     {
         persistentLoopNotes.RemoveAll(t => t.stepIndex == stepAbs);
         _loopCacheDirtyPending = true;
+
+        // If ascension just drained the last note out of this bin, clear its fill state
+        // (keep allocation so the span/timeline stays stable). Without this the bin reads
+        // as filled forever and GetBinForNextSpawn expands instead of refilling it.
+        int bin = BinIndexForStep(stepAbs);
+        if (!HasAnyNoteInBin(bin))
+        {
+            EnsureBinList();
+            if (bin >= 0 && bin < _binFilled.Count && _binFilled[bin])
+            {
+                _binFilled[bin] = false;
+                if (_binCompletionTime != null && bin < _binCompletionTime.Length) _binCompletionTime[bin] = -1f;
+                Harmony_OnBinEmptied(bin);
+            }
+        }
     }
 
     /// <summary>

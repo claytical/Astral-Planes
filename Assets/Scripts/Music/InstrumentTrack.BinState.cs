@@ -86,6 +86,27 @@ public partial class InstrumentTrack
         }
     }
 
+    /// <summary>
+    /// First bin within the active span that was emptied by note ascension: allocated but
+    /// unfilled, with no committed notes and no in-flight burst (allocated-but-unfilled is
+    /// also the state of a bin whose burst hasn't been collected yet — those are excluded
+    /// via HasOutstandingNotesInRange). Returns -1 when no such bin exists.
+    /// </summary>
+    public int GetFirstEmptyAllocatedBin()
+    {
+        EnsureBinList();
+        int binSize = Mathf.Max(1, BinSize());
+        int span = Mathf.Clamp(loopMultiplier, 1, _binFilled.Count);
+        for (int b = 0; b < span; b++)
+        {
+            if (!IsBinAllocated(b) || _binFilled[b]) continue;
+            if (HasAnyNoteInBin(b)) continue;
+            if (HasOutstandingNotesInRange(b * binSize, (b + 1) * binSize)) continue;
+            return b;
+        }
+        return -1;
+    }
+
     // Advances the bin cursor to at least targetBin+1, clamped to loopMultiplier.
     // ByVoice tracks suppress cursor movement — their cursor advances via NotifyBinFilled.
     private void AdvanceCursorPastBin(int targetBin)

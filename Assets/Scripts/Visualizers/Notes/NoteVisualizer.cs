@@ -1107,16 +1107,15 @@ public partial class NoteVisualizer : MonoBehaviour
         ascensionDirector?.ResetPhrasing();
     }
 
-    public void TriggerBurstAscend(InstrumentTrack track, int burstId, float seconds)
+    public void TriggerBurstAscend(InstrumentTrack track, int burstId, int ascendLoops)
     {
         if (ascensionDirector == null) return;
 
         ascensionDirector.TriggerBurstAscend(
             track,
             burstId,
-            seconds,
             GetMarkersForTrackAndBurst,
-            ResolveAscendLoopsForTrack(track),
+            ascendLoops,
             GetCommittedStepForMarker
         );
     }
@@ -1130,14 +1129,10 @@ public partial class NoteVisualizer : MonoBehaviour
     public void TriggerStepRangeAscend(InstrumentTrack track, int stepStart, int stepEnd, int ascendLoopsOverride)
     {
         if (ascensionDirector == null || _drum == null || track == null) return;
-        float loopLen = _drum.GetLoopLengthInSeconds();
-        if (loopLen <= 0f) return;
-        float totalSeconds = loopLen * ascendLoopsOverride;
 
         ascensionDirector.TriggerBurstAscend(
             track,
             burstId: int.MinValue,
-            totalSeconds,
             (t, _) => GetMarkersInStepRange(t, stepStart, stepEnd),
             ascendLoopsOverride,
             GetCommittedStepForMarker
@@ -1155,18 +1150,6 @@ public partial class NoteVisualizer : MonoBehaviour
             var go = kvp.Value?.gameObject;
             if (go != null) yield return go;
         }
-    }
-
-    private int ResolveAscendLoopsForTrack(InstrumentTrack track)
-    {
-        if (track == null) return -1;
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var motif = _gfm?.phaseTransitionManager?.currentMotif;
-        if (motif?.roleNoteConfigs == null) return -1;
-        foreach (var cfg in motif.roleNoteConfigs)
-            if (cfg != null && cfg.ascendLoops > 0 && cfg.role == track.assignedRole)
-                return cfg.ascendLoops;
-        return -1; // fall back to NoteAscensionDirector's inspector default
     }
 
     /// <summary>

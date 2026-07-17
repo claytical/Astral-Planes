@@ -23,7 +23,6 @@ public partial class DrumTrack : MonoBehaviour
     private float _lateBindMotifTimer = 0f;
     private const float kLateBindMotifInterval = 1.0f;
     private float _lastTotalSpentSample = -1f; // baseline sample of TOTAL spent tanks (cumulative)
-    private float _burnBaselineEma = 0f;       // EMA of per-loop delta (aggregate)
     private double _lastApplyMotifDsp = -1.0;
     private string _lastApplyMotifId = "";
     [HideInInspector]
@@ -78,9 +77,9 @@ public partial class DrumTrack : MonoBehaviour
     private MotifProfile _motif;
     private List<AudioClip> _entryLoops;
     private List<AudioClip> _intensityLoops;
-    private List<float>     _intensityThresholds;
 
     private int _entryLoopsRemaining;
+    private bool _carryLatched; // one-way: set once any vehicle carries a collectable
 
     private AudioClip _currentDrumClip;
 
@@ -91,8 +90,6 @@ public partial class DrumTrack : MonoBehaviour
     private int _lastStepIdx = -1;
     private bool _driveFromEnergy;
 
-
-    private float _lastSpentTanksSample = -1f; // baseline at last boundary
     private float _lastIntensity01 = 0f; // for hysteresis
     private float _burnTier = 0f;        // ramp counter: steps up while burning, down when idle
 
@@ -291,17 +288,19 @@ public partial class DrumTrack : MonoBehaviour
         _motif               = motif;
         _entryLoops          = _motif?.entryDrumLoops;
         _intensityLoops      = _motif?.intensityDrumLoops;
-        _intensityThresholds = _motif?.intensityThresholds;
         _driveFromEnergy     = _motif != null && _motif.driveBeatsFromEnergy;
+
+        // Carry latch is one-way for the session: survives motif changes unless the incoming
+        // motif opts into re-arming the intro hold. A hard transport restart always re-arms.
+        if (restartTransport || (motifChanged && _motif != null && _motif.resetFirstCarryOnStart))
+            _carryLatched = false;
 
         // Only reset entry window and intensity sampling when the motif actually changed,
         // OR when restartTransport forces hard-reset semantics.
         if (motifChanged || restartTransport)
         {
             _entryLoopsRemaining  = _motif != null ? Mathf.Max(0, _motif.entryLoopCount) : 0;
-            _lastSpentTanksSample = -1f;
             _lastTotalSpentSample = -1f;
-            _burnBaselineEma      = 0f;
             _burnTier             = 0f;
             // Preserve intensity when timing is identical — same BPM/steps means no perceptual
             // discontinuity and resetting would cause a spurious intensity dip.
@@ -509,6 +508,9 @@ public partial class DrumTrack : MonoBehaviour
 
     if (leaderStartDspTime <= 0.0)
         leaderStartDspTime = startDspTime;
+
+    if (!_carryLatched && Vehicle.AnyVehicleCarrying())
+        _carryLatched = true;
 
     TickLoopBoundaries();
     TickDeckSwap();
@@ -736,6 +738,13 @@ public partial class DrumTrack : MonoBehaviour
         {
             if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: entry window active remain={_entryLoopsRemaining} motif={_motif.motifId}");
             _entryLoopsRemaining--;
+            return;
+        }
+
+        // 1b) Hold intro until a vehicle has carried a collectable (one-way latch)
+        if (!_carryLatched)
+        {
+            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: awaiting first carry motif={_motif.motifId}");
             return;
         }
 
@@ -1042,9 +1051,7 @@ public partial class DrumTrack : MonoBehaviour
     public void ResetBeatSequencingState(string who)
     {
         // Do NOT clear _motif or loop lists. This is a state reset, not a motif reset.
-        _lastSpentTanksSample = -1f;
         _lastTotalSpentSample = -1f;
-        _burnBaselineEma = 0f;
         _burnTier = 0f;
         _lastIntensity01 = 0f;
 
