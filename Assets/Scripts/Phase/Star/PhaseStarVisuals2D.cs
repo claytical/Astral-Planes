@@ -242,10 +242,6 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         }
     }
 
-    public void ShowSafetyBubble(float radiusWorld, Color bubbleTint, Color shardInnerTint, Vector2 worldCenter = default) { }
-    public void HideSafetyBubble() { }
-    public void UpdateBubblePosition(Vector2 worldPos) { }
-
     // Called every frame from PhaseStar.Update() to continuously lerp body color.
     public void LerpBodyColor(Color roleColor, float t)
     {

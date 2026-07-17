@@ -47,6 +47,9 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     private static readonly int BasePropId  = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorPropId = Shader.PropertyToID("_Color");
 
+    // Dot-launch lead when the drum track can't report a step duration.
+    private const int FallbackLeadSteps = 2;
+
     private struct RingEntry
     {
         public GameObject    Root;
@@ -173,7 +176,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         drumRef?.TryGetNextBaseStepDsp(out _, out stepDur);
         int leadSteps = stepDur > 0.001f
             ? Mathf.Max(1, Mathf.RoundToInt(config.noteTravelDuration / stepDur))
-            : (config != null ? config.noteLaunchLeadSteps : 2);
+            : FallbackLeadSteps;
 
         float tugR = outerR * (1f - config.tugDepthFraction);
 
@@ -249,173 +252,6 @@ public class MotifRingGlyphApplicator : MonoBehaviour
             if (!_clearingGameplayRings && !_gameplayFadingOut)
                 transform.localScale = Vector3.zero;
         }
-    }
-
-    /// <summary>Fade and destroy all gameplay rings.</summary>
-    public IEnumerator FadeAndClearGameplayRings(float duration)
-    {
-        _gameplayFadingOut = true;
-        var snapshot = _gameplayRings.ToArray();
-        var mpbs     = MakeMpbs(snapshot.Length);
-
-        float elapsed = 0f;
-        while (elapsed < duration)
-        {
-            elapsed += Time.deltaTime;
-            ApplyAlpha(snapshot, 1f - Mathf.Clamp01(elapsed / duration), mpbs);
-            yield return null;
-        }
-
-        DestroyList(_gameplayRings);
-        _gameplayFadingOut = false;
-    }
-
-    /// <summary>
-    /// Spin a single gameplay ring off the left edge of the play area with
-    /// accelerating rotation. Called at the end of each ring's lifecycle.
-    /// </summary>
-    private IEnumerator SpinOffRing(RingEntry ring, float baseRotDegPerSec)
-    {
-        if (ring.Root == null) yield break;
-
-        float extraDeg   = config != null ? config.spinOffExtraDegPerSec : 720f;
-        float tiltDeg    = config != null ? config.tiltXDegrees          : 75f;
-        float tiltDur    = config != null ? config.tiltXDuration         : 1.0f;
-        float scaleDur   = config != null ? config.scaleDownDuration     : 0.5f;
-
-        float spinDir    = baseRotDegPerSec >= 0f ? 1f : -1f;
-        float spinSpeed  = spinDir * (Mathf.Abs(baseRotDegPerSec) + extraDeg);
-        float currentZRot = ring.Root.transform.localEulerAngles.z;
-
-        // Phase 1: tilt X axis to tiltDeg while continuing Z spin
-        float elapsed = 0f;
-        while (elapsed < tiltDur)
-        {
-            if (ring.Root == null) break;
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / tiltDur);
-            currentZRot += spinSpeed * Time.deltaTime;
-            float xRot = Mathf.Lerp(0f, tiltDeg, t);
-            ring.Root.transform.localEulerAngles = new Vector3(xRot, 0f, currentZRot);
-            yield return null;
-        }
-
-        // Phase 2: scale to zero, continuing Z spin at tiltDeg
-        Vector3 startScale = ring.Root != null ? ring.Root.transform.localScale : Vector3.zero;
-        elapsed = 0f;
-        while (elapsed < scaleDur)
-        {
-            if (ring.Root == null) break;
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / scaleDur);
-            currentZRot += spinSpeed * Time.deltaTime;
-            ring.Root.transform.localScale = Vector3.Lerp(startScale, Vector3.zero, t);
-            ring.Root.transform.localEulerAngles = new Vector3(tiltDeg, 0f, currentZRot);
-            yield return null;
-        }
-
-        _gameplayRings.Remove(ring);
-        if (ring.Root != null) Destroy(ring.Root);
-    }
-
-    /// <summary>
-    /// Translate rings from center to off the left edge of the play area over
-    /// <c>config.rollOffDuration</c> seconds. Used by record rings if needed.
-    /// </summary>
-    public IEnumerator RollOffGameplayRings()
-    {
-        var snapshot = _gameplayRings.ToArray();
-        if (snapshot.Length == 0) yield break;
-
-        var startPositions = new Vector3[snapshot.Length];
-        for (int i = 0; i < snapshot.Length; i++)
-            startPositions[i] = snapshot[i].Root != null
-                ? snapshot[i].Root.transform.position : transform.position;
-
-        float duration  = config != null ? config.rollOffDuration : 1.5f;
-        float targetX   = startPositions[0].x - 20f;
-        var   gfm       = GameFlowManager.Instance;
-        if (gfm?.activeDrumTrack != null && gfm.activeDrumTrack.TryGetPlayAreaWorld(out var area))
-        {
-            float worldScale  = transform.lossyScale.x;
-            float outerRWorld = worldScale > 0f
-                ? worldScale * (RingInnerRadius(snapshot.Length - 1) + config.ringThickness)
-                : config.ringThickness;
-            targetX = area.left - outerRWorld;
-        }
-
-        float elapsed = 0f;
-        while (elapsed < duration)
-        {
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / duration);
-            for (int i = 0; i < snapshot.Length; i++)
-            {
-                if (snapshot[i].Root == null) continue;
-                var pos = snapshot[i].Root.transform.position;
-                pos.x = Mathf.Lerp(startPositions[i].x, targetX, t);
-                snapshot[i].Root.transform.position = pos;
-            }
-            yield return null;
-        }
-
-        DestroyList(_gameplayRings);
-    }
-
-    /// <summary>
-    /// After <paramref name="delay"/> seconds, press-and-bounce the ring to ringHoldScale:
-    /// fast compress to bouncePressScale, spring past ringHoldScale, settle.
-    /// </summary>
-    private IEnumerator BounceToHoldScale(Transform ringTransform, float delay)
-    {
-        if (delay > 0f) yield return new WaitForSeconds(delay);
-        if (ringTransform == null || config == null) yield break;
-
-        float holdScale   = config.ringHoldScale;
-        float pressScale  = config.bouncePressScale;
-        float pressDur    = config.bouncePressDuration;
-        float settleDur   = config.bounceSettleDuration;
-        // Overshoot slightly past holdScale on the spring-back.
-        float overshoot   = holdScale + (holdScale - pressScale) * 0.4f;
-
-        // Phase 1: press down.
-        float elapsed = 0f;
-        while (elapsed < pressDur)
-        {
-            if (ringTransform == null) yield break;
-            elapsed += Time.deltaTime;
-            float s = Mathf.Lerp(1f, pressScale, Mathf.Clamp01(elapsed / pressDur));
-            ringTransform.localScale = new Vector3(s, s, 1f);
-            yield return null;
-        }
-
-        // Phase 2: spring back past holdScale (60% of settle time).
-        float springDur = settleDur * 0.6f;
-        elapsed = 0f;
-        while (elapsed < springDur)
-        {
-            if (ringTransform == null) yield break;
-            elapsed += Time.deltaTime;
-            float s = Mathf.Lerp(pressScale, overshoot, Mathf.Clamp01(elapsed / springDur));
-            ringTransform.localScale = new Vector3(s, s, 1f);
-            yield return null;
-        }
-
-        // Phase 3: dampen to holdScale (remaining 40%).
-        float dampDur  = settleDur * 0.4f;
-        float dampStart = ringTransform != null ? ringTransform.localScale.x : overshoot;
-        elapsed = 0f;
-        while (elapsed < dampDur)
-        {
-            if (ringTransform == null) yield break;
-            elapsed += Time.deltaTime;
-            float s = Mathf.Lerp(dampStart, holdScale, Mathf.Clamp01(elapsed / dampDur));
-            ringTransform.localScale = new Vector3(s, s, 1f);
-            yield return null;
-        }
-
-        if (ringTransform != null)
-            ringTransform.localScale = new Vector3(holdScale, holdScale, 1f);
     }
 
     /// <summary>Destroy all gameplay rings immediately and hide the record.</summary>
@@ -787,29 +623,9 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         }
     }
 
-    /// <summary>Fade all record rings to transparent, then destroy.</summary>
-    public IEnumerator FadeOutAndClear(float duration)
-    {
-        _recordFadingOut = true;
-        var snapshot = _recordRings.ToArray();
-        var mpbs     = MakeMpbs(snapshot.Length);
-
-        float elapsed = 0f;
-        while (elapsed < duration)
-        {
-            elapsed += Time.deltaTime;
-            ApplyAlpha(snapshot, 1f - Mathf.Clamp01(elapsed / duration), mpbs);
-            yield return null;
-        }
-
-        DestroyList(_recordRings);
-        _recordFadingOut = false;
-    }
-
     /// <summary>
     /// Spin the whole record 360° clockwise over <paramref name="spinDuration"/>, then
-    /// slide it off the left edge over <paramref name="rollDuration"/>. Replaces
-    /// FadeOutAndClear at bridge exit when the record hold finishes.
+    /// slide it off the left edge over <paramref name="rollDuration"/>.
     /// </summary>
     public IEnumerator SpinAndRollOffRecordRings(float spinDuration, float rollDuration)
     {
@@ -1060,8 +876,9 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         lr.useWorldSpace     = false;
         lr.loop              = false;
         lr.widthMultiplier   = config.lineWidth;
-        lr.startColor        = color;
-        lr.endColor          = color;
+        var contourColor     = new Color(color.r, color.g, color.b, config.contourAlpha);
+        lr.startColor        = contourColor;
+        lr.endColor          = contourColor;
         lr.positionCount     = 0;
         lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         lr.receiveShadows    = false;
@@ -1098,7 +915,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
 
             if (entries[i].Contour != null)
             {
-                var lc = new Color(c.r, c.g, c.b, normalizedAlpha);
+                var lc = new Color(c.r, c.g, c.b, config.contourAlpha * normalizedAlpha);
                 entries[i].Contour.startColor = lc;
                 entries[i].Contour.endColor   = lc;
             }
@@ -1259,7 +1076,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         drumRef?.TryGetNextBaseStepDsp(out _, out stepDurRec);
         int leadSteps = stepDurRec > 0.001f
             ? Mathf.Max(1, Mathf.RoundToInt(config.noteTravelDuration / stepDurRec))
-            : (config != null ? config.noteLaunchLeadSteps : 2);
+            : FallbackLeadSteps;
 
         var      revealedNotes = new List<MotifSnapshot.NoteEntry>();
         Coroutine contourTween = null;
@@ -1305,131 +1122,6 @@ public class MotifRingGlyphApplicator : MonoBehaviour
                 ringTransform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
             yield return null;
         }
-    }
-
-    private IEnumerator AnimateNoteReveal(
-        RingEntry ring,
-        List<MotifSnapshot.NoteEntry> notes,
-        int totalSteps, float outerR,
-        MusicalRole role, int binIndex, Color color,
-        float rotDegPerSec, float binDurationSec, InstrumentTrack track,
-        System.Func<bool> shouldStop)
-    {
-        int binSteps = Mathf.Max(1, totalSteps);
-
-        // ── Phase 1: Quick appear — dips already baked into ContourPoints ────────
-        var currentPts = ring.ContourPoints;
-        int totalPts   = currentPts?.Count ?? 0;
-        float appearDur = config != null ? config.ringAppearDuration : 0.1f;
-
-        ring.Contour.positionCount = 2;
-        float elapsed = 0f;
-        while (elapsed < appearDur && totalPts > 0)
-        {
-            elapsed += Time.deltaTime;
-            float progress = Mathf.Clamp01(elapsed / appearDur);
-            int   count    = Mathf.Clamp(Mathf.RoundToInt(progress * totalPts), 2, totalPts);
-            ring.Contour.positionCount = count;
-            for (int i = 0; i < count; i++)
-                ring.Contour.SetPosition(i, new Vector3(currentPts[i].x, currentPts[i].y, 0f));
-            yield return null;
-        }
-        if (currentPts != null && totalPts > 0)
-            ApplyContourPoints(ring.Contour, currentPts);
-
-        if (shouldStop() || ring.Root == null)
-            yield break;
-
-        // ── Phase 2: Rotate at bin tempo; launch dots before each note's beat ────
-        var drumRef     = GameFlowManager.Instance?.activeDrumTrack;
-        int leaderSteps = drumRef != null ? drumRef.GetLeaderSteps() : binSteps;
-
-        // Derive lead steps from travel duration so the dot arrives exactly on the beat.
-        float stepDur = 0f;
-        drumRef?.TryGetNextBaseStepDsp(out _, out stepDur);
-        int leadSteps = stepDur > 0.001f
-            ? Mathf.Max(1, Mathf.RoundToInt(config.noteTravelDuration / stepDur))
-            : (config != null ? config.noteLaunchLeadSteps : 2);
-
-        float tugR = outerR * (1f - config.tugDepthFraction);
-
-        var sortedNotes = notes == null
-            ? new List<MotifSnapshot.NoteEntry>()
-            : notes.OrderBy(n => n.Step % leaderSteps).ToList();
-
-        // Shared tween state — updated by each note's onLaunch callback.
-        var      revealedNotes  = new List<MotifSnapshot.NoteEntry>();
-        Coroutine contourTween  = null;
-        bool contourSettled     = sortedNotes.Count == 0;
-
-        foreach (var note in sortedNotes)
-        {
-            if (shouldStop() || ring.Root == null) break;
-
-            int   noteLeaderStep = note.Step % leaderSteps;
-            int   triggerStep    = (noteLeaderStep - leadSteps + leaderSteps) % leaderSteps;
-            int   localStep      = note.Step % binSteps;
-            float angle          = localStep / (float)binSteps * Mathf.PI * 2f;
-            var   tugLocal       = new Vector3(Mathf.Cos(angle) * tugR, Mathf.Sin(angle) * tugR, 0f);
-
-            Transform markerTr = null;
-            if (noteVisualizer?.noteMarkers != null && track != null)
-                noteVisualizer.noteMarkers.TryGetValue((track, note.Step), out markerTr);
-
-            // Capture loop variables for the closure.
-            var capturedNote = note;
-            StartCoroutine(WaitAndLaunchDot(
-                ring.Root.transform, tugLocal, note.TrackColor,
-                markerTr, outerR, angle,
-                drumRef, triggerStep, config.noteTravelDuration, shouldStop,
-                onLaunch: () =>
-                {
-                    // Add this note's dip and tween the ring contour over the same
-                    // duration as the dot travel — they deform and arrive together.
-                    revealedNotes.Add(capturedNote);
-                    var targetPoly = MotifRingGlyphGenerator.GenerateSingleRingAtRadius(
-                        role, binIndex, color, revealedNotes, binSteps, outerR, config);
-                    var targetPts = targetPoly?.Points;
-                    if (targetPts != null)
-                    {
-                        contourSettled = false;
-                        if (contourTween != null) StopCoroutine(contourTween);
-                        contourTween = StartCoroutine(
-                            TweenContour(ring.Contour, targetPts, config.noteTravelDuration,
-                                onComplete: () => contourSettled = true));
-                    }
-                }));
-        }
-
-        // Rotate for one bin duration + one dot-travel window.
-        // The extra window ensures dots whose trigger step fires near the end of
-        // binDurationSec still complete their travel before the ring presses.
-        float binElapsed      = 0f;
-        float travelBuffer    = config != null ? config.noteTravelDuration : 0.35f;
-        float effectiveBinDur = (binDurationSec > 0.01f ? binDurationSec : 2f) + travelBuffer;
-        while (binElapsed < effectiveBinDur && !shouldStop())
-        {
-            if (ring.Root == null) yield break;
-            ring.Root.transform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
-            binElapsed += Time.deltaTime;
-            yield return null;
-        }
-
-        // Don't advance to Phase 3 until every note has fired and the last curvature tween settles.
-        while ((!contourSettled || revealedNotes.Count < sortedNotes.Count) && !shouldStop())
-        {
-            if (ring.Root == null) yield break;
-            ring.Root.transform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
-            yield return null;
-        }
-
-        // ── Phase 3: Press ────────────────────────────────────────────────────────
-        if (!shouldStop() && ring.Root != null)
-            yield return BounceToHoldScale(ring.Root.transform, delay: 0f);
-
-        // ── Phase 4: Spin off ─────────────────────────────────────────────────────
-        if (!shouldStop())
-            yield return SpinOffRing(ring, rotDegPerSec);
     }
 
     private IEnumerator WaitAndLaunchDot(

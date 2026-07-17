@@ -21,7 +21,7 @@ MonoBehaviour:
   carveResistance01: 0.475
   drainResistance01: 0.75
   mineNodeSpeed: 0.85
-  mineNodeLocomotionProfile: {fileID: 11400000, guid: 11624763ef95c447b9cf6c2e6fcadda7,
+  mineNodeLocomotionProfile: {fileID: 11400000, guid: f19ac05ceb9f240339b920df3ef68d58,
     type: 2}
   orbitalTurnBias: 0.6
   burstDuration: 0.4

@@ -46,28 +46,28 @@ public partial class PhaseStar
         }
         if (!IsEjectionReady())
         {
-            if (GetDominantRoleRaw(out var dominantRoleForDescriptor, out _, out _))
+            if (_attunedRole != MusicalRole.None)
             {
-                var dominantTrack = FindTrackByRole(dominantRoleForDescriptor);
-                if (dominantTrack != null)
+                var attunedTrack = FindTrackByRole(_attunedRole);
+                if (attunedTrack != null)
                 {
                     TryRefreshRequiredZapCountForPlannedRole(
-                        dominantRoleForDescriptor,
-                        dominantTrack,
+                        _attunedRole,
+                        attunedTrack,
                         resetCurrentZapCount: false,
                         reason: "collision-recovery-refresh");
                 }
             }
 
-            if (HasDominantRoleEjectable() && GetDominantRoleRaw(out var dominantRole, out _, out _))
+            if (_attunedRole != MusicalRole.None && zappedCount >= RequiredZapCount)
             {
-                TransitionZapState(ZapProgressState.ReadyLatched, dominantRole, "collision-recovery-latch");
+                TransitionZapState(ZapProgressState.ReadyLatched, _attunedRole, "collision-recovery-latch");
             }
             else
             {
-                Trace("OnCollisionEnter2D: ignored poke — dominant role not ejectable yet");
-                Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=dominant-not-ejectable " +
-                          $"zapState={_zapProgressState} dominantRole={dominantRoleForDescriptor} charge01={GetChargeNormalized01(dominantRoleForDescriptor):F2}");
+                Trace("OnCollisionEnter2D: ignored poke — zap requirement not met yet");
+                Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=zaps-not-met " +
+                          $"zapState={_zapProgressState} zapped={zappedCount}/{RequiredZapCount}");
                 return;
             }
         }
@@ -112,18 +112,12 @@ public partial class PhaseStar
             return;
         }
 
-        if (_previewRole != MusicalRole.None)
+        if (_disarmReason == PhaseStarDisarmReason.SiblingActive)
         {
-            if (_disarmReason == PhaseStarDisarmReason.SiblingActive)
-            {
-                Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=sibling-active previewRole={_previewRole}");
-                return;
-            }
-            EjectActivePreviewShardAndFlow(coll);
+            Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=sibling-active previewRole={_previewRole}");
             return;
         }
-
-        EjectCachedDirectiveAndFlow(coll);
+        EjectActivePreviewShardAndFlow(coll);
     }
 
     private void HandleDisarmedVehicleHit(Collision2D coll)
@@ -189,17 +183,7 @@ public partial class PhaseStar
 
             if (this == null) return;
 
-            if (_state == PhaseStarState.BridgeInProgress) return;
-
-            _awaitingCollectableClear = true;
-            ResolveGameFlowManager();
-            _awaitingCollectableClearSinceLoop = (_drum != null)
-                ? _drum.completedLoops
-                : (_gfm?.activeDrumTrack?.completedLoops ?? -1);
-            _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
-            HideInPlaceForBurst();
-            Disarm(PhaseStarDisarmReason.NodeResolving, spawnTint);
-            LogState("OnResolved");
+            EnterAwaitCollectableClear(spawnTint, "OnResolved");
         };
 
         CollectionSoundManager.Instance?.PlayPhaseStarImpact(usedTrack, usedTrack.GetCurrentNoteSet(), 0.8f);
@@ -212,11 +196,8 @@ public partial class PhaseStar
     {
         if (behaviorProfile == null || visuals == null) return;
 
-        if (!GetDominantRoleRaw(out MusicalRole ejectedRole, out float rawCharge, out float threshold))
-            return;
-
-        if (rawCharge < threshold)
-            return;
+        MusicalRole ejectedRole = _attunedRole;
+        if (ejectedRole == MusicalRole.None) return;
 
         InstrumentTrack ejectedTrack = FindTrackByRole(ejectedRole);
         if (ejectedTrack == null)
@@ -229,13 +210,12 @@ public partial class PhaseStar
         if (CanCommitEjection != null && !CanCommitEjection(ejectedRole, isSuperNodeEjection))
         {
             // Another sequence is still unresolved (or the harvest budget is spent). Keep
-            // the charge and stay armed — the poke retries once that sequence resolves.
+            // the zap latch and stay armed — the poke retries once that sequence resolves.
             visuals?.FlashReject();
             if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar] Eject deferred — sequence in flight or no harvest budget (role={ejectedRole}).");
             return;
         }
 
-        _starCharge[ejectedRole] = Mathf.Max(0f, rawCharge - threshold);
         _displayedCharge01 = 0f;
         var contact = coll.GetContact(0).point;
         var starPos = (Vector2)transform.position;
@@ -258,10 +238,9 @@ public partial class PhaseStar
 
         if (!spawned)
         {
-            // Refund the charge deducted above and re-latch so the next poke retries.
-            // OnEjected must NOT fire — StarPool would set _mineNodePending with no node
-            // to ever resolve it, permanently reserving an ejection slot.
-            _starCharge[ejectedRole] = rawCharge;
+            // Re-latch so the next poke retries. OnEjected must NOT fire — StarPool would
+            // set _mineNodePending with no node to ever resolve it, permanently reserving
+            // an ejection slot.
             TransitionZapState(ZapProgressState.ReadyLatched, ejectedRole, "spawn-failed-relatch");
             ArmNext();
             Trace("EjectActive: node spawn failed — star recovered, no OnEjected");
@@ -359,16 +338,7 @@ public partial class PhaseStar
 
             if (this == null) return;
 
-            if (_state == PhaseStarState.BridgeInProgress) return;
-            _awaitingCollectableClear = true;
-            ResolveGameFlowManager();
-            _awaitingCollectableClearSinceLoop = (_drum != null)
-                ? _drum.completedLoops
-                : (_gfm?.activeDrumTrack?.completedLoops ?? -1);
-            _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
-            HideInPlaceForBurst();
-            Disarm(PhaseStarDisarmReason.NodeResolving, spawnTint);
-            LogState("OnSuperNodeResolved");
+            EnterAwaitCollectableClear(spawnTint, "OnSuperNodeResolved");
         };
 
         // Initialize AFTER subscribing — when shardTracks is empty, Initialize() resolves
@@ -378,45 +348,6 @@ public partial class PhaseStar
 
         PrepareNextDirective();
         return true;
-    }
-
-    void EjectCachedDirectiveAndFlow(Collision2D coll)
-    {
-        if (CanCommitEjection != null && !CanCommitEjection(_attunedRole, _cachedIsSuperNode))
-        {
-            // Another sequence is still unresolved (or the harvest budget is spent). Keep
-            // the cached directive and stay armed — the poke retries once it resolves.
-            visuals?.FlashReject();
-            if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar] Cached eject deferred — sequence in flight or no harvest budget (role={_attunedRole}).");
-            return;
-        }
-
-        var contact = coll.GetContact(0).point;
-        var starPos = (Vector2)transform.position;
-        var vehiclePos = coll.rigidbody != null ? coll.rigidbody.position : contact;
-
-        _lastImpactDir = (starPos - vehiclePos).normalized;
-        _lastImpactStrength = Mathf.Clamp(coll.relativeVelocity.magnitude, 0f, MaxImpactStrength);
-
-        Disarm(PhaseStarDisarmReason.NodeResolving, _cachedTrack.DisplayColor);
-        ActivateSafetyBubble();
-        bool spawned = _cachedIsSuperNode
-            ? SpawnSuperNodeCommon(contact, _cachedTrack)
-            : SpawnNodeCommon(contact, _cachedTrack);
-
-        if (!spawned)
-        {
-            // Re-latch and re-arm so the next poke retries (ArmNext also deactivates the
-            // safety bubble). OnEjected must NOT fire — see EjectActivePreviewShardAndFlow.
-            TransitionZapState(ZapProgressState.ReadyLatched, _attunedRole, "spawn-failed-relatch");
-            ArmNext();
-            return;
-        }
-
-        TransitionZapState(ZapProgressState.Seeking, _attunedRole, "ejection-succeeded");
-        dust?.SetAcquisitionEnabled(true, "post-eject-new-cycle");
-
-        OnEjected?.Invoke(this, _attunedRole);
     }
 
     private bool ShouldSpawnSuperNodeForTrack(InstrumentTrack track)
@@ -477,9 +408,8 @@ public partial class PhaseStar
         {
             rb.linearVelocity = _lastImpactDir * _lastImpactStrength;
         }
-        int entropy = CurrentEntropyForSelection();
         ResolveGameFlowManager();
-        var noteSet = _gfm != null ? _gfm.GenerateNotes(track, entropy) : null;
+        var noteSet = _gfm != null ? _gfm.GenerateNotes(track, 0) : null;
         if (!TryResolveAuthoritativeZapCount(track.assignedRole, track, out _currentBurstRequiredZaps))
             _currentBurstRequiredZaps = Mathf.Max(1, GetNoteSetNoteCount(noteSet));
         if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNode] Initializing track {track.name} with {track.assignedRole}");
@@ -522,6 +452,21 @@ public partial class PhaseStar
         int distinctStepCount = noteSet.GetStepList()?.Distinct().Count() ?? 0;
         int noteListCount = noteSet.GetNoteList()?.Count ?? 0;
         return Mathf.Max(persistentTemplateCount, Mathf.Max(distinctStepCount, noteListCount));
+    }
+
+    // Shared tail for MineNode/SuperNode resolution: park the star off-screen and hold
+    // the gate until the resulting collectable burst clears.
+    private void EnterAwaitCollectableClear(Color tint, string logTag)
+    {
+        _awaitingCollectableClear = true;
+        ResolveGameFlowManager();
+        _awaitingCollectableClearSinceLoop = (_drum != null)
+            ? _drum.completedLoops
+            : (_gfm?.activeDrumTrack?.completedLoops ?? -1);
+        _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
+        HideInPlaceForBurst();
+        Disarm(PhaseStarDisarmReason.NodeResolving, tint);
+        LogState(logTag);
     }
 
     private void EnableColliders()

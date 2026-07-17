@@ -296,20 +296,10 @@ public partial class Vehicle : MonoBehaviour
 
         float dt = Time.fixedDeltaTime;
 
-        bool insideBubble = StarPool.IsPointInsideAnySafetyBubble(transform.position);
         _isActivePlow = false;   // always reset; DoPlowTick sets true only when cells are carved
 
-        if (insideBubble)
-        {
-            // Release keep-clear claim so refuge dust regrows.
-            if (gfm != null && gfm.dustGenerator != null && gfm.activeDrumTrack != null)
-                gfm.dustGenerator.ReleaseVehicleKeepClear(_id);
-        }
-        else
-        {
-            DoPlowTick();
-            RefreshVehicleKeepClearIfNeeded();
-        }
+        DoPlowTick();
+        RefreshVehicleKeepClearIfNeeded();
 
         if (!boosting) _plowVelocityDrain = 0f;
         // --- Loop boundary check (null-safe) ---
