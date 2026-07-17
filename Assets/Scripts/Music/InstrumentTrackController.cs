@@ -1058,6 +1058,10 @@ public class InstrumentTrackController : MonoBehaviour
         if (track.IsExpansionPending)
             return Mathf.Clamp(track.GetNextFilledBinForDensity(), 0, trackMaxBinIndex);
 
+        // Refill a bin emptied by note ascension before advancing/expanding.
+        int emptied = track.GetFirstEmptyAllocatedBin();
+        if (emptied >= 0) return emptied;
+
         bool allowAdvance = ConsumeAllowAdvanceNextBurst(track); // consume exactly once
         int globalFrontier = ComputeGlobalFrontier();
         if (globalFrontier < 0) return 0;

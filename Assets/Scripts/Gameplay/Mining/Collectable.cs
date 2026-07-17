@@ -209,11 +209,14 @@ public partial class Collectable : MonoBehaviour
     [Tooltip("Candidate step anchors this collectable may resolve to when attaching to the track ribbon.")]
     public List<int> sharedTargetSteps = new List<int>();
     // --- Movement (intent-driven velocity steering) ---
-    [NonSerialized] public float spawnVelocity127 = 100f; // authored MIDI velocity from the riff template; additive speed on top of the role's base
+    [NonSerialized] public float spawnVelocity127 = 100f; // authored MIDI velocity from the riff template; modulates the role's speed ±25%
 
     private Camera _cam;
     private Rigidbody2D _rb;
-    private float _speed;                   // base + velocity additive, resolved at Initialize
+    private const float kBaseLinearSpeed = 2.4f; // world units/sec of linear drift at multiplier 1.0
+    private float _profileSpeedMul = 1f;    // profile collectableSpeed — global multiplier on all motion
+    private float _speed;                   // kBaseLinearSpeed × multiplier × velocity modulation, resolved at Initialize
+    private float _steerAccel = 20f;        // _speed / collectableAccelSeconds — full speed on every note length
     private System.Random _rng;
     private MusicalRole _role = MusicalRole.None;
     private MusicalRoleProfile _roleProfile;
@@ -225,7 +228,10 @@ public partial class Collectable : MonoBehaviour
     private float _intentInterval = 1f;        // seconds; the note's duration in musical time
     private float _bounceRecoverTimer;         // > 0 right after a dust hit — steering weakened
     private int _bassChargeSign = 1;           // +1 up / -1 down, alternates per intent
-    private float _harmonyHeadingDeg;          // persistent orbital heading
+    private float _bassChargeSpeed;            // per-pulse: spans to the opposite cage edge in one note duration
+    private float _accelSeconds = 0.12f;       // time-to-speed; steering accel scales with the desired speed
+    private float _leadHeadingDeg;             // Lead: drifting base heading; swerve oscillates across it
+    private float _leadSwervePhase;            // Lead: radians into the sine weave
     private Vector2 _homeWorld;                // arrival position — the note's gravitational anchor
     private float _homeFreeRadius;             // world units of pull-free movement around home
     private float _fleeRadiusWorld;            // vehicle distance that triggers fleeing (0 = fearless)
@@ -272,7 +278,11 @@ public partial class Collectable : MonoBehaviour
             Debug.LogWarning($"{gameObject.name} - No target steps provided.");
 
         _role = assignedInstrumentTrack != null ? assignedInstrumentTrack.assignedRole : MusicalRole.None;
-        _roleProfile = MusicalRoleProfileLibrary.GetProfile(_role);
+        // Prefer the motif-selected profile installed on the track; the library keeps only
+        // the first-loaded asset per role, so it can't see per-motif tuning.
+        _roleProfile = (assignedInstrumentTrack != null && assignedInstrumentTrack.ActiveProfile != null)
+            ? assignedInstrumentTrack.ActiveProfile
+            : MusicalRoleProfileLibrary.GetProfile(_role);
         _orbitalChirality = (_id & 1) == 0 ? 1f : -1f;
         if (assignedInstrumentTrack != null)
         {
@@ -287,11 +297,18 @@ public partial class Collectable : MonoBehaviour
 
         if (_rb == null) TryGetComponent(out _rb);
         _rng ??= new System.Random(StableSeed());
+        _leadHeadingDeg = (float)(_rng.NextDouble() * 360.0);
 
-        // Speed: role base + authored MIDI velocity additive.
-        float baseSpd = _roleProfile != null ? _roleProfile.collectableBaseSpeed : 1.2f;
-        float velAdd  = _roleProfile != null ? _roleProfile.collectableVelocitySpeedAdd : 1.5f;
-        _speed = baseSpd + Mathf.Clamp01(spawnVelocity127 / 127f) * velAdd;
+        // Speed: global role multiplier × base linear speed × MIDI-velocity modulation (±25%).
+        _profileSpeedMul = _roleProfile != null ? Mathf.Max(0f, _roleProfile.collectableSpeed) : 1f;
+        float velMod = Mathf.Lerp(0.75f, 1.25f, Mathf.Clamp01(spawnVelocity127 / 127f));
+        _speed = kBaseLinearSpeed * _profileSpeedMul * velMod;
+
+        // Steering accel: reach full speed in collectableAccelSeconds, on every note length.
+        // Duration-derived pulse speeds (bass slam, harmony surge) can exceed _speed, so
+        // MovementRoutine scales the accel with the desired speed using _accelSeconds.
+        _accelSeconds = Mathf.Max(0.02f, _roleProfile != null ? _roleProfile.collectableAccelSeconds : 0.12f);
+        _steerAccel = _speed / _accelSeconds;
 
         // Intent interval: the note's duration in musical time (ticks @ 480/quarter).
         var drums = assignedInstrumentTrack != null ? assignedInstrumentTrack.drumTrack : null;

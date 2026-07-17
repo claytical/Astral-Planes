@@ -207,6 +207,12 @@ public class Explode : MonoBehaviour
 
     public void ZapExplode()
     {
+        if (explosion == null)
+        {
+            Debug.LogWarning($"[EXPLODE] ZapExplode skipped: explosion is null on {name}", this);
+            return;
+        }
+
         var go = Instantiate(explosion, transform.position, Quaternion.identity);
         ApplyTintToInstance(go, explosionTint);
         if (_burstDir.sqrMagnitude > 0.0001f)

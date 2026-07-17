@@ -1481,7 +1481,7 @@ public partial class Vehicle : MonoBehaviour
                 if (effectiveRes >= 1f) continue;
                 if (!canCarve) continue;
 
-                gen.DisableCellCollider(cell);
+                gen.SuppressCellColliderForPlow(cell);
                 gen.ChipDustByVehicle(cell, chipAmount, fade, profile.carveResistanceBypass01, profile);
                 _isActivePlow = true;
             }

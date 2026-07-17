@@ -76,12 +76,10 @@ MonoBehaviour:
   visual:
     prefabReferenceScale: {x: 1, y: 1, z: 1}
     particleSystem: {fileID: 5371160903463010692}
-    particleFootprintMul: 0.5
     sprite: {fileID: 8999714297043290424}
   interaction:
     energyDrainPerSecond: 1
   clearing:
-    carveResistance01: 0
     drainResistance01: 0
   useWorkShaderParams: 1
   terrainCollider: {fileID: 0}
@@ -103,6 +101,7 @@ MonoBehaviour:
     type: 3}
   preExplosion: {fileID: 1461853990459934639, guid: 5a583006814b549ee920415843bae4de,
     type: 3}
+  expireExplosion: {fileID: 0}
   lifetime: 0
   randomizeLifetimer: 0
   tintExplosions: 1
@@ -378,7 +377,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 1, g: 1, b: 1, a: 1}
-      maxColor: {r: 1, g: 1, b: 1, a: 0.5019608}
+      maxColor: {r: 1, g: 1, b: 1, a: 0.34901962}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -5025,7 +5024,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &8999714297043290424
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -5083,6 +5082,7 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &8081140791669243937
 GameObject:
   m_ObjectHideFlags: 0

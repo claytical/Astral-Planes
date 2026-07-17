@@ -13,6 +13,14 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
     [Tooltip("Blend duration from seek colors into active drain colors.")]
     [SerializeField] private float colorTransitionTime = 0.5f;
 
+    [Header("Drain Polish")]
+    [Tooltip("Anticipation window after contact: the cell shudders/brightens before the drain fires. 0 = legacy instant chip.")]
+    [SerializeField, Min(0f)] private float drainBuildupSeconds = 0.35f;
+    [Tooltip("Travel time of the siphon energy packet from tentacle tip to the star root.")]
+    [SerializeField, Min(0.05f)] private float siphonTravelSeconds = 0.5f;
+    [Tooltip("How far the siphon packet color is pushed toward white.")]
+    [SerializeField, Range(0f, 1f)] private float siphonBrightness = 0.85f;
+
     [Header("Tentacle Motion")]
     [Tooltip("Regrow speed for tentacle extension (progress per second).")]
     [SerializeField] private float tentacleGrowSpeed = 0.35f;   // progress/sec (0-1 range)
@@ -89,6 +97,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         public float clearTimer;
         public float clearDuration;
         public int pendingZapUnits;
+        public bool buildupStarted;
+        public bool siphonActive;
+        public float siphonT; // 1 = at tip, 0 = arrived at star root
     }
 
     public Action<MusicalRole, float> onDelivery;
@@ -467,12 +478,24 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
                 tentacle.tipPos          = tentacle.targetWorldPos;
                 tentacle.drainFlashTimer = Mathf.Max(0f, tentacle.drainFlashTimer - dt);
+                TickSiphon(tentacle, dt);
 
                 UpdateTentacleLine(tentacle, starPos, dt);
 
                 tentacle.contactTimer += dt;
                 if (tentacle.contactTimer >= minContactTime)
-                    HandleDrainContactAndClear(tentacle, dt, starPos);
+                {
+                    if (!tentacle.buildupStarted)
+                    {
+                        tentacle.buildupStarted = true;
+                        if (drainBuildupSeconds > 0f && gen != null &&
+                            gen.TryGetDustAt(tentacle.targetCell, out var buildupDust) && buildupDust != null)
+                            buildupDust.BeginDrainBuildup(drainBuildupSeconds);
+                    }
+
+                    if (tentacle.contactTimer >= minContactTime + drainBuildupSeconds)
+                        HandleDrainContactAndClear(tentacle, dt, starPos);
+                }
 
                 break;
             }
@@ -501,6 +524,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
                 tentacle.dissolveTimer  += dt;
                 tentacle.drainFlashTimer = Mathf.Max(0f, tentacle.drainFlashTimer - dt);
+                TickSiphon(tentacle, dt);
                 tentacle.alphaScale      = Mathf.Clamp01(1f - tentacle.dissolveTimer / dissolveDuration);
                 tentacle.tipPos          = tentacle.targetWorldPos;
                 UpdateTentacleLine(tentacle, starPos, dt);
@@ -537,6 +561,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.clearTimer = 0f;
         tentacle.clearDuration = 0f;
         tentacle.pendingZapUnits = 0;
+        tentacle.buildupStarted = false;
+        tentacle.siphonActive = false;
+        tentacle.siphonT = 0f;
 
         Vector3 root3 = new Vector3(starPos.x, starPos.y, transform.position.z);
         for (int i = 0; i < SplinePoints; i++)
@@ -545,6 +572,21 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         TransitionTentacleState(tentacle, TentacleState.Growing, "acquired target");
         tentacle.line.enabled = true;
         UpdateTentacleLine(tentacle, starPos, 0f);
+    }
+
+    // Advances the siphon energy packet from tip toward root; on arrival, fires the
+    // existing root drain flash as the "energy absorbed by star" beat.
+    private void TickSiphon(Tentacle tentacle, float dt)
+    {
+        if (!tentacle.siphonActive) return;
+
+        tentacle.siphonT -= dt / Mathf.Max(0.05f, siphonTravelSeconds);
+        if (tentacle.siphonT <= 0f)
+        {
+            tentacle.siphonActive = false;
+            tentacle.siphonT = 0f;
+            tentacle.drainFlashTimer = DrainFlashDuration;
+        }
     }
 
     private void HandleDrainContactAndClear(Tentacle tentacle, float dt, Vector2 starPos)
@@ -563,13 +605,19 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
             if (gen != null && gen.TryGetDustAt(tentacle.targetCell, out var dust) && dust != null)
             {
+                // Capture the vivid role tint BEFORE ChipEnergy lerps it toward gray,
+                // so the clear explosion fires in the cell's true color.
+                Color preDrainTint = dust.CurrentTint;
                 tentacle.pendingZapUnits = dust.ChipEnergy(1);
                 if (tentacle.pendingZapUnits > 0)
                 {
                     // Drained energy is held by the MineNode the star builds from it;
                     // the cell regrows when that node dies (or the star is destroyed first).
-                    gen.ZapClearCellHeld(tentacle.targetCell);
+                    Vector2 burstDir = starPos - tentacle.targetWorldPos; // blow toward the star
+                    gen.ZapClearCellHeld(tentacle.targetCell, preDrainTint, burstDir);
                     _star?.RegisterHeldDrainCell(tentacle.targetCell);
+                    tentacle.siphonActive = true;
+                    tentacle.siphonT = 1f;
                 }
             }
         }
@@ -771,6 +819,17 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private void BeginRetractingTentacle(Tentacle tentacle, Vector2 starPos, string reason)
     {
+        // Buildup started but the drain never fired (target lost/invalidated):
+        // restore the cell's normal scale and tint. If the clear started, the
+        // clear visuals own the cell — leave it alone.
+        if (tentacle.buildupStarted && !tentacle.clearStarted)
+        {
+            var gen = _gfm?.dustGenerator;
+            if (gen != null && gen.TryGetDustAt(tentacle.targetCell, out var buildupDust) && buildupDust != null)
+                buildupDust.CancelDrainBuildup();
+        }
+        tentacle.buildupStarted = false;
+
         ReleaseDrainLock(tentacle);
         ReleaseReservation(tentacle, tentacle.targetCell);
 
@@ -860,15 +919,34 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
 
     private void BuildDrainPulseGradient(Tentacle tentacle, Color roleColor, float alpha, float dustCharge01 = 1f)
     {
-        float rawT     = (Time.time * tentacleFlowSpeed + tentacle.flowOffset) % 1f;
-        float pulse    = 1f - rawT;
-        float halfWidth = 0.1f;
+        // While a siphon packet is in flight, it replaces the ambient flow pulse:
+        // a brighter, wider packet whose position is driven by siphonT (tip -> root)
+        // instead of the looping flow phase. Same key structure, no extra keys.
+        bool siphon = tentacle.siphonActive;
+
+        float pulse;
+        float halfWidth;
+        Color bright;
+        if (siphon)
+        {
+            pulse     = Mathf.Clamp01(tentacle.siphonT);
+            halfWidth = 0.14f;
+            bright    = Color.Lerp(roleColor, Color.white, siphonBrightness);
+        }
+        else
+        {
+            float rawT = (Time.time * tentacleFlowSpeed + tentacle.flowOffset) % 1f;
+            pulse      = 1f - rawT;
+            halfWidth  = 0.1f;
+            float flashBoost = tentacle.drainFlashTimer > 0f ? 0.5f : 0.4f;
+            bright     = Color.Lerp(roleColor, Color.white, flashBoost);
+        }
+
         float p0 = Mathf.Clamp01(pulse - halfWidth);
         float p1 = pulse;
         float p2 = Mathf.Clamp01(pulse + halfWidth);
 
-        float flashBoost = tentacle.drainFlashTimer > 0f ? 0.5f : 0.4f;
-        Color bright     = Color.Lerp(roleColor, Color.white, flashBoost);
+        float pulsePeakAlpha = siphon ? 1.0f : 1.0f * alpha;
 
         Color dustTipColor = Color.Lerp(Color.gray, roleColor, dustCharge01);
         float tipAlpha     = dustCharge01 * 0.6f * alpha;
@@ -886,7 +964,7 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
             {
                 new GradientAlphaKey(drainingBaseAlpha * alpha,        0f),
                 new GradientAlphaKey(drainingBaseAlpha * 0.5f * alpha, p0),
-                new GradientAlphaKey(1.0f * alpha,                     p1),
+                new GradientAlphaKey(pulsePeakAlpha,                   p1),
                 new GradientAlphaKey(drainingBaseAlpha * 0.5f * alpha, p2),
                 new GradientAlphaKey(tipAlpha,                         0.92f),
                 new GradientAlphaKey(0f,                               1f),
@@ -1081,6 +1159,9 @@ public sealed class PhaseStarDustAffect : MonoBehaviour
         tentacle.clearTimer = 0f;
         tentacle.clearDuration = 0f;
         tentacle.pendingZapUnits = 0;
+        tentacle.buildupStarted = false;
+        tentacle.siphonActive = false;
+        tentacle.siphonT = 0f;
 
         if (tentacle.line != null)
         {

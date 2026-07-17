@@ -74,6 +74,18 @@ public class MotifSnapshot
     /// bridge time in GrowTracksAnimated.</summary>
     public int TotalSteps;
 
+    /// <summary>Drum BPM at commit time. Converts NoteEntry.DurationTicks → ms during
+    /// preview playback. 0 on rings saved before timing capture existed.</summary>
+    public float Bpm;
+
+    /// <summary>Actual seconds-per-step at commit time (playing drum clip length /
+    /// TotalSteps). 0 on legacy rings ⇒ preview re-derives from the MotifProfile.</summary>
+    public float StepDurationSec;
+
+    /// <summary>Leader loop width in bins at commit time (max loopMultiplier across
+    /// tracks). 0 on legacy rings ⇒ preview infers from TrackBins.</summary>
+    public int LeaderBins;
+
     /// <summary>MIDI root note of the motif (default C4 = 60). Gives root-note buds
     /// a distinct visual treatment.</summary>
     public int MotifKeyRootMidi;
@@ -216,6 +228,10 @@ public class MotifSnapshot
         public int   BinIndex;
         public bool  IsMatched;
 
+        /// <summary>Note duration in MPTK ticks (480/quarter), as played in the session.
+        /// 0 on legacy rings ⇒ preview falls back to distance-to-next-onset.</summary>
+        public int   DurationTicks;
+
         /// <summary>
         /// Normalized step position within the bin (0 = first step, 1 = last step).
         /// Drives ring tug-dip width in MotifRingGlyphGenerator: later-position notes
@@ -245,15 +261,17 @@ public class MotifSnapshot
         public NoteEntry() { }
 
         public NoteEntry(int step, int note, float velocity, Color trackColor,
-                         int binIndex = 0, bool isMatched = false, float commitTime01 = 0f)
+                         int binIndex = 0, bool isMatched = false, float commitTime01 = 0f,
+                         int durationTicks = 0)
         {
-            Step         = step;
-            Note         = note;
-            Velocity     = velocity;
-            BinIndex     = binIndex;
-            IsMatched    = isMatched;
-            CommitTime01 = commitTime01;
-            TrackColor   = trackColor; // writes through to SerializedTrackColor
+            Step          = step;
+            Note          = note;
+            Velocity      = velocity;
+            BinIndex      = binIndex;
+            IsMatched     = isMatched;
+            CommitTime01  = commitTime01;
+            DurationTicks = durationTicks;
+            TrackColor    = trackColor; // writes through to SerializedTrackColor
         }
     }
 

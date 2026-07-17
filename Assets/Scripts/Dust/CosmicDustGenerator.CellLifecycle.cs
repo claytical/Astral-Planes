@@ -106,6 +106,7 @@ public partial class CosmicDustGenerator
 
     private void FinalizeVehicleCarve(Vector2Int cell, float fadeSeconds, ShipMusicalProfile shipProfile = null)
     {
+        _plowSuppressedColliders.Remove(cell);
         _imprints ??= new Dictionary<Vector2Int, DustImprint>();
         if (!RestoreVoronoiImprint(cell))
             PromoteHiddenRole(cell);
@@ -176,6 +177,9 @@ public partial class CosmicDustGenerator
         float fadeSeconds = 0.10f,
         float regrowDelaySeconds = -1f)
     {
+        // Collectable-driven clear: regrow gray so the hidden imprint stays unrevealed
+        // (and the regrown cell can't become a PhaseStar tentacle target).
+        SetCellFlag(gpCenter, CellFlags.ForceGrayRegrow);
         ClearCell(gpCenter, mode, fadeSeconds, scheduleRegrow: true, source: DustClearSource.Jail, regrowDelaySeconds: regrowDelaySeconds);
 
         if (dustClaims != null && holdSeconds > 0f)
@@ -190,6 +194,7 @@ public partial class CosmicDustGenerator
             var np = gpCenter + n;
             if (!IsInBounds(np)) continue;
             if (!HasDustAt(np)) continue;
+            SetCellFlag(np, CellFlags.ForceGrayRegrow);
             ClearCell(np, mode, fadeSeconds, scheduleRegrow: true, source: DustClearSource.Jail, regrowDelaySeconds: regrowDelaySeconds);
         }
     }

@@ -241,6 +241,11 @@ public sealed class StarPool : MonoBehaviour
 
         foreach (var role in roles)
         {
+            // Every live star and any mine sequence in flight will consume one ejection if
+            // harvested — spawn only while unreserved budget remains so the total number of
+            // node sequences can't overshoot nodesPerStar.
+            if (_remainingEjectionsTotal - ReservedEjections() <= 0) break;
+
             // Only block this role's slot if its own MineNode sequence is pending.
             if (role == _lastEjectedRole && (_mineNodePending || HasUnresolvedMineNodeSequence())) continue;
 
@@ -258,6 +263,18 @@ public sealed class StarPool : MonoBehaviour
                 SpawnStarForRole(role);
             }
         }
+    }
+
+    // Live stars (active or paused) plus an in-flight mine sequence each hold a claim on one
+    // ejection from _remainingEjectionsTotal. Expired/escaped/SuperNode outcomes release the
+    // claim without spending it (star destroyed + _mineNodePending cleared), so refunds keep
+    // working.
+    private int ReservedEjections()
+    {
+        int live = 0;
+        foreach (var s in _activeStars.Values)
+            if (s != null) live++;
+        return live + (_mineNodePending ? 1 : 0);
     }
 
     // ── Star spawning ─────────────────────────────────────────────────────────

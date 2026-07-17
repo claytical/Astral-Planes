@@ -27,7 +27,7 @@ public class MineNode : MonoBehaviour
     [SerializeField] private MineNodeDecisionArchetypeLibrary decisionArchetypeLibrary;
 
     [Header("Flee Boundary Targeting")]
-    [Tooltip("How strongly fleeing node steers toward the nearest horizontal screen edge.")]
+    [Tooltip("How strongly fleeing node steers toward its sought border gap.")]
     [SerializeField, Range(0f, 1f)] private float fleeTowardBoundaryWeight = 0.45f;
 
     [Header("NoteSet-Driven Motion")]
@@ -119,6 +119,28 @@ public class MineNode : MonoBehaviour
     private bool  _burstPauseSnapPending;
     private float _burstPauseSnapAt;
 
+    // Fleeing: sought border gap (side columns only — top/bottom are never escape walls)
+    private bool       _hasFleeGap;
+    private Vector2Int _fleeGapCell;
+    private Vector2Int _fleeWaypointCell;
+    private float      _fleeRetargetTimer;
+    private readonly Queue<Vector2Int>                  _fleeBfsQueue   = new Queue<Vector2Int>(256);
+    private readonly Dictionary<Vector2Int, Vector2Int> _fleeBfsParents = new Dictionary<Vector2Int, Vector2Int>(256);
+    private const int   kFleeBfsBudget       = 600;
+    private const float kFleeRetargetPeriod  = 0.5f;
+    private const int   kFleeWaypointStride  = 3;
+
+    // Escape glide: once escaped, the node stops steering/containment and drifts
+    // straight out through the gap until it is fully off-screen.
+    private bool    _isEscapeGliding;
+    private Vector2 _escapeGlideDir;
+    private float   _escapeGlideRadius;
+    private const float kEscapeGlideMinSpeed = 1.5f;
+    private static readonly Vector2Int[] kFleeNeighbours4 =
+    {
+        new( 1, 0), new(-1, 0), new( 0, 1), new( 0,-1)
+    };
+
     // Motion tunables (previously local consts in FixedUpdate)
     private const float kStallSpeed        = 0.20f; // below this velocity the node is considered stopped
     private const float kStuckDot          = 0.10f; // carve dir vs velocity alignment — catches spinning-in-place
@@ -137,7 +159,9 @@ public class MineNode : MonoBehaviour
         _spawnCell = spawnCell;
         _role = track != null ? track.assignedRole : default;
         _noteSet = noteSet;
-        expireAfterLoops = noteSet?.expireAfterLoops ?? 0;
+        // NoteSet value wins only when authored (>0); otherwise the prefab fallback stands.
+        if (noteSet != null && noteSet.expireAfterLoops > 0)
+            expireAfterLoops = noteSet.expireAfterLoops;
         _lockedColor = tint;
         _drumTrack = (track != null) ? track.drumTrack : null;
         var prof = MusicalRoleProfileLibrary.GetProfile(_role);
@@ -279,8 +303,30 @@ public class MineNode : MonoBehaviour
         WasEscaped = true;
         SetBehaviorIntent(MineNodeBehaviorIntent.Escaping);
         if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNode] {name} — escaped through boundary.");
+        BeginEscapeGlide();
         FireResolvedOnce();
         StartCoroutine(CleanupAndDestroy(waitForFullEscape: true));
+    }
+
+    // Freeze gameplay interaction and drift straight out through the gap so the
+    // player watches the node leave instead of it popping at the screen edge.
+    private void BeginEscapeGlide()
+    {
+        float centerX = 0f;
+        if (_drumTrack != null && _drumTrack.TryGetPlayAreaWorld(out var area))
+            centerX = (area.left + area.right) * 0.5f;
+        else if (_cam != null)
+            centerX = _cam.transform.position.x;
+
+        _escapeGlideDir    = _rb.position.x >= centerX ? Vector2.right : Vector2.left;
+        _escapeGlideRadius = _col != null ? Mathf.Max(_col.bounds.extents.x, _col.bounds.extents.y) : 0f;
+        _isEscapeGliding   = true;
+
+        // No capture, bounce, or boundary-trigger interaction on the way out.
+        if (_col != null) _col.enabled = false;
+        // Edge-hug / escape-push forces would drag the node back toward the wall.
+        if (_dustInteractor == null) _dustInteractor = GetComponent<MineNodeDustInteractor>();
+        if (_dustInteractor != null) _dustInteractor.enabled = false;
     }
 
     // ---------------------------------------------------------------
@@ -298,6 +344,13 @@ public class MineNode : MonoBehaviour
 
         didContainmentThisTick = false;
         _hardCorrectionsThisTick = 0;
+
+        if (_isEscapeGliding)
+        {
+            // Resolved and leaving: constant outward drift, no steering or containment.
+            _rb.linearVelocity = _escapeGlideDir * Mathf.Max(_currentDesiredSpeed, kEscapeGlideMinSpeed);
+            return;
+        }
 
         switch (State)
         {
@@ -362,47 +415,63 @@ public class MineNode : MonoBehaviour
 
         ApplyLocomotion(speed01, 1f);
 
-        // Steer toward nearest horizontal screen edge
-        if (_cam == null) _cam = Camera.main;
-        if (_cam != null)
+        // Seek the nearest reachable side-wall gap and steer toward it. Escape is
+        // only ever through a dust-free perimeter cell on the LEFT or RIGHT column.
+        UpdateFleeGapTarget(myCell);
+
+        bool gapOnNearSide = false;
+        if (_hasFleeGap)
         {
-            float camHalfW  = _cam.orthographicSize * _cam.aspect;
-            float leftDist  = _rb.position.x - (-camHalfW);
-            float rightDist = camHalfW - _rb.position.x;
-            float targetX   = leftDist < rightDist ? -camHalfW : camHalfW;
-            Vector2 toEdge  = new Vector2(targetX - _rb.position.x, 0f).normalized;
-            if (toEdge.sqrMagnitude > 0.0001f)
+            Vector2 waypoint = _drumTrack.GridToWorldPosition(_fleeWaypointCell);
+            Vector2 toGap    = waypoint - _rb.position;
+            if (toGap.sqrMagnitude > 0.0001f)
             {
-                // Only bias toward the edge when that direction is not blocked by dust.
-                bool edgeBlocked = false;
-                for (int i = 1; i <= 2; i++)
-                {
-                    var probe = myCell + new Vector2Int(Mathf.RoundToInt(toEdge.x * i), Mathf.RoundToInt(toEdge.y * i));
-                    if (_drumTrack.HasDustAt(probe)) { edgeBlocked = true; break; }
-                }
-                if (!edgeBlocked)
-                {
-                    float edgeBias = Mathf.Lerp(fleeTowardBoundaryWeight * 0.25f, fleeTowardBoundaryWeight, _decisionArchetype.fleeBias);
-                    _carveDir = Vector2.Lerp(_carveDir, toEdge, edgeBias).normalized;
-                }
+                float gapBias = Mathf.Lerp(fleeTowardBoundaryWeight * 0.25f, fleeTowardBoundaryWeight, _decisionArchetype.fleeBias);
+                // At the doorway, override corridor lookahead so it can't turn the node away.
+                int cellDist = Mathf.Abs(myCell.x - _fleeGapCell.x) + Mathf.Abs(myCell.y - _fleeGapCell.y);
+                if (cellDist < 3) gapBias = Mathf.Max(gapBias, 0.9f);
+                _carveDir = Vector2.Lerp(_carveDir, toGap.normalized, gapBias).normalized;
             }
+
+            // Open the X clamp only when the node is at its gap: gap wall is the node's
+            // near wall, node is within one row of the gap, and the perimeter cell in the
+            // node's own row is authoritative — dust there = wall, no exit.
+            int w = Mathf.Max(1, _drumTrack.GetSpawnGridWidth());
+            int edgeX = _fleeGapCell.x > 0 ? w - 1 : 0;
+            bool gapWallIsNear = (_fleeGapCell.x == 0) == (myCell.x <= (w - 1) / 2);
+            gapOnNearSide = gapWallIsNear
+                         && Mathf.Abs(myCell.y - _fleeGapCell.y) <= 1
+                         && !_drumTrack.HasDustAt(new Vector2Int(edgeX, myCell.y));
         }
 
         RunStallEscape(myCell);
         if (!ShouldSkipBoundaryClampThisTick())
-            RunBoundaryClamp(false, true); // No X clamp — let it reach the side edge
+            RunBoundaryClamp(!gapOnNearSide, true); // X clamp opens only at the sought gap
 
-        // Off-screen escape fallback:
-        // Allowed escape sides are LEFT, RIGHT, and TOP only.
-        // Bottom off-screen does NOT count as an escape and must never call HandleEscape().
-        if (_cam == null) _cam = Camera.main;
-        if (_cam != null)
+        // Off-screen escape: LEFT and RIGHT only, and only through a genuine wall gap.
+        // Top and bottom off-screen must never call HandleEscape().
+        Vector2 posNow = _rb.position;
+        if (_drumTrack.TryGetPlayAreaWorld(out var area))
         {
-            const float kEscapeMargin = 2f;
-            float halfW = _cam.orthographicSize * _cam.aspect;
-            float halfH = _cam.orthographicSize;
-            Vector2 pos = _rb.position;
-            if (CanEscapeFromWorldPos(pos, halfW, halfH, kEscapeMargin))
+            float margin = Mathf.Max(0.5f, _drumTrack.GetCellWorldSize()); // ~1 cell past the grid edge
+            bool outside = posNow.x < area.left  - margin
+                        || posNow.x > area.right + margin;
+            if (!outside) return;
+
+            if (ExitGapCrossed(posNow))
+            {
+                HandleEscape();
+                return;
+            }
+            // Slipped past a solid wall (containment miss): shove back inside instead of escaping.
+            if (!didContainmentThisTick)
+                ClampIntoPlayArea(posNow, area);
+        }
+        else
+        {
+            // Play area unavailable: fall back to camera geometry (no gap check possible).
+            if (_cam == null) _cam = Camera.main;
+            if (_cam != null && CanEscapeFromWorldPos(posNow, _cam.orthographicSize * _cam.aspect, 2f))
             {
                 HandleEscape();
                 return;
@@ -410,13 +479,121 @@ public class MineNode : MonoBehaviour
         }
     }
 
-    private static bool CanEscapeFromWorldPos(Vector2 pos, float halfW, float halfH, float margin)
+    // ---------------------------------------------------------------
+    // Fleeing gap-seek: BFS through open cells to the nearest dust-free
+    // side-column perimeter cell (a punched exit or player-carved hole).
+    // ---------------------------------------------------------------
+
+    private void UpdateFleeGapTarget(Vector2Int fromCell)
+    {
+        // Drop the target the moment its cell seals again (regrowth or player action).
+        if (_hasFleeGap && _drumTrack.HasDustAt(_fleeGapCell))
+        {
+            _hasFleeGap = false;
+            _fleeRetargetTimer = 0f;
+        }
+
+        _fleeRetargetTimer -= Time.fixedDeltaTime;
+        if (_fleeRetargetTimer > 0f) return;
+        _fleeRetargetTimer = kFleeRetargetPeriod;
+        TryFindEscapeGap(fromCell);
+    }
+
+    private void TryFindEscapeGap(Vector2Int fromCell)
+    {
+        _hasFleeGap = false;
+
+        int w = _drumTrack.GetSpawnGridWidth();
+        int h = _drumTrack.GetSpawnGridHeight();
+        if (w <= 0 || h <= 0) return;
+
+        fromCell.x = Mathf.Clamp(fromCell.x, 0, w - 1);
+        fromCell.y = Mathf.Clamp(fromCell.y, 0, h - 1);
+        if (_drumTrack.HasDustAt(fromCell)) return; // embedded in dust — retry next interval
+
+        _fleeBfsQueue.Clear();
+        _fleeBfsParents.Clear();
+        _fleeBfsQueue.Enqueue(fromCell);
+        _fleeBfsParents[fromCell] = fromCell;
+
+        int visited = 0;
+        while (_fleeBfsQueue.Count > 0 && visited < kFleeBfsBudget)
+        {
+            var cell = _fleeBfsQueue.Dequeue();
+            visited++;
+
+            // BFS order means the first side-column open cell reached is the nearest gap.
+            if (cell.x == 0 || cell.x == w - 1)
+            {
+                SetFleeGap(fromCell, cell);
+                return;
+            }
+
+            for (int i = 0; i < kFleeNeighbours4.Length; i++)
+            {
+                var nb = cell + kFleeNeighbours4[i];
+                // No wrap: the perimeter must act as a boundary for escape pathing.
+                if (nb.x < 0 || nb.y < 0 || nb.x >= w || nb.y >= h) continue;
+                if (_fleeBfsParents.ContainsKey(nb)) continue;
+                if (_drumTrack.HasDustAt(nb)) continue;
+                _fleeBfsParents[nb] = cell;
+                _fleeBfsQueue.Enqueue(nb);
+            }
+        }
+    }
+
+    private void SetFleeGap(Vector2Int fromCell, Vector2Int gapCell)
+    {
+        _hasFleeGap  = true;
+        _fleeGapCell = gapCell;
+
+        // Walk the parent chain back from the gap and pick the cell
+        // kFleeWaypointStride steps out from the node as the steering waypoint.
+        int pathLen = 0;
+        for (var c = gapCell; c != fromCell; c = _fleeBfsParents[c]) pathLen++;
+
+        var waypoint = gapCell;
+        for (int back = pathLen - kFleeWaypointStride; back > 0; back--)
+            waypoint = _fleeBfsParents[waypoint];
+        _fleeWaypointCell = waypoint;
+    }
+
+    /// True when the border cell the node crossed (WorldToGridPosition clamps off-grid
+    /// positions back onto the perimeter) — or a neighbor along that wall — is dust-free.
+    /// The one-cell tolerance forgives drift across a 2-cell gap while still requiring
+    /// adjacency to a real opening; neighbors are checked along the wall only, never inward.
+    private bool ExitGapCrossed(Vector2 pos)
+    {
+        Vector2Int b = _drumTrack.WorldToGridPosition(pos);
+        if (!_drumTrack.HasDustAt(b)) return true;
+
+        // Side walls only (escape is never through top or bottom) → vary y along the wall.
+        int h = Mathf.Max(1, _drumTrack.GetSpawnGridHeight());
+        return !_drumTrack.HasDustAt(new Vector2Int(b.x, Mathf.Min(b.y + 1, h - 1)))
+            || !_drumTrack.HasDustAt(new Vector2Int(b.x, Mathf.Max(b.y - 1, 0)));
+    }
+
+    private void ClampIntoPlayArea(Vector2 pos, DrumTrack.PlayArea area)
+    {
+        Vector2 clamped = pos;
+        clamped.x = Mathf.Clamp(clamped.x, area.left + 0.1f, area.right - 0.1f);
+        clamped.y = Mathf.Min(clamped.y, area.top - 0.1f);
+        if ((clamped - pos).sqrMagnitude < 0.0001f) return;
+
+        _rb.position = clamped;
+        Vector2 inward = (clamped - pos).normalized;
+        _carveDir = Vector2.Lerp(_carveDir, inward, 0.75f).normalized;
+        _rb.linearVelocity = _carveDir * _rb.linearVelocity.magnitude;
+        didContainmentThisTick = true;
+        _hardCorrectionsThisTick++;
+    }
+
+    private static bool CanEscapeFromWorldPos(Vector2 pos, float halfW, float margin)
     {
         // Keep this rule in sync with boundary-trigger behavior:
-        // escape permitted from left/right/top only; never from bottom.
+        // escape permitted from left/right only; never from top or bottom.
         return pos.x < -halfW - margin
-            || pos.x > halfW + margin
-            || pos.y > halfH + margin;
+            || pos.x > halfW + margin;
     }
 
     private void EnforceGridContainment(Vector2 fromPos, Vector2 toPos)
@@ -901,7 +1078,7 @@ public class MineNode : MonoBehaviour
             yield break;
         }
 
-        float timeoutAt = Time.time + 2f;
+        float timeoutAt = Time.time + 6f;
         while (Time.time < timeoutAt)
         {
             if (IsFullyOutsidePlayArea(_rb.position))
@@ -913,8 +1090,9 @@ public class MineNode : MonoBehaviour
 
     private bool IsFullyOutsidePlayArea(Vector2 worldPos)
     {
-        float radius = 0f;
-        if (_col != null)
+        // Disabled colliders report empty bounds, so use the radius cached at escape time.
+        float radius = _escapeGlideRadius;
+        if (_col != null && _col.enabled)
             radius = Mathf.Max(_col.bounds.extents.x, _col.bounds.extents.y);
 
         // Use the visible camera frame first so escape cleanup waits until the node is fully off-screen,

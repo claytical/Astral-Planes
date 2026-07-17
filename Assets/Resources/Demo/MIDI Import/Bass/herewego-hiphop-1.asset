@@ -21,14 +21,18 @@ MonoBehaviour:
       midiNote: 61
       durSteps: 12
       velocity01: 0.61417323
-    - step: 11
+    - step: 6
       midiNote: 59
-      durSteps: 1
+      durSteps: 4
       velocity01: 0.48818898
-    - step: 12
-      midiNote: 64
+    - step: 10
+      midiNote: 52
       durSteps: 2
       velocity01: 0.7322835
+    - step: 12
+      midiNote: 59
+      durSteps: 4
+      velocity01: 0.48818898
     - step: 14
       midiNote: 62
       durSteps: 2

@@ -15,6 +15,13 @@ MonoBehaviour:
   patternType: 6
   dustTiming:
     regrowDelay: 4
+    vehiclePlowRegrowDelay: -1
+    collectableArrivalRegrowDelay: -1
+    collectablePlowRegrowDelay: -1
+    jailRegrowDelay: -1
+    superNodeRegrowDelay: -1
+    zapRegrowDelay: -1
+    starDrainReleaseDelay: -1
   clearBoxes:
     clearBoxCount: 4
     clearBoxWidth: 5
@@ -34,7 +41,7 @@ MonoBehaviour:
   diagonalLanes:
     step: 12
   tunnels:
-    corridorStep: 3
-    corridorWidth: 3
+    corridorStep: 2
+    corridorWidth: 2
   porousBorder:
     exitCount: 3

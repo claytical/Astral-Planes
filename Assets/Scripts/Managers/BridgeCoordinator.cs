@@ -92,6 +92,9 @@ public sealed class BridgeCoordinator
             : MazeArchetype.Windows;
         snapshot.Color = _gameFlow.dustGenerator.MazeColor();
         snapshot.TotalSteps = (drum != null && drum.totalSteps > 0) ? drum.totalSteps : 16;
+        snapshot.Bpm = (drum != null && drum.drumLoopBPM > 0f) ? drum.drumLoopBPM : 120f;
+        float clipLen = drum != null ? drum.GetClipLengthInSeconds() : 0f;
+        snapshot.StepDurationSec = (clipLen > 0f) ? clipLen / snapshot.TotalSteps : 0f; // 0 ⇒ preview falls back
         snapshot.MotifKeyRootMidi = (_gameFlow.phaseTransitionManager != null && _gameFlow.phaseTransitionManager.currentMotif != null)
             ? _gameFlow.phaseTransitionManager.currentMotif.keyRootMidi
             : 60;
@@ -99,6 +102,8 @@ public sealed class BridgeCoordinator
         snapshot.MotifIndex  = _gameFlow.phaseTransitionManager?.currentMotifIndex ?? 0;
 
         if (retained == null || retained.Count == 0) return snapshot;
+
+        snapshot.LeaderBins = Mathf.Max(1, retained.Max(t => t != null ? t.loopMultiplier : 1));
 
         float motifStartTime = _motifStartTime > 0f ? _motifStartTime : snapshot.Timestamp;
 
@@ -122,7 +127,8 @@ public sealed class BridgeCoordinator
                     trackColor: track.DisplayColor,
                     binIndex: binIndex,
                     isMatched: true,
-                    commitTime01: commitTime01));
+                    commitTime01: commitTime01,
+                    durationTicks: n.duration));
             }
 
             int allocatedBins = Mathf.Max(1, track.loopMultiplier);

@@ -66,18 +66,27 @@ public class RingPreviewPlayer : MonoBehaviour
         if (motif == null)
             return;
 
-        float bpm = motif.bpm > 0f ? motif.bpm : 120f;
-        int stepsPerLoop = motif.stepsPerLoop > 0 ? motif.stepsPerLoop : 16;
+        float bpm = snap.Bpm > 0f ? snap.Bpm : (motif.bpm > 0f ? motif.bpm : 120f);
+        int stepsPerLoop = snap.TotalSteps > 0 ? snap.TotalSteps
+            : (motif.stepsPerLoop > 0 ? motif.stepsPerLoop : 16);
 
-        AudioClip drumClip = null;
-        if (motif.intensityDrumLoops != null)
-            foreach (var c in motif.intensityDrumLoops) { if (c != null) { drumClip = c; break; } }
-        if (drumClip == null && motif.entryDrumLoops != null)
-            foreach (var c in motif.entryDrumLoops) { if (c != null) { drumClip = c; break; } }
+        if (snap.StepDurationSec > 0f)
+        {
+            _stepDurationSec = snap.StepDurationSec;
+        }
+        else
+        {
+            // Legacy ring (saved before timing capture): re-derive from the MotifProfile.
+            AudioClip drumClip = null;
+            if (motif.intensityDrumLoops != null)
+                foreach (var c in motif.intensityDrumLoops) { if (c != null) { drumClip = c; break; } }
+            if (drumClip == null && motif.entryDrumLoops != null)
+                foreach (var c in motif.entryDrumLoops) { if (c != null) { drumClip = c; break; } }
 
-        _stepDurationSec = drumClip != null
-            ? drumClip.length / stepsPerLoop
-            : 60f / bpm * 4f / stepsPerLoop;
+            _stepDurationSec = drumClip != null
+                ? drumClip.length / stepsPerLoop
+                : 60f / bpm * 4f / stepsPerLoop;
+        }
 
         // Build (binIndex, trackColor) → role lookup from TrackBins.
         var roleByBinColor = new Dictionary<(int, Color), MusicalRole>();
@@ -91,26 +100,28 @@ public class RingPreviewPlayer : MonoBehaviour
             }
         }
 
-        // Build per-role sorted ring lists (each role's BinIndexes in ascending order).
-        var roleSortedBins = new Dictionary<MusicalRole, List<int>>();
-        if (snap.TrackBins != null)
+        // Loop length = leader loop width at capture time; legacy rings infer it from
+        // the max allocated bin count across roles, capped at 5 (4 primary + 1 alternate).
+        int leaderBins = snap.LeaderBins;
+        if (leaderBins <= 0)
         {
-            foreach (var tb in snap.TrackBins)
+            var roleBinCounts = new Dictionary<MusicalRole, HashSet<int>>();
+            if (snap.TrackBins != null)
             {
-                if (!roleSortedBins.TryGetValue(tb.Role, out var list))
-                    roleSortedBins[tb.Role] = list = new List<int>();
-                if (!list.Contains(tb.BinIndex)) list.Add(tb.BinIndex);
+                foreach (var tb in snap.TrackBins)
+                {
+                    if (!roleBinCounts.TryGetValue(tb.Role, out var set))
+                        roleBinCounts[tb.Role] = set = new HashSet<int>();
+                    set.Add(tb.BinIndex);
+                }
             }
-            foreach (var kvp in roleSortedBins) kvp.Value.Sort();
+            int maxBinsPerRole = 0;
+            foreach (var kvp in roleBinCounts)
+                maxBinsPerRole = Mathf.Max(maxBinsPerRole, kvp.Value.Count);
+            leaderBins = Mathf.Min(maxBinsPerRole > 0 ? maxBinsPerRole : 1, 5);
         }
 
-        // Loop length = max ring count across all roles, capped at 5 (4 primary + 1 alternate).
-        int maxBinsPerRole = 0;
-        foreach (var kvp in roleSortedBins)
-            maxBinsPerRole = Mathf.Max(maxBinsPerRole, kvp.Value.Count);
-        int playbackBinCount = Mathf.Min(maxBinsPerRole > 0 ? maxBinsPerRole : 1, 5);
-
-        _totalSteps    = playbackBinCount * stepsPerLoop;
+        _totalSteps    = leaderBins * stepsPerLoop;
         _loopLengthSec = _totalSteps * _stepDurationSec;
 
         // Cache presets per channel — use the motif's own roleProfile, fall back to library.
@@ -131,23 +142,20 @@ public class RingPreviewPlayer : MonoBehaviour
             }
         }
 
-        // Build step table: spread notes across sequential bins and retune to per-bin chord.
+        // Build step table: place notes at their absolute session step (silent regions
+        // where a track hadn't expanded stay silent, matching the live loop structure)
+        // and retune to the per-bin chord.
         _stepTable = new List<List<(int, int, int, int)>>(_totalSteps);
         for (int i = 0; i < _totalSteps; i++)
             _stepTable.Add(new List<(int, int, int, int)>());
 
         foreach (var entry in snap.CollectedNotes)
         {
+            if (entry.Step < 0 || entry.Step >= _totalSteps) continue;
+
             roleByBinColor.TryGetValue((entry.BinIndex, entry.TrackColor), out var role);
 
-            if (!roleSortedBins.TryGetValue(role, out var sortedBins)) continue;
-            int ringIdx = sortedBins.IndexOf(entry.BinIndex);
-            if (ringIdx < 0 || ringIdx >= playbackBinCount) continue;
-
-            int withinBinStep = entry.Step % stepsPerLoop;
-            int newStep       = Mathf.Clamp(ringIdx * stepsPerLoop + withinBinStep, 0, _totalSteps - 1);
-
-            Chord chord      = GetChordForBin(ringIdx, motif.chordProgression, motif.alternateChordProgressionProfile);
+            Chord chord       = GetChordForBin(entry.BinIndex, motif.chordProgression, motif.alternateChordProgressionProfile);
             int   retunedNote = SnapNoteToChord(entry.Note, chord);
 
             int ch = RoleChannel.TryGetValue(role, out int rc) ? rc : 4;
@@ -155,10 +163,17 @@ public class RingPreviewPlayer : MonoBehaviour
             float v01  = entry.Velocity > 1.01f ? entry.Velocity / 127f : entry.Velocity;
             int vel127 = Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(40f, 127f, v01)), 40, 100);
 
-            _stepTable[newStep].Add((Mathf.Clamp(retunedNote, 0, 127), ch, vel127, 0));
+            // Session duration in MPTK ticks → ms via capture-time BPM (same math as
+            // MidiVoice.PlayNoteTicks). 0 ⇒ legacy ring, filled by the fallback below.
+            int dMs = entry.DurationTicks > 0
+                ? Mathf.Max(10, Mathf.RoundToInt(entry.DurationTicks * (60000f / (bpm * 480f))))
+                : 0;
+
+            _stepTable[entry.Step].Add((Mathf.Clamp(retunedNote, 0, 127), ch, vel127, dMs));
         }
 
-        // Post-process: assign per-note duration = distance to next onset on the same channel.
+        // Legacy fallback: notes without a stored duration get distance to next onset
+        // on the same channel.
         var channelNoteSteps = new Dictionary<int, List<int>>();
         for (int s = 0; s < _totalSteps; s++)
             foreach (var e in _stepTable[s])
@@ -189,7 +204,7 @@ public class RingPreviewPlayer : MonoBehaviour
                 for (int j = 0; j < row.Count; j++)
                 {
                     var n = row[j];
-                    if (n.channel == ch)
+                    if (n.channel == ch && n.durationMs == 0)
                         row[j] = (n.note, n.channel, n.vel127, dMs);
                 }
             }

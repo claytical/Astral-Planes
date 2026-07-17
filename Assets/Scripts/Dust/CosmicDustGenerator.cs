@@ -88,10 +88,13 @@ public partial class CosmicDustGenerator : MonoBehaviour
     // until ReleaseHeldCells (node death) or a maze flush supersedes them.
     private readonly HashSet<Vector2Int> _heldRegrowCells = new HashSet<Vector2Int>();
     private Dictionary<Vector2Int, float> _carveAccumulator = new();
-    // Ripeness: cells currently showing their true role color after a player carve.
-    private readonly Dictionary<Vector2Int, float> _ripenessByCell = new();
-    // Reusable snapshot buffer for TickRipeness to avoid per-frame allocation.
-    private List<Vector2Int> _ripenessKeys;
+    // Cells whose colliders are temporarily disabled by an active vehicle plow.
+    // Vehicle.DoPlowTick refreshes the stamp each tick; TickPlowColliderRecovery
+    // re-enables colliders on cells that survive once the plow moves on.
+    private readonly Dictionary<Vector2Int, float> _plowSuppressedColliders = new();
+    // Reusable snapshot buffer for TickPlowColliderRecovery to avoid per-frame allocation.
+    private List<Vector2Int> _plowSuppressedKeys;
+    private const float kPlowColliderRecoveryGraceSeconds = 0.25f;
     private Coroutine _spawnRoutine;
     private DrumTrack drums;
     private PhaseTransitionManager phaseTransitionManager;
@@ -155,8 +158,11 @@ public partial class CosmicDustGenerator : MonoBehaviour
         public readonly DustClearSource Source;
         public readonly float RegrowDelaySeconds;
         public readonly bool RunPreExplode;
+        public readonly Color? ExplosionTintOverride;
+        public readonly Vector2 BurstDirection;          // zero = radial burst
+        public readonly float PreExplodeScaleOutSeconds; // <= 0 = DustTimings.clearSpriteScaleOutSeconds
 
-        public DustClearRequest(DustInteractionMode interactionMode, DustClearMode clearMode, float fadeSeconds, bool scheduleRegrow, DustClearSource source, float regrowDelaySeconds, bool runPreExplode)
+        public DustClearRequest(DustInteractionMode interactionMode, DustClearMode clearMode, float fadeSeconds, bool scheduleRegrow, DustClearSource source, float regrowDelaySeconds, bool runPreExplode, Color? explosionTintOverride = null, Vector2 burstDirection = default, float preExplodeScaleOutSeconds = -1f)
         {
             InteractionMode = interactionMode;
             ClearMode = clearMode;
@@ -165,6 +171,9 @@ public partial class CosmicDustGenerator : MonoBehaviour
             Source = source;
             RegrowDelaySeconds = regrowDelaySeconds;
             RunPreExplode = runPreExplode;
+            ExplosionTintOverride = explosionTintOverride;
+            BurstDirection = burstDirection;
+            PreExplodeScaleOutSeconds = preExplodeScaleOutSeconds;
         }
     }
 
@@ -173,7 +182,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         FadeAndHide,
         HideInstant
     }
-    public void ClearCell(Vector2Int gp, DustClearMode mode, float fadeSeconds, bool scheduleRegrow, DustClearSource source = DustClearSource.System, float regrowDelaySeconds = -1f, bool runPreExplode = false) {
+    public void ClearCell(Vector2Int gp, DustClearMode mode, float fadeSeconds, bool scheduleRegrow, DustClearSource source = DustClearSource.System, float regrowDelaySeconds = -1f, bool runPreExplode = false, Color? explosionTintOverride = null, Vector2 burstDirection = default, float preExplodeScaleOutSeconds = -1f) {
         if (!TryGetCellState(gp, out var st)) return;
         if (st == DustCellState.Empty || st == DustCellState.Clearing || st == DustCellState.PendingRegrow) {
             // Optionally refresh regrow timer even if already empty.
@@ -201,9 +210,12 @@ public partial class CosmicDustGenerator : MonoBehaviour
                  var explode = go.GetComponentInChildren<Explode>(true);
                  if (explode != null)
                  {
-                     var tint = dust.CurrentTint;
+                     var tint = explosionTintOverride ?? dust.CurrentTint;
                      tint.a = 1f;
                      explode.SetTint(tint);
+                     // Always set the direction: zero clears stale state left on this
+                     // pooled instance by a previous directed burst.
+                     explode.SetBurstDirection(burstDirection);
                      explode.ZapExplode();
                  }
              }
@@ -219,7 +231,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
              }
              else {
                 if (runPreExplode)
-                    StartCoroutine(DeferredDissipateAfterPreExplode(dust, DustTimings.clearSpriteScaleOutSeconds));
+                    StartCoroutine(DeferredDissipateAfterPreExplode(dust, preExplodeScaleOutSeconds > 0f ? preExplodeScaleOutSeconds : DustTimings.clearSpriteScaleOutSeconds));
                 else
                     dust.DissipateAndHideVisualOnly(Mathf.Max(0.01f, fadeSeconds));
                 // OnDustVisualFadedOut will finalize Empty + hide visuals
@@ -821,6 +833,45 @@ public partial class CosmicDustGenerator : MonoBehaviour
         var dust = _gridState.CellDust?[cell.x, cell.y];
         if (dust != null) SetDustCollision(dust, false);
     }
+
+    // Plow pass-through: the collider comes back via TickPlowColliderRecovery once
+    // the plow stops refreshing the stamp, so surviving Solid cells re-solidify.
+    public void SuppressCellColliderForPlow(Vector2Int cell)
+    {
+        if (!IsInBounds(cell)) return;
+        DisableCellCollider(cell);
+        _plowSuppressedColliders[cell] = Time.time;
+    }
+
+    private void TickPlowColliderRecovery()
+    {
+        if (_plowSuppressedColliders.Count == 0) return;
+
+        float now = Time.time;
+        _plowSuppressedKeys ??= new List<Vector2Int>(32);
+        _plowSuppressedKeys.Clear();
+        _plowSuppressedKeys.AddRange(_plowSuppressedColliders.Keys);
+
+        for (int i = 0; i < _plowSuppressedKeys.Count; i++)
+        {
+            var gp = _plowSuppressedKeys[i];
+            if (now - _plowSuppressedColliders[gp] < kPlowColliderRecoveryGraceSeconds) continue;
+
+            if (!TryGetCellState(gp, out var st) || st != DustCellState.Solid)
+            {
+                // Fully carved (or repurposed): the clear/regrow path owns the collider now.
+                _plowSuppressedColliders.Remove(gp);
+                continue;
+            }
+
+            // Defer while a vehicle still overlaps so the collider doesn't pop it out.
+            if (IsVehicleOverlappingCell(gp)) continue;
+
+            var dust = _gridState.CellDust?[gp.x, gp.y];
+            if (dust != null) SetDustCollision(dust, true);
+            _plowSuppressedColliders.Remove(gp);
+        }
+    }
     private void EnsureImprints()
     {
         if (_imprints == null)
@@ -1123,12 +1174,12 @@ public partial class CosmicDustGenerator : MonoBehaviour
         }
 
         if (!drums) return;
+        TickPlowColliderRecovery();
         if (_regrowthSuppressed)
             return;
         EnsureRegrowController();
         // Tint diffusion: keep visual seams soft around recent changes.
         ProcessTintDiffusion(Time.deltaTime);
-        TickRipeness(Time.deltaTime);
 
         if (drums == null) return;
 
@@ -1276,9 +1327,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
             SetDustCollision(dust, true);
         }
         _regrowExcludeRoleByCell.Remove(gp);
-
-        if (regrowRole != MusicalRole.None)
-            _ripenessByCell[gp] = 1f;
     }
 
     private void EnqueueStepRegrow(Vector2Int gp)
@@ -1450,7 +1498,10 @@ public partial class CosmicDustGenerator : MonoBehaviour
             request.ScheduleRegrow,
             source: request.Source,
             regrowDelaySeconds: request.RegrowDelaySeconds,
-            runPreExplode: request.RunPreExplode);
+            runPreExplode: request.RunPreExplode,
+            explosionTintOverride: request.ExplosionTintOverride,
+            burstDirection: request.BurstDirection,
+            preExplodeScaleOutSeconds: request.PreExplodeScaleOutSeconds);
     }
 
     public void ZapClearCell(Vector2Int cell)
@@ -1465,13 +1516,13 @@ public partial class CosmicDustGenerator : MonoBehaviour
     /// Zap-clear a cell whose energy is being consumed by a PhaseStar: no regrow is
     /// scheduled and the cell is held empty until <see cref="ReleaseHeldCells"/>.
     /// </summary>
-    public void ZapClearCellHeld(Vector2Int cell)
+    public void ZapClearCellHeld(Vector2Int cell, Color? explosionTint = null, Vector2 burstDirection = default)
     {
         if (!IsInBounds(cell)) return;
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
 
         SetCellFlag(cell, CellFlags.ZapForceGray);
-        var req = new DustClearRequest(DustInteractionMode.Zap, DustClearMode.FadeAndHide, config.zapFadeSeconds, false, DustClearSource.StarDrain, -1f, true);
+        var req = new DustClearRequest(DustInteractionMode.Zap, DustClearMode.FadeAndHide, config.zapFadeSeconds, false, DustClearSource.StarDrain, -1f, true, explosionTint, burstDirection, config.zapScaleOutSeconds);
         ClearCellByInteraction(cell, req);
         _heldRegrowCells.Add(cell);
     }
@@ -1935,7 +1986,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
         }
         _imprints?.Clear();
         _cellFlags.Clear();
-        _ripenessByCell.Clear();
         _gridState.AllSolidCount    = 0;
         _targetSolidCount = -1;
         _gridState.RegrowingCount   = 0;
@@ -2155,61 +2205,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
         if (_tintDiffusionSystem == null) return;
         _tintDiffusionSystem.MarkDirty(center, radius);
     }
-    private void TickRipeness(float dt)
-    {
-        if (_ripenessByCell.Count == 0) return;
-
-        _ripenessKeys ??= new List<Vector2Int>(64);
-        _ripenessKeys.Clear();
-        _ripenessKeys.AddRange(_ripenessByCell.Keys);
-
-        for (int i = 0; i < _ripenessKeys.Count; i++)
-        {
-            var gp = _ripenessKeys[i];
-
-            if (!TryGetCellState(gp, out var st) || st != DustCellState.Solid
-                || !TryGetDustAt(gp, out var dust) || dust == null)
-            {
-                _ripenessByCell.Remove(gp);
-                continue;
-            }
-
-            if (_imprints == null || !_imprints.TryGetValue(gp, out var ripeImp)
-                || ripeImp.hiddenRole == MusicalRole.None)
-            {
-                _ripenessByCell.Remove(gp);
-                continue;
-            }
-
-            var profile = MusicalRoleProfileLibrary.GetProfile(ripeImp.hiddenRole);
-            float duration = profile != null ? Mathf.Max(0.01f, profile.ripeDuration) : 8f;
-            float ripeness = _ripenessByCell[gp] - (1f / duration) * dt;
-
-            if (ripeness <= 0f)
-            {
-                // Fully decayed: revert to gray, role becomes None for all external queries.
-                dust.ApplyRoleAndCharge(MusicalRole.None, config.mazeTint, dust.Charge01);
-                ApplyHiddenHintToDust(gp, dust);
-                _ripenessByCell.Remove(gp);
-            }
-            else
-            {
-                _ripenessByCell[gp] = ripeness;
-                // Mid-decay: lerp color only (Role stays set so PhaseStar can still drain).
-                // Use the per-cell imprint color so random voice colors are preserved through decay.
-                Color roleColor = Color.white;
-                if (_imprints != null && _imprints.TryGetValue(gp, out var imp))
-                    roleColor = new Color(imp.color.r, imp.color.g, imp.color.b, 1f);
-                else if (profile != null)
-                    roleColor = profile.GetBaseColor();
-                Color full = new Color(roleColor.r, roleColor.g, roleColor.b, dust.Charge01);
-                Color gray = new Color(config.mazeTint.r, config.mazeTint.g, config.mazeTint.b, dust.Charge01);
-                float effectiveRipeness = Mathf.Max(ripeness, dust.Charge01);
-                dust.SetTint(Color.Lerp(gray, full, effectiveRipeness));
-            }
-        }
-    }
-
     private void ProcessTintDiffusion(float dt)
     {
         if (!config.enableTintDiffusion) return;
