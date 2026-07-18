@@ -1169,7 +1169,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 300}
   m_SizeDelta: {x: 1200, y: 200}
   m_Pivot: {x: 0.5, y: 0}
 --- !u!114 &1057326952
@@ -1974,6 +1974,11 @@ PrefabInstance:
       propertyPath: maxRecordRadius
       value: 3
       objectReference: {fileID: 0}
+    - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: pressToStartCue
+      value: 
+      objectReference: {fileID: 1057326950}
     - target: {fileID: 3751250523553378462, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
       propertyPath: midiStreamPlayer

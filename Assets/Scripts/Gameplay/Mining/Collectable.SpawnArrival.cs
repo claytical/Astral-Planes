@@ -89,7 +89,7 @@ public partial class Collectable
                 {
                     lastCarvedCell = cell;
                     if (arrivalDustGen.HasDustAt(cell))
-                        arrivalDustGen.CarveCellPreserveGray(cell, arrivalCarveFadeSeconds, DustClearSource.CollectableArrival);
+                        arrivalDustGen.CarveCellPreserveGray(cell, arrivalCarveFadeSeconds, DustClearSource.CollectableArrival, runPreExplode: true);
                 }
             }
 

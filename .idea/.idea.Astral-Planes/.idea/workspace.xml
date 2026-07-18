@@ -6,30 +6,36 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/MIDI Import/Still Sky/waiting-stillsky-asharp-46.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/MIDI Import/Still Sky/waiting-stillsky-asharp-46.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/Here We Go.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/Here We Go.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/Intro.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/Intro.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Bass-NoteSetConfig-0.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Bass-NoteSetConfig-0.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Bass-NoteSetConfig-1.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Bass-NoteSetConfig-1.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Bass-NoteSetConfig-2.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Bass-NoteSetConfig-2.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Groove-NoteSetConfig-0.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Groove-NoteSetConfig-0.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Groove-NoteSetConfig-1.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Groove-NoteSetConfig-1.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Groove-NoteSetConfig-2.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Groove-NoteSetConfig-2.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Harmony-NoteSetConfig-0.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Harmony-NoteSetConfig-0.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Harmony-NoteSetConfig-1.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Harmony-NoteSetConfig-1.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Harmony-NoteSetConfig-2.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Harmony-NoteSetConfig-2.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Lead-NoteSetConfig-0.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Lead-NoteSetConfig-0.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Lead-NoteSetConfig-1.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Lead-NoteSetConfig-1.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Lead-NoteSetConfig-2.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Lead-NoteSetConfig-2.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Lead-NoteSetConfig-3.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Lead-NoteSetConfig-3.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Intro-Harmony-NoteSetConfig-0.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Intro-Harmony-NoteSetConfig-0.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Bass-NoteSetConfig-0.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Bass-NoteSetConfig-0.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Bass-NoteSetConfig-1.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Bass-NoteSetConfig-1.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Bass-NoteSetConfig-2.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Bass-NoteSetConfig-2.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-0.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-0.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-1.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-1.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-2.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-2.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-3.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-3.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-4.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-4.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Resources/Phase Library.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Phase Library.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/BinRingController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/BinRingController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/RingGlyphConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/RingGlyphConfig.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Light Keys.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Light Keys.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Drifter.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Drifter.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/FloTilla.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/FloTilla.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/HeartDrive.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/HeartDrive.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Howler.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Howler.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Sandwave.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Sandwave.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Scout.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Scout.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Scuttle.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Scuttle.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/X-agong.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/X-agong.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/Main.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/Main.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.Movement.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.Movement.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.SpawnArrival.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.SpawnArrival.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/SceneFlowCoordinator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/SceneFlowCoordinator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/PhaseLibraryCarousel.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/PhaseLibraryCarousel.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/FX/explode.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Sounds/FX/explode.wav" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -319,7 +325,7 @@
       <workItem from="1782242441165" duration="1547000" />
       <workItem from="1782328476836" duration="3122000" />
       <workItem from="1782340432119" duration="23136000" />
-      <workItem from="1783970322056" duration="89025000" />
+      <workItem from="1783970322056" duration="95194000" />
     </task>
     <servers />
   </component>

@@ -420,7 +420,7 @@ public partial class Collectable
         if (gen == null || drums == null) return;
 
         Vector2Int cell = drums.WorldToGridPosition(dust.transform.position);
-        gen.CarveCellPreserveGray(cell, arrivalCarveFadeSeconds, DustClearSource.CollectablePlow);
+        gen.CarveCellPreserveGray(cell, arrivalCarveFadeSeconds, DustClearSource.CollectablePlow, runPreExplode: true);
     }
 
     private void OnCollisionEnter2D(Collision2D coll)

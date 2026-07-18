@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Waiting-Bass-NoteSetConfig-0
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: waiting-hiphop-0
-  roleProfile: {fileID: 11400000, guid: 56fb4948a3b7c4c6f897bc4a78bd2c2d, type: 2}
+  roleProfile: {fileID: 11400000, guid: 6ffff740db144459387528ee1b1b902b, type: 2}
   riff: {fileID: 11400000, guid: b64c5cf8aa6164432914049bdd20b854, type: 2}
   mineNodeTintBudget: 15
   mineNodeExpireAfterLoops: 4
