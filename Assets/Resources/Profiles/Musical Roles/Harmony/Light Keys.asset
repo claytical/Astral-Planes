@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73a7dafb875bb4538b4ac52124a92a37, type: 3}
   m_Name: Light Keys
   m_EditorClassIdentifier: 
-  role: 1
+  role: 3
   dustColors:
     baseColor: {r: 0, g: 1, b: 0.21960784, a: 1}
     shadowColor: {r: 0, g: 0.5566038, b: 0.12223455, a: 1}

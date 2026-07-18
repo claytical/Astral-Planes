@@ -1461,11 +1461,11 @@ public partial class CosmicDustGenerator : MonoBehaviour
     // - Regrow is normally scheduled, except for permanent clear systems that explicitly disable it.
     // - Void-grown exception applies: vehicle carve removes void-grow imprint so regrow can re-resolve role.
     // - Visual fade duration is caller-provided (resistance/tuning aware).
-    public void CarveCellPreserveGray(Vector2Int cell, float fadeSeconds, DustClearSource source, float regrowDelaySeconds = -1f)
+    public void CarveCellPreserveGray(Vector2Int cell, float fadeSeconds, DustClearSource source, float regrowDelaySeconds = -1f, bool runPreExplode = false)
     {
         if (!IsInBounds(cell)) return;
         SetCellFlag(cell, CellFlags.ForceGrayRegrow);
-        CarveCell(cell, fadeSeconds, scheduleRegrow: true, source: source, regrowDelaySeconds: regrowDelaySeconds, runPreExplode: false);
+        CarveCell(cell, fadeSeconds, scheduleRegrow: true, source: source, regrowDelaySeconds: regrowDelaySeconds, runPreExplode: runPreExplode);
     }
 
     public void CarveCell(Vector2Int cell, float fadeSeconds, bool scheduleRegrow = true, DustClearSource source = DustClearSource.VehiclePlow, float regrowDelaySeconds = -1f, bool runPreExplode = true)

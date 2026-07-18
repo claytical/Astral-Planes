@@ -140,9 +140,11 @@ public class PhaseLibraryCarousel : MonoBehaviour
             return;
         }
 
+        if (_sliding) return; // ignore all input mid-slide so Confirm() never reads a stale _centerDataIndex
+
         if (confirm) { Confirm(); return; }
 
-        if (!_sliding && Time.unscaledTime >= _nextInputTime)
+        if (Time.unscaledTime >= _nextInputTime)
         {
             if      (next) { _nextInputTime = Time.unscaledTime + inputCooldown; Navigate(1);  }
             else if (prev) { _nextInputTime = Time.unscaledTime + inputCooldown; Navigate(-1); }

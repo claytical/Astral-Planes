@@ -26,13 +26,20 @@ MonoBehaviour:
   mass: 1.3
   impactSpeedCap: 32
   hitVelocityMultiplier: 1
-  capacity: 350
+  capacity: 175
   burnRate: 0.5
   plowHalfWidthCells: 1
   vehicleKeepClearRadiusCells: 0
   plowDepthCells: 2
   plowMinSpeed: 2
   plowChipAmount: 2
+  regrowDelayMultipliers:
+    bass: 1
+    harmony: 1
+    lead: 1
+    groove: 1
+    rhythm: 1
+    gray: 1
   carveResistanceBypass01: 0
   carveVelocityDrainPerCell: 0
   directionalAuthority01: 0.7

@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 61c29f65464264bd8aaca35b6879dc9a, type: 3}
+  m_Name: Lanes
+  m_EditorClassIdentifier: Assembly-CSharp::MazePatternConfig
+  patternType: 5
+  dustTiming:
+    regrowDelay: 4
+    vehiclePlowRegrowDelay: -1
+    collectableArrivalRegrowDelay: -1
+    collectablePlowRegrowDelay: -1
+    jailRegrowDelay: -1
+    superNodeRegrowDelay: -1
+    zapRegrowDelay: -1
+    starDrainReleaseDelay: -1
+  clearBoxes:
+    clearBoxCount: 4
+    clearBoxWidth: 5
+    clearBoxHeight: 5
+  cellularAutomata:
+    fillChance: 0.3
+    iterations: 3
+  ring:
+    spacing: 6
+    thickness: 1
+    jitter: 0.35
+  drunkenStrokes:
+    strokes: 10
+    maxLen: 18
+    jitter: 0.35
+    dilate: 0.3
+  diagonalLanes:
+    step: 12
+  tunnels:
+    corridorStep: 2
+    corridorWidth: 2
+  porousBorder:
+    exitCount: 3

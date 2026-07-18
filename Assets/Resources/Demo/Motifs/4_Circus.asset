@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
+  m_Name: 4_Circus
+  m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
+  motifId: herewego
+  displayName: herewego
+  keyRootMidi: 61
+  entryDrumLoops:
+  - {fileID: 8300000, guid: 2c9e9f60fcefa467f95614209d77fdc3, type: 3}
+  intensityDrumLoops:
+  - {fileID: 8300000, guid: 68513712204a840e99d31cf255a924d3, type: 3}
+  - {fileID: 8300000, guid: 09a5ac8f7afd84f22ab62c5a5aecbba2, type: 3}
+  - {fileID: 8300000, guid: d8f4f62856c954e0a96d817fabcbcb48, type: 3}
+  - {fileID: 8300000, guid: 0f70156de12b74a699f800d9cfddcca1, type: 3}
+  - {fileID: 8300000, guid: 5deb52a19f13449218e0af72824484ef, type: 3}
+  entryLoopCount: 16
+  resetFirstCarryOnStart: 0
+  bpm: 135
+  stepsPerLoop: 16
+  nodesPerStar: 12
+  starBehavior: {fileID: 11400000, guid: 9dd08ed983d384107aaff4f28fa8803d, type: 2}
+  mazePattern: {fileID: 11400000, guid: 050d70a4230ab433db3d2c8c77d7b9e3, type: 2}
+  roleGeoConfigs: []
+  chordProgression: {fileID: 11400000, guid: 991c67d1ca5c243d6ac378f043d7169a, type: 2}
+  alternateChordProgressionProfile: {fileID: 11400000, guid: c8c9f48f91fe94e16910dce874279875,
+    type: 2}
+  roleNoteConfigs:
+  - {fileID: 11400000, guid: 31a13ef7d6db844dea0037d699d08471, type: 2}
+  - {fileID: 11400000, guid: 9aa6ba42dea6f44cb8b12b26c43180c3, type: 2}
+  - {fileID: 11400000, guid: 2a8bd5d54615e46cdbddb239764600f9, type: 2}
+  - {fileID: 11400000, guid: 6502e76b7d7204f1498cce1e282a5552, type: 2}
+  - {fileID: 11400000, guid: f222f22202d9646fe885da11281d1175, type: 2}
+  - {fileID: 11400000, guid: d5ca7227b07b04a079fed9abe0a914f7, type: 2}
+  - {fileID: 11400000, guid: edb1db8261b764cc3bf59e25cfda5fc7, type: 2}
+  - {fileID: 11400000, guid: df62691353d4845fbaaac8afa0c7fe98, type: 2}
+  - {fileID: 11400000, guid: df62691353d4845fbaaac8afa0c7fe98, type: 2}
+  - {fileID: 11400000, guid: 0798f301ad1a044a7aaadf17ff05b06a, type: 2}
+  - {fileID: 11400000, guid: 9bfeedf9cb45b4744b2ac1148914e766, type: 2}
+  - {fileID: 11400000, guid: 5e8054b513de74a0ab4963f207d36f78, type: 2}
+  - {fileID: 11400000, guid: c1196b438fe4a459fbd35190f4b80785, type: 2}
+  selectionWeight: 1
+  beatIntroCount: 1
+  driveBeatsFromEnergy: 1
+  spawnVehicleTrap: 1
+  trapShape: 0
+  trapRadius: 3
+  trapGrowSeconds: 0.4
+  trapRole: 0

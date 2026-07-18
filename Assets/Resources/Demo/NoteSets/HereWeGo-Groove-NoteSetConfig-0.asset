@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: HereWeGo-Groove-NoteSetConfig-0
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: herewego-groove-0
-  roleProfile: {fileID: 11400000, guid: 63e9675dcbfd24e678536c2e715ee834, type: 2}
+  roleProfile: {fileID: 11400000, guid: 89c1916cae7f14914858278ad2f8ff2f, type: 2}
   riff: {fileID: 11400000, guid: aa53d23760fc144378b5e7d313787202, type: 2}
   mineNodeTintBudget: 20
   mineNodeExpireAfterLoops: 8
