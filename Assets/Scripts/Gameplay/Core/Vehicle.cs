@@ -30,7 +30,7 @@ public partial class Vehicle : MonoBehaviour
     [SerializeField] private SpriteRenderer soulSprite;
 
     [Header("Gravity Void Detection")]
-    [SerializeField] private LayerMask gravityVoidMask; // set in inspector OR leave 0 and use tag fallback in VehicleConfig
+    [SerializeField] private LayerMask gravityVoidMask; // set in inspector; 0 disables gravity-void detection
 
     [Header("Boost Collision")]
     [SerializeField] private LayerMask dustLayerMask; // assign to dust layer so boost ignores dust colliders

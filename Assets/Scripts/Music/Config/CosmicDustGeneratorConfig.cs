@@ -39,10 +39,7 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     public float zapRegrowDelaySeconds = -1f;
     [Tooltip("Sprite scale-out duration when a star drain clears a cell. Shorter = punchier.")]
     [Min(0.01f)] public float zapScaleOutSeconds = 0.12f;
-
-    [Header("Mine Node Erosion")]
-    public int mineNodeErodePerTick = 10;
-
+    
     [Header("Visual")]
     public Color mazeTint = new Color(0.7f, 0.7f, 0.7f, 0.25f);
 

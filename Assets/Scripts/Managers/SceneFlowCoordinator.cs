@@ -254,7 +254,7 @@ public sealed class SceneFlowCoordinator
         if (PhaseLibraryStartConfig.HasPendingStart)
         {
             _gameFlow.phaseTransitionManager.StartChapter(PhaseLibraryStartConfig.PhaseIndex, "GFM/Setup/Library");
-            _gameFlow.phaseTransitionManager.JumpToMotifIndex(PhaseLibraryStartConfig.MotifIndex, "GFM/Setup/Library");
+            _gameFlow.phaseTransitionManager.JumpToMotif(PhaseLibraryStartConfig.MotifId, PhaseLibraryStartConfig.MotifIndex, "GFM/Setup/Library");
             PhaseLibraryStartConfig.Consume();
         }
         else

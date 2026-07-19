@@ -79,7 +79,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
     private MazePatternConfig _activeMazePattern;
     private readonly DustRegrowthScheduler _regrowthScheduler = new();
     private readonly MazeTopologyService _mazeTopologyService = new();
-    private PhaseStarBehaviorProfile _activeProfile;
 
     private List<Vector2Int> _reservedVehicleCells = new List<Vector2Int>(64);
 
@@ -1902,11 +1901,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
     {
         if (profile == null) return;
 
-        _activeProfile = profile;
         _loggedInvalidResistanceContexts.Clear();
-
-        // Authoritative default: phase-authored maze tint.
-//        config.mazeTint = profile.mazeColor;
 
         // If dust already exists (e.g., generator persists between phases), immediately
         // nudge visuals to match the new profile so we don't leave any tiles at prefab/default.

@@ -7,13 +7,12 @@ public sealed class PhaseStarInteractionState
     public sealed class InteractionStatus
     {
         public bool BurstOffScreen;
-        public bool EntryInProgress;
         public bool AwaitingCollectableClear;
         public bool IsArmed;
         public int DisarmReason;
 
         public override string ToString() =>
-            $"armed={IsArmed} entry={EntryInProgress} burstOff={BurstOffScreen} awaitClr={AwaitingCollectableClear} disarm={(PhaseStarDisarmReason)DisarmReason}";
+            $"armed={IsArmed} burstOff={BurstOffScreen} awaitClr={AwaitingCollectableClear} disarm={(PhaseStarDisarmReason)DisarmReason}";
     }
 
     [Serializable]

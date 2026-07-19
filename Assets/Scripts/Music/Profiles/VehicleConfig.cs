@@ -44,8 +44,6 @@ public class VehicleConfig : ScriptableObject
     public float stuckSecondsInVoid = 0.60f;
 
     [Header("Gravity Void Detection")]
-    [Tooltip("Optional fallback tag if you don't want a LayerMask.")]
-    public string gravityVoidTag = "GravityVoid";
     public float voidProbeRadiusWorld = 0.6f;
 
     [Header("Vehicle Resonance")]

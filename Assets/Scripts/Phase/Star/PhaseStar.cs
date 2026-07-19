@@ -45,13 +45,13 @@ public partial class PhaseStar : MonoBehaviour
     // Defaults here are used only if behaviorProfile is missing.
     [SerializeField] private GameObject superNodePrefab;  // rainbow shard prefab (collider + visual)
     private SoloVoice soloVoice;                          // runtime cache, resolved via FindAnyObjectByType
-    [Tooltip("Accumulator rotation speed multiplier when charge is ready (diamonds merged → faster spin).")]
-    [SerializeField, Min(1f)] private float readyRotSpeedMul = 2.5f;
 
     private int CollectableClearTimeoutLoops => behaviorProfile ? behaviorProfile.collectableClearTimeoutLoops : 2;
 
     private float CollectableClearTimeoutSeconds =>
         behaviorProfile ? behaviorProfile.collectableClearTimeoutSeconds : 0f;
+
+    private float ReadyRotSpeedMul => behaviorProfile ? behaviorProfile.readyRotSpeedMul : 2.5f;
     
     private bool _previewInitialized;
 
@@ -83,7 +83,6 @@ public partial class PhaseStar : MonoBehaviour
     private Transform   _previewVisualB;   // second counter-rotating diamond
     private bool _isDisposing;
     private readonly PhaseStarInteractionState _interactionState = new();
-    private bool _entryInProgress { get => _interactionState.Interaction.EntryInProgress; set => _interactionState.Interaction.EntryInProgress = value; }
     private bool _buildingPreview;
     // Cached impact data for the next MineNode spawn
     Vector2 _lastImpactDir = Vector2.right;
@@ -207,7 +206,6 @@ public partial class PhaseStar : MonoBehaviour
         EnsureSubcomponents();
         StopManagedCoroutine(ref _waitForDustCo);
 
-        _entryInProgress = false;
         _state = PhaseStarState.Dormant;
 
         transform.position = (Vector3)worldPos + Vector3.forward * transform.position.z;
@@ -237,7 +235,6 @@ public partial class PhaseStar : MonoBehaviour
     
     private void EnterDormantWaitState()
     {
-        _entryInProgress = false;
         _state = PhaseStarState.Dormant;
         _isArmed = false;
         _disarmReason = PhaseStarDisarmReason.None;
@@ -269,7 +266,7 @@ public partial class PhaseStar : MonoBehaviour
 
     private void TransitionDormantToActive()
     {
-        if (_entryInProgress || _state != PhaseStarState.Dormant)
+        if (_state != PhaseStarState.Dormant)
             return;
 
         bool zapReady =
@@ -664,15 +661,8 @@ public partial class PhaseStar : MonoBehaviour
             _subscribedLoopBoundary = true;
         }
 
-        if (_entryInProgress)
-        {
-            LogState("Initialized+AwaitingEntry");
-        }
-        else
-        {
-            EnterDormantWaitState();
-            LogState("Initialized+DormantWait");
-        }
+        EnterDormantWaitState();
+        LogState("Initialized+DormantWait");
     }
     private void OnAttuned_SetRole(MusicalRole role)
     {
@@ -804,7 +794,7 @@ public partial class PhaseStar : MonoBehaviour
                 rotA, aLocked,
                 rotB, bLocked,
                 dominantReady,
-                readyRotSpeedMul);
+                ReadyRotSpeedMul);
         }
 
         // Scale 0→1 as charge builds. _previewVisual and _previewVisualB are children of

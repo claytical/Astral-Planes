@@ -98,6 +98,12 @@ public class MotifSnapshot
     /// Used to map a saved record back to a specific MotifProfile in PhaseLibrary.</summary>
     public int MotifIndex;
 
+    /// <summary>Stable identifier of the motif at save time (MotifProfile.motifId).
+    /// Used to re-resolve the correct motif if the PhaseLibrary asset's motif order
+    /// changes after this ring was saved. Null/empty on legacy rings saved before this
+    /// field existed ⇒ resolution falls back to the raw MotifIndex.</summary>
+    public string MotifId;
+
     // -------------------------------------------------------------------------
     // Runtime-typed properties (reconstruct from serializable backing)
     // -------------------------------------------------------------------------

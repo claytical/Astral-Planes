@@ -2,25 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-public readonly struct StepDomain
-{
-    public readonly int stepsPerBin;   // canonical, e.g. 16
-    public readonly int bins;          // how many bins you want the set to span during generation
-    public int stepsTotal => stepsPerBin * bins;
 
-    public StepDomain(int stepsPerBin, int bins)
-    {
-        this.stepsPerBin = Mathf.Max(1, stepsPerBin);
-        this.bins = Mathf.Max(1, bins);
-    }
-}
 public class NoteSetFactory : MonoBehaviour
 {
 
-    public NoteSet Generate(InstrumentTrack track, MotifProfile motif, int entropy = 0)
-    {
-        return GenerateForBin(track, motif, binIndex: 0, entropy: entropy);
-    }
+
     public NoteSet GenerateForBin(InstrumentTrack track, MotifProfile motif, int binIndex, int entropy = 0)
     {
     if (track == null)

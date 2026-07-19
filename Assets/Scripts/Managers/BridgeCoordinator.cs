@@ -100,6 +100,7 @@ public sealed class BridgeCoordinator
             : 60;
         snapshot.PhaseIndex  = _gameFlow.phaseTransitionManager?.CurrentPhaseIndex ?? 0;
         snapshot.MotifIndex  = _gameFlow.phaseTransitionManager?.currentMotifIndex ?? 0;
+        snapshot.MotifId     = _gameFlow.phaseTransitionManager?.currentMotif?.motifId;
 
         if (retained == null || retained.Count == 0) return snapshot;
 

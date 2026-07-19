@@ -12,18 +12,7 @@ public class InstrumentTrackControllerConfig : ScriptableObject
     public AudioClip pickupTickLead;
     public AudioClip pickupTickHarmony;
     public AudioClip pickupTickGroove;
-
-    [Header("SFX: Commit")]
-    [Range(0f, 2f)] public float commitStingerVolume = 1.25f;
-    [Range(0f, 0.15f)] public float commitStingerPitchJitter = 0.02f;
-    [Tooltip("Fallback clip if role-specific commit clips are not set.")]
-    public AudioClip commitStingerDefault;
-    public AudioClip commitStingerBass;
-    public AudioClip commitStingerLead;
-    public AudioClip commitStingerHarmony;
-    public AudioClip commitStingerGroove;
-    public AudioClip commitStingerDrums;
-
+    
     [Header("Gravity Void")]
     public float gravityVoidScale = 1f;
     [Min(1)] public int voidRingWidthCells = 1;

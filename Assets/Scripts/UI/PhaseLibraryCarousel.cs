@@ -220,7 +220,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
         }
 
         var snap = _rings[_centerDataIndex];
-        PhaseLibraryStartConfig.RequestStart(snap.PhaseIndex, snap.MotifIndex);
+        PhaseLibraryStartConfig.RequestStart(snap.PhaseIndex, snap.MotifIndex, snap.MotifId);
         onMotifConfirmed.Invoke();
         SceneManager.LoadScene(trackSelectionScene);
     }

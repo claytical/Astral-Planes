@@ -10,7 +10,6 @@ public sealed class PhaseStarStateController : IPhaseStarStateController
 {
     public bool CanArm(in PhaseStarInteractionSnapshot snapshot)
         => snapshot.State == PhaseStarState.WaitingForPoke
-           && !snapshot.Interaction.EntryInProgress
            && !snapshot.HasWaitCoroutine
            && !snapshot.HasActiveNode
            && !snapshot.Interaction.AwaitingCollectableClear
