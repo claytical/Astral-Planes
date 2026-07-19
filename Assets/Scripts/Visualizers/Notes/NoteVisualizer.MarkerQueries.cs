@@ -138,6 +138,7 @@ public partial class NoteVisualizer
         if (v == null) return;
         if (!_releaseCuesByVehicle.TryGetValue(v, out var cue) || cue == null)
         {
+            cue = Instantiate(releaseCuePrefab, p, Quaternion.identity);
             _releaseCuesByVehicle[v] = cue;
         }
         else

@@ -141,6 +141,33 @@ public class PhaseTransitionManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Like JumpToMotifIndex, but resolves the target by stable motifId first (if the
+    /// current phase's motif list has been reordered since motifId/fallbackIndex were
+    /// recorded, e.g. a PhaseLibrary asset edit). Falls back to the raw fallbackIndex
+    /// when motifId is null/empty or isn't found in the current phase.
+    /// </summary>
+    public void JumpToMotif(string motifId, int fallbackIndex, string who)
+    {
+        int resolvedIndex = fallbackIndex;
+
+        if (!string.IsNullOrEmpty(motifId) && _chapterMotifs != null)
+        {
+            int idx = _chapterMotifs.FindIndex(m => m != null && m.motifId == motifId);
+            if (idx >= 0)
+            {
+                resolvedIndex = idx;
+            }
+            else
+            {
+                Debug.LogWarning($"[MOTIF] JumpToMotif: motifId '{motifId}' not found in current phase " +
+                                  $"(count={_chapterMotifs.Count}); falling back to stored index {fallbackIndex} by {who}");
+            }
+        }
+
+        JumpToMotifIndex(resolvedIndex, who);
+    }
+
+    /// <summary>
     /// Override the active motif to a specific index within the current phase without
     /// resetting phase state. Applies the new motif to audio and tracks immediately.
     /// Intended for use during scene setup when starting from a PhaseLibrary selection.

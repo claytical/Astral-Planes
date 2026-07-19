@@ -3,7 +3,6 @@ using System.Collections;
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEngine.UI;
 
 public partial class NoteVisualizer : MonoBehaviour
 {
@@ -38,14 +37,9 @@ public partial class NoteVisualizer : MonoBehaviour
     public float releaseCueArcHeight = 0.8f;
     [Header("Track Rows (one per InstrumentTrack in controller order)")]
     public List<RectTransform> trackRows;
-    [Header("Bin Visualization")]
-    [Tooltip("Parent RectTransform where bin indicators will be instantiated.")]
-    public RectTransform binStripParent;
     public Dictionary<(InstrumentTrack, int), Transform> noteMarkers = new();
     [Header("First-Play Confirm FX")]
     [SerializeField] private ParticleSystem firstPlayConfirmOrbPrefab;
-    [SerializeField] private float firstPlayConfirmTravelSeconds = 2f;
-    [SerializeField] private int firstPlayConfirmEmitCount = 24;
     [Header("Playhead Trail (Particles)")]
     [SerializeField] private bool playheadTrailEnabled = true;
 
@@ -79,37 +73,10 @@ public partial class NoteVisualizer : MonoBehaviour
     private bool isInitialized;
     private readonly Dictionary<InstrumentTrack, HashSet<int>> _ghostNoteSteps = new();
     private readonly Dictionary<InstrumentTrack, Dictionary<int, Vector3>> _trackStepWorldPositions = new();
-    private readonly List<Image> _binIndicators = new List<Image>();
-    private int _activeBinCount = 0;      // How many bins are currently in use (post-contraction)
-    private int _currentTargetBin = -1;  
 
     private Vector3 _lastPlayheadParticleWorldPos;
     private bool _hasLastPlayheadParticleWorldPos;
-    private struct BlastTask
-    {
-        public GameObject go;
-        public Vector3 startPos;
-        public Vector3 dir;       // world-space direction
-        public float startScale;
-        public float endScale;
-        public float dur;         // seconds
-        public float t;           // normalized 0..1
-        public System.Action onDone; // optional (SFX, pooling return, etc.)
-    }
-    private struct RushTask
-    {
-        public GameObject go;        // marker being animated
-        public Vector3 startPos;     // cached at enqueue
-        public Transform target;     // vehicle (or any target)
-        public float dur;            // seconds
-        public float t;              // normalized 0..1
-        public Action onArrive; // called when we reach target (chain effects/cleanup)
-    }
-    private int _lastObservedCompletedLoops = -1;
     private readonly Dictionary<(InstrumentTrack track, int step), int> _stepBurst = new();
-    private readonly HashSet<(InstrumentTrack track, int step)> _animatingSteps = new();
-    private readonly List<BlastTask> _blastTasks = new();
-    private readonly List<RushTask> _rushTasks = new();
 
     private readonly Dictionary<Vehicle, GameObject> _releaseCuesByVehicle = new();
 
@@ -124,18 +91,7 @@ public partial class NoteVisualizer : MonoBehaviour
         public float duration;
     }
 
-    private struct FirstPlayConfirmTask
-    {
-        public ParticleSystem ps;
-        public Vector3 start;
-        public Vector3 end;
-        public double startDsp;
-        public double endDsp;
-        public Color color;
-    }
-
     private readonly List<FirstPlayConfirmRequest> _firstPlayRequests = new();
-    private readonly List<FirstPlayConfirmTask> _firstPlayTasks = new();
     private Color stepColor;
 
     public void RegisterCollectedMarker(InstrumentTrack track, int burstId, int step, GameObject markerGo)
@@ -311,8 +267,6 @@ public partial class NoteVisualizer : MonoBehaviour
             Vector3 p = Vector3.Lerp(prev, now, u);
             emitParams.position = p;
 
-            // Optional: tiny jitter can soften "beads on a string" if you want it.
-            // emitParams.position += UnityEngine.Random.insideUnitSphere * 0.01f;
 // Make trail particles inherit the same pulse color immediately.
             if (_releasePulseT > 0f)
             {
@@ -339,16 +293,12 @@ public partial class NoteVisualizer : MonoBehaviour
     {
         // Stop any in-progress task state (we use Update-driven task lists; clearing is sufficient).
         ascensionDirector?.ClearAllTasks();
-        _blastTasks.Clear();
-        _rushTasks.Clear();
         _stepBurst.Clear();
-        _animatingSteps.Clear();
         _ghostNoteSteps.Clear();
         _hasLastPlayheadParticleWorldPos = false;
         _lastPlayheadParticleWorldPos = Vector3.zero;
         //_trackStepWorldPositions.Clear();
-        _lastObservedCompletedLoops = -1;
-        if (destroyMarkerGameObjects) { 
+        if (destroyMarkerGameObjects) {
             // 1) Destroy any markers we know about.
             if (noteMarkers != null) { 
                 foreach (var kv in noteMarkers) { 
@@ -374,16 +324,6 @@ public partial class NoteVisualizer : MonoBehaviour
             }
         }
         noteMarkers?.Clear();
-
-        // Bin strip visuals
-        if (binStripParent != null)
-        {
-            for (int i = binStripParent.childCount - 1; i >= 0; i--)
-                Destroy(binStripParent.GetChild(i).gameObject);
-        }
-        _binIndicators.Clear();
-        _activeBinCount = 0;
-        _currentTargetBin = -1;
 
         // Force any temporarily overridden leader sizes back to default.
         _forcedLeaderSteps = -1;
@@ -448,12 +388,7 @@ public partial class NoteVisualizer : MonoBehaviour
                     continue; // keep in-flight ascension markers intact
 
                 // Safe to destroy (orphan / out-of-window)
-#if UNITY_EDITOR
-                if (!Application.isPlaying) DestroyImmediate(tr.gameObject);
-                else Destroy(tr.gameObject);
-#else
-                Destroy(tr.gameObject);
-#endif
+                SafeDestroy(tr.gameObject);
             }
 
             noteMarkers.Remove(key);
@@ -484,12 +419,7 @@ public partial class NoteVisualizer : MonoBehaviour
 
         if ((outOfRange || notInLoop) && loopOwned)
         {
-#if UNITY_EDITOR
-            if (!Application.isPlaying) DestroyImmediate(child.gameObject);
-            else Destroy(child.gameObject);
-#else
-            Destroy(child.gameObject);
-#endif
+            SafeDestroy(child.gameObject);
         }
     }
 
@@ -500,7 +430,19 @@ public partial class NoteVisualizer : MonoBehaviour
     // 4) Relayout after removals/additions.
     RecomputeTrackLayout(track);
 }
- 
+
+    // Editor-safe destroy: uses DestroyImmediate in edit mode, Destroy during play.
+    private void SafeDestroy(GameObject go)
+    {
+        if (!go) return;
+#if UNITY_EDITOR
+        if (!Application.isPlaying) DestroyImmediate(go);
+        else Destroy(go);
+#else
+        Destroy(go);
+#endif
+    }
+
     /// <summary>
     /// Set how "charged" the playhead is [0..1] based on how many notes in the
     /// current burst have been collected. This will be smoothed visually.
@@ -556,25 +498,17 @@ public partial class NoteVisualizer : MonoBehaviour
         TickPlayheadEnergy();
         MovePlayheadLine(leaderStartDsp);
         ProcessFirstPlayConfirmFx();
-        UpdateFirstPlayConfirmTasks();
         UpdatePlayheadParticleTrailWorld();
         ComputeCurrentStepState(leaderStartDsp, out int currentStep, out bool shimmer, out float maxVelocity);
         stepColor = ComputeStepColor(currentStep);
         UpdateParticleEmission(shimmer, maxVelocity);
         UpdateNoteMarkerPositions();
-
-        int loopsNow = _drum.completedLoops;
-        if (loopsNow != _lastObservedCompletedLoops)
-            _lastObservedCompletedLoops = loopsNow;
-
-        TickAnimationTasks();
     }
 
     // Visual clock MUST match the audio clock: use leader loop length for both x-position and step sampling.
     // GetLeaderSteps() returns the expanded step count (e.g. 32 for a 2-bin loop).
     private void MovePlayheadLine(double leaderStartDsp)
     {
-        int drumTotalSteps = Mathf.Max(1, _drum.GetLeaderSteps());
         float fullVisualLoopDuration = Mathf.Max(0.0001f, _drum.GetLoopLengthInSeconds());
         float globalElapsed = (float)(AudioSettings.dspTime - leaderStartDsp);
         float globalNormalized = (globalElapsed % fullVisualLoopDuration) / fullVisualLoopDuration;
@@ -739,19 +673,15 @@ public partial class NoteVisualizer : MonoBehaviour
             ? ascensionDirector.GetAscendTargetWorldY()
             : GetTopWorldY();   // fallback — should not normally be reached
     }
-    public float GetTopWorldY()
+    public float GetTopWorldY() => GetWorldCornerY(1);
+    private float GetBottomWorldY() => GetWorldCornerY(0); // bottom-left corner
+
+    private float GetWorldCornerY(int cornerIndex)
     {
         RectTransform rt = GetComponent<RectTransform>();
         Vector3[] worldCorners = new Vector3[4];
         rt.GetWorldCorners(worldCorners);
-        return worldCorners[1].y;
-    }
-    private float GetBottomWorldY()
-    {
-        RectTransform rt = GetComponent<RectTransform>();
-        Vector3[] worldCorners = new Vector3[4];
-        rt.GetWorldCorners(worldCorners);
-        return worldCorners[0].y; // bottom-left corner
+        return worldCorners[cornerIndex].y;
     }
     public Transform GetUIParent() => _uiParent;
 
@@ -772,7 +702,7 @@ public partial class NoteVisualizer : MonoBehaviour
 
         RecomputeTrackLayout(track);
         int activeBurst = (currentBurstId >= 0) ? currentBurstId : track.currentBurstId;
-        DestroyOrphanRowMarkers(track, activeBurst, dryRun: false);
+        DestroyOrphanRowMarkers(track, activeBurst);
     }
 
     private void RemoveStaleMarkerEntries(InstrumentTrack track)
@@ -801,8 +731,7 @@ public partial class NoteVisualizer : MonoBehaviour
             if (tag.isAscending) continue;
 
             bool isLoop = loopSteps.Contains(tag.step);
-            bool inFilledBin = true;
-            try { inFilledBin = track.IsStepInFilledBin(tag.step); } catch {}
+            bool inFilledBin = SafeIsStepInFilledBin(track, tag.step);
             if (!isLoop && tag.isPlaceholder)
             {
                 // Keep placeholders that belong to this canonicalization burst even if bin
@@ -819,12 +748,7 @@ public partial class NoteVisualizer : MonoBehaviour
 
                 if (!inFilledBin)
                 {
-#if UNITY_EDITOR
-                    if (!Application.isPlaying) UnityEngine.Object.DestroyImmediate(tag.gameObject);
-                    else UnityEngine.Object.Destroy(tag.gameObject);
-#else
-                    UnityEngine.Object.Destroy(tag.gameObject);
-#endif
+                    SafeDestroy(tag.gameObject);
                     continue;
                 }
             }
@@ -852,12 +776,7 @@ public partial class NoteVisualizer : MonoBehaviour
                 if (tag.burstId != currentBurstId)
                 {
                     if (GameFlowManager.VerboseLogging) Debug.Log($"[CANONICALIZE TRACK MARKERS] Placeholder Tag: {tag.gameObject.name} BurstID is not Current BurstID");
-#if UNITY_EDITOR
-                    if (!Application.isPlaying) UnityEngine.Object.DestroyImmediate(tag.gameObject);
-                    else UnityEngine.Object.Destroy(tag.gameObject);
-#else
-                    UnityEngine.Object.Destroy(tag.gameObject);
-#endif
+                    SafeDestroy(tag.gameObject);
                     continue;
                 }
 
@@ -940,13 +859,6 @@ public partial class NoteVisualizer : MonoBehaviour
         }
 
         UpdateMarkerXPreserveYIfAscending(rowRect, row, track, stepIndex, existing);
-
-        if (_animatingSteps.Contains(key))
-        {
-            if (GameFlowManager.VerboseLogging) Debug.Log($"[NoteViz] [Reuse-WhileAnimating] step {stepIndex} is animating → keep existing, no new spawn");
-            result = existing.gameObject;
-            return true;
-        }
 
         if (shouldLight)
         {
@@ -1058,7 +970,7 @@ public partial class NoteVisualizer : MonoBehaviour
         }
     }
 
-    private void UpdateNoteMarkerPositions(bool forceXReflow = false)
+    private void UpdateNoteMarkerPositions()
     {
         // Snapshot to avoid "collection modified" issues if other code mutates noteMarkers this frame.
         var kvs = noteMarkers.ToArray();
@@ -1071,9 +983,6 @@ public partial class NoteVisualizer : MonoBehaviour
             var track  = kvp.Key.Item1;
             var step   = kvp.Key.Item2;
             var marker = kvp.Value;
-
-            if (!forceXReflow && _animatingSteps != null && _animatingSteps.Contains((track, step)))
-                continue;
 
             if (marker == null) { deadKeys.Add(kvp.Key); continue; }
 
@@ -1209,7 +1118,7 @@ public partial class NoteVisualizer : MonoBehaviour
             ? new Vector3(xLocal, lp.y, lp.z)      // preserve Y during ascent
             : new Vector3(xLocal, lp.y, 0f);       // preserve Y generally; row handles baseline
     }
-    private void DestroyOrphanRowMarkers(InstrumentTrack track, int activeBurstId, bool dryRun = true)
+    private void DestroyOrphanRowMarkers(InstrumentTrack track, int activeBurstId)
 {
     int trackIndex = Array.IndexOf(_ctrl.tracks, track);
     if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
@@ -1225,8 +1134,6 @@ public partial class NoteVisualizer : MonoBehaviour
     }
 
     var toDestroy = new List<GameObject>();
-    var debugNotOwned = new List<GameObject>();
-    var debugUntaggedUnowned = new List<GameObject>();
 
     for (int i = 0; i < row.childCount; i++)
     {
@@ -1235,13 +1142,12 @@ public partial class NoteVisualizer : MonoBehaviour
 
         var tag = child.GetComponent<MarkerTag>();
 
-        // NEW: if untagged and not dict-owned, it's unmanaged "mystery" content.
+        // If untagged and not dict-owned, it's unmanaged "mystery" content.
         if (tag == null)
         {
             bool isOwned = owned.Contains(child);
             if (!isOwned)
             {
-                debugUntaggedUnowned.Add(child.gameObject);
                 // Treat as orphan candidate (safe because we only act within the row)
                 toDestroy.Add(child.gameObject);
             }
@@ -1257,16 +1163,13 @@ public partial class NoteVisualizer : MonoBehaviour
         bool hasKey = noteMarkers.TryGetValue(key, out var tr) && tr;
         bool sameObject = hasKey && tr.gameObject == child.gameObject;
 
-        bool inFilledBin = true;
-        try { inFilledBin = track.IsStepInFilledBin(tag.step); } catch { }
+        bool inFilledBin = SafeIsStepInFilledBin(track, tag.step);
 
         // Only consider destroying placeholders if their bin is filled.
         bool stalePlaceholder = tag.isPlaceholder && inFilledBin && (tag.burstId >= 0) && (tag.burstId != activeBurstId);
 
         // Duplicate object (dict has key, but points to a different GO)
         bool duplicateForKey = hasKey && !sameObject;
-
-        if (!sameObject) debugNotOwned.Add(child.gameObject);
 
         // Extra safety: if the dict-owned marker is ascending, do not destroy anything for this key.
         if (duplicateForKey)
@@ -1281,19 +1184,8 @@ public partial class NoteVisualizer : MonoBehaviour
 
     }
 
- 
-    if (!dryRun)
-    {
-        foreach (var go in toDestroy)
-        {
-#if UNITY_EDITOR
-            if (!Application.isPlaying) DestroyImmediate(go);
-            else Destroy(go);
-#else
-            Destroy(go);
-#endif
-        }
-    }
+    foreach (var go in toDestroy)
+        SafeDestroy(go);
 }
     private float GetScreenWidth() {
         RectTransform rt = _worldSpaceCanvas.GetComponent<RectTransform>();
@@ -1389,9 +1281,6 @@ public partial class NoteVisualizer : MonoBehaviour
             if (!tf) continue;
 
             var dictKey = (track, step);
-            if (noteMarkers.TryGetValue(dictKey, out var oldTf) && oldTf && oldTf != tf)
-               // Debug.LogWarning($"[RECOMPUTE] DICT_SWAP track={track.name} step={step} old={oldTf.gameObject.GetInstanceID()} new={tf.gameObject.GetInstanceID()}");
-
             noteMarkers[dictKey] = tf;
         }
 
@@ -1430,19 +1319,7 @@ public partial class NoteVisualizer : MonoBehaviour
             if (!chosenByStep.TryGetValue(step, out var canonical) || !canonical) continue;
             if (child == canonical) continue;
 
-            bool isAnimatingNow = _animatingSteps != null && _animatingSteps.Contains((track, step));
-            if (isAnimatingNow)
-            {
-//                Debug.LogWarning($"[RECOMPUTE] KEEP_DUP_DURING_ANIM track={track.name} step={step} dup={child.gameObject.GetInstanceID()} canonical={canonical.gameObject.GetInstanceID()}");
-                continue;
-            }
-
-#if UNITY_EDITOR
-            if (!Application.isPlaying) DestroyImmediate(child.gameObject);
-            else Destroy(child.gameObject);
-#else
-            Destroy(child.gameObject);
-#endif
+            SafeDestroy(child.gameObject);
         }
     }
     private int GetLeaderBinsForPlacement(InstrumentTrack track, int totalSteps, int binSize) {

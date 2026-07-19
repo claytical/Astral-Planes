@@ -12,12 +12,7 @@ public class RoleMotifNoteSetConfig : ScriptableObject
 
     [Header("Authored Riff")]
     public RiffAsset riff;
-
-    [Header("MineNode")]
-    [Tooltip("Legacy: tint budget system removed in Stage 5. No longer read at runtime.")]
-    [Min(0)]
-    public int mineNodeTintBudget = 20;
-
+    
     [Tooltip("Number of loop boundaries after spawn before the node expires if not captured. 0 = never.")]
     [Min(0)]
     public int mineNodeExpireAfterLoops = 3;

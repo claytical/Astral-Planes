@@ -20,7 +20,6 @@ MonoBehaviour:
   manualReleaseArmAheadMinSeconds: 0.5
   manualReleaseAutoCommitEpsSteps: 0.35
   manualReleaseGracePeriodSteps: 1
-  plowTickSeconds: 0.03
   plowFadeSeconds: 0.04
   inputTimeout: 0.15
   enableRecovery: 1
@@ -29,15 +28,11 @@ MonoBehaviour:
   respawnSearchRadiusCells: 8
   stuckSpeedThreshold: 0.35
   stuckSecondsInVoid: 0.6
-  gravityVoidTag: GravityVoid
   voidProbeRadiusWorld: 0.6
-  keepDustClearAroundVehicle: 1
   vehicleKeepClearRefreshSeconds: 0.1
   useVehiclePlacementResonance: 1
   vehiclePlacementColorLerpSpeed: 10
   vehiclePlacementMinTint: 0.08
-  vehiclePlacementOscillation: 0.18
-  vehiclePlacementOscillationSpeed: 1
   carveSpawnRestPocket: 1
   spawnRestPocketAutoRadius: 1
   spawnRestPocketRadiusCells: 1
@@ -46,4 +41,3 @@ MonoBehaviour:
   trailSlotSpacing: 0.1
   trailFirstSlotOffset: 0.3
   trailHistoryCapacity: 48
-  trailReleasePulseSteps: 4
