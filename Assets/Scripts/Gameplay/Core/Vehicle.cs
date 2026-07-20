@@ -186,6 +186,9 @@ public partial class Vehicle : MonoBehaviour
         if (_vehicleTether == null) return;
         Destroy(_vehicleTether.gameObject);
         _vehicleTether = null;
+
+        if (gfm == null) gfm = GameFlowManager.Instance;
+        gfm?.noteViz?.ClearManualReleaseCue(transform);
     }
 
     /// <summary>
@@ -689,6 +692,11 @@ public partial class Vehicle : MonoBehaviour
             {
                 _vehicleTether.SetStartWorldPos(SampleTrailPosition(vehicleConfig.trailFirstSlotOffset));
                 UpdateVehicleTether(viz);
+
+                if (_vehicleTether.IsShown)
+                    viz?.SetManualReleaseCuePosition(transform, _vehicleTether.EvaluatePosition01(_vehicleTether.ReleaseProgress01));
+                else
+                    viz?.ClearManualReleaseCue(transform);
             }
         }
 

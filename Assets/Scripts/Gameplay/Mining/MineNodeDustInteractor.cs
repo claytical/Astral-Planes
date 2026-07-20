@@ -228,7 +228,7 @@ public class MineNodeDustInteractor : MonoBehaviour
         if (!go.TryGetComponent<CosmicDust>(out var dust)) return;
 
         MusicalRole role = _node.GetImprintRole();
-        var         prof = MusicalRoleProfileLibrary.GetProfile(role);
+        var         prof = _node.RoleProfile;
         if (prof == null) return;
 
         Color roleColor = prof.GetBaseColor();

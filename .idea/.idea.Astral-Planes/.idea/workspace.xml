@@ -6,82 +6,18 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Bass.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Bass/Bass Sub Drone.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Bass/Bass Sub Drone.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Bass/Bass Sync Fifths.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Bass/Bass Sync Fifths.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Bass/Major Drone.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Bass/Major Drone.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Bass/Minor Bass Walk.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Bass/Minor Bass Walk.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Bass/Minor Walking Bass 1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Bass/Minor Walking Bass 1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Bass/Minor Walking Bass.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Bass/Minor Walking Bass.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Bass/Pulsing Bass.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Bass/Pulsing Bass.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Groove.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Groove/Groove Scatter Percussion.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Groove/Groove Scatter Percussion.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Groove/Groove Stutter Grid.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Groove/Groove Stutter Grid.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Groove/Groove Sync Ticks.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Groove/Groove Sync Ticks.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Groove/Groove Triplet Flare.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Groove/Groove Triplet Flare.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Groove/Osinato Scatter Groove.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Groove/Osinato Scatter Groove.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Groove/Percussive Groove.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Groove/Percussive Groove.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Harmony.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Harmony/Fifth Ornament Harmony.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Harmony/Fifth Ornament Harmony.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Harmony/Harmony Air Voicing.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Harmony/Harmony Air Voicing.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Harmony/Harmony Bright Stabs.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Harmony/Harmony Bright Stabs.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Harmony/Harmony Broken Minor.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Harmony/Harmony Broken Minor.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Harmony/Harmony Warm Pads.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Harmony/Harmony Warm Pads.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Harmony/Syncopated Triplet Harmony.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Harmony/Syncopated Triplet Harmony.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Lead.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Lead/Arp Down Lead.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Lead/Arp Down Lead.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Lead/Arp Up Lead.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Lead/Arp Up Lead.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Lead/Lead Call and Response.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Lead/Lead Call and Response.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Lead/Lead Fractured Minor.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Lead/Lead Fractured Minor.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Lead/Lead Smooth Glide.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Lead/Lead Smooth Glide.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Lead/Lead Sync Hook.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Generative Notes/Lead/Lead Sync Hook.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Star Behavior/Drifting Star.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Star Behavior/Drifting Star.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Star Behavior/Fast Star.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Star Behavior/Fast Star.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/DefaultVehicleConfig.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/DefaultVehicleConfig.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Effects/Energy Cue.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Effects/Energy Cue.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.CellLifecycle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.CellLifecycle.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustRegrowthController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustRegrowthController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/DustRegrowthScheduler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/DustRegrowthScheduler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.ManualRelease.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.ManualRelease.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/BridgeCoordinator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/BridgeCoordinator.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/SceneFlowCoordinator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/SceneFlowCoordinator.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Config/CosmicDustGeneratorConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Config/CosmicDustGeneratorConfig.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Config/InstrumentTrackControllerConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Config/InstrumentTrackControllerConfig.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Motif/RoleMotifNoteSetConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Motif/RoleMotifNoteSetConfig.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Profiles/VehicleConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Profiles/VehicleConfig.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Theory/NoteSetFactory.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Theory/NoteSetFactory.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/PhaseLibraryStartConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/PhaseLibraryStartConfig.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/PhaseTransitionManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/PhaseTransitionManager.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarBehaviorProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarBehaviorProfile.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarInteractionState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarInteractionState.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarStateController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarStateController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/PhaseLibraryCarousel.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/PhaseLibraryCarousel.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MotifSnapshot.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MotifSnapshot.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteVisualizer.AnimationTasks.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteVisualizer.AnimationTasks.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNode.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeDustInteractor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/MineNodeDustInteractor.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteTether.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteTether.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteVisualizer.MarkerQueries.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteVisualizer.MarkerQueries.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteVisualizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteVisualizer.cs" afterDir="false" />
     </list>
@@ -374,7 +310,7 @@
       <workItem from="1782328476836" duration="3122000" />
       <workItem from="1782340432119" duration="23136000" />
       <workItem from="1783970322056" duration="95875000" />
-      <workItem from="1784402198304" duration="4436000" />
+      <workItem from="1784402198304" duration="14244000" />
     </task>
     <servers />
   </component>

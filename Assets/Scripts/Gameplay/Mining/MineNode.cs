@@ -151,6 +151,7 @@ public class MineNode : MonoBehaviour
     private const float kEscapeCooldown    = 0.30f;
 
     public MusicalRole GetImprintRole() => _role;
+    public MusicalRoleProfile RoleProfile => _roleProfile;
 
     public void Initialize(InstrumentTrack track, NoteSet noteSet, Color tint, Vector2Int spawnCell,
                            Sprite diamondSprite = null)
@@ -164,7 +165,11 @@ public class MineNode : MonoBehaviour
             expireAfterLoops = noteSet.expireAfterLoops;
         _lockedColor = tint;
         _drumTrack = (track != null) ? track.drumTrack : null;
-        var prof = MusicalRoleProfileLibrary.GetProfile(_role);
+        // Prefer the motif-selected profile installed on the track; the library keeps only
+        // the first-loaded asset per role, so it can't see per-motif tuning.
+        var prof = (_track != null && _track.ActiveProfile != null)
+            ? _track.ActiveProfile
+            : MusicalRoleProfileLibrary.GetProfile(_role);
         if (prof != null) _speed = prof.mineNodeSpeed;  // category speed is applied in FixedUpdateDrifting
         _activeLocomotionProfile = ResolveLocomotionProfile(prof);
         ResolveDecisionArchetype();

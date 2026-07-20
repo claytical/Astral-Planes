@@ -1,5 +1,4 @@
-﻿using System;
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
@@ -22,8 +21,6 @@ public class InstrumentTrackController : MonoBehaviour
     private bool _chordEventsSubscribed;
     private Vector2Int _gravityVoidCenterGP;
     private bool _gravityVoidHasCenterGP;
-    public float lastCollectionTime { get; private set; } = -1f;
-    private readonly HashSet<(InstrumentTrack track, int bin)> _binExtensionSignaled = new();
     private readonly List<Vector2Int> _vehicleCellsScratch = new();
     private readonly Dictionary<InstrumentTrack, bool> _allowAdvanceNextBurst = new Dictionary<InstrumentTrack, bool>();
     [Header("Gravity Void (Expansion Waiting)")]
@@ -48,10 +45,8 @@ public class InstrumentTrackController : MonoBehaviour
     private Vector3 _gravityVoidCenterWorld;
     private Color _gravityVoidParticleTint;
     private Color _gravityVoidDustImprintTint;
-    private float _gravityVoidGrowSecondsRuntime = -1f;
     private int   _gravityVoidMaxRadiusRuntime   = -1;
     private double _lastTransportDsp;
-    private int _lastPlayheadBin;
 // ------------------------------------------------------------
 // Transport cache + guard against transient future-dated anchors
 // ------------------------------------------------------------
@@ -64,7 +59,6 @@ public class InstrumentTrackController : MonoBehaviour
     // Fired when the carried note visually lands on the loop / marker lights.
     // ---------------------------------------------------------------------
     [SerializeField] private AudioSource commitSfxSource;
-    private GameFlowManager gfm;
 
     private float GetSecondsRemainingInCurrentBin() {
         if (_gfm == null) _gfm = GameFlowManager.Instance;
@@ -164,7 +158,6 @@ public class InstrumentTrackController : MonoBehaviour
     }
     public void NotifyCollected(InstrumentTrack track)
     {
-        lastCollectionTime = Time.time;
         PlayPickupTick(track);
     }
     public void BeginGravityVoidForPendingExpand(InstrumentTrack ownerTrack, Vector3 centerWorld, Vector2Int centerGP)
@@ -174,7 +167,6 @@ public class InstrumentTrackController : MonoBehaviour
         // Is this a repeat Begin for the same owner while already active?
         bool sameOwner = (_gravityVoidOwner != null && ownerTrack == _gravityVoidOwner);
         bool routineRunning = (_gravityVoidRoutine != null);
-        bool instanceAlive = (_gravityVoidInstance != null);
 
         // Update owner + center every time (Begin acts as "refresh" too).
         _gravityVoidOwner = ownerTrack;
@@ -190,16 +182,10 @@ public class InstrumentTrackController : MonoBehaviour
         SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
 
         // Recompute runtime parameters; these can change while pending.
-        _gravityVoidGrowSecondsRuntime = -1f;
-        _gravityVoidMaxRadiusRuntime   = -1;
+        _gravityVoidMaxRadiusRuntime = -1;
 
         if (_gravityVoidOwner != null)
         {
-            // Drive dur by DSP time-to-commit, so the final radius happens at the commit point.
-            float secsToCommit = _gravityVoidOwner.GetSecondsUntilNextLoopBoundaryDSP();
-            if (secsToCommit > 0.01f)
-                _gravityVoidGrowSecondsRuntime = secsToCommit;
-
             // Radius mapping: 1 bin = 1 radius cell (visualize incoming bin => current + 1).
             int targetRadius = Mathf.Max(1, _gravityVoidOwner.loopMultiplier + 1);
             _gravityVoidMaxRadiusRuntime = targetRadius;
@@ -255,10 +241,6 @@ public class InstrumentTrackController : MonoBehaviour
 
         DespawnGravityVoid();
     }
-    // Canonical role order for rainbow ring cycling.
-    private static readonly MusicalRole[] kVoidRoleOrder =
-        { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove, MusicalRole.Rhythm };
-    
     private IEnumerator GravityVoidGrowAndImprintRoutine()
     {
         if (_gfm == null) _gfm = GameFlowManager.Instance;
@@ -304,11 +286,11 @@ public class InstrumentTrackController : MonoBehaviour
     {
         _vehicleCellsScratch.Clear();
         var vehicleList = _gfm?.GetVehicles();
-        if (vehicleList == null || gfm?.activeDrumTrack == null) return;
+        if (vehicleList == null || _gfm?.activeDrumTrack == null) return;
         foreach (var v in vehicleList)
         {
             if (v != null && v.isActiveAndEnabled)
-                _vehicleCellsScratch.Add(gfm.activeDrumTrack.WorldToGridPosition(v.transform.position));
+                _vehicleCellsScratch.Add(_gfm.activeDrumTrack.WorldToGridPosition(v.transform.position));
         }
     }
 
@@ -607,29 +589,43 @@ public class InstrumentTrackController : MonoBehaviour
 
     public void ResetControllerBinGuards()
     {
-        _binExtensionSignaled?.Clear();
     }
 
-    public void CheckAndTriggerAllTracksMaxed()
+    // Shared precondition for both AllTracksMaxed paths below: resolves GameFlowManager
+    // and the motif's alternate chord profile, and confirms every track whose role is
+    // active in the current motif has reached its max loopMultiplier.
+    private bool TryGetAllTracksMaxedAltProfile(out GameFlowManager gfm, out ChordProgressionProfile alt)
     {
-        if (tracks == null) return;
-        var gfm = GameFlowManager.Instance;
-        if (gfm == null) return;
-        if (gfm.GhostCycleInProgress || gfm.BridgePending) return;
+        gfm = null;
+        alt = null;
+        if (tracks == null) return false;
+
+        gfm = GameFlowManager.Instance;
+        if (gfm == null) return false;
+
         var motif = gfm.phaseTransitionManager?.currentMotif;
-        var alt   = motif?.alternateChordProgressionProfile;
-        if (alt == null) return;
+        var candidateAlt = motif?.alternateChordProgressionProfile;
+        if (candidateAlt == null) return false;
 
         var activeRoles = motif.GetActiveRoles();
-        if (activeRoles == null || activeRoles.Count == 0) return;
+        if (activeRoles == null || activeRoles.Count == 0) return false;
 
         // Only check tracks whose role is active in the current motif.
         foreach (var t in tracks)
         {
             if (t == null) continue;
             if (!activeRoles.Contains(t.assignedRole)) continue;
-            if (t.loopMultiplier < t.maxLoopMultiplier) return;
+            if (t.loopMultiplier < t.maxLoopMultiplier) return false;
         }
+
+        alt = candidateAlt;
+        return true;
+    }
+
+    public void CheckAndTriggerAllTracksMaxed()
+    {
+        if (!TryGetAllTracksMaxedAltProfile(out var gfm, out var alt)) return;
+        if (gfm.GhostCycleInProgress || gfm.BridgePending) return;
 
         gfm.harmony?.SetActiveProfile(alt, applyImmediately: true);
         gfm.BeginMotifBridge("AllTracksMaxed");
@@ -637,23 +633,7 @@ public class InstrumentTrackController : MonoBehaviour
 
     public void StageAltChordIfAllTracksMaxed()
     {
-        if (tracks == null) return;
-        var gfm = GameFlowManager.Instance;
-        if (gfm == null) return;
-        var motif = gfm.phaseTransitionManager?.currentMotif;
-        var alt   = motif?.alternateChordProgressionProfile;
-        if (alt == null) return;
-
-        var activeRoles = motif.GetActiveRoles();
-        if (activeRoles == null || activeRoles.Count == 0) return;
-
-        foreach (var t in tracks)
-        {
-            if (t == null) continue;
-            if (!activeRoles.Contains(t.assignedRole)) continue;
-            if (t.loopMultiplier < t.maxLoopMultiplier) return;
-        }
-
+        if (!TryGetAllTracksMaxedAltProfile(out var gfm, out var alt)) return;
         gfm.harmony?.SetActiveProfile(alt, applyImmediately: false);
     }
 
@@ -709,7 +689,7 @@ public class InstrumentTrackController : MonoBehaviour
         _gfm = GameFlowManager.Instance;
         if (_gfm == null || !_gfm.ReadyToPlay()) return;
         noteVisualizer?.Initialize(); // ← ensures playhead + mapping are active
-        ResetAllCursorsAndGuards(clearLoops:false);
+        ResetAllCursorsAndGuards();
         EnsurePickupSfxSource();
         UpdateVisualizer();
         // Subscribe to ascension-complete events
@@ -1107,13 +1087,13 @@ public class InstrumentTrackController : MonoBehaviour
         return Mathf.Clamp(track.GetNextFilledBinForDensity(), 0, trackMaxBinIndex);
     }
 
-    private void ResetAllCursorsAndGuards(bool clearLoops=false)
+    private void ResetAllCursorsAndGuards()
         {
             ResetControllerBinGuards();
             if (tracks == null) return;
             foreach (var t in tracks)
                 if (t) t.ResetBinsForPhase();
-        } 
+        }
     public bool AnyExpansionPending() {
         if (tracks == null || tracks.Length == 0) return false;
         foreach (var t in tracks) {
@@ -1121,12 +1101,6 @@ public class InstrumentTrackController : MonoBehaviour
             if (t.IsExpansionPending) return true;
         }
         return false;
-    }
-
-    private bool AnyCollectablesInFlight()
-    {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        return _gfm != null && _gfm.AnyCollectablesInFlightGlobal();
     }
 
     private int ForceDestroyAllCollectablesInFlight(string reason)
@@ -1155,7 +1129,6 @@ public class InstrumentTrackController : MonoBehaviour
         ForceDestroyAllCollectablesInFlight(reason);
 
         // Reset controller-level guards/caches.
-        _binExtensionSignaled.Clear();
         _allowAdvanceNextBurst.Clear();
         _loopHash.Clear();
 
@@ -1227,8 +1200,6 @@ public class InstrumentTrackController : MonoBehaviour
         }
     }
 
-    public event Action<MusicalRole, int> OnChordGroupBinFilled;
-
     public bool IsChordGroupComplete(MusicalRole role, int binIndex)
     {
         if (tracks == null) return false;
@@ -1250,7 +1221,6 @@ public class InstrumentTrackController : MonoBehaviour
         if (roleProfile == null || roleProfile.configSelectionMode != RoleConfigSelectionMode.ByVoice) return;
         if (!IsChordGroupComplete(track.assignedRole, binIndex)) return;
 
-        OnChordGroupBinFilled?.Invoke(track.assignedRole, binIndex);
         // All voices filled this bin together — advance cursors for the whole group so
         // the next GenerateNotes call returns the correct next bin.
         // Do NOT grant _allowAdvanceNextBurst: that token feeds TrackExpansionController,
@@ -1330,55 +1300,10 @@ public class InstrumentTrackController : MonoBehaviour
         }
         return maxMul;
     }
-    public int GetMaxLoopMultiplier()
-    {
-        int max = 1;
-        foreach (var t in tracks)
-            if (t != null) max = Mathf.Max(max, t.loopMultiplier);
-        return max;
-    }
+    // Same "max loopMultiplier across tracks" concept as GetMaxActiveLoopMultiplier;
+    // kept as a separate name since callers use both, but delegates to avoid duplication.
+    public int GetMaxLoopMultiplier() => GetMaxActiveLoopMultiplier();
 
-    /// <summary>
-    /// Returns the bin-count that the UI should use for consistent, cross-track visualization.
-    ///
-    /// <summary>
-    /// Global visual bin count used by NoteVisualizer layout.
-    ///
-    /// Rationale:
-    /// - The UI must remain phase-aligned across tracks even when a specific track is
-    ///   temporarily empty (e.g., subtractive bin expiration creating silence).
-    /// - Using only "active" loop multipliers (based on persistentLoopNotes) causes the
-    ///   visual width to collapse during those moments, which produces overlap and
-    ///   desync between tracks.
-    ///
-    /// Definition:
-    /// - The maximum number of bins any track has advanced to (binCursor), with
-    ///   fallbacks to declared total steps and loopMultiplier.
-    ///
-    /// This should be stable across subtractive changes: bins can become silent, but
-    /// the visual timebase should not shrink.
-    /// </summary>
-    public int GetGlobalVisualBins()
-    {
-        if (tracks == null || tracks.Length == 0) return 1;
-
-        int maxBins = 1;
-        foreach (var t in tracks)
-        {
-            if (t == null) continue;
-
-            int binSize = Mathf.Max(1, t.BinSize());
-            int fromSteps = Mathf.Max(1, Mathf.CeilToInt(Mathf.Max(1, t.GetTotalSteps()) / (float)binSize));
-            int fromMul   = Mathf.Max(1, t.loopMultiplier);
-            int fromCursor = Mathf.Max(1, t.GetBinCursor());
-
-            maxBins = Mathf.Max(maxBins, fromSteps);
-            maxBins = Mathf.Max(maxBins, fromMul);
-            maxBins = Mathf.Max(maxBins, fromCursor);
-        }
-
-        return maxBins;
-    }
     public void BeginGameOverFade()
     {
         foreach (var track in tracks)

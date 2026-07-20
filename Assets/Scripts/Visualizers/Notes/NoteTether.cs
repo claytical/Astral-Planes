@@ -266,6 +266,15 @@ private int     _cachedHash  = 0;
             _lr.widthMultiplier = baseWidth * Mathf.Lerp(releaseWidthMin, releaseWidthMax, _releaseProgress01);
     }
 
+    // Last progress value set via SetReleaseProgress — lets other systems (the manual-release
+    // ghost cue) ride the same 0..1 timeline as the tether's own width/color pulse.
+    public float ReleaseProgress01 => _releaseProgress01;
+
+    // Whether the tether line is currently drawn (see SetTimingState). RebuildCurve() runs every
+    // Update() regardless, so _points/EvaluatePosition01 stay valid even while hidden — callers
+    // that only want to show something while the cable itself is visible should check this.
+    public bool IsShown => _lr != null && _lr.enabled;
+
     public void SetTimingState(float windowLerp01, bool inWindow, bool atExactStep)
     {
         if (_lr == null) return;

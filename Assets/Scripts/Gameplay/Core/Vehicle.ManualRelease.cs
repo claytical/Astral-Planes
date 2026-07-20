@@ -35,12 +35,6 @@ public partial class Vehicle
 
     private void TickManualReleaseCue()
     {
-        if (gfm == null) gfm = GameFlowManager.Instance;
-        var viz = (gfm != null) ? gfm.noteViz : null;
-        if (viz == null) return;
-
-        var spokenFor = BuildManualReleaseSpokenFor();
-
         if (_armedReleases.Count > 0)
         {
             var a = _armedReleases.Peek();
@@ -53,7 +47,7 @@ public partial class Vehicle
             }
 
             if (!armed.track.controller.TryGetRawPlayheadAbsStep(
-                    out double rawAbs, out int floorAbs, out int totalStepsLive))
+                    out double rawAbs, out _, out int totalStepsLive))
                 return;
 
             int totalSteps = Mathf.Max(1, totalStepsLive);
@@ -80,14 +74,12 @@ public partial class Vehicle
                 {
                     _armedReleases.Dequeue();
                     _pendingNotes.Enqueue(armed);
-                    spokenFor.Remove(a.targetAbsStep);
                     return;
                 }
 
                 CommitManualReleaseAtStep(armed, a.targetAbsStep, a.releaseVelocity);
                 if (_armedReleases.Count == 0) return;
                 _armedReleases.Dequeue();
-                spokenFor.Remove(a.targetAbsStep);
                 if (_releaseButtonHeld && _armedReleases.Count == 0 && _pendingNotes.Count > 0)
                 {
                     // Don't sacrifice — if next note's step isn't in window yet, leave it
@@ -99,37 +91,19 @@ public partial class Vehicle
 
             _lastRawAbsStep = rawAbs;
             _hasLastRawAbsStep = true;
-
-            if (_pendingNotes.Count > 0)
-                viz.UpdateManualReleaseCueExcluding(transform, armed.track, rawAbs, floorAbs, totalStepsLive, spokenFor);
-            else
-                viz.ClearManualReleaseCue(transform);
-
             return;
         }
 
         if (_pendingNotes.Count <= 0)
-        {
-            viz.ClearManualReleaseCue(transform);
             return;
-        }
 
         var queued = _pendingNotes.Peek();
         if (queued.track == null || queued.track.controller == null)
-        {
-            viz.ClearManualReleaseCue(transform);
             return;
-        }
 
         if (!queued.track.controller.TryGetRawPlayheadAbsStep(
-                out double rawAbsQ, out int floorAbsQ, out int totalStepsQ))
-        {
-            viz.ClearManualReleaseCue(transform);
+                out double rawAbsQ, out _, out _))
             return;
-        }
-
-        var pendingSpokenFor = BuildManualReleaseSpokenFor(queued);
-        viz.UpdateManualReleaseCueExcluding(transform, queued.track, rawAbsQ, floorAbsQ, totalStepsQ, pendingSpokenFor);
 
         _lastRawAbsStep = rawAbsQ;
         _hasLastRawAbsStep = true;

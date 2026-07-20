@@ -283,7 +283,7 @@ private Coroutine _drainBuildupRoutine;
     }
 
     // Sets current energy units, clamped [0, max]. Updates tint alpha accordingly.
-    public void SetEnergyUnits(int units)
+    private void SetEnergyUnits(int units)
     {
         _currentEnergyUnits = Mathf.Clamp(units, 0, _maxEnergyUnits);
         float visibleAlpha = Mathf.Lerp(kSolidAlphaFloor, 1f, Charge01);

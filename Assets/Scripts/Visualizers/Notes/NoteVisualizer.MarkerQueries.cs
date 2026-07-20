@@ -5,7 +5,7 @@ using UnityEngine;
 /// <summary>
 /// Marker query and step-search methods for NoteVisualizer.
 /// All methods here are read-mostly: they query noteMarkers or search for steps
-/// without mutating marker state. Exception: UpdateManualReleaseCueExcluding and
+/// without mutating marker state. Exception: SetManualReleaseCuePosition and
 /// UpdateCarryHighlights drive transient visual state on markers.
 /// </summary>
 public partial class NoteVisualizer
@@ -103,47 +103,25 @@ public partial class NoteVisualizer
         return true;
     }
 
-    public void UpdateManualReleaseCueExcluding(
-        Transform vehicle, InstrumentTrack track,
-        double rawAbsStep, int floorAbsStep, int totalAbsSteps,
-        HashSet<int> excludedSteps)
+    // Places (creating if needed) the manual-release ghost cue at worldPos. Position/visibility
+    // are owned by the caller (Vehicle.TickNoteTrail rides the vehicle's NoteTether curve) —
+    // this method only manages the per-vehicle cue GameObject lifecycle.
+    public void SetManualReleaseCuePosition(Transform vehicle, Vector3 worldPos)
     {
-        if (releaseCuePrefab == null || vehicle == null || track == null) return;
+        if (releaseCuePrefab == null || vehicle == null) return;
         if (!isActiveAndEnabled) return;
-
-        totalAbsSteps = Mathf.Max(1, totalAbsSteps);
-
-        if (!TryGetNextUnlitStepExcluding(track, rawAbsStep, totalAbsSteps, excludedSteps, out int targetAbs))
-        {
-            ClearManualReleaseCue(vehicle);
-            return;
-        }
-
-        Vector3 a = vehicle.position;
-        Vector3 b = (noteMarkers != null &&
-                     noteMarkers.TryGetValue((track, targetAbs), out var markerTr) && markerTr != null)
-            ? markerTr.position : a;
-
-        double fwd = (targetAbs - rawAbsStep + totalAbsSteps) % totalAbsSteps;
-        int binSize = (_ctrl != null && _drum != null) ? Mathf.Max(1, _drum.totalSteps) : 16;
-        int lookahead = Mathf.Clamp(Mathf.Max(releaseCueLookaheadSteps, binSize), 1, totalAbsSteps);
-
-        if (fwd > lookahead) { ClearManualReleaseCue(vehicle); return; }
-
-        float u = Mathf.SmoothStep(0f, 1f, 1f - Mathf.Clamp01((float)(fwd / lookahead)));
-        Vector3 p = Vector3.Lerp(a, b, u);
-        if (releaseCueArcHeight != 0f) p.y += releaseCueArcHeight * 4f * u * (1f - u);
 
         var v = vehicle.GetComponent<Vehicle>();
         if (v == null) return;
+
         if (!_releaseCuesByVehicle.TryGetValue(v, out var cue) || cue == null)
         {
-            cue = Instantiate(releaseCuePrefab, p, Quaternion.identity);
+            cue = Instantiate(releaseCuePrefab, worldPos, Quaternion.identity);
             _releaseCuesByVehicle[v] = cue;
         }
         else
         {
-            cue.transform.position = p;
+            cue.transform.position = worldPos;
         }
     }
 

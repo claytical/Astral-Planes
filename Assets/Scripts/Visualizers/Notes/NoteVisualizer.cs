@@ -31,10 +31,6 @@ public partial class NoteVisualizer : MonoBehaviour
     [Tooltip("Particle prefab instantiated at the release cue position when a manual release fails.")]
     [SerializeField] private ParticleSystem failureExplosionPrefab;
     [SerializeField] private Color failureColor = new Color(1f, 0.12f, 0.05f, 1f);
-    [Tooltip("How many steps ahead (max) the cue starts moving toward the target. Beyond this distance it stays near the vehicle.")]
-    [Min(1)] public int releaseCueLookaheadSteps = 8;
-    [Tooltip("World-space arc height for the cue path (0 = straight line).")]
-    public float releaseCueArcHeight = 0.8f;
     [Header("Track Rows (one per InstrumentTrack in controller order)")]
     public List<RectTransform> trackRows;
     public Dictionary<(InstrumentTrack, int), Transform> noteMarkers = new();
