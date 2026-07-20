@@ -226,12 +226,7 @@ public partial class CosmicDustGenerator
         if (_regrowthSuppressed)
             return;
         if (!IsInBounds(gridPos)) {
-
-            if (_regrowthScheduler.RegrowthCoroutines != null && _regrowthScheduler.RegrowthCoroutines.TryGetValue(gridPos, out var pending))
-            {
-                if (pending != null) StopCoroutine(pending);
-                _regrowthScheduler.RegrowthCoroutines.Remove(gridPos);
-            }
+            _regrow?.CancelRegrow(gridPos);
             return;
         }
 

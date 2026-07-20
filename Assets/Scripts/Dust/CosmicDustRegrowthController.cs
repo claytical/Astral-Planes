@@ -35,7 +35,7 @@ public sealed class CosmicDustRegrowthController
     private readonly Func<Vector2Int, bool> _tryGetPendingRegrow; // true if state == PendingRegrow
     private readonly Action<Vector2Int> _setCellEmpty;            // used for permanent veto on step gate
     private readonly Action<Vector2Int> _setCellPendingRegrow;    // used by delay coroutine
-    private readonly Func<Vector2Int, IEnumerator> _commitRegrowCell;
+    private readonly Action<Vector2Int> _startCommitRegrowCell;   // host starts + tracks the commit coroutine itself
 
     // --- Tunables provided per tick / call ---
     private readonly Func<float> _getRegrowVetoRetryDelaySeconds;
@@ -54,7 +54,7 @@ public sealed class CosmicDustRegrowthController
         Func<Vector2Int, bool> tryGetPendingRegrow,
         Action<Vector2Int> setCellEmpty,
         Action<Vector2Int> setCellPendingRegrow,
-        Func<Vector2Int, IEnumerator> commitRegrowCell,
+        Action<Vector2Int> startCommitRegrowCell,
         Func<float> getRegrowVetoRetryDelaySeconds,
         Func<int> getRegrowCellsPerStep)
     {
@@ -72,7 +72,7 @@ public sealed class CosmicDustRegrowthController
         _tryGetPendingRegrow = tryGetPendingRegrow;
         _setCellEmpty = setCellEmpty;
         _setCellPendingRegrow = setCellPendingRegrow;
-        _commitRegrowCell = commitRegrowCell;
+        _startCommitRegrowCell = startCommitRegrowCell;
 
         _getRegrowVetoRetryDelaySeconds = getRegrowVetoRetryDelaySeconds;
         _getRegrowCellsPerStep = getRegrowCellsPerStep;
@@ -86,6 +86,19 @@ public sealed class CosmicDustRegrowthController
         _regrowthCoroutines.Remove(cell);
         _pendingStepRegrowSet.Remove(cell);
         // NOTE: queue removal is not trivial; we leave it and ignore when dequeued.
+    }
+
+    // Stops every pending per-cell delay coroutine (RegrowCellAfterDelay). Does NOT touch
+    // CommitRegrowCell coroutines — those are started and tracked by the host generator
+    // via _startCommitRegrowCell, so the host is responsible for stopping those itself.
+    public void CancelAllPending()
+    {
+        foreach (var kv in _regrowthCoroutines)
+            if (kv.Value != null) _host.StopCoroutine(kv.Value);
+        _regrowthCoroutines.Clear();
+
+        _pendingStepRegrow.Clear();
+        _pendingStepRegrowSet.Clear();
     }
 
     public void RequestRegrowCellAt(
@@ -167,7 +180,7 @@ public sealed class CosmicDustRegrowthController
                 continue;
             }
 
-            _host.StartCoroutine(_commitRegrowCell(gp));
+            _startCommitRegrowCell(gp);
         }
     }
 

@@ -5,8 +5,8 @@ using UnityEngine;
 public sealed class DustRegrowthScheduler
 {
     public readonly Queue<List<Vector2Int>> PendingCorridorRegrowth = new();
-    public readonly Dictionary<Vector2Int, Coroutine> RegrowthCoroutines = new();
     public readonly Dictionary<Vector2Int, Coroutine> VoidGrowCoroutines = new();
+    public readonly Dictionary<Vector2Int, Coroutine> CommitRegrowCoroutines = new();
 
     public int RegrowCellsPerStep { get; private set; }
     public float ColliderEnableDelaySeconds { get; private set; }

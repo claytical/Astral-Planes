@@ -281,16 +281,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
             _spawnRoutine = null;
         }
 
-        // Stop any legacy per-cell regrowth coroutines if they still exist.
-        if (_regrowthScheduler.RegrowthCoroutines != null)
-        {
-            foreach (var kv in _regrowthScheduler.RegrowthCoroutines)
-            {
-                if (kv.Value != null)
-                    StopCoroutine(kv.Value);
-            }
-            _regrowthScheduler.RegrowthCoroutines.Clear();
-        }
+        // Stop any pending per-cell regrowth-delay coroutines.
+        _regrow?.CancelAllPending();
 
         // Stop any void-grow coroutines that might still be animating dust in.
         if (_regrowthScheduler.VoidGrowCoroutines != null)
@@ -301,6 +293,17 @@ public partial class CosmicDustGenerator : MonoBehaviour
                     StopCoroutine(kv.Value);
             }
             _regrowthScheduler.VoidGrowCoroutines.Clear();
+        }
+
+        // Stop any in-flight commit coroutines (past the delay, animating a cell solid).
+        if (_regrowthScheduler.CommitRegrowCoroutines != null)
+        {
+            foreach (var kv in _regrowthScheduler.CommitRegrowCoroutines)
+            {
+                if (kv.Value != null)
+                    StopCoroutine(kv.Value);
+            }
+            _regrowthScheduler.CommitRegrowCoroutines.Clear();
         }
 
         // Dismiss transient cells from the outgoing motif using the same dissipation visual as
@@ -649,28 +652,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         _runtimeVoidOnlyDustCreation = true; 
         StopActiveStaggeredGrowth();
     }
-
-    /// <summary>
-    /// Erodes all Solid cells within <paramref name="radiusCells"/> of <paramref name="centerGP"/>
-    /// so the gravity-void safety bubble zone is visually clear when the void begins.
-    /// Cells may regrow normally after the void ends.
-    /// </summary>
-    public void ClearBubbleZone(Vector2Int centerGP, int radiusCells)
-    {
-        if (radiusCells <= 0 || _gridState.CellState == null) return;
-        EnsureCellGrid();
-        int rSq = radiusCells * radiusCells;
-        for (int dy = -radiusCells; dy <= radiusCells; dy++)
-        for (int dx = -radiusCells; dx <= radiusCells; dx++)
-        {
-            if (dx * dx + dy * dy > rSq) continue;
-            var gp = new Vector2Int(centerGP.x + dx, centerGP.y + dy);
-            if (!IsInBounds(gp)) continue;
-            if (TryGetCellState(gp, out var st) && st == DustCellState.Solid)
-                ClearCell(gp, DustClearMode.FadeAndHide, DustTimings.clearSpriteScaleOutSeconds, scheduleRegrow: true);
-        }
-    }
-
+    
     /// <summary>
     /// Promotes hidden Solid cells within <paramref name="radiusCells"/> of <paramref name="centerGP"/>
     /// whose Voronoi role matches <paramref name="role"/> to their true role color,
@@ -1103,7 +1085,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             tryGetPendingRegrow: gp => TryGetCellState(gp, out var st) && st == DustCellState.PendingRegrow,
             setCellEmpty: gp => SetCellState(gp, DustCellState.Empty),
             setCellPendingRegrow: gp => SetCellState(gp, DustCellState.PendingRegrow),
-            commitRegrowCell: gp => CommitRegrowCell(gp),
+            startCommitRegrowCell: gp => _regrowthScheduler.CommitRegrowCoroutines[gp] = StartCoroutine(CommitRegrowCell(gp)),
 
             getRegrowVetoRetryDelaySeconds: () => Mathf.Max(0.05f, config.regrowVetoRetryDelaySeconds),
             getRegrowCellsPerStep: () => Mathf.Max(0, config.regrowCellsPerStep)
@@ -1224,6 +1206,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 HideCellGO(existing);
 
             SetCellState(gp, DustCellState.Empty);
+            _regrowthScheduler.CommitRegrowCoroutines.Remove(gp);
             yield break;
         }
 
@@ -1235,14 +1218,15 @@ public partial class CosmicDustGenerator : MonoBehaviour
         {
             SetCellState(gp, DustCellState.PendingRegrow);
             EnqueueStepRegrow(gp);
+            _regrowthScheduler.CommitRegrowCoroutines.Remove(gp);
             yield break;
         }
 
         // Density gate: a frontier compensation cell already restored coverage for this
         // erosion event. Suppress the original cell so dust "shifts" rather than doubling.
-        
+
         var go = GetOrCreateCellGO(gp);
-        if (go == null) yield break;
+        if (go == null) { _regrowthScheduler.CommitRegrowCoroutines.Remove(gp); yield break; }
         if (!go.activeSelf)
             go.SetActive(true);
         // Visual comes back first.
@@ -1307,6 +1291,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         {
             SetCellState(gp, DustCellState.Empty);
             FadeAndHideCellGO(go);
+            _regrowthScheduler.CommitRegrowCoroutines.Remove(gp);
             yield break;
         }
 
@@ -1315,6 +1300,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             SetCellState(gp, DustCellState.PendingRegrow);
             FadeAndHideCellGO(go);              // stays active, but invisible + non-colliding
             EnqueueStepRegrow(gp);
+            _regrowthScheduler.CommitRegrowCoroutines.Remove(gp);
             yield break;
         }
 
@@ -1326,6 +1312,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             SetDustCollision(dust, true);
         }
         _regrowExcludeRoleByCell.Remove(gp);
+        _regrowthScheduler.CommitRegrowCoroutines.Remove(gp);
     }
 
     private void EnqueueStepRegrow(Vector2Int gp)
@@ -2242,6 +2229,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         if (go.TryGetComponent<CosmicDust>(out var dust) && dust != null)
         {
             SetDustCollision(dust, false);
+            dust.regrowAlphaCapped = false;
             dust.HideVisualsInstant();
         }
     }
@@ -2252,6 +2240,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         if (go.TryGetComponent<CosmicDust>(out var dust) && dust != null)
         {
             SetDustCollision(dust, false);
+            dust.regrowAlphaCapped = false;
             dust.DissipateAndHideVisualOnly(.5f);
         }
         else
