@@ -235,8 +235,6 @@ GameObject:
   - component: {fileID: 269415557}
   - component: {fileID: 269415556}
   - component: {fileID: 269415558}
-  - component: {fileID: 269415561}
-  - component: {fileID: 269415562}
   - component: {fileID: 269415563}
   m_Layer: 0
   m_Name: Main Camera
@@ -425,37 +423,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &269415561
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 269415555}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9a3a070408aa941ab83ae10be1708848, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _intensity: 0
-  _shader: {fileID: 4800000, guid: ba40dc630e1d9417cb9ea22586ece1e1, type: 3}
---- !u!114 &269415562
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 269415555}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 870b9a8f0f82f4f56800cc427bcd1025, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _scanLineJitter: 0
-  _verticalJump: 0
-  _horizontalShake: 0
-  _colorDrift: 0
-  _shader: {fileID: 4800000, guid: da33272284ea24f208f36998880990be, type: 3}
 --- !u!114 &269415563
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1335,7 +1302,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e84647cb53cd94c9eb8da1d63d8a23ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  motifGlyphApplicator: {fileID: 0}
   motifRingGlyphApplicator: {fileID: 0}
   binRingController: {fileID: 0}
   motifBridgeHoldSeconds: 4
