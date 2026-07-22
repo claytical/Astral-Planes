@@ -2,22 +2,6 @@ using UnityEngine;
 
 public static class SuperNodeSteeringMath
 {
-    public static Vector2 SteerTowards(Vector2 currentVel, Vector2 desiredVel, float turnRateDegPerSec, float accelerationUnitsPerSecondSq, float deltaTime)
-    {
-        float curSpeed = currentVel.magnitude;
-        float desSpeed = desiredVel.magnitude;
-
-        float speed = Mathf.MoveTowards(curSpeed, desSpeed, accelerationUnitsPerSecondSq * deltaTime);
-
-        Vector2 curDir = curSpeed > 0.001f ? currentVel / curSpeed : (desSpeed > 0.001f ? desiredVel / desSpeed : Vector2.right);
-        Vector2 desDir = desSpeed > 0.001f ? desiredVel / desSpeed : curDir;
-
-        float maxRadians = turnRateDegPerSec * Mathf.Deg2Rad * deltaTime;
-        Vector2 newDir = Vector3.RotateTowards(curDir, desDir, maxRadians, 0f);
-
-        return newDir * speed;
-    }
-
     public static float EdgeFactor01(Vector2 position, Rect bounds, float softnessWorld)
     {
         float dx = Mathf.Min(position.x - bounds.xMin, bounds.xMax - position.x);

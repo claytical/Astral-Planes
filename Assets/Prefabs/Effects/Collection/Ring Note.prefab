@@ -691,7 +691,7 @@ ParticleSystem:
     gravityModifier:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0
+      scalar: 0.03
       minScalar: 0
       maxCurve:
         serializedVersion: 2
@@ -4933,7 +4933,7 @@ SpriteRenderer:
   m_MaskInteraction: 0
   m_Sprite: {fileID: 6485846461334653488, guid: 43dc102d976b24668a4c8bf47427b57d,
     type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.57254905}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
