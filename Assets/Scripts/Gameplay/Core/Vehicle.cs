@@ -52,7 +52,7 @@ public partial class Vehicle : MonoBehaviour
     public AudioClip thrustClip;
     public PlayerStats playerStatsUI; // Reference to the PlayerStats UI element
     public PlayerStatsTracking playerStats;
-    
+
     private GameObject activeTrail; // Reference to the currently active trail instance
     private TrailRenderer _activeTrailRenderer;
     public Rigidbody2D rb;
@@ -64,7 +64,7 @@ public partial class Vehicle : MonoBehaviour
     private float _lastDamageTime = -1f;
     private Coroutine flickerPulseRoutine;
     private bool isFlickering = false;
-    
+
 
 
     private Coroutine _spawnRestPocketCo;
@@ -332,7 +332,7 @@ public partial class Vehicle : MonoBehaviour
         UpdateSafeAnchor();
         RecoverIfNeeded();
     }
-    
+
 }
 
     private void UpdatePressureInstability()
@@ -410,7 +410,7 @@ public partial class Vehicle : MonoBehaviour
         TickNoteTrail();
     }
 
-    
+
     // ---- Note Trail Management ----
     private void RecordPositionHistory()
     {
@@ -704,7 +704,7 @@ public partial class Vehicle : MonoBehaviour
         foreach (var p in _pendingNotes)   if (p.track != null)       _carriedTracksScratch.Add(p.track);
         if (viz != null) viz.UpdateCarryHighlights(_carriedTracksScratch);
     }
-    
+
     private void UpdateVehicleTether(NoteVisualizer viz)
     {
         if (_vehicleTether == null) return;
@@ -871,313 +871,11 @@ public partial class Vehicle : MonoBehaviour
             );
         }
     }
-      private void UpdateSafeAnchor()
-{
-    if (rb == null || drumTrack == null) return;
 
-    // Only record anchor when we are reasonably “in play”.
-    // (Avoid recording while already offscreen or during a trap.)
-    if (IsFarOutsideViewport(vehicleConfig.viewportOobMargin * 0.5f)) return;
-
-    // If you want, you can also avoid anchoring while inside a void:
-    // if (IsInsideGravityVoid(out _, out _)) return;
-
-    _lastSafeWorld = rb.position;
-    _lastSafeCell = drumTrack.WorldToGridPosition(rb.position);
-    _hasSafeAnchor = true;
-}
-
-    private void RecoverIfNeeded()
-{
-    if (Time.time - _lastRecoverAt < vehicleConfig.minSecondsBetweenRecoveries) return;
-    if (rb == null || drumTrack == null || gfm == null || gfm.dustGenerator == null) return;
-
-    // 1) Hard OOB: if we’re well outside camera viewport, snap back.
-    if (IsFarOutsideViewport(vehicleConfig.viewportOobMargin))
-    {
-        DoSnapRespawn("viewport_oob");
-        return;
-    }
-
-    // 2) Void trap: if we’re inside a void collider AND not moving for a while, do localized eject or snap.
-    if (IsInsideGravityVoid(out var voidCenter, out var voidRadius))
-    {
-        float speed = rb.linearVelocity.magnitude;
-
-        if (speed <= vehicleConfig.stuckSpeedThreshold)
-            _timeStuckInVoid += Time.fixedDeltaTime;
-        else
-            _timeStuckInVoid = 0f;
-
-        if (_timeStuckInVoid >= vehicleConfig.stuckSecondsInVoid)
-        {
-            // Prefer local eject (feels physical), but fall back to snap if we can’t find a clean spot.
-            if (!TryEjectFromVoid(voidCenter, voidRadius))
-            {
-                DoSnapRespawn("void_trap_snap");
-            }
-            else
-            {
-                _lastRecoverAt = Time.time;
-                _timeStuckInVoid = 0f;
-            }
-        }
-    }
-    else
-    {
-        _timeStuckInVoid = 0f;
-    }
-}
-
-    private bool IsFarOutsideViewport(float margin)
-{
-    var cam = Camera.main;
-    if (cam == null) return false;
-
-    Vector3 vp = cam.WorldToViewportPoint(transform.position);
-
-    // If behind camera (z < 0), treat as OOB.
-    if (vp.z < 0f) return true;
-
-    return (vp.x < -margin || vp.x > 1f + margin || vp.y < -margin || vp.y > 1f + margin);
-}
-
-    private bool IsInsideGravityVoid(out Vector2 center, out float radius)
-{
-    center = default;
-    radius = 0f;
-
-    if (gravityVoidMask.value == 0)
-        return false; // explicitly disabled
-
-    Vector2 pos = rb != null ? rb.position : (Vector2)transform.position;
-
-    Collider2D hit = Physics2D.OverlapCircle(
-        pos,
-        vehicleConfig.voidProbeRadiusWorld,
-        gravityVoidMask
-    );
-
-    if (hit == null)
-        return false;
-
-    var cc = hit as CircleCollider2D;
-    if (cc != null)
-    {
-        center = cc.bounds.center;
-        radius = Mathf.Max(0.05f, cc.bounds.extents.x);
-        return true;
-    }
-
-    center = hit.bounds.center;
-    radius = Mathf.Max(
-        0.05f,
-        Mathf.Max(hit.bounds.extents.x, hit.bounds.extents.y)
-    );
-    return true;
-}
-
-    private bool TryEjectFromVoid(Vector2 voidCenter, float voidRadius)
-{
-    if (!_hasSafeAnchor) return false;
-
-    // Aim to put the vehicle just outside the void boundary, away from center.
-    Vector2 pos = rb.position;
-    Vector2 away = (pos - voidCenter);
-    if (away.sqrMagnitude < 0.0001f) away = Random.insideUnitCircle.normalized;
-    else away.Normalize();
-
-    // Candidate target position on rim + small margin
-    float margin = Mathf.Max(0.15f, vehicleConfig.voidProbeRadiusWorld * 0.5f);
-    Vector2 targetWorld = voidCenter + away * (voidRadius + margin);
-
-    // Convert to a grid cell and look for a nearby empty cell (localized)
-    Vector2Int targetCell = drumTrack.WorldToGridPosition(targetWorld);
-    if (TryFindNearbyEmptyCell(targetCell, maxRadius: 4, out var emptyCell))
-    {
-        Vector2 world = (Vector2)drumTrack.GridToWorldPosition(emptyCell);
-
-        // Teleport + impulse outward so we don’t immediately re-stick
-        rb.position = world;
-        rb.linearVelocity = away * Mathf.Max(2.5f, arcadeMaxSpeed * 0.35f);
-        rb.angularVelocity = 0f;
-
-        _lastRecoverAt = Time.time;
-        _timeStuckInVoid = 0f;
-        return true;
-    }
-
-    return false;
-}
-
-    private void DoSnapRespawn(string reason)
-{
-    if (!_hasSafeAnchor) return;
-
-    // Try to find an empty cell near the last safe anchor.
-    if (!TryFindNearbyEmptyCell(_lastSafeCell, vehicleConfig.respawnSearchRadiusCells, out var respawnCell))
-    {
-        // Absolute fallback: last safe world position.
-        rb.position = _lastSafeWorld;
-        rb.linearVelocity = Vector2.zero;
-        rb.angularVelocity = 0f;
-
-        _lastRecoverAt = Time.time;
-        _timeStuckInVoid = 0f;
-        Debug.LogWarning($"[VEHICLE:RECOVER] {name} fallback to lastSafeWorld (reason={reason})", this);
-        return;
-    }
-
-    Vector2 respawnWorld = (Vector2)drumTrack.GridToWorldPosition(respawnCell);
-
-    rb.position = respawnWorld;
-    rb.linearVelocity = Vector2.zero;
-    rb.angularVelocity = 0f;
-
-    _lastRecoverAt = Time.time;
-    _timeStuckInVoid = 0f;
-
-    Debug.LogWarning($"[VEHICLE:RECOVER] {name} respawn to cell {respawnCell} (reason={reason})", this);
-}
-
-    private bool TryFindNearbyEmptyCell(Vector2Int around, int maxRadius, out Vector2Int found) {
-        found = around;
-
-    var gen = gfm.dustGenerator;
-    if (gen == null) return false;
-
-    // radius 0 first
-    if (IsCellEmpty(around)) { found = around; return true; }
-
-    int rMax = Mathf.Clamp(maxRadius, 1, 64);
-
-    // ring scan
-    for (int r = 1; r <= rMax; r++)
-    {
-        // top/bottom rows
-        for (int dx = -r; dx <= r; dx++)
-        {
-            var a = new Vector2Int(around.x + dx, around.y + r);
-            var b = new Vector2Int(around.x + dx, around.y - r);
-            if (IsCellEmpty(a)) { found = a; return true; }
-            if (IsCellEmpty(b)) { found = b; return true; }
-        }
-
-        // left/right cols (skip corners already checked)
-        for (int dy = -r + 1; dy <= r - 1; dy++)
-        {
-            var a = new Vector2Int(around.x + r, around.y + dy);
-            var b = new Vector2Int(around.x - r, around.y + dy);
-            if (IsCellEmpty(a)) { found = a; return true; }
-            if (IsCellEmpty(b)) { found = b; return true; }
-        }
-    }
-
-    return false;
-}
-
-    private bool IsCellEmpty(Vector2Int gp)
-{
-    var gen = gfm.dustGenerator;
-
-    // IMPORTANT:
-    // In your current usage, TryGetDustAt() seems to return false OR dust==null
-    // when there is no dust cell at that position (or out of bounds).
-    // We’re using it as “empty enough to respawn”.
-    if (!gen.TryGetDustAt(gp, out var dust)) return true;
-    return (dust == null);
-}
-
-    public void CollectEnergy(float amount)
-    {
-        energyLevel += amount;
-        if (energyLevel > capacity)
-        {
-            energyLevel = capacity;
-        }
-
-        if (playerStatsUI != null)
-        {
-            playerStatsUI.UpdateFuel(energyLevel, capacity);
-        }
-
-        playerStats.RecordItemCollected();
-            
-    }
-    public void DrainEnergy(float amount, string source = "Unknown")
-{
-    if (amount <= 0f) return;
-    if (_boostCostFree) return; // free boost phase: skip all external energy drains
-    ConsumeEnergy(amount);
-}
-
-    private void ApplyShipProfile(ShipMusicalProfile p, bool refillEnergy = true)
-    {
-        profile = p;
-
-        arcadeMaxSpeed = p.arcadeMaxSpeed;
-
-        rb.mass             = p.mass;
-        rb.linearDamping    = p.arcadeLinearDamping;
-        rb.angularDamping   = p.arcadeAngularDamping;
-
-        capacity = p.capacity;
-        if (refillEnergy) energyLevel = capacity;
-
-        if (p.vehicleKeepClearRadiusCells > 0)
-            vehicleKeepClearRadiusCells = p.vehicleKeepClearRadiusCells;
-    }
-
-    public void SyncEnergyUI()
-        {
-            if (playerStatsUI != null)
-            {
-                playerStatsUI.UpdateFuel(energyLevel, capacity);
-            }
-            
-        }
     public void SetDrumTrack(DrumTrack drums)
         {
             drumTrack = drums;
         }
-    public int GetForceAsDamage()
-        {
-            float speed = rb.linearVelocity.magnitude;
-            float impactCapVelocity = profile != null ? profile.impactSpeedCap : 32f;
-            float normalizedSpeed = Mathf.InverseLerp(0f, impactCapVelocity, speed);
-            float curvedSpeed = Mathf.Pow(normalizedSpeed, 1.75f);
-            float baseDamage = Mathf.Lerp(25f, 100f, curvedSpeed); 
-
-            float massMultiplier = Mathf.Clamp(rb.mass, 0.75f, 2f);
-            float damage = baseDamage * massMultiplier;
-
-            // If we hit something within the last 0.5s, pad the damage slightly
-            if (Time.time - _lastDamageTime < 0.5f)
-            {
-                damage = Mathf.Max(damage, 10f); // Floor for quick follow-ups
-            }
-
-            _lastDamageTime = Time.time;
-
-            return Mathf.RoundToInt(Mathf.Clamp(damage, 0f, 120f));
-        }
-    public float HitVelocityMultiplier => profile != null ? profile.hitVelocityMultiplier : 1.0f;
-
-    public float GetForceAsMidiVelocity()
-    {
-        float speed = rb.linearVelocity.magnitude;
-
-        // Make sure this reflects *true* achievable speed (including boost),
-        // otherwise you will peg at 127 constantly.
-        float max = Mathf.Max(0.01f, arcadeMaxSpeed);
-
-        float x = Mathf.Clamp01(speed / max);
-
-        // Optional: curve to give more resolution in the midrange
-        // x = Mathf.Pow(x, 0.7f);
-
-        return Mathf.Lerp(40f, 127f, x);
-    }
 
     private float GetEffectiveAuthority()
     {
@@ -1248,91 +946,6 @@ public partial class Vehicle : MonoBehaviour
         if (_activeTrailRenderer != null)
             _activeTrailRenderer.emitting = false;
     }
-    public float GetCumulativeSpentTanks() {
-        if (capacity <= 0f) return 0f;
-        return _cumulativeEnergySpent / capacity;
-    }
-    private void RefreshVehicleKeepClearIfNeeded() {
-        if (gfm.BridgePending || gfm.GhostCycleInProgress) return;
-
-        // Throttle refresh — collision safety clearance, not a dust design feature
-        if (Time.time < _nextVehicleKeepClearRefreshAt) return;
-        _nextVehicleKeepClearRefreshAt = Time.time + Mathf.Max(0.02f, vehicleConfig.vehicleKeepClearRefreshSeconds);
-        if (gfm == null) return;
-
-        var gen = gfm.dustGenerator;
-        var drum = gfm.activeDrumTrack;
-        if (gen == null || drum == null) return;
-
-        int ownerId = _id;
-
-        Vector2Int centerCell = drum.WorldToGridPosition(rb.position);
-
-        if (!boosting)
-        {
-            // Claim just the center cell (radius=0, no force-remove) so dust can never
-            // regrow directly under the vehicle, without actively clearing any dust.
-            gen.SetVehicleKeepClear(ownerId, centerCell, 0, forceRemoveExisting: false);
-            return;
-        }
-
-        // While boosting, claim the pocket (prevents regrowth) but don't force-remove existing
-        // dust — the plow owns carving with resistance applied. forceRemoveExisting is only
-        // used for the one-time spawn rest pocket, not for live carving.
-        gen.SetVehicleKeepClear(
-            ownerId,
-            centerCell,
-            Mathf.Max(0, vehicleKeepClearRadiusCells),
-            forceRemoveExisting: false
-        );
-    }
-    private IEnumerator Co_CarveSpawnRestPocket()
-    {
-        // Optional delay to allow spawn ordering (dust grid, drumTrack, etc.) to settle.
-        if (vehicleConfig.spawnRestPocketDelaySeconds > 0f)
-            yield return new WaitForSeconds(vehicleConfig.spawnRestPocketDelaySeconds);
-        else
-            yield return null; // at least one frame so the dust grid exists
-
-        if (gfm == null) yield break;
-
-        var gen = gfm.dustGenerator;
-
-        if (gen == null || drumTrack == null) yield break;
-
-        // Compute which cell we're currently in.
-        Vector2 pos = (rb != null) ? rb.position : (Vector2)transform.position;
-        Vector2Int centerCell = drumTrack.WorldToGridPosition(pos);
-
-        // Choose a radius that guarantees we are not born overlapping walls.
-        int radiusCells = Mathf.Max(0, vehicleConfig.spawnRestPocketRadiusCells);
-        if (vehicleConfig.spawnRestPocketAutoRadius)
-        {
-            float cellWorld = Mathf.Max(0.01f, drumTrack.GetCellWorldSize());
-            float rWorld = 0.0f;
-            var col = GetComponent<Collider2D>();
-            if (col != null)
-                rWorld = Mathf.Max(col.bounds.extents.x, col.bounds.extents.y);
-            else
-                rWorld = 0.35f; // conservative fallback
-
-            // Expand by a small margin so resting contacts don't continuously resolve.
-            float rWithMargin = rWorld + (cellWorld * 0.15f);
-            radiusCells = Mathf.Max(0, Mathf.CeilToInt(rWithMargin / cellWorld));
-        }
-
-        // Carve a small pocket *once*, then release keep-clear so regrowth behaves normally.
-        // This creates a "rest" volume without creating a tunnel or permanently preventing regrowth.
-        int ownerId = _id;
-        gen.SetVehicleKeepClear(
-            ownerId,
-            centerCell,
-            radiusCells,
-            forceRemoveExisting: true,
-            forceRemoveFadeSeconds: Mathf.Max(0.01f, vehicleConfig.spawnRestPocketFadeSeconds)
-        );
-        gen.ReleaseVehicleKeepClear(ownerId);
-    }
     void OnDisable()
     {
         if (gfm == null || gfm.dustGenerator == null) return;
@@ -1353,44 +966,6 @@ public partial class Vehicle : MonoBehaviour
 
         gen.ReleaseVehicleKeepClear(_id);
     }
-    private void ConsumeEnergy(float amount)
-        {
-            energyLevel -= amount;
-            energyLevel = Mathf.Max(0, energyLevel);
-            _cumulativeEnergySpent += Mathf.Max(0f, amount);
-            if (energyLevel <= 0)
-            {
-                _isDead = true;
-                rb.linearVelocity = Vector2.zero;
-                rb.angularVelocity = 0f;
-                rb.simulated = false;
-
-                // Hide the vehicle immediately so the explosion VFX (a separate, independently
-                // timed object) reads as the vehicle being destroyed, not as it surviving and
-                // flying off while the explosion happens to its name.
-                if (baseSprite != null) baseSprite.enabled = false;
-                if (soulSprite != null) soulSprite.enabled = false;
-                var ownCollider = GetComponent<Collider2D>();
-                if (ownCollider != null) ownCollider.enabled = false;
-
-                DiscardCarriedCollectables();
-                    Explode explode = GetComponent<Explode>();
-                    if (explode != null)
-                    {
-                        explode.Permanent();
-                    }
-                    playerStats?.GetComponent<LocalPlayer>()?.OnVehicleDied();
-                    gfm?.CheckAllPlayersOutOfEnergy();
-//                }
-
-            }
-
-            // Update UI
-            if (playerStatsUI != null)
-            {
-                playerStatsUI.UpdateFuel(energyLevel, capacity);
-            }
-        }
     private void UpdateDistanceCovered()
     {
         // Calculate the distance covered since the last frame
@@ -1409,129 +984,7 @@ public partial class Vehicle : MonoBehaviour
                 rb.angularVelocity = Mathf.Clamp(rb.angularVelocity, -maxAngularVelocity, maxAngularVelocity);
             }
         }
-    
-    void OnCollisionEnter2D(Collision2D coll)
-    {
-        var node = coll.gameObject.GetComponent<MineNode>();
 
-        // 🎯 Apply impact damage
-        int damage = GetForceAsDamage();
-        if (node != null)
-        {
-            TriggerFlickerAndPulse(1.2f, node.coreSprite.color, false);
-            // 💥 Apply knockback
-            Rigidbody2D nodeRb = node.GetComponent<Rigidbody2D>();
-            if (nodeRb != null)
-            {
-                Vector2 forceDirection = rb.linearVelocity.normalized;
-                float knockbackForce = rb.mass * rb.linearVelocity.magnitude * 0.5f; // Tunable
-                nodeRb.AddForce(forceDirection * knockbackForce, ForceMode2D.Impulse);
-            }
-        }
-
-        if (coll.gameObject.tag == "Bump")
-        {
-            TriggerThud(coll.contacts[0].point);
-        }
-}
-
-    private void DoPlowTick()
-    {
-        _plowVelocityDrain = 0f;
-        if (gfm == null || gfm.dustGenerator == null || drumTrack == null) return;
-        if (gfm.BridgePending || gfm.GhostCycleInProgress) return;
-        if (!boosting) return;
-
-        Vector2 vel = rb.linearVelocity;
-        var gen = gfm.dustGenerator;
-        float cellSize  = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
-        Vector2 forward = vel.normalized;
-        Vector2 perp    = new Vector2(-forward.y, forward.x);
-        float fade      = Mathf.Max(0.01f, vehicleConfig.plowFadeSeconds);
-        int halfW       = Mathf.Max(0, profile.plowHalfWidthCells);
-        int depth       = Mathf.Max(0, profile.plowDepthCells);
-        int chipAmount  = Mathf.Max(1, profile.plowChipAmount);
-
-        // Drain is felt regardless of speed; chipping requires min speed to carve.
-        bool canCarve = vel.magnitude >= profile.plowMinSpeed;
-        float totalVelocityDrain = 0f;
-
-        for (int d = 0; d <= depth; d++)
-        {
-            for (int s = -halfW; s <= halfW; s++)
-            {
-                Vector2    sampleWorld = rb.position
-                    + forward * (d * cellSize)
-                    + perp    * (s * cellSize);
-                Vector2Int cell = drumTrack.WorldToGridPosition(sampleWorld);
-                if (!gen.TryGetCellState(cell, out var cellState)) continue;
-                bool isSolid    = cellState == DustCellState.Solid;
-                bool isClearing = cellState == DustCellState.Clearing;
-                if (!isSolid && !isClearing) continue;
-
-                float liveRes      = gen.GetLiveCarveResistance01(cell);
-                float effectiveRes = liveRes * (1f - Mathf.Clamp01(profile.carveResistanceBypass01));
-
-                if (profile.carveVelocityDrainPerCell > 0f)
-                    totalVelocityDrain = Mathf.Max(totalVelocityDrain, liveRes * profile.carveVelocityDrainPerCell);
-
-                if (!isSolid) continue;
-                if (effectiveRes >= 1f) continue;
-                if (!canCarve) continue;
-
-                gen.SuppressCellColliderForPlow(cell);
-                gen.ChipDustByVehicle(cell, chipAmount, fade, profile.carveResistanceBypass01, profile);
-                _isActivePlow = true;
-            }
-        }
-
-        _plowVelocityDrain = totalVelocityDrain;
-    }
-
-    private void TriggerThud(Vector2 collisionPoint)
-        {
-            if (baseSprite == null || isFlickering) return;
-
-            if (flickerPulseRoutine != null)
-            {
-                StopCoroutine(flickerPulseRoutine); // Prevent stacking
-            }
-            flickerPulseRoutine = StartCoroutine(ThudRoutine(collisionPoint));
-        }
-    private void TriggerFlickerAndPulse(float scaleMultiplier, Color? baseColor = null, bool cycleHue = false)
-        {
-            if (baseSprite == null || isFlickering) return;
-
-            if (flickerPulseRoutine != null)
-            {
-                StopCoroutine(flickerPulseRoutine); // Prevent stacking
-            }
-
-            flickerPulseRoutine = StartCoroutine(FlickerAndPulseRoutine(scaleMultiplier, baseColor, cycleHue));
-        }
-    private IEnumerator ThudRoutine(Vector2 coll)
-        {
-            isFlickering = true;
-            yield return VisualFeedbackUtility.BoundaryThudFeedback(baseSprite, transform, coll);
-            isFlickering = false;
-            flickerPulseRoutine = null;
-        }
-    private IEnumerator FlickerAndPulseRoutine(float scaleMultiplier, Color? baseColor, bool cycleHue)
-        {
-            isFlickering = true;
-
-            yield return VisualFeedbackUtility.SpectrumFlickerWithPulse(
-                baseSprite,
-                transform,
-                0.2f,
-                scaleMultiplier,
-                cycleHue ? null : baseColor,
-                cycleHue
-            );
-
-            isFlickering = false;
-            flickerPulseRoutine = null;
-        }
     // Enqueue a collected note for manual release. Returns true if queued.
     private bool EnqueuePendingCollectedNote(PendingCollectedNote p)
     {
@@ -1559,7 +1012,7 @@ public partial class Vehicle : MonoBehaviour
 
     // Back-compat with earlier patches / external callers.
     public bool EnqueuePendingNote(PendingCollectedNote p) => EnqueuePendingCollectedNote(p);
-    
+
     public bool TryReleaseQueuedNote(bool allowSacrifice = true)
 {
     if (_pendingNotes.Count <= 0) return false;
