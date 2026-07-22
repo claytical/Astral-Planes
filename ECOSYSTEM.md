@@ -1,14 +1,18 @@
 # Astral Planes — Subsystem Ecosystem
 
-Current-state reference for how the gameplay, music, backbone, and UI layers interlock.  
-SuperNode, glyph, and coral systems are **in transition** — their call-sites are noted but their internals are not described.
+Current-state reference for how the gameplay, music, backbone, and UI layers interlock.
+Coral has been fully removed; the 2D glyph path is dormant (wired but unused). Both are noted briefly rather than described in depth — see the **Glyph & Ring Systems** and **Removed / Dormant Systems** sections.
 
 ---
 
 ## Layer Map
 
 ```
-[GameFlowManager] ─── scene / motif / bridge lifecycle
+[GameFlowManager] ─── scene refs, top-level facade
+       │
+       ├─► [SessionStateCoordinator]  ─── game state, players, ghost-cycle / bridge-pending flags
+       ├─► [BridgeCoordinator]        ─── bridge sequence: freeze, snapshot, fade, ring spin-off
+       ├─► [SceneFlowCoordinator]     ─── scene transitions, next-motif / next-phase setup
        │
        ├─► [DrumTrack]  ─── DSP clock, step ticks, loop boundaries, spawn grid
        │         │
@@ -18,39 +22,56 @@ SuperNode, glyph, and coral systems are **in transition** — their call-sites a
        │
        ├─► [CosmicDustGenerator] ─── authoritative cell grid, role imprints, regrowth
        │
-       ├─► [PhaseStar] ─── node spawner, charge accumulator, bridge trigger
+       ├─► [StarPool] ─── per-role star lifecycle, ejection gate + budget, refunds
+       │         │
+       │    [PhaseStar] ─── zap-count drain, tentacle siphon, eject decision
        │         │
        │    [MineNode] ─── note-driven carver → burst on depletion
+       │         │
+       │    [SuperNode] ─── alternate ejection: multi-track chase bonus round
        │         │
        │    [Collectable] ─── autonomous drifter → Vehicle pickup → DSP deposit
        │
        ├─► [Vehicle] ─── player physics, energy, manual release queue
        │
-       └─► [NoteVisualizer] ─── loop grid, playhead, release cue, ascension
+       └─► [NoteVisualizer] / [MotifRingGlyphApplicator] ─── loop grid, playhead, ring bridge FX
 ```
 
 ---
 
 ## Backbone
 
+`GameFlowManager` used to own the full bridge/scene sequence directly. A refactor ("scene, bridge, and session coordinators") split that logic out into three sealed helper classes it delegates to; `GameFlowManager` itself is now a thin facade holding scene references.
+
 ### GameFlowManager
-`Assets/Scripts/Managers/GameFlowManager.cs` (+ `.LifeCycle.cs`, `.PlayerFlow.cs`, `.BridgeOrchestration.cs`, `.BridgeVisuals.cs`)
+`Assets/Scripts/Managers/GameFlowManager.cs` (+ `.LifeCycle.cs`, `.PlayerFlow.cs`, `.BridgeOrchestration.cs` — now an 11-line dispatcher, see Flow C)
 
-Top-level state machine: **Begin → Selection → Playing → GameOver**.  
-Owns the authoritative references to every major system and drives scene transitions, motif swaps, and bridge cinematics.
+Top-level facade. Holds the authoritative references to every major system and exposes coordinator-backed properties (`CurrentState`, `BridgePending`, `GhostCycleInProgress` all forward to `SessionState`).
 
-**Owns:** Vehicle list, active `DrumTrack`, `InstrumentTrackController`, `CosmicDustGenerator`, `NoteVisualizer`, motif snapshot history, bridge-pending / ghost-cycle flags.
+**Owns:** Vehicle list, active `DrumTrack`, `InstrumentTrackController`, `CosmicDustGenerator`, `NoteVisualizer`, glyph/ring-glyph applicator references, phase-in FX, vehicle-trap spawning, note-tether cleanup, `AnyCollectablesInFlightGlobal()` (shared collectable-in-flight query used by `StarPool`/`PhaseStar`).
 
-**Emits / calls out:**
-- `DrumTrack.ApplyMotif()` — hands new `MotifProfile` to the transport
-- `CosmicDustGenerator.HardStopRegrowthForBridge()` / `BeginSlowFadeAllDust()` — freezes dust on bridge
-- `motifRingGlyphApplicator.AnimateApply(snapshot)` / `FadeOutAndClear()` — ring glyph active call-sites
-- *(commented-out)* `motifGlyphApplicator.Apply()` — 2D glyph block, in transition
-- *(commented-out)* `SetBridgeCinematicMode(true)` / coral grow — coral block, in transition
-- `ConstellationMemoryStore.StoreSnapshot()` — persists completed-phase history
-- `CheckAllPlayersOutOfEnergy()` — game-over gate
+**Delegates to:** `SessionState`, `BridgeFlow`, `SceneFlow` (below) for everything state/sequencing-related.
 
-**Listens to:** energy-out signals from `Vehicle` (intensity mapping), all-players-out (game-over).
+---
+
+### SessionStateCoordinator
+`Assets/Scripts/Managers/SessionStateCoordinator.cs`
+
+Owns player-session state: joined `LocalPlayer` list, readiness, `GameState` (`Begin/Selection/Playing/GameOver`), `GhostCycleInProgress`/`BridgePending` flags, game-over guard (`_hasGameOverStarted`). Fires `GameStateChanged`/`BridgePendingChanged`/`GhostCycleChanged` events. `CheckAllPlayersOutOfEnergy()` is the game-over gate, called from `GameFlowManager`.
+
+---
+
+### BridgeCoordinator
+`Assets/Scripts/Managers/BridgeCoordinator.cs`
+
+Owns the motif-bridge sequence (see **Flow C** for the full call order) and the in-memory `MotifSnapshot` history (`MotifSnapshots` list — this replaces the no-longer-existing `ConstellationMemoryStore` that older documentation referenced). `StampMotifStartTime()` marks when the current motif began, used to compute `MotifSnapshot.TrackBinData.MotifStartTime`.
+
+---
+
+### SceneFlowCoordinator
+`Assets/Scripts/Managers/SceneFlowCoordinator.cs`
+
+Owns scene transitions and next-motif/next-phase setup: `TransitionToScene()`, `FadeScreenToBlack()`/`FadeScreenFromBlack()`, `StartNextMotifInPhase()` (hands the new `MotifProfile` to `DrumTrack.ApplyMotif()`, resets `InstrumentTrackController`, clears `NoteVisualizer`, resumes dust regrowth), `StartNextPhaseMazeAndStar()`.
 
 ---
 
@@ -61,7 +82,7 @@ Owns the authoritative references to every major system and drives scene transit
 
 The single DSP time authority. Every timing-sensitive system derives loop position from it.
 
-**Owns:** BPM, step count, active `MotifProfile` clip pool, loop-boundary DSP anchors, spawn grid (world ↔ grid coordinate mapping), `MineNode` registry, current bin count.
+**Owns:** BPM, step count, active `MotifProfile` clip pool, loop-boundary DSP anchors, spawn grid (world ↔ grid coordinate mapping), `MineNode` registry, `_starPool` reference, current bin count.
 
 **Emits:**
 | Event | Consumers |
@@ -70,7 +91,7 @@ The single DSP time authority. Every timing-sensitive system derives loop positi
 | `OnLoopBoundary` | `MineNode` (path prune), `Collectable` (idea direction), `PhaseStar` (re-arm logic) |
 
 **Key methods called on it:**
-- `ApplyMotif(MotifProfile)` — swaps drum clip + timing, defers to next boundary
+- `ApplyMotif(MotifProfile)` — swaps drum clip + timing, deferred to next boundary by `SceneFlowCoordinator`
 - `SetBinCount(n)` — updates visual bin count after track expansion
 - `WorldToGridPosition()` / `GridToWorldPosition()` — coordinate bridge for all spawners
 - `GetRandomAvailableCell()` / `OccupySpawnCell()` / `FreeSpawnCell()` — grid occupancy for node placement
@@ -103,13 +124,13 @@ Per-role MIDI loop state. The **bin** is the expansion unit — each bin adds on
 **Emits:**
 | Event | Consumer |
 |-------|----------|
-| `OnCollectableBurstCleared(burstId, hadNotes)` | `PhaseStar` — triggers re-arm |
+| `OnCollectableBurstCleared(burstId, hadNotes)` | `StarPool` — clears the ejection gate; `PhaseStar` — triggers re-arm |
 | `OnAscensionCohortCompleted(startStep, endStep)` | `NoteVisualizer` — ascension animation |
 
 **Receives:**
 - `OnCollectableCollected(note, step)` — auto-deposit path; writes note to loop grid
 - `CommitManualReleasedNote(note, step)` — manual release path from `Vehicle`
-- `SpawnCollectableBurst(noteSet)` — called by `MineNode` on depletion; spawns collectable swarm
+- `SpawnCollectableBurst(noteSet)` — called by `MineNode` (or `InstantFillAllBins()` by `SuperNode`) on depletion; spawns collectable swarm
 
 **Calls out:**
 - `NoteVisualizer.RegisterCollectedMarker(track, step)` — lights marker
@@ -121,44 +142,62 @@ Per-role MIDI loop state. The **bin** is the expansion unit — each bin adds on
 
 | Asset | Purpose |
 |-------|---------|
-| `MotifProfile` | Phase identity: BPM, drum clip pools, `nodesPerStar`, per-role note configs, chord progression ref, `PhaseStarBehaviorProfile` |
+| `MotifProfile` | Phase identity: BPM, drum clip pools, `nodesPerStar`, per-role note configs, chord progression ref, `alternateChordProgressionProfile` (gates SuperNode) |
 | `RoleMotifNoteSetConfig` | Per-role generation rules: weighted scales, melodic patterns, rhythms, chord function palette, optional riff override |
 | `ChordProgressionProfile` | Ordered chord sequence; `NoteSetFactory` shifts note pitches to each chord's root |
-| `MusicalRoleProfile` | Role constants: dust colors (base + shadow), energy units, carve/drain resistance, mine node speed + agility, ripeness duration, per-role regrowth delay override (`regrowthDelay`, vehicle carves only) |
-| `MazePatternConfig` | Maze wall pattern + `dustTiming`: base regrow delay plus per-source overrides (vehicle plow, collectable arrival/plow, jail, supernode, zap, star-drain release) keyed by `DustClearSource` |
+| `MusicalRoleProfile` | Role constants: dust colors (base + shadow), energy units (dust-cell plow HP, not a star currency), carve/drain resistance, mine node speed + agility, ripeness duration, per-role regrowth delay override (`regrowthDelay`, vehicle carves only) |
+| `MazePatternConfig` | Maze wall pattern + `dustTiming`: base regrow delay plus per-source overrides (vehicle plow, collectable arrival/plow, jail, SuperNode, zap, star-drain release) keyed by `DustClearSource` |
 | `ShipMusicalProfile` | Ship physics, fuel, plow footprint, and `regrowDelayMultipliers` — per-role scaling of regrow delay for cells this ship carves (growth agent) |
 
-`MotifProfile` → references `RoleMotifNoteSetConfig[]`, `ChordProgressionProfile`, and `MazePatternConfig` (`mazePattern`).  
-`MusicalRoleProfile` → consumed by `CosmicDustGenerator` (imprint color), `MineNode` (speed/agility), `PhaseStar` (dust affinity), `InstrumentTrackController` (SFX routing).
+`MotifProfile` → references `RoleMotifNoteSetConfig[]`, `ChordProgressionProfile`, and `MazePatternConfig` (`mazePattern`).
+`MusicalRoleProfile` → consumed by `CosmicDustGenerator` (imprint color), `MineNode`/`SuperNodeTrackNode` (speed/agility), `PhaseStar` (dust affinity), `InstrumentTrackController` (SFX routing).
 
 ---
 
 ## Gameplay Subsystem
 
+### StarPool
+`Assets/Scripts/Phase/Star/StarPool.cs`
+
+The per-motif ejection authority. One `StarPool` exists per phase (owned by `DrumTrack._starPool`); it spawns a `PhaseStar` per active role with available dust, gates how many MineNode/SuperNode ejections the motif is allowed, and decides when the harvest is done and the bridge can fire.
+
+**Owns:** `_remainingEjectionsTotal` (seeded from `MotifProfile.nodesPerStar` — a single global count across *all* roles, not per-role), `_mineNodePending` (the single in-flight-sequence gate), `_lastEjectedRole`, `_ejectedBurstWasEmpty`, per-role `_activeStars`.
+
+**Ejection budget — eject-time commitment (`StarPool.cs:150-196`):** `Tick()` lets every role with dust and an empty star slot spawn a star; there is no spawn-time budget check. The budget is spent only when a star actually ejects: `CanStarCommitEjection(isSuperNode)` (`:195-196`) = `!_mineNodePending && (isSuperNode || _remainingEjectionsTotal > 0)`, wired into each spawned star so it self-checks at poke time and `FlashReject`s if denied. This deliberately serializes ejections — **one sequence in flight at a time, of any kind, across all roles** (a per-role ledger was considered and rejected as a bigger refactor; see `project_starpool_phase_system.md` memory for the full history).
+
+**`_mineNodePending` gate — 4 clear paths** (`OnStarMineNodeResolved`, `StarPool.cs:409-441`; `HandleCollectableBurstCleared`, `:446-509`):
+1. **Normal burst** — the ejected role's `OnCollectableBurstCleared(hadNotes:true)` fires → decrements `_remainingEjectionsTotal`, clears the gate, triggers `DespawnLeftoverStars()` if the budget just hit zero.
+2. **Empty-burst race** — a burst clears with `hadNotes:false` before the node resolves → sets `_ejectedBurstWasEmpty`; the later `OnStarMineNodeResolved` call clears the gate without spending a harvest.
+3. **SuperNode** — no burst ever spawns for a SuperNode outcome; `OnStarMineNodeResolved` sees `wasSuperNode` and clears the gate directly, no spend.
+4. **Expired/escaped MineNode** — `wasExpired`/`wasEscaped` clears the gate and refunds nothing spent (harvest count is untouched either way — the deduction only ever happens in path 1).
+
+**`DespawnLeftoverStars()`** (`:511-530`): once `_remainingEjectionsTotal` hits 0, explodes every remaining active/paused star so `CheckBridgeGate()` (`:562-`, requires zero live stars) can pass and `PhaseStar` can hand off to the bridge.
+
+**Listens to:** `InstrumentTrack.OnCollectableBurstCleared` (all tracks), `PhaseStar.OnMineNodeResolved` (per spawned star).
+
+---
+
 ### PhaseStar
 `Assets/Scripts/Phase/Star/PhaseStar.cs`
 
-The spawn authority for the current phase. Accumulates charge from dust interaction; decides when to eject a new node; triggers the bridge when all shards have been resolved.
+The per-role drain/eject actor spawned and gated by `StarPool`. Siphons dust from its attuned role's carved cells and, once its zap quota is met, ejects a `MineNode` or `SuperNode`.
 
-**Owns:** charge level (by role), safety bubble radius, armed/disarmed state, `_activeNode` / `_activeSuperNode` guards, `_shardsEjectedCount`, `_heldDrainCells` (cells drained since the last node spawn).
+**Owns:** attuned role, safety-bubble-free tentacle set, armed/disarmed state, `_activeNode` / `_activeSuperNode` guards, `_shardsEjectedCount`, `_heldDrainCells` (cells drained since the last node spawn).
 
-**Tentacle drain (`PhaseStarDustAffect`):** one tentacle grows per available role-carved cell, capped by the node payload — the zap budget is `RemainingZapCount` minus in-flight tentacles, so a 5-note payload with 3 carved cells grows 3 tentacles at once and adds more as cells are carved. Each drained cell goes through `CosmicDustGenerator.ZapClearCellHeld()` (no regrow while held) and is registered on the star. When the payload's zap count is met, acquisition disables and the star latches ready.
+Readiness is **zap-count-only** — there is no charge/threshold gate. `_displayedCharge01` (`PhaseStar.cs:149`) is a pure visual lerp of `ZapProgress01` (drives the diamond-fill animation); it does not gate ejection. `IsEjectionReady()` = descriptor valid + `ReadyLatched` (zap quota met), period.
+
+**Tentacle drain (`PhaseStarDustAffect`):** one tentacle grows per available role-carved cell, capped by the node payload — the zap budget is `RemainingZapCount` minus in-flight tentacles, so a 5-note payload with 3 carved cells grows 3 tentacles at once and adds more as cells are carved. Each drained cell goes through `CosmicDustGenerator.ZapClearCellHeld()` (no regrow while held) and is registered on the star; the zap is credited immediately on drain (`CreditZap()`), not deferred to full tentacle retraction. When the payload's zap count is met, acquisition disables and the star latches `ReadyLatched`.
 
 **Emits / calls out:**
-- Spawns `MineNode` via `SpawnNodeCommon()` or `SuperNode` via `SpawnSuperNodeCommon()` (SuperNode path = track fully expanded + NoteSet saturated; SuperNode is **in transition**)
+- Spawns `MineNode` via `SpawnNodeCommon()` or `SuperNode` via `SpawnSuperNodeCommon()` — gated by `ShouldSpawnSuperNodeForTrack()` (target track fully expanded + `MotifProfile.alternateChordProgressionProfile` set)
 - Hands the drained-cell batch to the spawned node (`MineNode.AttachHeldDustBatch()`); releases any unassigned batch via `CosmicDustGenerator.ReleaseHeldCells()` on destroy
-- Calls `GameFlowManager.BeginMotifBridge()` when all shards resolved + no collectables in flight
+- Calls into the bridge path once `StarPool.CheckBridgeGate()` passes (no live stars, budget spent) + no collectables in flight
 - Queries `InstrumentTrack.IsSaturatedForRepeatingNoteSet()` to decide MineNode vs SuperNode path
 
 **Listens to:**
 - `InstrumentTrack.OnCollectableBurstCleared` — sets `_awaitingCollectableClear = false`, re-evaluates bridge
-- `MineNode.OnResolved` — clears `_activeNode`; re-arms or advances to bridge
-- `SuperNode.OnResolved` — clears `_activeSuperNode` *(in transition)*
+- `MineNode.OnResolved` / `SuperNode.OnResolved` — clears `_activeNode`/`_activeSuperNode`; re-arms or advances to bridge
 - `DrumTrack.OnLoopBoundary` — evaluates bridge readiness at each boundary
-
-**Structural call-sites (transitioning systems):**
-- `SpawnSuperNodeCommon()` instantiates `SuperNode` prefab and wires `OnResolved` — SuperNode in transition
-- Bridge path calls `GameFlowManager.BeginMotifBridge()` which internally calls `motifRingGlyphApplicator.AnimateApply()` (active) and the commented-out coral block
 
 ---
 
@@ -179,9 +218,10 @@ corridor lookahead (wall avoidance)
 ```
 
 **Emits / calls out:**
-- `OnResolved` event → `PhaseStar` clears `_activeNode`
+- `OnResolved` event → `PhaseStar` clears `_activeNode`; `StarPool` reads `WasCaptured`/expiry off the resolved star
 - `ReleaseHeldDustOnce()` on resolve **and** destroy → `CosmicDustGenerator.ReleaseHeldCells()` — the star-drained cells finally regrow (gray, `starDrainReleaseDelay`)
 - `InstrumentTrack.SpawnCollectableBurst(noteSet)` on depletion
+- Self-destructs after `expireAfterLoops` boundaries (default 3) without capture, refunding the ejection slot via `StarPool`
 - `Explode` component → visual burst
 
 **Listens to:**
@@ -191,10 +231,27 @@ corridor lookahead (wall avoidance)
 
 ---
 
+### SuperNode
+`Assets/Scripts/Gameplay/Mining/SuperNode.cs`, `SuperNodeTrackNode.cs`, `SuperNodeShard.cs`, `SuperNodeSteeringMath.cs`
+
+MineNode's alternate ejection outcome — a multi-track "bonus round" instead of a single mineable shard. `PhaseStar` picks one of the two mutually exclusive paths per poke (`ShouldSpawnSuperNodeForTrack`, `PhaseStar.EjectionLogic.cs:353-386`): a SuperNode requires `MotifProfile.alternateChordProgressionProfile` to be set **and** the target track already at `maxLoopMultiplier`. Prefab naming is not obvious from the class names: the SuperNode prefab is `Assets/Prefabs/Interactable Objects/Major Discovery.prefab` (wired via `Star.prefab.superNodePrefab`), and the `SuperNodeTrackNode` prefab is `Assets/Prefabs/Interactable Objects/Ideas.prefab`.
+
+**Spawn** (`SpawnSuperNodeCommon`, `PhaseStar.EjectionLogic.cs:256-351`): instantiates the SuperNode prefab, computes `difficulty01` from harvests-so-far, builds a `shardTracks` list of every other active-role track still below `maxLoopMultiplier` (the target track is filled directly, not chased).
+
+**`SuperNode.Initialize`** spawns one `SuperNodeTrackNode` chaser per shard track in a ring around the spawn point and tracks `_pendingChaseCount`. If there are no shard tracks, it resolves synchronously in the same frame.
+
+**`SuperNodeTrackNode` movement** (`FixedUpdate`): dust-seeking wander — flees nearby vehicles, cycles burst/pause speed, raycast-scores directions favoring dust matching its `AssignedTrack.assignedRole`, wall-hugs, stall-escapes, and expires on a loop-boundary timer. On matching-role dust contact it carves the cell (`CarveCellPreserveGray`, tagged `DustClearSource.SuperNode`, gray regrow — never feeds the star). On vehicle contact, `Collect()` calls `AssignedTrack.InstantFillAllBins(toMaxCapacity:true)` and fires the completion sequence.
+
+**Resolution:** each `SuperNodeTrackNode.OnResolved` decrements `SuperNode._pendingChaseCount`; at zero, `SuperNode.OnResolved` fires and it despawns. `PhaseStar`'s subscriber mirrors the fill/advance logic for the *target* track, fires the shared `OnMineNodeResolved`, and enters the same await-collectable-clear tail MineNode uses.
+
+**Dead code note:** `SuperNodeKiteSteering.cs` (an alternate, unattached steering component superseded by the dust-seeking AI above) and its sole dependency `SuperNodeSteeringMath.SteerTowards` have been removed — zero scene/prefab/code references at time of removal.
+
+---
+
 ### Collectable
 `Assets/Scripts/Gameplay/Mining/Collectable.cs`
 
-A note-carrying orb spawned in bursts by `MineNode`. Has two lifecycle paths:
+A note-carrying orb spawned in bursts by `MineNode` (or instant-filled by `SuperNode`). Has two lifecycle paths:
 
 **Path 1 — Auto-deposit:**
 ```
@@ -250,7 +307,6 @@ Collectable trigger → EnqueuePendingCollectedNote()
 **Calls out:**
 - `NoteVisualizer.TryGetNextUnlitStepExcluding()` — finds target for ghost cue
 - `dustGenerator.SetVehicleKeepClear()` / `ChipDustByVehicle(…, profile)` — dust pocket + plow; the ship's `regrowDelayMultipliers` scale the carved cell's regrow delay per role (growth agent — a Bass-accelerator ship regrows Bass dust sooner)
-- `PhaseStar.IsPointInsideSafetyBubble()` — suppresses keep-clear carving inside bubble
 
 ---
 
@@ -270,16 +326,16 @@ Authoritative 2D grid. All spatial state lives here — cell solid/empty status,
 | `SetVehicleKeepClear()` / `ReleaseVehicleKeepClear()` | `Vehicle` |
 | `ChipDustByVehicle()` / `CarveDustByVehicle()` | `Vehicle` boost plow (passes `ShipMusicalProfile`) |
 | `PaintDustExhaust()` | `MineNodeDustInteractor` — role tint only, never clears |
-| `GrowVoidDustDiskFromGrid()` | `InstrumentTrackController` (expansion pending) |
+| `GrowVoidDustDiskFromGrid()` | `InstrumentTrackController` (expansion pending), `GameFlowManager.SpawnVehicleTraps` |
 | `CreateJailCenterForCollectable()` | `Collectable` spawn pocket |
-| `HardStopRegrowthForBridge()` | `GameFlowManager` bridge start (also flushes held cells) |
-| `BeginSlowFadeAllDust()` | `GameFlowManager` bridge fade |
-| `ResumeRegrowthAfterBridge()` | `GameFlowManager` next motif start |
-| `ApplyActiveRoles()` | `GameFlowManager` motif swap |
+| `HardStopRegrowthForBridge()` | `BridgeCoordinator` bridge start (also flushes held cells) |
+| `BeginSlowFadeAllDust()` | `BridgeCoordinator` bridge fade |
+| `ResumeRegrowthAfterBridge()` | `SceneFlowCoordinator` next motif start |
+| `ApplyActiveRoles()` | `SceneFlowCoordinator` motif swap |
 
 **Regrow delay resolution** (`ResolveRegrowDelay`, precedence high → low): explicit per-call override → carved cell's `MusicalRoleProfile.regrowthDelay` (vehicle carves only) → maze `dustTiming` per-source delay → maze base `regrowDelay` → 8s fallback. Vehicle carves then scale the result by the carving ship's per-role `regrowDelayMultipliers`. Cells flagged `ForceGrayRegrow`/`ZapForceGray` always regrow gray and uncharged — role tint (and drainable charge) is only earned by vehicle plow-carves or MineNode exhaust painting.
 
-Role imprinting: a vehicle plow-carve promotes the cell's hidden Voronoi role into the active imprint, so it regrows in its true role color with charge. Same-role cells attract nearby `MineNode` and `Collectable` movement.
+Role imprinting: a vehicle plow-carve promotes the cell's hidden Voronoi role into the active imprint, so it regrows in its true role color with charge. Same-role cells attract nearby `MineNode`/`SuperNodeTrackNode` and `Collectable` movement.
 
 ---
 
@@ -308,21 +364,47 @@ Renders the loop grid, DSP-synced playhead, manual-release ghost cue, note ascen
 
 ---
 
+### Glyph & Ring Systems
+
+**Ring glyph (live, record/vinyl metaphor):**
+`Assets/Scripts/Visualizers/MotifRingGlyphApplicator.cs` + `RingGlyphConfig.cs` (SO knobs) + `MotifRingGlyphGenerator.cs` (geometry) + `Assets/Scripts/Managers/BinRingController.cs` (drives gameplay ring spawn/deformation off the drum playhead).
+
+Each ring is a filled annulus tinted by musical role, plus a contour line that dips inward ("tug") at each note position — the applicator's own header comment describes the look as record-groove tracks. Two separate rings collections exist on the applicator: `_gameplayRings` accumulate live, one per completed bin, during play; `_recordRings` render a full completed-motif snapshot for browsing UI.
+
+There are **two distinct consumers**, and they use different methods — this is the biggest place the old documentation was wrong:
+- **Live bridge:** `BridgeCoordinator.PlayMotifBridgeAndRestart()` calls `MotifRingGlyphApplicator.SpinAndRollOffActiveRings(spinDur, rollOffDuration)` on the accumulated gameplay rings (spin 360°, tilt, scale to zero). It does **not** call `AnimateApply`/`FadeOutAndClear` — `FadeOutAndClear()` doesn't exist anywhere in the codebase.
+- **Library/browsing UI:** `Assets/Scripts/UI/PhaseLibraryCarousel.cs` and `Assets/Scripts/UI/SolarSystemRecordDisplay.cs` call `AnimateApply(MotifSnapshot)` to render a *past* completed motif (loaded via `RingSessionStore.LoadAllRingsFromDisk()`), independent of live gameplay.
+
+**Motif snapshot persistence:** `BridgeCoordinator.BuildPhaseSnapshotForBridge()` builds a `MotifSnapshot` (`Assets/Scripts/Utilities/MotifSnapshot.cs`) fresh each bridge from `InstrumentTrack.GetPersistentLoopNotes()` + per-bin fill state — it is not read from any long-lived store. `RingSessionStore.SaveRingToDisk(motifSnap)` (`Assets/Scripts/Utilities/RingSessionStore.cs`) then writes it to `Application.persistentDataPath/RingSessions/ring_{phase}_{motif}.json` for later browsing. (Older documentation referenced a `ConstellationMemoryStore.StoreSnapshot()` call — that class does not exist in the current codebase.)
+
+**2D glyph (dormant):**
+`Assets/Scripts/Visualizers/GlyphApplicator.cs` + `MotifGlyphRegistrar.cs` + `MotifGlyphGenerator.cs`. `MotifGlyphRegistrar` is attached in `Assets/Scenes/GeneratedTrack.unity` and registers the applicator with `GameFlowManager.RegisterGlyphApplicator()`, but nothing in the live bridge/gameplay flow ever calls `GlyphApplicator.Apply()` — the only caller is the editor-only `MotifGlyphPreview.cs` tool. Left in place (has live scene wiring) but effectively unused.
+
+---
+
+## Removed / Dormant Systems
+
+- **Coral** — fully removed (`MotifCoralVisualizer`, `MotifCoralAnimationController`, and related files deleted in commit `c3315424`). `GameFlowManager.SetBridgeCinematicMode()` no longer exists anywhere in the codebase. The only surviving artifact was an orphaned, unreferenced `Coral Base Segment.prefab`, since deleted. Do not treat coral as "in transition" — there's nothing left to finish.
+- **2D glyph** — see **Glyph & Ring Systems** above. Registered and scene-wired but not invoked outside the editor preview tool.
+
+---
+
 ## Cross-System Data Flows
 
 ### Flow A — Note Birth → Loop Commit
 ```
-PhaseStar ejects → MineNode spawned (NoteSet from MotifProfile via InstrumentTrack)
-  → MineNode FixedUpdate: navigates corridors, paints role exhaust on CosmicDustGenerator cells
-  → Vehicle collides with MineNode → MineNode.HandleDepleted()
-  → InstrumentTrack.SpawnCollectableBurst(noteSet) → Collectables spawn + drift
+StarPool spawns PhaseStar for role → tentacles drain role-carved dust cells (1 zap/cell)
+  → zap quota met → star ReadyLatched → vehicle pokes → PhaseStar ejects
+      [MineNode path] → MineNode navigates corridors, paints role exhaust, depletes on vehicle collision
+                          → InstrumentTrack.SpawnCollectableBurst(noteSet)
+      [SuperNode path] → target track InstantFillAllBins(); shard tracks chased via SuperNodeTrackNode
   → Vehicle trigger collides Collectable
       [auto] → BeginCarryAndDepositAtDsp() → InstrumentTrack.OnCollectableCollected()
       [manual] → Vehicle.EnqueuePendingCollectedNote()
                    → DrumTrack.OnStepChanged → TryReleaseQueuedNote()
                    → InstrumentTrack.CommitManualReleasedNote()
   → NoteVisualizer.RegisterCollectedMarker() lights step
-  → InstrumentTrack.OnCollectableBurstCleared() → PhaseStar re-arms
+  → InstrumentTrack.OnCollectableBurstCleared() → StarPool clears gate, PhaseStar re-arms
 ```
 
 ### Flow B — Bin Expansion
@@ -340,19 +422,23 @@ InstrumentTrack.IsSaturatedForRepeatingNoteSet() → true
 
 ### Flow C — Bridge / Phase Transition
 ```
-PhaseStar: all shards resolved, no collectables in flight, no active node
-  → GameFlowManager.BeginMotifBridge()
-  → CosmicDustGenerator.HardStopRegrowthForBridge() + BeginSlowFadeAllDust()
-  → motifRingGlyphApplicator.AnimateApply(snapshot)       ← active call-site
-  → [commented-out: motifGlyphApplicator.Apply()]         ← glyph, in transition
-  → [commented-out: SetBridgeCinematicMode / coral grow]  ← coral, in transition
-  → wait for boundary → motifRingGlyphApplicator.FadeOutAndClear()
-  → StartNextMotifInPhase()
-      → DrumTrack.ApplyMotif(newMotif)
-      → InstrumentTrackController full reset (clears loop notes, bin state, burst state)
-      → NoteVisualizer.BeginNewMotif_ClearAll()
-      → CosmicDustGenerator.ResumeRegrowthAfterBridge()
-  → PhaseStar re-arms for new phase
+StarPool.CheckBridgeGate() passes (budget spent, no live stars) + no collectables in flight
+  → GameFlowManager.BeginMotifBridge() (11-line dispatcher)
+  → BridgeCoordinator.PlayMotifBridgeAndRestart():
+      SessionState.SetGhostCycleInProgress(true) / SetBridgePending(true)
+      FreezeGameplayForBridge() — clears tethers, pending notes, live Collectables/MineNodes, destroys the StarPool
+      BuildPhaseSnapshotForBridge() → MotifSnapshot from InstrumentTrack.GetPersistentLoopNotes()
+      CosmicDustGenerator.HardStopRegrowthForBridge() + BeginSlowFadeAllDust()
+      RingSessionStore.SaveRingToDisk(motifSnap)          ← persistence, not ConstellationMemoryStore
+      MotifRingGlyphApplicator.SpinAndRollOffActiveRings() ← live ring exit, not AnimateApply/FadeOutAndClear
+      wait for loop boundary
+      SceneFlowCoordinator.StartNextMotifInPhase():
+          DrumTrack.ApplyMotif(newMotif)
+          InstrumentTrackController full reset (clears loop notes, bin state, burst state)
+          NoteVisualizer.BeginNewMotif_ClearAll()
+          CosmicDustGenerator.ResumeRegrowthAfterBridge()
+      SessionState.SetGhostCycleInProgress(false) / SetBridgePending(false)
+  → new StarPool spins up, PhaseStars re-arm for the new phase
 ```
 
 ### Flow D — Energy / Drum Intensity
@@ -360,7 +446,7 @@ PhaseStar: all shards resolved, no collectables in flight, no active node
 Vehicle.TurnOnBoost() → ConsumeEnergy() per frame
   → GameFlowManager accumulates burn rate → intensity level (0–4)
   → DrumTrack.ApplyMotif(intensityLevel) → swaps to intensity drum clip
-  → Vehicle energy = 0 → respawn + GameFlowManager.CheckAllPlayersOutOfEnergy()
+  → Vehicle energy = 0 → respawn + SessionStateCoordinator.CheckAllPlayersOutOfEnergy()
 ```
 
 ### Flow E — Dust Energy Economy
@@ -368,27 +454,12 @@ Vehicle.TurnOnBoost() → ConsumeEnergy() per frame
 Vehicle plow-carves dust → cell regrows in its true role color + charge
     (delay = maze dustTiming table × ship's per-role regrowDelayMultiplier)
   → PhaseStar grows one tentacle per revealed cell, capped at the node payload
-      → each drained cell: ZapClearCellHeld() — held, no regrow
+      → each drained cell: ZapClearCellHeld() — held, no regrow; zap credited immediately
   → payload zap count met → tentacles retract → star ReadyLatched
-  → MineNode ejected, holding the drained-cell batch
+  → MineNode (or SuperNode) ejected, holding the drained-cell batch
   → node captured / escaped / expired → ReleaseHeldCells()
       → cells regrow gray + uncharged (starDrainReleaseDelay)
   → gray dust must be plow-carved again to re-earn role charge
 ```
-Collectable dust removal (arrival flight + intent-window plowing) always regrows gray —
-it opens temporary corridors but never feeds the star.
-
----
-
-## Transitioning System Call-Sites
-
-SuperNode, glyph, and coral are in transition. These are the stable-system locations that reach into them:
-
-| Stable System | File | Call | Target |
-|---------------|------|------|--------|
-| `PhaseStar` | `PhaseStar.cs:1733` | `SpawnSuperNodeCommon()` → instantiates SuperNode prefab, wires `OnResolved` | SuperNode |
-| `PhaseStar` | `PhaseStar.cs:1808` | `ShouldSpawnSuperNodeForTrack()` → gate for SuperNode vs MineNode path | SuperNode |
-| `GameFlowManager` (bridge) | `GameFlowManager.BridgeOrchestration.cs:39` | `motifRingGlyphApplicator?.AnimateApply(motifSnap)` | Ring glyph (active) |
-| `GameFlowManager` (bridge) | `GameFlowManager.BridgeOrchestration.cs:110` | `motifRingGlyphApplicator.FadeOutAndClear()` | Ring glyph (active) |
-| `GameFlowManager` (bridge) | `GameFlowManager.BridgeOrchestration.cs:83–96` | `motifGlyphApplicator.Apply(motifSnap)` block | 2D glyph (commented out) |
-| `GameFlowManager` (bridge) | `GameFlowManager.BridgeOrchestration.cs:69` | `SetBridgeCinematicMode(true)` + coral grow block | Coral (commented out) |
+Collectable dust removal (arrival flight + intent-window plowing) and SuperNodeTrackNode dust-seeking always regrow gray —
+they open temporary corridors but never feed the star.
