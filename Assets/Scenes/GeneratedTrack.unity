@@ -14923,9 +14923,6 @@ GameObject:
   m_Component:
   - component: {fileID: 2009313293}
   - component: {fileID: 2009313295}
-  - component: {fileID: 2009313292}
-  - component: {fileID: 2009313290}
-  - component: {fileID: 2009313294}
   - component: {fileID: 2009313291}
   m_Layer: 0
   m_Name: Glyph Generator
@@ -14934,36 +14931,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 0
---- !u!114 &2009313290
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2009313289}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fd54378dfddb42bca7bd59f0cb24d7a1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GlyphApplicator
-  SpeciesParams:
-    BassMinLoops: 1
-    BassMaxLoops: 4
-    BassBaseRadius: 0.35
-    BassWidthBase: 0.025
-    HarmonyMinBranches: 1
-    HarmonyMaxBranches: 6
-    HarmonyBranchLen: 0.25
-    HarmonyWidthBase: 0.018
-    LeadControlPoints: 12
-    LeadAmplitude: 0.3
-    LeadWidthBase: 0.015
-    GrooveMinTicks: 3
-    GrooveMaxTicks: 16
-    GrooveTickLen: 0.08
-    GrooveWidthBase: 0.01
-    GlyphRadius: 0.45
-  LineMaterial: {fileID: 10306, guid: 0000000000000000f000000000000000, type: 0}
 --- !u!120 &2009313291
 LineRenderer:
   serializedVersion: 3
@@ -15074,18 +15041,6 @@ LineRenderer:
   m_UseWorldSpace: 1
   m_Loop: 0
   m_ApplyActiveColorSpace: 1
---- !u!114 &2009313292
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2009313289}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3fecb906a0b6b4c839e7ed7f76308562, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::MotifGlyphRegistrar
 --- !u!4 &2009313293
 Transform:
   m_ObjectHideFlags: 0
@@ -15101,60 +15056,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2009313294
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2009313289}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4938235e403c8447dac13925202c3c5d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::MotifGlyphPreview
-  Target: {fileID: 2009313290}
-  Pattern: 3
-  MotifColor: {r: 0.4, g: 0.8, b: 1, a: 1}
-  TotalSteps: 16
-  KeyRootMidi: 60
-  Bass:
-    Active: 1
-    Role: 0
-    NoteCount: 8
-    BinCount: 2
-    FilledBins: 2
-    MatchRatio: 0.7
-    Velocity: 0.6
-    TrackColor: {r: 0.3, g: 0.5, b: 1, a: 1}
-  Harmony:
-    Active: 0
-    Role: 1
-    NoteCount: 8
-    BinCount: 2
-    FilledBins: 2
-    MatchRatio: 0.7
-    Velocity: 0.6
-    TrackColor: {r: 0.3, g: 1, b: 0.5, a: 1}
-  Lead:
-    Active: 0
-    Role: 2
-    NoteCount: 8
-    BinCount: 2
-    FilledBins: 2
-    MatchRatio: 0.7
-    Velocity: 0.6
-    TrackColor: {r: 1, g: 0.8, b: 0.2, a: 1}
-  Groove:
-    Active: 0
-    Role: 3
-    NoteCount: 8
-    BinCount: 2
-    FilledBins: 2
-    MatchRatio: 0.7
-    Velocity: 0.6
-    TrackColor: {r: 1, g: 0.3, b: 0.4, a: 1}
-  LivePreview: 0
 --- !u!114 &2009313295
 MonoBehaviour:
   m_ObjectHideFlags: 0
