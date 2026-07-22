@@ -62,6 +62,7 @@ public sealed class InstrumentTrackCompositionSpawner
     private readonly Func<int> _resolveTargetBinFromController; // () => controller?.GetBinForNextSpawn(host) ?? GetNextBinForSpawn()
     private readonly Func<bool> _isExpansionPending;
     private readonly Action<Vector3> _beginGravityVoidForPendingExpandIfEligible;
+    private readonly Action _endGravityVoidForPendingExpandIfOwner;
     private readonly Action<Collectable> _assignInstrumentTrack; // c => c.assignedInstrumentTrack = this
     private readonly Action<Collectable> _applyTrackVisuals; // c => c.ApplyTrackVisuals(this)
     private readonly Action<Collectable, Vector3, Vector3, int, int, NoteSet, List<int>> _beginSpawnArrival;
@@ -90,6 +91,7 @@ public sealed class InstrumentTrackCompositionSpawner
         Func<int> resolveTargetBinFromController,
         Func<bool> isExpansionPending,
         Action<Vector3> beginGravityVoidForPendingExpandIfEligible,
+        Action endGravityVoidForPendingExpandIfOwner,
         Action<Collectable> assignInstrumentTrack,
         Action<Collectable> applyTrackVisuals,
         Action<Collectable, Vector3, Vector3, int, int, NoteSet, List<int>> beginSpawnArrival,
@@ -126,6 +128,7 @@ public sealed class InstrumentTrackCompositionSpawner
         _resolveTargetBinFromController = resolveTargetBinFromController;
         _isExpansionPending = isExpansionPending;
         _beginGravityVoidForPendingExpandIfEligible = beginGravityVoidForPendingExpandIfEligible;
+        _endGravityVoidForPendingExpandIfOwner = endGravityVoidForPendingExpandIfOwner;
         _assignInstrumentTrack = assignInstrumentTrack;
         _applyTrackVisuals = applyTrackVisuals;
         _beginSpawnArrival = beginSpawnArrival;
@@ -479,6 +482,10 @@ public sealed class InstrumentTrackCompositionSpawner
             _setCurrentBurstRemaining(0);
             _raiseBurstCleared(burstId, false);
             Debug.LogWarning($"[TRK:COMP] EMPTY track={name} burstId={burstId}");
+
+            // No notes queued means there's nothing left to wait for — end the void now
+            // rather than leaving it stranded with no future OnCompositionStepFired event.
+            _endGravityVoidForPendingExpandIfOwner?.Invoke();
             return;
         }
 
@@ -571,6 +578,12 @@ public sealed class InstrumentTrackCompositionSpawner
                 _compositionSpawnEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
                 _compositionSpawnEffect = null;
             }
+
+            // The final queued note (across any concurrently active bursts for this track)
+            // has now ejected. If this track is still the gravity void's owner, end it here
+            // rather than at expansion-commit time so the void persists through the whole
+            // burst instead of vanishing before the notes finish launching.
+            _endGravityVoidForPendingExpandIfOwner?.Invoke();
         }
     }
 
