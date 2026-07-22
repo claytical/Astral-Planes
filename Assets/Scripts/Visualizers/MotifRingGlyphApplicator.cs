@@ -73,6 +73,7 @@ public class MotifRingGlyphApplicator : MonoBehaviour
     private bool    _spinOffPending;       // spin is imminent; prevents per-deformation hide during wait
     private Vector3 _fitScale;
     private int     _pendingDeformationCount;
+    private Coroutine _gameplayHideCoroutine;
 
     private struct NoteAnimInfo
     {
@@ -156,6 +157,15 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         // Match on both binIndex AND role — multiple roles can share the same binIndex.
         int ringIdx = _gameplayRings.FindIndex(r => r.BinIndex == binIndex && r.Role == role);
         if (ringIdx < 0 || config == null) return;
+
+        // A new bin is starting to deform — cancel any leftover hide/scale-down from a
+        // previous bin so it can't shrink the stack out from under these incoming notes.
+        if (_gameplayHideCoroutine != null)
+        {
+            StopCoroutine(_gameplayHideCoroutine);
+            _gameplayHideCoroutine = null;
+        }
+
         float innerR = RingInnerRadius(ringIdx);
         float outerR = innerR + config.ringThickness;
         _pendingDeformationCount++;
@@ -236,23 +246,55 @@ public class MotifRingGlyphApplicator : MonoBehaviour
 
         _pendingDeformationCount--;
 
-        // Hide record after deformation — only when all concurrent deformations are done
-        // and we are not in spin-off or SuperNode mode.
+        // Hide the stack after deformation — only when all concurrent deformations are done
+        // and we are not in spin-off or SuperNode mode. Runs as its own coroutine so a newly
+        // started bin's deformation can cancel it outright (see BeginBinRingDeformation).
         if (!_superNodeMode && !_gameplayFadingOut && !_clearingGameplayRings && !_spinOffPending
             && _pendingDeformationCount == 0)
         {
-            float dur        = config != null ? config.scaleDownDuration : 0.5f;
-            Vector3 startScale = transform.localScale;
-            float elapsed    = 0f;
-            while (elapsed < dur && !_clearingGameplayRings && !_gameplayFadingOut)
-            {
-                elapsed += Time.deltaTime;
-                transform.localScale = Vector3.Lerp(startScale, Vector3.zero, elapsed / dur);
-                yield return null;
-            }
-            if (!_clearingGameplayRings && !_gameplayFadingOut)
-                transform.localScale = Vector3.zero;
+            _gameplayHideCoroutine = StartCoroutine(HideGameplayRingStackAfterLoopBoundary());
         }
+    }
+
+    // Waits for the drum's next full loop boundary (so the stack stays visible through the
+    // remainder of the currently-playing loop), then scales the whole ring stack to zero.
+    // Bails at any point if a new bin's deformation starts (_pendingDeformationCount > 0) or if
+    // BeginBinRingDeformation cancels this coroutine directly.
+    private IEnumerator HideGameplayRingStackAfterLoopBoundary()
+    {
+        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (drum != null)
+        {
+            bool boundaryHit = false;
+            System.Action onBoundary = () => boundaryHit = true;
+            drum.OnLoopBoundary += onBoundary;
+            while (!boundaryHit && !_superNodeMode && !_gameplayFadingOut
+                   && !_clearingGameplayRings && !_spinOffPending && _pendingDeformationCount == 0)
+                yield return null;
+            drum.OnLoopBoundary -= onBoundary;
+        }
+
+        if (_superNodeMode || _gameplayFadingOut || _clearingGameplayRings || _spinOffPending
+            || _pendingDeformationCount != 0)
+        {
+            _gameplayHideCoroutine = null;
+            yield break;
+        }
+
+        float dur          = config != null ? config.scaleDownDuration : 0.5f;
+        Vector3 startScale = transform.localScale;
+        float elapsed      = 0f;
+        while (elapsed < dur && !_clearingGameplayRings && !_gameplayFadingOut
+               && _pendingDeformationCount == 0)
+        {
+            elapsed += Time.deltaTime;
+            transform.localScale = Vector3.Lerp(startScale, Vector3.zero, elapsed / dur);
+            yield return null;
+        }
+        if (!_clearingGameplayRings && !_gameplayFadingOut && _pendingDeformationCount == 0)
+            transform.localScale = Vector3.zero;
+
+        _gameplayHideCoroutine = null;
     }
 
     /// <summary>
@@ -745,10 +787,30 @@ public class MotifRingGlyphApplicator : MonoBehaviour
         // the record stays animated during the wait (rings look live, not frozen).
         _spinOffPending = true;
 
+        // Motif completion can land anywhere in the currently-playing pass. Wait for the pass
+        // to actually finish (all bins played) before doing anything else. This has to happen
+        // here, first — not in the caller — because _spinOffPending (set above) is the only
+        // thing stopping HideGameplayRingStackAfterLoopBoundary's ordinary per-bin auto-hide
+        // from scaling the stack to zero mid-pass; a wait performed before this coroutine even
+        // starts wouldn't be covered by that guard.
+        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        if (drum != null && drum.leaderStartDspTime > 0)
+        {
+            double loopBoundaryDsp = drum.leaderStartDspTime + drum.GetLoopLengthInSeconds();
+            while (AudioSettings.dspTime < loopBoundaryDsp && !_clearingGameplayRings)
+                yield return null;
+        }
+
         // Wait for any in-flight deformations so the final ring fully deforms before spin-off.
+        // Notes only fire in sync with actual playback (WaitAndLaunchDot waits for the drum to
+        // reach each note's real trigger step), so a bin filled with notes whose steps already
+        // went by this lap can take up to one full loop pass to finish. Cap the wait at a full
+        // loop length (instead of the short spin/roll duration) so a last-instant bin always
+        // gets to deform in sync rather than being torn down mid-wait.
         if (_pendingDeformationCount > 0)
         {
-            float maxWait = spinDuration + rollDuration;
+            float maxWait = Mathf.Max(spinDuration + rollDuration,
+                drum != null ? drum.GetLoopLengthInSeconds() : 0f);
             float waited  = 0f;
             while (_pendingDeformationCount > 0 && waited < maxWait && !_clearingGameplayRings)
             {
