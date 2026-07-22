@@ -568,6 +568,11 @@ public class InstrumentTrackController : MonoBehaviour
         _gravityVoidInstance.transform.localScale = baseScale * s;
     }
 
+    // ----- Keep particle-system duration/lifetime roughly matched to how long the
+    // pending burst is expected to take, so the ring's own animation cycle doesn't
+    // visibly finish and idle while it waits for the event-driven despawn. -----
+    float estimatedSeconds = EstimateGravityVoidDurationSeconds();
+
     // ----- Tint particles without compounding alpha -----
     for (int i = 0; i < _gravityVoidParticles.Length; i++)
     {
@@ -584,8 +589,38 @@ public class InstrumentTrackController : MonoBehaviour
         outC.a = prefabA * tint.a;      // preserve prefab alpha; tint.a is your multiplier
 
         main.startColor = outC;
+
+        if (estimatedSeconds > 0f)
+        {
+            main.duration = estimatedSeconds;
+            if (main.startLifetime.mode == ParticleSystemCurveMode.Constant)
+                main.startLifetime = estimatedSeconds;
+        }
     }
 }
+
+    // Estimates seconds until the pending/in-flight burst's last note should eject, purely
+    // as a cosmetic hint for the void particle system's duration. Actual despawn timing is
+    // event-driven (see InstrumentTrackCompositionSpawner.OnCompositionStepFired), so an
+    // imprecise estimate here only affects how the ring's animation cycles, not correctness.
+    private float EstimateGravityVoidDurationSeconds()
+    {
+        if (_gravityVoidOwner == null) return 0f;
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _gfm?.activeDrumTrack;
+        if (drum == null) return 0f;
+
+        int binSize = _gravityVoidOwner.BinSize();
+        if (binSize <= 0) return 0f;
+
+        int resolvedBin = _gravityVoidOwner.PendingIntendedTargetBin ?? Mathf.Max(0, _gravityVoidOwner.loopMultiplier);
+        int finalStep = (resolvedBin + 1) * binSize;
+
+        int leaderSteps = Mathf.Max(1, drum.GetLeaderSteps());
+        float stepDurationSec = drum.EffectiveLoopLengthSec / leaderSteps;
+
+        return Mathf.Max(0f, finalStep * stepDurationSec);
+    }
 
     public void ResetControllerBinGuards()
     {

@@ -450,6 +450,8 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     
     public bool IsExpansionPending => _expansionCtrl?.IsExpansionPending ?? false;
     public string DebugExpansionState() => _expansionCtrl?.DebugPendingState() ?? "no-ctrl";
+    /// <summary>Target bin of the currently staged/pending burst, if any. Cosmetic hint for the gravity void's particle-duration estimate.</summary>
+    public int? PendingIntendedTargetBin => _expansionCtrl?.PendingIntendedTargetBin;
     public List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)> GetPersistentLoopNotes() { // Source-of-truth accessor: keep visuals + controller logic stable.
         return persistentLoopNotes;
     }
@@ -1230,6 +1232,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             if (!isByVoice && controller != null && drumTrack != null)
                 controller.BeginGravityVoidForPendingExpand(this, voidPos, drumTrack.WorldToGridPosition(voidPos));
         },
+        endGravityVoidForPendingExpandIfOwner: () => controller?.EndGravityVoidForPendingExpand(this),
         assignInstrumentTrack: c => c.assignedInstrumentTrack = this,
         applyTrackVisuals: c => c.ApplyTrackVisuals(this),
         beginSpawnArrival: (c, origin, target, note, dur, noteSet, steps) =>

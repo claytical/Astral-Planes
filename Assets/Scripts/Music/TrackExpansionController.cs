@@ -138,6 +138,10 @@ public class TrackExpansionController
     public bool IsExpansionPending =>
         PendingExpandForBurst || _pendingBurstAfterExpand.HasValue || HookedBoundaryForExpand;
 
+    /// <summary>Target bin of the currently staged/pending burst, if any. Used only as a
+    /// cosmetic hint for the gravity void's particle-duration estimate.</summary>
+    public int? PendingIntendedTargetBin => _pendingBurstAfterExpand?.intendedTargetBin;
+
     /// <summary>Read-only snapshot of the expansion-pending flags, for diagnostic logging.</summary>
     public string DebugPendingState() =>
         $"pendingExpand={PendingExpandForBurst} pendingBurst={_pendingBurstAfterExpand.HasValue} hookedBoundary={HookedBoundaryForExpand}";
@@ -336,7 +340,8 @@ public class TrackExpansionController
 
                 if (_pendingBurstAfterExpand.HasValue)
                 {
-                    _host.EndGravityVoidForPendingExpand();
+                    // Void stays alive here — a burst is about to spawn into it, and
+                    // OnCompositionStepFired ends the void once its notes finish ejecting.
                     var req = _pendingBurstAfterExpand.Value;
                     _pendingBurstAfterExpand = null;
 
@@ -351,7 +356,12 @@ public class TrackExpansionController
                             trapSearchRadiusCells: 10,
                             trapBufferCells: 1,
                             forcedTargetBin: forcedBin));
-                    
+
+                }
+                else
+                {
+                    // No burst follows — nothing left to wait for, so end it now.
+                    _host.EndGravityVoidForPendingExpand();
                 }
 
                 UnhookExpandBoundary();
@@ -377,10 +387,11 @@ public class TrackExpansionController
                 PendingExpandForBurst            = false;
                 MapIncomingCollectionsToSecondHalf = false;
                 ExpandCommitted                  = false;
-                _host.EndGravityVoidForPendingExpand();
 
                 if (_pendingBurstAfterExpand.HasValue)
                 {
+                    // Void stays alive here — a burst is about to spawn into it, and
+                    // OnCompositionStepFired ends the void once its notes finish ejecting.
                     var req = _pendingBurstAfterExpand.Value;
                     _pendingBurstAfterExpand = null;
                     OverrideNextSpawnBin = _host.PickRandomExistingBinForDensity();
@@ -396,6 +407,11 @@ public class TrackExpansionController
                             trapSearchRadiusCells: 10,
                             trapBufferCells: 1,
                             forcedTargetBin: forcedBin));
+                }
+                else
+                {
+                    // No burst follows — nothing left to wait for, so end it now.
+                    _host.EndGravityVoidForPendingExpand();
                 }
 
                 _host.RecomputeAllTrackLayouts();
@@ -420,7 +436,10 @@ public class TrackExpansionController
                 $"newBins={newBins} loopMulNow={_host.LoopMultiplier} totalStepsNow={_host.TotalSteps} " +
                 $"halfOffset={HalfOffsetAtExpand} mapSecondHalf={MapIncomingCollectionsToSecondHalf}");
 
-            _host.EndGravityVoidForPendingExpand();
+            // NOTE: the gravity void is intentionally NOT ended here. It must stay visible
+            // until the staged burst's notes have actually ejected, not just at commit —
+            // see InstrumentTrackCompositionSpawner.OnCompositionStepFired, which ends it
+            // once the last queued launch for this track has fired.
 
             // ---- D) Mark new bin ----
             _host.SetBinAllocated(_host.LoopMultiplier - 1, true);
