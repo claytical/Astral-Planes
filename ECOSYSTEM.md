@@ -1,7 +1,7 @@
 # Astral Planes — Subsystem Ecosystem
 
 Current-state reference for how the gameplay, music, backbone, and UI layers interlock.
-Coral has been fully removed; the 2D glyph path is dormant (wired but unused). Both are noted briefly rather than described in depth — see the **Glyph & Ring Systems** and **Removed / Dormant Systems** sections.
+Coral and the 2D glyph path have both been fully removed — noted briefly rather than described in depth, see the **Glyph & Ring Systems** and **Removed / Dormant Systems** sections.
 
 ---
 
@@ -377,15 +377,14 @@ There are **two distinct consumers**, and they use different methods — this is
 
 **Motif snapshot persistence:** `BridgeCoordinator.BuildPhaseSnapshotForBridge()` builds a `MotifSnapshot` (`Assets/Scripts/Utilities/MotifSnapshot.cs`) fresh each bridge from `InstrumentTrack.GetPersistentLoopNotes()` + per-bin fill state — it is not read from any long-lived store. `RingSessionStore.SaveRingToDisk(motifSnap)` (`Assets/Scripts/Utilities/RingSessionStore.cs`) then writes it to `Application.persistentDataPath/RingSessions/ring_{phase}_{motif}.json` for later browsing. (Older documentation referenced a `ConstellationMemoryStore.StoreSnapshot()` call — that class does not exist in the current codebase.)
 
-**2D glyph (dormant):**
-`Assets/Scripts/Visualizers/GlyphApplicator.cs` + `MotifGlyphRegistrar.cs` + `MotifGlyphGenerator.cs`. `MotifGlyphRegistrar` is attached in `Assets/Scenes/GeneratedTrack.unity` and registers the applicator with `GameFlowManager.RegisterGlyphApplicator()`, but nothing in the live bridge/gameplay flow ever calls `GlyphApplicator.Apply()` — the only caller is the editor-only `MotifGlyphPreview.cs` tool. Left in place (has live scene wiring) but effectively unused.
+**2D glyph — removed.** `GlyphApplicator.cs`, `MotifGlyphRegistrar.cs`, and `MotifGlyphPreview.cs` (the editor preview tool) have been deleted; `GameFlowManager`'s `motifGlyphApplicator` field and `RegisterGlyphApplicator()` method are gone with them. The three components were attached to a shared, inactive-by-default "Glyph Generator" GameObject in `GeneratedTrack.unity` alongside the live `BinRingController` — that GameObject's component list was trimmed rather than deleting the object itself, since `BinRingController` still needed it. `MotifGlyphGenerator.cs` stays: it declares `GlyphPolyline`, which the *live* `MotifRingGlyphGenerator.cs` reuses (`Generate()`/`GenerateSingleRing()` etc.) — only the parts of that file specific to the dead 2D-glyph geometry (`GlyphOutput`, `GlyphSpeciesParams`, the `MotifGlyphGenerator` static class itself) are now unreachable, left in place rather than extracting the shared type into its own file.
 
 ---
 
 ## Removed / Dormant Systems
 
 - **Coral** — fully removed (`MotifCoralVisualizer`, `MotifCoralAnimationController`, and related files deleted in commit `c3315424`). `GameFlowManager.SetBridgeCinematicMode()` no longer exists anywhere in the codebase. The only surviving artifact was an orphaned, unreferenced `Coral Base Segment.prefab`, since deleted. Do not treat coral as "in transition" — there's nothing left to finish.
-- **2D glyph** — see **Glyph & Ring Systems** above. Registered and scene-wired but not invoked outside the editor preview tool.
+- **2D glyph** — fully removed, see **Glyph & Ring Systems** above.
 
 ---
 

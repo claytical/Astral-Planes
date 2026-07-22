@@ -15,9 +15,6 @@ public partial class GameFlowManager : MonoBehaviour
     [Tooltip("If true, bridge/cinematic is pending and should gate spawns and re-arm.")]
     public bool BridgePending => SessionState?.BridgePending ?? false;
     
-    [Header("Glyph (2D Bridge Visualizer)")]
-    [SerializeField] private GlyphApplicator motifGlyphApplicator;
-
     [Header("Ring Glyph (Motif Rings)")]
     [SerializeField] private MotifRingGlyphApplicator motifRingGlyphApplicator;
     [SerializeField] private BinRingController binRingController;
@@ -74,11 +71,6 @@ public partial class GameFlowManager : MonoBehaviour
     public BridgeCoordinator BridgeFlow { get; private set; }
     public SceneFlowCoordinator SceneFlow { get; private set; }
     
-    public void RegisterGlyphApplicator(GlyphApplicator applicator)
-    {
-        motifGlyphApplicator = applicator;
-    }
-
     public void RegisterRingGlyphApplicator(MotifRingGlyphApplicator applicator)
     {
         motifRingGlyphApplicator = applicator;
