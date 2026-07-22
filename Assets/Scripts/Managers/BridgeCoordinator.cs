@@ -64,6 +64,9 @@ public sealed class BridgeCoordinator
 
         _gameFlow.GetBinRingController()?.CancelPendingDraw();
 
+        // SpinAndRollOffActiveRings waits out the rest of the current loop pass itself
+        // (guarded by _spinOffPending, which also suppresses the ordinary per-bin auto-hide
+        // for the whole wait) before it starts the visual spin/roll — see that method.
         var rings = _gameFlow.GetMotifRingGlyphApplicator();
         if (rings != null)
         {

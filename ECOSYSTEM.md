@@ -78,11 +78,19 @@ Owns scene transitions and next-motif/next-phase setup: `TransitionToScene()`, `
 ## Music Subsystem
 
 ### DrumTrack
-`Assets/Scripts/Music/DrumTrack.cs`
+`Assets/Scripts/Music/DrumTrack.cs` (+ `.MotifApplication.cs`, `.BeatIntensity.cs`, `.Transport.cs`)
+`Assets/Scripts/Music/DrumTrackGridMapper.cs` — owned grid/play-area mapping helper
 
 The single DSP time authority. Every timing-sensitive system derives loop position from it.
+A modularization pass split motif-clip scheduling, beat/energy-driven intensity, and
+DSP-clock ticking into three `partial` files that still share DrumTrack's fields directly
+(same pattern as `InstrumentTrack.Lifecycle.cs` etc.); grid/play-area world mapping and
+spawn-grid delegation (fully decoupled, no DSP-timing dependency) moved into an owned
+`DrumTrackGridMapper` instance instead, mirroring the `CosmicDustGenerator` /
+`CosmicDustCellRegistry` split. All public method signatures on `DrumTrack` are unchanged,
+so external callers are unaffected.
 
-**Owns:** BPM, step count, active `MotifProfile` clip pool, loop-boundary DSP anchors, spawn grid (world ↔ grid coordinate mapping), `MineNode` registry, `_starPool` reference, current bin count.
+**Owns:** BPM, step count, active `MotifProfile` clip pool, loop-boundary DSP anchors, spawn grid (world ↔ grid coordinate mapping, via `DrumTrackGridMapper`), `MineNode` registry, `_starPool` reference, current bin count.
 
 **Emits:**
 | Event | Consumers |
