@@ -10,7 +10,7 @@ public partial class CosmicDustGenerator
 
         SetDustCollision(dust, false);
         Vector2Int gp = default;
-        bool have = _goToCell.TryGetValue(dust.gameObject, out gp);
+        bool have = _registry.GoToCell.TryGetValue(dust.gameObject, out gp);
         if (!have && drums != null)
         {
             gp = drums.WorldToGridPosition(dust.transform.position);
@@ -58,7 +58,7 @@ public partial class CosmicDustGenerator
 
         _gridState.CellGo[gp.x, gp.y] = go;
         _gridState.CellDust[gp.x, gp.y] = dust;
-        _goToCell[go] = gp;
+        _registry.GoToCell[go] = gp;
         SetCellState(gp, DustCellState.Empty);
 
         return go;
@@ -107,14 +107,14 @@ public partial class CosmicDustGenerator
     private void FinalizeVehicleCarve(Vector2Int cell, float fadeSeconds, ShipMusicalProfile shipProfile = null)
     {
         _plowSuppressedColliders.Remove(cell);
-        _imprints ??= new Dictionary<Vector2Int, DustImprint>();
-        if (!RestoreVoronoiImprint(cell))
-            PromoteHiddenRole(cell);
+        _imprints.EnsureAllocated();
+        if (!_imprints.RestoreVoronoiImprint(cell))
+            _imprints.PromoteHiddenRole(cell);
 
         SetCellFlag(cell, CellFlags.PlayerCarved);
 
         bool wasVoidCell = ClearCellFlag(cell, CellFlags.VoidGrow);
-        if (wasVoidCell) _imprints?.Remove(cell);
+        if (wasVoidCell) _imprints.Remove(cell);
 
         // The carving ship is a growth agent: its per-role multiplier scales the resolved
         // delay, so a Bass-accelerator ship makes Bass dust regrow sooner. Resolved after
@@ -252,47 +252,8 @@ public partial class CosmicDustGenerator
         _regrow?.RequestRegrowCellAt(gridPos, delay, refreshIfPending);
     }
 
-    public void SetStarKeepClear(Vector2Int centerCell, int radiusCells, bool forceRemoveExisting)
-    {
-        if (drums == null) return;
-
-        int w = drums.GetSpawnGridWidth();
-        int h = drums.GetSpawnGridHeight();
-        if (w <= 0 || h <= 0) return;
-
-        radiusCells = Mathf.Max(0, radiusCells);
-
-        var next = new HashSet<Vector2Int>();
-        FillDisk(next, centerCell, radiusCells, w, h);
-
-        _exclusions.UpdateStarPocket(next, _tmpReleased, _tmpClaimed);
-
-        const string claimOwner = "PhaseStarPocket";
-        if (dustClaims != null)
-        {
-            for (int i = 0; i < _tmpReleased.Count; i++)
-                dustClaims.ReleaseCell(claimOwner, _tmpReleased[i], DustClaimType.KeepClear);
-
-            for (int i = 0; i < _tmpClaimed.Count; i++)
-                dustClaims.ClaimCell(claimOwner, _tmpClaimed[i], DustClaimType.KeepClear, seconds: -1f, refresh: true);
-        }
-
-        for (int i = 0; i < _tmpReleased.Count; i++)
-        {
-            var cell = _tmpReleased[i];
-            RequestRegrowCellAt(cell, delaySeconds: -1f, refreshIfPending: true, clearImprintOnRefresh: false);
-        }
-
-        if (forceRemoveExisting)
-        {
-            for (int i = 0; i < _tmpClaimed.Count; i++)
-            {
-                var cell = _tmpClaimed[i];
-                if (TryGetCellGo(cell, out var go) && go != null)
-                    ClearCell(cell, DustClearMode.FadeAndHide, fadeSeconds: 2f, scheduleRegrow: false);
-            }
-        }
-    }
+    public void SetStarKeepClear(Vector2Int centerCell, int radiusCells, bool forceRemoveExisting) =>
+        _vehicleReservation.SetStarKeepClear(centerCell, radiusCells, forceRemoveExisting);
 
     private void CarvePermanentDisk(Vector2Int center, int radiusCells)
     {

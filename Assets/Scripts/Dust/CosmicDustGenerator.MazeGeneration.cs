@@ -70,7 +70,7 @@ public partial class CosmicDustGenerator
         if (cells == null || cells.Count == 0) return;
         if (drums == null) return;
 
-        _imprints ??= new Dictionary<Vector2Int, DustImprint>(cells.Count * 2);
+        _imprints.EnsureAllocated(cells.Count * 2);
 
         IReadOnlyList<MusicalRole> roles = (_activeRoles != null && _activeRoles.Count > 0)
             ? _activeRoles
@@ -106,7 +106,7 @@ public partial class CosmicDustGenerator
         {
             MusicalRole onlyRole = rolesList[0];
             for (int i = 0; i < occupied.Count; i++)
-                SetHiddenRole(occupied[i], onlyRole);
+                _imprints.SetHiddenRole(occupied[i], onlyRole);
 
             if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden single role={onlyRole}");
             return;
@@ -143,69 +143,6 @@ public partial class CosmicDustGenerator
         return occupied;
     }
 
-    private static (Vector2Int[] seedCells, MusicalRole[] seedRoles, int actualSeedCount) SelectRoleSeeds(
-        List<Vector2Int> occupied,
-        List<MusicalRole> rolesList,
-        Vector2Int starCell)
-    {
-        int seedCount = Mathf.Min(rolesList.Count, occupied.Count);
-        var seedCells = new Vector2Int[seedCount];
-        var seedRoles = new MusicalRole[seedCount];
-        if (seedCount <= 0) return (seedCells, seedRoles, 0);
-
-        int firstSeedIdx = 0;
-        float bestStarDist = float.MinValue;
-        for (int i = 0; i < occupied.Count; i++)
-        {
-            float d = (occupied[i] - starCell).sqrMagnitude;
-            if (d > bestStarDist)
-            {
-                bestStarDist = d;
-                firstSeedIdx = i;
-            }
-        }
-
-        seedCells[0] = occupied[firstSeedIdx];
-        seedRoles[0] = rolesList[0];
-
-        var chosen = new HashSet<Vector2Int> { seedCells[0] };
-
-        for (int s = 1; s < seedCount; s++)
-        {
-            int bestIdx = -1;
-            float bestMinDist = float.MinValue;
-
-            for (int i = 0; i < occupied.Count; i++)
-            {
-                Vector2Int candidate = occupied[i];
-                if (chosen.Contains(candidate)) continue;
-
-                float minDistToChosen = float.MaxValue;
-                for (int c = 0; c < s; c++)
-                {
-                    float d = (candidate - seedCells[c]).sqrMagnitude;
-                    if (d < minDistToChosen)
-                        minDistToChosen = d;
-                }
-
-                if (minDistToChosen > bestMinDist)
-                {
-                    bestMinDist = minDistToChosen;
-                    bestIdx = i;
-                }
-            }
-
-            if (bestIdx < 0)
-                break;
-
-            seedCells[s] = occupied[bestIdx];
-            seedRoles[s] = rolesList[s];
-            chosen.Add(seedCells[s]);
-        }
-
-        return (seedCells, seedRoles, chosen.Count);
-    }
-
     private void AssignHiddenImprintsByNearestSeed(
         List<Vector2Int> occupied,
         Vector2Int[] seedCells,
@@ -229,7 +166,7 @@ public partial class CosmicDustGenerator
                 }
             }
 
-            SetHiddenRole(gp, seedRoles[bestSeed]);
+            _imprints.SetHiddenRole(gp, seedRoles[bestSeed]);
         }
     }
 
@@ -435,7 +372,7 @@ public partial class CosmicDustGenerator
                         if (d < bestOtherDist) { bestOtherDist = d; bestOtherSeed = s; }
                     }
                     if (bestOtherSeed >= 0)
-                        SetHiddenRole(gp, seedRoles[bestOtherSeed]);
+                        _imprints.SetHiddenRole(gp, seedRoles[bestOtherSeed]);
                 }
             }
             else if (feature == MazeGeoFeature.Glade)
@@ -468,7 +405,7 @@ public partial class CosmicDustGenerator
                     for (int i = 0; i < territory.Count; i++)
                     {
                         if ((territory[i] - center).sqrMagnitude <= gladeRadiusSq)
-                            SetHiddenRole(territory[i], softRole);
+                            _imprints.SetHiddenRole(territory[i], softRole);
                     }
                 }
             }
@@ -580,7 +517,6 @@ public partial class CosmicDustGenerator
                 CarvePermanentDisk(vehCell, vehicleHoleRadiusCells);
         }
         _targetSolidCount = TotalSolidCount();
-        OnMazeReady?.Invoke(starCell);
         _isBootstrappingMaze = false;
     }
 
