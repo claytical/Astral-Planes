@@ -30,6 +30,12 @@ public class MineNode : MonoBehaviour
     [Tooltip("How strongly fleeing node steers toward its sought border gap.")]
     [SerializeField, Range(0f, 1f)] private float fleeTowardBoundaryWeight = 0.45f;
 
+    [Header("Hit Stun")]
+    [Tooltip("Seconds after any Vehicle hit during which the node dashes away from the vehicle instead of seeking an exit.")]
+    [SerializeField, Min(0f)] private float hitStunDuration = 0.8f;
+    [Tooltip("Speed multiplier applied while dashing away during the stun window.")]
+    [SerializeField, Min(1f)] private float hitStunSpeedMultiplier = 1.6f;
+
     [Header("NoteSet-Driven Motion")]
     [SerializeField] private bool driveCarvingMotionFromNoteSet = true;
 
@@ -118,6 +124,9 @@ public class MineNode : MonoBehaviour
     private float _burstPauseTimer;
     private bool  _burstPauseSnapPending;
     private float _burstPauseSnapAt;
+
+    // Hit stun: dash-away heading lock after a Vehicle collision, before exit-seeking resumes.
+    private float _stunTimer;
 
     // Fleeing: sought border gap (side columns only — top/bottom are never escape walls)
     private bool       _hasFleeGap;
@@ -418,35 +427,45 @@ public class MineNode : MonoBehaviour
         int currentNote = _noteSet.GetNoteForPhaseAndRole(_track, stepNow);
         float speed01   = Mathf.InverseLerp(_track.lowestAllowedNote, _track.highestAllowedNote, currentNote);
 
-        ApplyLocomotion(speed01, 1f);
-
-        // Seek the nearest reachable side-wall gap and steer toward it. Escape is
-        // only ever through a dust-free perimeter cell on the LEFT or RIGHT column.
-        UpdateFleeGapTarget(myCell);
-
         bool gapOnNearSide = false;
-        if (_hasFleeGap)
+        if (_stunTimer > 0f)
         {
-            Vector2 waypoint = _drumTrack.GridToWorldPosition(_fleeWaypointCell);
-            Vector2 toGap    = waypoint - _rb.position;
-            if (toGap.sqrMagnitude > 0.0001f)
-            {
-                float gapBias = Mathf.Lerp(fleeTowardBoundaryWeight * 0.25f, fleeTowardBoundaryWeight, _decisionArchetype.fleeBias);
-                // At the doorway, override corridor lookahead so it can't turn the node away.
-                int cellDist = Mathf.Abs(myCell.x - _fleeGapCell.x) + Mathf.Abs(myCell.y - _fleeGapCell.y);
-                if (cellDist < 3) gapBias = Mathf.Max(gapBias, 0.9f);
-                _carveDir = Vector2.Lerp(_carveDir, toGap.normalized, gapBias).normalized;
-            }
+            // Stunned: dash away on the heading locked at hit-time. No exit-seeking —
+            // gapOnNearSide stays false, so the boundary clamp below stays fully closed.
+            _stunTimer -= Time.fixedDeltaTime;
+            ApplyLocomotion(speed01, hitStunSpeedMultiplier);
+        }
+        else
+        {
+            ApplyLocomotion(speed01, 1f);
 
-            // Open the X clamp only when the node is at its gap: gap wall is the node's
-            // near wall, node is within one row of the gap, and the perimeter cell in the
-            // node's own row is authoritative — dust there = wall, no exit.
-            int w = Mathf.Max(1, _drumTrack.GetSpawnGridWidth());
-            int edgeX = _fleeGapCell.x > 0 ? w - 1 : 0;
-            bool gapWallIsNear = (_fleeGapCell.x == 0) == (myCell.x <= (w - 1) / 2);
-            gapOnNearSide = gapWallIsNear
-                         && Mathf.Abs(myCell.y - _fleeGapCell.y) <= 1
-                         && !_drumTrack.HasDustAt(new Vector2Int(edgeX, myCell.y));
+            // Seek the nearest reachable side-wall gap and steer toward it. Escape is
+            // only ever through a dust-free perimeter cell on the LEFT or RIGHT column.
+            UpdateFleeGapTarget(myCell);
+
+            if (_hasFleeGap)
+            {
+                Vector2 waypoint = _drumTrack.GridToWorldPosition(_fleeWaypointCell);
+                Vector2 toGap    = waypoint - _rb.position;
+                if (toGap.sqrMagnitude > 0.0001f)
+                {
+                    float gapBias = Mathf.Lerp(fleeTowardBoundaryWeight * 0.25f, fleeTowardBoundaryWeight, _decisionArchetype.fleeBias);
+                    // At the doorway, override corridor lookahead so it can't turn the node away.
+                    int cellDist = Mathf.Abs(myCell.x - _fleeGapCell.x) + Mathf.Abs(myCell.y - _fleeGapCell.y);
+                    if (cellDist < 3) gapBias = Mathf.Max(gapBias, 0.9f);
+                    _carveDir = Vector2.Lerp(_carveDir, toGap.normalized, gapBias).normalized;
+                }
+
+                // Open the X clamp only when the node is at its gap: gap wall is the node's
+                // near wall, node is within one row of the gap, and the perimeter cell in the
+                // node's own row is authoritative — dust there = wall, no exit.
+                int w = Mathf.Max(1, _drumTrack.GetSpawnGridWidth());
+                int edgeX = _fleeGapCell.x > 0 ? w - 1 : 0;
+                bool gapWallIsNear = (_fleeGapCell.x == 0) == (myCell.x <= (w - 1) / 2);
+                gapOnNearSide = gapWallIsNear
+                             && Mathf.Abs(myCell.y - _fleeGapCell.y) <= 1
+                             && !_drumTrack.HasDustAt(new Vector2Int(edgeX, myCell.y));
+            }
         }
 
         RunStallEscape(myCell);
@@ -1182,6 +1201,16 @@ public class MineNode : MonoBehaviour
         if (!coll.gameObject.TryGetComponent<Vehicle>(out var vehicle)) return;
 
         TryPlayPreviewNote();
+
+        Vector2 awayDir = (Vector2)transform.position - (Vector2)vehicle.transform.position;
+        if (awayDir.sqrMagnitude < 0.0001f) awayDir = _carveDir;
+        _carveDir = awayDir.normalized;
+
+        _loopsSinceSpawn = 0;
+        _stunTimer = hitStunDuration;
+        // Lock RunCorridorLookahead's commit window so it doesn't immediately overwrite the dash heading.
+        _nextDirectionDecisionAt = Time.time + hitStunDuration;
+        _pathCommitUntil        = Time.time + hitStunDuration;
 
         _strength -= vehicle.GetForceAsDamage();
         _strength  = Mathf.Max(0, _strength);
