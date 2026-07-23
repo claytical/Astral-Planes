@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -201,5 +202,113 @@ public partial class InstrumentTrack
             shifted = Mathf.Clamp(shifted, low, high);
 
         return shifted;
+    }
+
+    /// <summary>
+    /// Per-bin retune: snaps each note to the nearest tone in its bin's assigned chord
+    /// in the current HarmonyDirector progression. Use this instead of RetuneLoopToChord(chord0)
+    /// when a profile change should respect the full chord progression across bins.
+    /// </summary>
+    public void RetuneLoopToCurrentProgression(bool forceHarmonyDirector = false)
+    {
+        if (persistentLoopNotes == null || persistentLoopNotes.Count == 0) return;
+
+        var modified = new List<(int step, int note, int dur, float vel, int authoredRoot)>(persistentLoopNotes.Count);
+        foreach (var (step, note, dur, vel, authoredRoot) in persistentLoopNotes)
+        {
+            int bin = BinIndexForStep(step);
+
+            // When a new ChordProgressionProfile is being committed (forceHarmonyDirector=true),
+            // skip the NoteSet's chordRegion — it was baked from the OLD progression and would
+            // override the new one. Always read directly from HarmonyDirector in that case.
+            var ns = GetNoteSetForBin(bin);
+            var region = (!forceHarmonyDirector) ? ns?.chordRegion : null;
+            Chord chord;
+            Chord baseChord = default;
+            if (region != null && region.Count > 0)
+            {
+                chord    = region[bin % region.Count];
+                baseChord = region[0];
+            }
+            else
+            {
+                int chordIdx = Harmony_GetChordIndexForBin(bin);
+                if (_gfm == null) _gfm = GameFlowManager.Instance;
+                var hd = _gfm?.harmony;
+                if (chordIdx < 0 || hd == null || !hd.TryGetChordAt(chordIdx, out chord))
+                {
+                    modified.Add((step, note, dur, vel, authoredRoot));
+                    continue;
+                }
+                if (!hd.TryGetChordAt(0, out baseChord)) baseChord = chord;
+            }
+
+            if (step % BinSize() == 0)
+            {
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[CHORD][TRK][Retune] track={name} step={step} bin={bin} chordRoot={chord.rootNote} intervals={(chord.intervals != null ? chord.intervals.Count : 0)} noteIn={note}");
+            }
+
+            var allowed = BuildChordTones(chord, lowestAllowedNote, highestAllowedNote);
+            if (allowed.Count == 0) { modified.Add((step, note, dur, vel, authoredRoot)); continue; }
+            allowed.Sort();
+
+            int rootDelta = (authoredRoot != int.MinValue) ? chord.rootNote - authoredRoot : chord.rootNote - baseChord.rootNote;
+            // Exact-register transposition: always apply the root delta. A pitch-class
+            // match with the target chord must not skip it — that discards the octave
+            // encoded in the progression. Octave-fit only if the result is unplayable.
+            int shifted = ShiftByOctavesIntoTrackRange(note + rootDelta);
+            int retuned = ShiftByOctavesIntoTrackRange(SnapToNearestChordTone(shifted, allowed));
+            modified.Add((step, retuned, dur, vel, authoredRoot));
+        }
+
+        RebuildLoopFromModifiedNotes(modified, transform.position);
+
+        // Force immediate cache rebuild so the scheduler uses retuned pitches from this
+        // frame onward. Without this a script-execution-order race between DrumTrack.Update
+        // (which fires OnLoopBoundary / retune) and InstrumentTrack.Update (which rebuilds
+        // via boundarySerial) can cause the first steps of the new loop to play old pitches.
+        RebuildLoopCache_FORCE();
+        _loopCacheDirtyPending = false;
+    }
+
+    private void RebuildLoopFromModifiedNotes(List<(int, int, int, float, int)> modified, Vector3 _)
+    {
+        Debug.LogWarning(
+            $"[TRK:CLEAR_LOOP] track={name} fn=RebuildLoopFromModifiedNotes " +
+            $"modified={(modified != null ? modified.Count : -1)} " +
+            $"persistentBefore={(persistentLoopNotes != null ? persistentLoopNotes.Count : -1)}\n" +
+            Environment.StackTrace);
+
+        // Preserve original commit times — chord retuning changes pitch but not when the
+        // player collected the note. Restoring these keeps CommitTime01 non-zero in the
+        // ring glyph so squiggles are visible after a chord change.
+        var savedCommitTimes = new Dictionary<int, float>(_noteCommitTimes);
+
+        persistentLoopNotes.Clear();
+        _noteCommitTimes.Clear();
+        _loopCacheDirtyPending = true;
+        // Keep existing marker GameObjects alive — chord retune never changes step positions,
+        // only pitches. ForceSyncMarkersToPersistentLoop at the end will reposition/reconcile.
+        // Destroying here caused a deferred-destroy timing bug: markers appeared alive during
+        // the sync but were deleted end-of-frame, leaving the track visually empty.
+        _spawnedNotes.Clear();
+
+        if (modified != null)
+        {
+            foreach (var (step, note, dur, vel, authoredRoot) in modified)
+            {
+                // skipChordQuantize=true: notes in `modified` are already at their final pitch;
+                // re-quantizing here would double-process them and produce wrong results.
+                AddNoteToLoop(step, note, dur, vel, true, authoredRoot, skipChordQuantize: true);
+                if (savedCommitTimes.TryGetValue(step, out float originalTime))
+                    _noteCommitTimes[step] = originalTime;
+            }
+        }
+
+        // AddNoteToLoop above tries to update noteMarkers by key lookup, but those GameObjects
+        // were just destroyed by the _spawnedNotes loop above. Dead Transform entries remain in
+        // noteMarkers, so AddNoteToLoop finds them but skips creation (t != null fails).
+        // ForceSyncMarkersToPersistentLoop purges dead entries and re-creates any missing markers.
+        controller?.noteVisualizer?.ForceSyncMarkersToPersistentLoop(this);
     }
 }

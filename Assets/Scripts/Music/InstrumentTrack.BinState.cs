@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -191,5 +192,110 @@ public partial class InstrumentTrack
             : drumTrack.startDspTime;
         float elapsed = Mathf.Max(0f, (float)(AudioSettings.dspTime - anchor));
         return elapsed % L;
+    }
+
+    private float RemainingActiveWindowSec() {
+        float my = BaseLoopSeconds() * MyMultiplier();
+        float L  = LeaderLengthSec();
+        if (L <= 0f) return float.MaxValue;
+        float tin = TimeInLeader();
+        return Mathf.Max(0f, my - tin);
+    }
+
+    public int GetHighestAllocatedBin()
+    {
+        if (binAllocated == null) return -1;
+
+        // IMPORTANT: allocation is a stable frontier; do NOT clamp by loopMultiplier.
+        for (int i = binAllocated.Length - 1; i >= 0; i--)
+            if (binAllocated[i]) return i;
+
+        return -1;
+    }
+    public int GetHighestFilledBin()
+    {
+        EnsureBinList();
+
+        // IMPORTANT: filled is a content frontier; do NOT clamp by loopMultiplier either.
+        // (You can choose to clamp for "audible span" decisions elsewhere, but not for frontier detection.)
+        for (int i = _binFilled.Count - 1; i >= 0; i--)
+            if (_binFilled[i]) return i;
+
+        return -1;
+    }
+    public bool IsBinFilled(int binIndex)
+    {
+        EnsureBinList();
+
+        return binIndex >= 0
+               && binIndex < _binFilled.Count
+               && _binFilled[binIndex];
+    }
+    /// <summary>
+    /// Returns the Time.time value at which the given bin was marked filled,
+    /// or -1 if the bin has not been filled yet.
+    /// </summary>
+    public float GetBinCompletionTime(int binIndex)
+    {
+        if (_binCompletionTime == null || binIndex < 0 || binIndex >= _binCompletionTime.Length)
+            return -1f;
+        return _binCompletionTime[binIndex];
+    }
+    public void ResetBinsForPhase()
+    {
+        // Hard reset of bin span + allocation for a clean new phase/motif.
+        int want = Mathf.Max(1, maxLoopMultiplier);
+
+        _binFilled = Enumerable.Repeat(false, want).ToList();
+        _binCompletionTime = Enumerable.Repeat(-1f, want).ToArray();
+
+        // Allocation drives span (EffectiveLoopBins). Ensure we clear it too.
+        binAllocated = new bool[want];
+
+        // Harmony bookkeeping per-bin should restart clean.
+        InitializeBinChords(want);
+
+        ResetBinCursor();
+        loopMultiplier = 1;                    // tracks don't pre-expand; width grows on demand
+        _totalSteps    = BinSize() * loopMultiplier;
+    }
+    public void ResetBinStateForNewPhase()
+    {
+        // Cursor-mode
+        SetBinCursor(0);
+
+        // Loop span: force a single bin wide loop (no hidden carryover)
+        loopMultiplier = 1;
+
+        _binFilled.Clear();
+
+        _expansionCtrl?.ResetForNewPhase();
+
+    }
+    /// <summary>
+    /// Single hard reset entry point for motif boundaries.
+    /// Clears loop content, bin allocation, burst state, and expansion/mapping flags.
+    /// Intended to be called exactly once by the motif authority (e.g., GameFlowManager).
+    /// </summary>
+    public void BeginNewMotifHardClear(string reason = "BeginNewMotif")
+    {
+        _binNoteSets = null;
+        Debug.LogWarning(
+            $"[TRK:CLEAR_LOOP] track={name} fn=BeginNewMotifHardClear reason={reason} " +
+            $"persistentCount={(persistentLoopNotes != null ? persistentLoopNotes.Count : -1)} " +
+            $"spawnedNotesCount={(_spawnedNotes != null ? _spawnedNotes.Count : -1)} " +
+            $"burstRemainingCount={_bursts?.Count ?? -1}\n" +
+            Environment.StackTrace);
+
+        persistentLoopNotes?.Clear();
+        _loopCacheDirtyPending = true;
+
+        _loopNotes?.Clear();
+        _spawnedNotes?.Clear();
+
+        _bursts?.Clear();
+
+        ResetBinStateForNewPhase();
+        ResetBinsForPhase();
     }
 }
