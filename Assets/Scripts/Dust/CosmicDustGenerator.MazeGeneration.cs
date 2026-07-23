@@ -7,6 +7,74 @@ using Random = UnityEngine.Random;
 
 public partial class CosmicDustGenerator
 {
+    private List<MazeRoleGeoConfig> _roleGeoConfigs;
+    private MazePatternType _activePatternType = MazePatternType.FullFill;
+
+    public void ApplyMotifGeoConfig(MotifProfile motif)
+    {
+        _roleGeoConfigs = motif?.roleGeoConfigs != null && motif.roleGeoConfigs.Count > 0
+            ? new List<MazeRoleGeoConfig>(motif.roleGeoConfigs)
+            : null;
+        _activePatternType = motif?.mazePattern?.patternType ?? MazePatternType.FullFill;
+    }
+
+    private bool TryGetGeoConfig(MusicalRole role, out MazeRoleGeoConfig config)
+    {
+        config = null;
+        if (_roleGeoConfigs == null) return false;
+        for (int i = 0; i < _roleGeoConfigs.Count; i++)
+            if (_roleGeoConfigs[i].role == role) { config = _roleGeoConfigs[i]; return true; }
+        return false;
+    }
+
+    private MazeGeoFeature ResolveGeoFeature(MusicalRole role, int roleIndex)
+    {
+        if (TryGetGeoConfig(role, out var cfg)) return cfg.feature;
+
+        return _activePatternType switch
+        {
+            MazePatternType.RingChokepoints => MazeGeoFeature.Rings,
+            MazePatternType.DrunkenStrokes  => MazeGeoFeature.Archipelago,
+            MazePatternType.DiagonalLanes   => MazeGeoFeature.Archipelago,
+            MazePatternType.ClearBoxes      => roleIndex == 0 ? MazeGeoFeature.Glade : MazeGeoFeature.Continent,
+            MazePatternType.Tunnels         => roleIndex == 0 ? MazeGeoFeature.Ridge : MazeGeoFeature.Continent,
+            _                               => MazeGeoFeature.Continent,
+        };
+    }
+
+    private MazeRoleGeoConfig ResolveGeoConfig(MusicalRole role)
+    {
+        TryGetGeoConfig(role, out var cfg);
+        return cfg;
+    }
+
+    private void ClearMaze()
+    {
+        try
+        {
+            for (int x = 0; x < _gridState.Width; x++)
+            {
+                for (int y = 0; y < _gridState.Height; y++)
+                {
+                    var gp = new Vector2Int(x, y);
+                    if (TryGetCellGo(gp, out var go) && go != null)
+                        RemoveActiveAt(gp, go);
+                }
+            }
+            _permanentClearCells.Clear();
+            _heldRegrowCells.Clear();
+        }
+        finally
+        {
+        }
+        _imprints?.Clear();
+        _registry.ClearAllFlags();
+        _gridState.AllSolidCount    = 0;
+        _targetSolidCount = -1;
+        _gridState.RegrowingCount   = 0;
+        _mazePatternCells = null;
+    }
+
     private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthFromConfig(
         MazePatternConfig config,
         Vector2Int starCell,
@@ -72,8 +140,8 @@ public partial class CosmicDustGenerator
 
         _imprints.EnsureAllocated(cells.Count * 2);
 
-        IReadOnlyList<MusicalRole> roles = (_activeRoles != null && _activeRoles.Count > 0)
-            ? _activeRoles
+        IReadOnlyList<MusicalRole> roles = (_roleDensity.ActiveRoles != null && _roleDensity.ActiveRoles.Count > 0)
+            ? _roleDensity.ActiveRoles
             : new List<MusicalRole>
             {
                 MusicalRole.Bass,
@@ -516,7 +584,7 @@ public partial class CosmicDustGenerator
             foreach (var vehCell in vehicleCells)
                 CarvePermanentDisk(vehCell, vehicleHoleRadiusCells);
         }
-        _targetSolidCount = TotalSolidCount();
+        _targetSolidCount = _roleDensity.TotalSolidCount();
         _isBootstrappingMaze = false;
     }
 
