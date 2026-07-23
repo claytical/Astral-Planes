@@ -233,9 +233,9 @@ public partial class GameFlowManager : MonoBehaviour
 
         yield return new WaitForSeconds(2f);
 
-        yield return StartCoroutine(SceneFlow.FadeScreenToBlack());
+        yield return StartCoroutine(SceneFlow.FadeScreen(toBlack: true));
         yield return TransitionToScene("TrackFinished");
-        yield return StartCoroutine(SceneFlow.FadeScreenFromBlack());
+        yield return StartCoroutine(SceneFlow.FadeScreen(toBlack: false));
     }
     
     /// <summary>
@@ -359,6 +359,8 @@ public partial class GameFlowManager : MonoBehaviour
     public float GetMotifBridgeHoldSeconds() => motifBridgeHoldSeconds;
     public MotifRingGlyphApplicator GetMotifRingGlyphApplicator() => motifRingGlyphApplicator;
     public float GetVehiclePhaseInDelaySeconds() => vehiclePhaseInDelaySeconds;
+    public DrumTrack ResolveDrumTrack() =>
+        activeDrumTrack != null ? activeDrumTrack : (activeDrumTrack = FindAnyObjectByType<DrumTrack>());
     public static Color QuantizeToColor32(Color c)
     {
         Color32 cc = (Color32)c;

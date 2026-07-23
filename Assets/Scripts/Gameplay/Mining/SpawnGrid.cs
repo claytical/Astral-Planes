@@ -26,10 +26,7 @@ using System.Collections.Generic;
         {
             // Prefer the active drum track from the GameFlowManager
             if (_gfm == null) _gfm = GameFlowManager.Instance;
-            if (_gfm != null && _gfm.activeDrumTrack != null)
-                _drums = _gfm.activeDrumTrack;
-            else
-                _drums = FindAnyObjectByType<DrumTrack>();
+            _drums = _gfm != null ? _gfm.ResolveDrumTrack() : FindAnyObjectByType<DrumTrack>();
         }
 
         if (GridCells == null || GridCells.Length == 0)
@@ -125,13 +122,11 @@ using System.Collections.Generic;
         }
         if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)
         {
-//            Debug.Log($"Cell check out of bounds: {x}, {y}");
             return false;
         }
 
         if (GridCells[x, y] == null)
         {
-  //          Debug.Log($"Cell {x}, {y} is null.");
             return false;
         }
 
@@ -188,9 +183,7 @@ using System.Collections.Generic;
         // Mark the cell as available
         GridCells[x, y].IsOccupied = false;
         GridCells[x, y].ObjectType = GridObjectType.Empty;
-
-    //    Debug.Log($"Cell {x}, {y} successfully freed.");
-    } 
+    }
     public void ResetCellBehavior(int x, int y)
     {
         if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight)

@@ -53,9 +53,10 @@ public class TrackSelectionJoinController : MonoBehaviour
 
     private void Start()
     {
-        foreach (var dev in InputSystem.devices)
-            Debug.Log($"[JoinController] Device: {dev.name} | id={dev.deviceId} | " +
-                      $"product={dev.description.product} | interface={dev.description.interfaceName}");
+        if (GameFlowManager.VerboseLogging)
+            foreach (var dev in InputSystem.devices)
+                Debug.Log($"[JoinController] Device: {dev.name} | id={dev.deviceId} | " +
+                          $"product={dev.description.product} | interface={dev.description.interfaceName}");
 
         // Exclude any HID gamepads already present.
         foreach (var gp in InputSystem.devices.OfType<Gamepad>())
@@ -76,8 +77,9 @@ public class TrackSelectionJoinController : MonoBehaviour
     {
         if (change == InputDeviceChange.Added && dev is Gamepad gp)
         {
-            Debug.Log($"[JoinController] Device added: {gp.name} | id={gp.deviceId} | " +
-                      $"product={gp.description.product} | interface={gp.description.interfaceName}");
+            if (GameFlowManager.VerboseLogging)
+                Debug.Log($"[JoinController] Device added: {gp.name} | id={gp.deviceId} | " +
+                          $"product={gp.description.product} | interface={gp.description.interfaceName}");
             TryExcludeHidGamepad(gp);
         }
         else if (change == InputDeviceChange.Removed)
@@ -98,8 +100,9 @@ public class TrackSelectionJoinController : MonoBehaviour
         if (!hasSteamVirtual) return;
 
         _excludedIds.Add(gp.deviceId);
-        Debug.Log($"[JoinController] Excluded raw HID (Steam Virtual present): " +
-                  $"{gp.name} | id={gp.deviceId} | product={gp.description.product}");
+        if (GameFlowManager.VerboseLogging)
+            Debug.Log($"[JoinController] Excluded raw HID (Steam Virtual present): " +
+                      $"{gp.name} | id={gp.deviceId} | product={gp.description.product}");
     }
 
     private void Update()
@@ -152,14 +155,16 @@ public class TrackSelectionJoinController : MonoBehaviour
 
             if (now - _lastJoinTime < GraceSeconds)
             {
-                Debug.Log($"[JoinController] Grace block: {gp.name} | id={gp.deviceId} | " +
-                          $"product={gp.description.product} | btn={btn} | " +
-                          $"{(now - _lastJoinTime) * 1000f:F0}ms since last join");
+                if (GameFlowManager.VerboseLogging)
+                    Debug.Log($"[JoinController] Grace block: {gp.name} | id={gp.deviceId} | " +
+                              $"product={gp.description.product} | btn={btn} | " +
+                              $"{(now - _lastJoinTime) * 1000f:F0}ms since last join");
                 continue;
             }
 
-            Debug.Log($"[JoinController] Joining: {gp.name} | id={gp.deviceId} | " +
-                      $"product={gp.description.product} | interface={gp.description.interfaceName} | btn={btn}");
+            if (GameFlowManager.VerboseLogging)
+                Debug.Log($"[JoinController] Joining: {gp.name} | id={gp.deviceId} | " +
+                          $"product={gp.description.product} | interface={gp.description.interfaceName} | btn={btn}");
             pim.JoinPlayer(pairWithDevices: new InputDevice[] { gp });
             _lastJoinTime = now;
             assignedIds.Add(gp.deviceId);

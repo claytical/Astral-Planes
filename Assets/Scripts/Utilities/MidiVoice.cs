@@ -25,7 +25,6 @@ public class MidiVoice : MonoBehaviour
     private System.Func<float> _remainingActiveWindowSec;
 
     private bool _warnedMissingDrums;
-    [System.Diagnostics.Conditional("UNITY_EDITOR")]
 
     public void SetDrumTrack(DrumTrack drums)
     {

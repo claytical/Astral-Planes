@@ -5,7 +5,6 @@ using UnityEngine;
 public class SuperNode : MonoBehaviour
 {
     [SerializeField] public  DrumTrack     drumTrack;
-//    [SerializeField] private ParticleSystem particles;
 
     [Header("Track Nodes")]
     [SerializeField] private GameObject trackNodePrefab;
@@ -24,7 +23,7 @@ public class SuperNode : MonoBehaviour
         if (drumTrack == null)
         {
             if (_gfm == null) _gfm = GameFlowManager.Instance;
-            drumTrack = _gfm?.activeDrumTrack ?? FindAnyObjectByType<DrumTrack>();
+            drumTrack = _gfm != null ? _gfm.ResolveDrumTrack() : FindAnyObjectByType<DrumTrack>();
         }
     }
 

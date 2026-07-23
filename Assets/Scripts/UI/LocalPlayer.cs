@@ -307,8 +307,9 @@ public class LocalPlayer : MonoBehaviour
         _playerInput = GetComponent<PlayerInput>();
         if (_playerInput == null) return;
 
-        foreach (var dev in _playerInput.devices)
-            Debug.Log($"[LocalPlayer.Awake] {dev.name} | product={dev.description.product} | interface={dev.description.interfaceName} | id={dev.deviceId}");
+        if (GameFlowManager.VerboseLogging)
+            foreach (var dev in _playerInput.devices)
+                Debug.Log($"[LocalPlayer.Awake] {dev.name} | product={dev.description.product} | interface={dev.description.interfaceName} | id={dev.deviceId}");
     }
 
     IEnumerator Start()

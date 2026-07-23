@@ -695,7 +695,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
         // Keep-clear is NOT a veto for visuals (it only prevents solid/collision).
         if (veto0_perm || veto0_spawnBlocked || veto0_claim)
         {
-//            Debug.Log($"[VOID_GROW] ABORT_START gp={gp} perm={veto0_perm} keep={veto0_keep} spawnBlocked={veto0_spawnBlocked} claim={veto0_claim}");
             _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
             yield break;
         }
@@ -703,12 +702,9 @@ public partial class CosmicDustGenerator : MonoBehaviour
         var go = GetOrCreateCellGO(gp);
         if (go == null)
         {
-//            Debug.Log($"[VOID_GROW] ABORT no-go gp={gp}");
             _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
             yield break;
         }
-
-//        Debug.Log($"[VOID_GROW] START gp={gp} growIn={growInSeconds:F2} a={tintWithAlpha.a:F2} role={role} keep={veto0_keep}");
 
         SetCellState(gp, DustCellState.Regrowing);
 
@@ -785,7 +781,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
             SetDustCollision(dust, true);
         }
 
-//        Debug.Log($"[VOID_GROW] SOLID gp={gp}");
         _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
     }
 
@@ -1176,7 +1171,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
     if (!drums)
     {
-        drums = FindAnyObjectByType<DrumTrack>();
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        drums = _gfm != null ? _gfm.ResolveDrumTrack() : FindAnyObjectByType<DrumTrack>();
         if (!drums) return;
     }
 
@@ -1727,7 +1723,11 @@ public partial class CosmicDustGenerator : MonoBehaviour
         float deadlineStep = Mathf.Max(0.0f, totalDuration / Mathf.Max(1, cells.Count));
         try
         {
-            if (drums == null) drums = FindAnyObjectByType<DrumTrack>();
+            if (drums == null)
+            {
+                if (_gfm == null) _gfm = GameFlowManager.Instance;
+                drums = _gfm != null ? _gfm.ResolveDrumTrack() : FindAnyObjectByType<DrumTrack>();
+            }
             if (drums == null || dustPrefab == null) yield break;
 
             drums.SyncTileWithScreen();
