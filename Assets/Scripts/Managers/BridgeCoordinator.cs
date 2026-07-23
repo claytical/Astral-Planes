@@ -160,10 +160,10 @@ public sealed class BridgeCoordinator
         foreach (var v in _gameFlow.GetVehicles())
             v?.ClearPendingNotesForBridge();
 
-        foreach (var c in Object.FindObjectsOfType<Collectable>())
+        foreach (var c in Object.FindObjectsByType<Collectable>(FindObjectsSortMode.None))
             if (c != null) Object.Destroy(c.gameObject);
 
-        foreach (var n in Object.FindObjectsOfType<MineNode>())
+        foreach (var n in Object.FindObjectsByType<MineNode>(FindObjectsSortMode.None))
         {
             if (n == null) continue;
             var explode = n.GetComponent<Explode>();

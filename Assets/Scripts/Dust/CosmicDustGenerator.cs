@@ -931,7 +931,10 @@ public partial class CosmicDustGenerator : MonoBehaviour
         Vector2 size = Vector2.one * Mathf.Max(0.001f, cellWorldSize * config.regrowVetoBoxMul);
 
         // NOTE: even if vehicleMask is broad/misconfigured, we only veto if a Vehicle is present.
-        int hits = Physics2D.OverlapBoxNonAlloc(cellWorld, size, 0f, _vehicleVetoHits, vehicleMask);
+        var filter = new ContactFilter2D();
+        filter.SetLayerMask(vehicleMask);
+        filter.useTriggers = Physics2D.queriesHitTriggers;
+        int hits = Physics2D.OverlapBox(cellWorld, size, 0f, filter, _vehicleVetoHits);
         if (hits <= 0) return false;
 
         for (int i = 0; i < hits; i++)
@@ -961,7 +964,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         drums = _gfm.activeDrumTrack;
         TryEnsureRefs();
         EnsureRegrowController();
-        if (dustClaims == null) dustClaims = FindObjectOfType<DustClaimManager>();
+        if (dustClaims == null) dustClaims = FindAnyObjectByType<DustClaimManager>();
         if (_tintDiffusionSystem == null)
             _tintDiffusionSystem = new CosmicDustTintDiffusionSystem(
                 cell =>
@@ -1018,7 +1021,10 @@ public partial class CosmicDustGenerator : MonoBehaviour
         if (_vehicleVetoHits == null || _vehicleVetoHits.Length != config.regrowVetoMaxHits)
             _vehicleVetoHits = new Collider2D[Mathf.Max(1, config.regrowVetoMaxHits)];
 
-        int hits = Physics2D.OverlapBoxNonAlloc(center, size, 0f, _vehicleVetoHits, vehicleMask);
+        var filter = new ContactFilter2D();
+        filter.SetLayerMask(vehicleMask);
+        filter.useTriggers = Physics2D.queriesHitTriggers;
+        int hits = Physics2D.OverlapBox(center, size, 0f, filter, _vehicleVetoHits);
         if (hits <= 0) return false;
 
         for (int i = 0; i < hits; i++)
@@ -1170,7 +1176,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
     if (!drums)
     {
-        drums = FindObjectOfType<DrumTrack>();
+        drums = FindAnyObjectByType<DrumTrack>();
         if (!drums) return;
     }
 
@@ -1721,7 +1727,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         float deadlineStep = Mathf.Max(0.0f, totalDuration / Mathf.Max(1, cells.Count));
         try
         {
-            if (drums == null) drums = FindObjectOfType<DrumTrack>();
+            if (drums == null) drums = FindAnyObjectByType<DrumTrack>();
             if (drums == null || dustPrefab == null) yield break;
 
             drums.SyncTileWithScreen();

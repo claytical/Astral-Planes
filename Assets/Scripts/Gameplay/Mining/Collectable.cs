@@ -135,7 +135,7 @@ public partial class Collectable : MonoBehaviour
             _s_liveByTrack[assignedInstrumentTrack] = Mathf.Max(0, lc - 1);
     }
     private DustClaimManager _dustClaims;
-    private DustClaimManager GetDustClaims() => _dustClaims != null ? _dustClaims : (_dustClaims = FindObjectOfType<DustClaimManager>());
+    private DustClaimManager GetDustClaims() => _dustClaims != null ? _dustClaims : (_dustClaims = FindAnyObjectByType<DustClaimManager>());
     Vector2Int _currentCell;
     Vector2Int _reservedCell;
 

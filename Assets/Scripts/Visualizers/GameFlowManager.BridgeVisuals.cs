@@ -15,8 +15,12 @@ public partial class GameFlowManager
             intro.SetActive(false);
             if (setup != null)
             {
-                string title = FindObjectsByType<TextMeshProUGUI>(FindObjectsSortMode.InstanceID).FirstOrDefault().text = "Select your vessel...";
-                if (GameFlowManager.VerboseLogging) Debug.Log($"Set title to {title}");
+                var title = FindObjectsByType<TextMeshProUGUI>(FindObjectsSortMode.None).FirstOrDefault();
+                if (title != null)
+                {
+                    title.text = "Select your vessel...";
+                    if (GameFlowManager.VerboseLogging) Debug.Log($"Set title to {title.text}");
+                }
                 setup.SetActive(true);
             }
         }

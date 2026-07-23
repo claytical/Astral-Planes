@@ -29,7 +29,7 @@ using System.Collections.Generic;
             if (_gfm != null && _gfm.activeDrumTrack != null)
                 _drums = _gfm.activeDrumTrack;
             else
-                _drums = FindObjectOfType<DrumTrack>();
+                _drums = FindAnyObjectByType<DrumTrack>();
         }
 
         if (GridCells == null || GridCells.Length == 0)
