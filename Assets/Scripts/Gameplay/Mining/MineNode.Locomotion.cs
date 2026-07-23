@@ -42,14 +42,15 @@ public partial class MineNode
         if (roleProfile != null && roleProfile.mineNodeLocomotionProfile != null)
             return roleProfile.mineNodeLocomotionProfile;
 
-        int count = locomotionArchetypeProfiles != null ? locomotionArchetypeProfiles.Length : 0;
+        var archetypeProfiles = config != null ? config.locomotionArchetypeProfiles : null;
+        int count = archetypeProfiles != null ? archetypeProfiles.Length : 0;
         if (count > 0)
         {
             int idx = Mathf.Clamp(Mathf.RoundToInt(_speed * (count - 1)), 0, count - 1);
-            if (locomotionArchetypeProfiles[idx] != null)
-                return locomotionArchetypeProfiles[idx];
+            if (archetypeProfiles[idx] != null)
+                return archetypeProfiles[idx];
         }
-        return defaultLocomotionProfile;
+        return config != null ? config.defaultLocomotionProfile : null;
     }
 
     private void RunCorridorLookahead(Vector2Int myCell)
@@ -240,7 +241,8 @@ public partial class MineNode
     private void ResolveDecisionArchetype()
     {
         _decisionArchetype = default;
-        if (decisionArchetypeLibrary == null)
+        var library = config != null ? config.decisionArchetypeLibrary : null;
+        if (library == null)
         {
             _decisionArchetype.id = "Steady";
             _decisionArchetype.reactionDelayWindow = new Vector2(0.1f, 0.25f);
@@ -252,7 +254,7 @@ public partial class MineNode
             return;
         }
 
-        decisionArchetypeLibrary.TryGet("Steady", out _decisionArchetype);
+        library.TryGet("Steady", out _decisionArchetype);
     }
 
     private void CacheAuthoredStepsFromNoteSet()

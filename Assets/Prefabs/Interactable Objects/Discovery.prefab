@@ -53,33 +53,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   coreSprite: {fileID: 2442014530722922072}
   outlineSprite: {fileID: 2442014530722922072}
-  maxStrength: 150
-  pruneCarvedPathOnLoopBoundary: 0
-  pruneMinPathCount: 8
-  driftSpeedMultiplier: 0.1
-  locomotionArchetypeProfiles:
-  - {fileID: 11400000, guid: e36f28096af234af1ba66f20d16b8c64, type: 2}
-  - {fileID: 11400000, guid: 11624763ef95c447b9cf6c2e6fcadda7, type: 2}
-  - {fileID: 11400000, guid: f19ac05ceb9f240339b920df3ef68d58, type: 2}
-  - {fileID: 11400000, guid: 729b36cbed0cf40df8012d4b5b1866b2, type: 2}
-  defaultLocomotionProfile: {fileID: 11400000, guid: 11624763ef95c447b9cf6c2e6fcadda7,
-    type: 2}
-  decisionArchetypeLibrary: {fileID: 11400000, guid: 46dd6f329391c4fb99c7adfc5229116b,
-    type: 2}
-  locomotionVariantOverride: 
-  fleeTowardBoundaryWeight: 0.303
-  driveCarvingMotionFromNoteSet: 1
-  boundaryLeakToleranceCells: 0.35
-  maxCorrectionPerTick: 0.5
-  maxSeparationSpeed: 4
-  separationAccel: 30
-  separationDeadZone: 0.02
-  inwardVelocityDamping: 0.65
-  maxVelocityCorrectionPerTick: 2.5
+  config: {fileID: 11400000, guid: 1e481e2fa5214b7d92089f14a4a608b0, type: 2}
   debugSweepContainment: 0
   assertSingleHardCorrectionPerTick: 1
-  expireAfterLoops: 3
-  expireBlastRadiusCells: 10
 --- !u!114 &2404411601338668691
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -31,7 +31,7 @@ public partial class MineNode
             MineNodeBehaviorCategory.Darting    => 1.5f,
             _                                   => 1.0f,
         };
-        ApplyLocomotion(0f, driftSpeedMultiplier * burstMult * catSpeedMult);
+        ApplyLocomotion(0f, config.driftSpeedMultiplier * burstMult * catSpeedMult);
 
         // Groove pause: actively damp velocity; kMinSpeedFloor inside ApplyLocomotion prevents a true stop otherwise
         if (_behaviorCategory == MineNodeBehaviorCategory.Rhythmic && !_isInBurst)
