@@ -106,7 +106,7 @@ public partial class CosmicDustGenerator
 
     private void FinalizeVehicleCarve(Vector2Int cell, float fadeSeconds, ShipMusicalProfile shipProfile = null)
     {
-        _plowSuppressedColliders.Remove(cell);
+        _colliderSuppression.ClearSuppression(cell);
         _imprints.EnsureAllocated();
         if (!_imprints.RestoreVoronoiImprint(cell))
             _imprints.PromoteHiddenRole(cell);
