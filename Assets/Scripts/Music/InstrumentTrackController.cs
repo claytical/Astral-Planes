@@ -207,13 +207,6 @@ public partial class InstrumentTrackController : MonoBehaviour
         if (GameFlowManager.VerboseLogging) Debug.Log($"[ITC:ARM_COHORTS] committedBins={committedBins} " +
                   $"trackMuls=[{string.Join(",", tracks.Where(t => t != null).Select(t => $"{t.name}:{t.loopMultiplier}"))}]");
 
-        int leaderSteps = (drum != null) ? drum.GetLeaderSteps() : 0;
-        if (leaderSteps <= 0)
-        {
-            // Fallback: use max of actual tracks if drum not ready yet
-            leaderSteps = tracks.Where(t => t != null).Select(t => t.GetTotalSteps()).DefaultIfEmpty(32).Max();
-        }
-
         // Force the note grid to match the committed leader steps immediately.
         // Without this, the UI may remain at 1 bin even when the transport is already wider.
         if (noteVisualizer != null && drum != null)
@@ -221,9 +214,6 @@ public partial class InstrumentTrackController : MonoBehaviour
             int baseSteps = Mathf.Max(1, drum.totalSteps);
             noteVisualizer.RequestLeaderGridChange(committedBins * baseSteps);
         }
-
-        int start = 0;
-        int endLeader = Mathf.Max(1, Mathf.RoundToInt(leaderSteps * Mathf.Clamp01(config.cohortWindowFraction)));
 
         foreach (var t in tracks)
         {
@@ -233,13 +223,6 @@ public partial class InstrumentTrackController : MonoBehaviour
             // counter drifted (e.g. a collectable was collected via a secondary path),
             // resolve the fill now so audio unblocks within 1 boundary instead of never.
             t.ResolveStrandedBursts();
-
-            int trackSteps = Mathf.Max(1, t.GetTotalSteps()); // <- NO extra * loopMultiplier
-            // Map [0..endLeader) from leader-space into this track’s local modulus
-            int endTrack = Mathf.Clamp(endLeader, 1, trackSteps);
-
-            t.ArmAscensionCohort(0, endTrack);
-
         }
     }
 }

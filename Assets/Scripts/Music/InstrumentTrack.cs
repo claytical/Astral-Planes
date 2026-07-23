@@ -4,107 +4,12 @@ using MidiPlayerTK;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-[System.Serializable]
-public class AscensionCohort
-{
-
-    // Hidden in inspector — debug aid only; runtime truth is in stepsRemaining (HashSet).
-    [HideInInspector] [SerializeField] private List<int> stepsRemainingSerialized = new();
-
-    // Runtime truth
-    [System.NonSerialized] public HashSet<int> stepsRemaining;
-
-    public bool armed;
-
-    public void Clear()
-    {
-        armed = false;
-        stepsRemainingSerialized.Clear();
-        stepsRemaining?.Clear();
-    }
-
-    public void SetSteps(IEnumerable<int> steps)
-    {
-        if (stepsRemaining == null) stepsRemaining = new HashSet<int>();
-        else stepsRemaining.Clear();
-
-        stepsRemainingSerialized.Clear();
-
-        foreach (var s in steps)
-        {
-            if (stepsRemaining.Add(s))
-                stepsRemainingSerialized.Add(s);
-        }
-    }
-}
 
 public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 {
     private static int _nextId;
     internal readonly int InstanceId = System.Threading.Interlocked.Increment(ref _nextId);
-
     private TrackExpansionController _expansionCtrl;
-    string IExpansionHost.TrackName => name;
-    int  IExpansionHost.LoopMultiplier     => loopMultiplier;
-    int  IExpansionHost.MaxLoopMultiplier  => maxLoopMultiplier;
-    int  IExpansionHost.TotalSteps         => _totalSteps;
-    int  IExpansionHost.BinSize            => BinSize();
-
-    void IExpansionHost.SetLoopMultiplier(int v) => loopMultiplier = v;
-    void IExpansionHost.SetTotalSteps(int v)     => _totalSteps = v;
-
-    void IExpansionHost.ResetStepCursors()
-    {
-        _lastLocalStep = -1;
-        _lastBarIndex  = -1;
-    }
-
-    void IExpansionHost.SetBinAllocated(int bin, bool v) => SetBinAllocated(bin, v);
-    void IExpansionHost.SetBinFilled(int bin, bool v)    => SetBinFilled(bin, v);
-    void IExpansionHost.EnsureBinList()                  => EnsureBinList();
-
-    int  IExpansionHost.PickRandomExistingBinForDensity() => PickRandomExistingBinForDensity();
-    void IExpansionHost.EnqueueNextFrame(Action a)        => EnqueueNextFrame(a);
-
-    void IExpansionHost.ResyncLeaderBinsNow()            => controller?.ResyncLeaderBinsNow();
-    void IExpansionHost.EndGravityVoidForPendingExpand()  => controller?.EndGravityVoidForPendingExpand(this);
-
-    void IExpansionHost.RecomputeAllTrackLayouts()
-    {
-        if (controller?.tracks == null || controller.noteVisualizer == null) return;
-        foreach (var t in controller.tracks)
-            if (t != null) controller.noteVisualizer.RecomputeTrackLayout(t);
-    }
-
-    void IExpansionHost.MarkGhostPaddingOnVisualizer(int oldTotal, int addedSteps) =>
-        controller?.noteVisualizer?.MarkGhostPadding(this, oldTotal, addedSteps);
-
-    void IExpansionHost.CanonicalizeTrackMarkersOnVisualizer(int burstId) =>
-        controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId);
-
-    void IExpansionHost.UpdateControllerVisualizer() => controller?.UpdateVisualizer();
-
-    int IExpansionHost.GetControllerMaxActiveLoopMultiplier() =>
-        controller != null ? controller.GetMaxActiveLoopMultiplier() : 1;
-
-    int IExpansionHost.GetControllerMaxLoopMultiplier() =>
-        controller != null ? controller.GetMaxLoopMultiplier() : 1;
-
-    void IExpansionHost.SpawnBurstNow(
-        NoteSet noteSet, int maxToSpawn, int burstId,
-        Vector3? originWorld, Vector3? repelFromWorld,
-        float burstImpulse, float spreadAngleDeg,
-        float spawnJitterRadius, BurstPlacementMode placementMode,
-        int trapSearchRadiusCells, int trapBufferCells, int forcedTargetBin)
-    {
-        SpawnCollectableBurst(
-            noteSet, maxToSpawn, burstId,
-            originWorld, repelFromWorld,
-            burstImpulse, spreadAngleDeg,
-            spawnJitterRadius, placementMode,
-            trapSearchRadiusCells, trapBufferCells,
-            forcedTargetBin);
-    }
 
     [Header("Track Settings")]
     public Color trackColor;
@@ -113,7 +18,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     public Color DisplayColor => MusicalRoleProfileLibrary.GetProfile(assignedRole)?.GetColorForVoice(voiceIndex) ?? trackColor;
     public GameObject collectablePrefab; // Prefab to spawn
     public Transform collectableParent; // Parent object for organization
-    public AscensionCohort ascensionCohort;
     [Header("Musical Role Assignment")]
     public MusicalRole assignedRole;
     public int voiceIndex { get; private set; }
@@ -149,9 +53,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     private int _lastLocalStep = -1;
     private int _lastBarIndex  = -1;
     private readonly Dictionary<int, float> _noteCommitTimes = new(); // stepIndex -> Time.time at commit
-    private bool _pendingCollapse;
-    private int  _collapseTargetMultiplier = 1;
-    private bool _hookedBoundaryForCollapse;
     private bool _ascendQueued;
     private int? _pendingLoopMultiplier;
     public int currentBurstId;
@@ -237,44 +138,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     public event Action<InstrumentTrack, int, bool> OnCollectableBurstCleared; // (track, burstId, hadNotes)
     public event Action<InstrumentTrack, int> OnBinFilled; // (track, binIndex)
 
-    private void OnDisable()
-    {
-        Debug.LogWarning(
-            $"[TRACK:LIFECYCLE] DISABLE name={name} " +
-            $"goActiveSelf={gameObject.activeSelf} " +
-            $"goActiveInHierarchy={gameObject.activeInHierarchy} " +
-            $"componentEnabled={enabled}\n" +
-            Environment.StackTrace);
-        _expansionCtrl?.UnhookExpandBoundary();
-        if (controller != null)
-            controller.EndGravityVoidForPendingExpand(this);
-    }
-    private void OnEnable()
-    {
-        if (GameFlowManager.VerboseLogging) Debug.Log(
-            $"[TRACK:LIFECYCLE] ENABLE name={name} " +
-            $"goActiveSelf={gameObject.activeSelf} " +
-            $"goActiveInHierarchy={gameObject.activeInHierarchy} " +
-            $"componentEnabled={enabled}");
-    }
-    private void OnTransformParentChanged()
-    {
-        Debug.LogWarning(
-            $"[TRACK:LIFECYCLE] PARENT_CHANGED name={name} " +
-            $"parent={(transform.parent != null ? transform.parent.name : "null")} " +
-            $"goActiveSelf={gameObject.activeSelf} " +
-            $"goActiveInHierarchy={gameObject.activeInHierarchy}");
-    }
-    private void OnDestroy()
-    {
-        _expansionCtrl?.UnhookExpandBoundary();
-        if (controller != null)
-            controller.EndGravityVoidForPendingExpand(this);    }
-
-    private readonly List<Action> _nextFrameQueue = new();
-    private void EnqueueNextFrame(Action a) => _nextFrameQueue.Add(a);
-    public int BinSize() => drumTrack != null ? drumTrack.totalSteps : 16;
-    public int BinIndexForStep(int step) => Mathf.Clamp(step / BinSize(), 0, Mathf.Max(0, maxLoopMultiplier - 1));
     /// <summary>
     /// Store the pre-generated NoteSet for a specific bin.
     /// Called by PhaseTransitionManager during motif setup.
@@ -319,123 +182,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             return n > 0 ? n : fallback;
         }
         return fallback;
-    }
-
-    /// <summary>
-    /// Instantly overwrites the entire track with perfect authored notes for every bin,
-    /// following each bin's chord progression. Called by SuperNode on collision.
-    /// </summary>
-    public void InstantFillAllBins(bool toMaxCapacity = false)
-    {
-        int binSz = BinSize();
-        int bins  = toMaxCapacity ? Mathf.Max(1, maxLoopMultiplier) : Mathf.Max(1, loopMultiplier);
-
-        // When expanding to max capacity, only fill bins above the current count so that the
-        // player's already-collected notes in existing bins survive the fill and are restored
-        // correctly when InstantCollapseToLoopMultiplier reverts this track at the boundary.
-        int fillFrom = toMaxCapacity ? loopMultiplier : 0;
-
-        if (bins > loopMultiplier)
-        {
-            loopMultiplier = bins;
-            _totalSteps    = binSz * bins;
-            EnsureBinList();
-            for (int b = 0; b < bins; b++)
-                SetBinAllocated(b, true);
-        }
-
-        // Clear only the bins we are about to fill (preserves existing bins when toMaxCapacity).
-        for (int b = fillFrom; b < bins; b++)
-            ClearBinNotesKeepAllocated(b);
-
-        // Write authored notes bin-by-bin (new bins only when toMaxCapacity).
-        for (int b = fillFrom; b < bins; b++)
-        {
-            var ns = GetNoteSetForBin(b);
-            if (ns == null) continue;
-
-            int binStart = b * binSz;
-
-            if (ns.persistentTemplate != null && ns.persistentTemplate.Count > 0)
-            {
-                // Riff-authoritative: step is local to the bin (0..binSz-1)
-                foreach (var (step, note, dur, vel, authoredRoot) in ns.persistentTemplate)
-                {
-                    int absStep = binStart + step;
-                    AddNoteToLoop(absStep, note, dur, vel, lightMarkerNow: true, authoredRoot);
-                }
-            }
-            else
-            {
-                // Generative fallback
-                var steps = ns.GetStepList();
-                foreach (int localStep in steps)
-                {
-                    int absStep = binStart + localStep;
-                    int note    = ns.GetNoteForPhaseAndRole(this, localStep);
-                    AddNoteToLoop(absStep, note, 120, 1.0f, lightMarkerNow: true, authoredRootMidi);
-                }
-            }
-
-            SetBinFilled(b, true);
-        }
-
-        _loopCacheDirtyPending = true;
-        controller?.EndGravityVoidForPendingExpand(this);
-        controller?.UpdateVisualizer();
-        // Sync leader bin count immediately when loopMultiplier expanded beyond the previous
-        // committed value. Without this, GetCommittedBinCount() stays at the old value for up
-        // to one full leader loop, causing barIndex >= committedLeaderBins to fire on the extra
-        // bars and silence all tracks for half the extended loop.
-        if (toMaxCapacity) controller?.ResyncLeaderBinsNow();
-    }
-
-    /// <summary>
-    /// Instantly contracts this track to <paramref name="targetMult"/> bins, clearing any notes
-    /// and allocation state above that count. Mirrors OnDrumDownbeat_CommitCollapse but runs
-    /// synchronously. Called by SuperNode when reverting a temporarily-filled track.
-    /// </summary>
-    public void InstantCollapseToLoopMultiplier(int targetMult)
-    {
-        // 0 is valid: track had no active bins before the SuperNode; restore to silent empty state.
-        targetMult = Mathf.Clamp(targetMult, 0, loopMultiplier);
-
-        // Keep at least 1 bin so the scheduler never divides by zero.
-        int effectiveMult = Mathf.Max(1, targetMult);
-
-        bool atTarget   = effectiveMult == loopMultiplier;
-        bool notesClean = persistentLoopNotes == null || persistentLoopNotes.Count == 0;
-        if (atTarget && (targetMult > 0 || notesClean)) return;
-
-        loopMultiplier = effectiveMult;
-
-        EnsureBinList();
-        // When targetMult=0 clear ALL bins (track was empty before SuperNode).
-        // When targetMult>0 clear only the bins above the new count.
-        ClearBinsAbove(targetMult);
-
-        _totalSteps = BinSize() * loopMultiplier;
-
-        if (targetMult == 0)
-            persistentLoopNotes.Clear();  // bin 0 keeps its allocation slot but must be silent
-        else
-            persistentLoopNotes.RemoveAll(t => t.stepIndex >= _totalSteps);
-
-        _loopCacheDirtyPending = true;
-        RecomputeBinsFromLoop();
-        RebuildLoopCache_FORCE();
-        _loopCacheDirtyPending = false;
-
-        if (controller != null && controller.noteVisualizer != null && drumTrack != null)
-        {
-            int leaderSteps = drumTrack.GetLeaderSteps();
-            if (leaderSteps <= 0) leaderSteps = _totalSteps;
-            controller.noteVisualizer.RequestLeaderGridChange(leaderSteps);
-            controller.noteVisualizer.ForceSyncMarkersToPersistentLoop(this);
-        }
-
-        controller?.UpdateVisualizer();
-        controller?.ResyncLeaderBinsNow();
     }
 
     public bool IsStepInFilledBin(int step)
@@ -594,12 +340,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         }
     }
 
-    public bool TryGetBurstSteps(int burstId, out HashSet<int> steps)
-    {
-        steps = null;
-        return _bursts.TryGetValue(burstId, out var s) && (steps = s.steps) != null && steps.Count > 0;
-    }
-
     public bool HasOutstandingNotesInRange(int stepStart, int stepEnd)
     {
         foreach (var kv in _bursts)
@@ -655,108 +395,34 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         return destroyed;
     }
-    private float RemainingActiveWindowSec() {
-        float my = BaseLoopSeconds() * MyMultiplier();
-        float L  = LeaderLengthSec();
-        if (L <= 0f) return float.MaxValue;
-        float tin = TimeInLeader();
-        return Mathf.Max(0f, my - tin);
-    }
-    private void UnhookCollapseBoundary() {
-        if (!_hookedBoundaryForCollapse || drumTrack == null) return;
-        drumTrack.OnLoopBoundary -= OnDrumDownbeat_CommitCollapse;
-        _hookedBoundaryForCollapse = false;
-    }
-    private void OnDrumDownbeat_CommitCollapse()
-    {
-        if (!_pendingCollapse) { UnhookCollapseBoundary(); return; }
-
-        int newMult = Mathf.Clamp(_collapseTargetMultiplier, 1, loopMultiplier);
-        if (newMult != loopMultiplier)
+    private LoopCollapseController _loopCollapseCtrlBacking;
+    private LoopCollapseController _loopCollapseCtrl => _loopCollapseCtrlBacking ??= new LoopCollapseController(
+        getLoopMultiplier: () => loopMultiplier,
+        setLoopMultiplier: v => loopMultiplier = v,
+        getBinSize: BinSize,
+        setTotalSteps: v => _totalSteps = v,
+        isExpansionPending: () => IsExpansionPending,
+        clearBinsAbove: ClearBinsAbove,
+        removeLoopNotesAtOrAfterStep: totalSteps => persistentLoopNotes.RemoveAll(t => t.stepIndex >= totalSteps),
+        markLoopCacheDirtyPending: () => _loopCacheDirtyPending = true,
+        recomputeBinsFromLoop: RecomputeBinsFromLoop,
+        resetStepCursors: () => { _lastLocalStep = -1; _lastBarIndex = -1; },
+        getDrumTrack: () => drumTrack,
+        getController: () => controller,
+        syncVisualizerAfterCollapse: totalStepsFallback =>
         {
-            loopMultiplier = newMult;
-
-            // Clear allocation/filled flags above the collapsed width so EffectiveLoopBins won't re-grow.
-            ClearBinsAbove(newMult);
-
-            // Use this track's bin size rather than DrumTrack.totalSteps.
-            // DrumTrack.totalSteps can represent a different timing grid (e.g. 16),
-            // while InstrumentTrack bins may be authored at a smaller width (e.g. 8).
-            // If we multiply by DrumTrack.totalSteps during collapse, notes in trimmed
-            // bins can remain inside _totalSteps and survive pruning, causing
-            // stale harmony/marker artifacts at the right edge after loop contraction.
-            _totalSteps = BinSize() * loopMultiplier;
-
-            // Remove any loop notes that are now outside the audible window
-            persistentLoopNotes.RemoveAll(t => t.stepIndex >= _totalSteps);
-
-            _loopCacheDirtyPending = true;
-            RecomputeBinsFromLoop();
-
-            // ---- VISUAL AUTHORITY (subtractive-safe) ----
-            // 1) snap the grid to the new leader width immediately (prevents stale X mapping)
-            if (controller != null && controller.noteVisualizer != null && drumTrack != null)
-            {
-                int leaderSteps = drumTrack.GetLeaderSteps();
-                if (leaderSteps <= 0) leaderSteps = _totalSteps;
-
-                controller.noteVisualizer.RequestLeaderGridChange(leaderSteps);
-
-                // 2) prune any stale loop-owned markers and re-add missing ones
-                controller.noteVisualizer.ForceSyncMarkersToPersistentLoop(this);
-            }
-
-            // Let controller update other tracks if needed (hash-driven).
-            controller?.UpdateVisualizer();
-
-            // Sync DrumTrack._binCount so audio transport and committed-leader queries agree.
-            controller?.ResyncLeaderBinsNow();
-        }
-
-        _pendingCollapse = false;
-        UnhookCollapseBoundary();
-        _lastLocalStep = -1;
-        _lastBarIndex  = -1;
-    }
+            if (controller == null || controller.noteVisualizer == null || drumTrack == null) return;
+            int leaderSteps = drumTrack.GetLeaderSteps();
+            if (leaderSteps <= 0) leaderSteps = totalStepsFallback;
+            controller.noteVisualizer.RequestLeaderGridChange(leaderSteps);
+            controller.noteVisualizer.ForceSyncMarkersToPersistentLoop(this);
+        });
 
     /// <summary>
     /// Requests that this track's loop shrink by one bin at the next loop boundary.
     /// Safe to call multiple times — ignored if already at minimum or a collapse is pending.
     /// </summary>
-    public void RequestLoopCollapseByOne()
-    {
-        if (loopMultiplier <= 1 || _pendingCollapse || IsExpansionPending) return;
-        _collapseTargetMultiplier = loopMultiplier - 1;
-        _pendingCollapse = true;
-        if (!_hookedBoundaryForCollapse && drumTrack != null)
-        {
-            drumTrack.OnLoopBoundary += OnDrumDownbeat_CommitCollapse;
-            _hookedBoundaryForCollapse = true;
-        }
-    }
-
-    public void ArmAscensionCohort(int windowStartInclusive, int windowEndExclusive)
-    {
-        ascensionCohort ??= new AscensionCohort();
-        
-        var loop = GetPersistentLoopNotes();
-        if (loop == null)
-        {
-            ascensionCohort.Clear();
-            return;
-        }
-
-        var steps = new List<int>();
-        foreach (var (step, _, _, _, _) in loop)
-            if (step >= windowStartInclusive && step < windowEndExclusive)
-                steps.Add(step);
-
-        ascensionCohort.SetSteps(steps);
-        ascensionCohort.armed = (ascensionCohort.stepsRemaining != null && ascensionCohort.stepsRemaining.Count > 0);
-
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[CHORD][ARMED] {name} window=[{windowStartInclusive},{windowEndExclusive}) " +
-                  $"count={(ascensionCohort.stepsRemaining != null ? ascensionCohort.stepsRemaining.Count : 0)} armed={ascensionCohort.armed}");
-    }
+    public void RequestLoopCollapseByOne() => _loopCollapseCtrl.RequestLoopCollapseByOne();
 
     public NoteSet GetCurrentNoteSet()
     {
@@ -766,31 +432,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     {
         if (_bursts.TryGetValue(burstId, out var s))
             s.steps.Add(step);
-    }
-    public void ClearBinNotesKeepAllocated(int binIdx)
-    {
-        int binSize = Mathf.Max(1, BinSize());
-        int start = binIdx * binSize;
-        int end   = start + binSize;
-
-        for (int i = persistentLoopNotes.Count - 1; i >= 0; i--)
-        {
-            var (step, _, _, _, _) = persistentLoopNotes[i];
-            if (step >= start && step < end)
-                persistentLoopNotes.RemoveAt(i);
-        }
-
-        EnsureBinList();
-        if (binIdx >= 0 && binIdx < _binFilled.Count)
-        {
-            _binFilled[binIdx] = false;
-            if (_binCompletionTime != null && binIdx < _binCompletionTime.Length) _binCompletionTime[binIdx] = -1f;
-            Harmony_OnBinEmptied(binIdx);
-        }
-
-        // CRITICAL: removed notes must stop playing immediately
-        _loopCacheDirtyPending = true;
-
     }
     /// <summary>Removes the persistent note at the given absolute step from the loop.</summary>
     public void RemovePersistentNoteAtStep(int stepAbs)
@@ -885,103 +526,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         int dur = (durationTicks > 0) ? durationTicks : 120;
         PlayNote127(midiNote, dur, velocity127);
     }
-    public int GetHighestAllocatedBin()
-    {
-        if (binAllocated == null) return -1;
-
-        // IMPORTANT: allocation is a stable frontier; do NOT clamp by loopMultiplier.
-        for (int i = binAllocated.Length - 1; i >= 0; i--)
-            if (binAllocated[i]) return i;
-
-        return -1;
-    }
-    public int GetHighestFilledBin()
-    {
-        EnsureBinList();
-
-        // IMPORTANT: filled is a content frontier; do NOT clamp by loopMultiplier either.
-        // (You can choose to clamp for "audible span" decisions elsewhere, but not for frontier detection.)
-        for (int i = _binFilled.Count - 1; i >= 0; i--)
-            if (_binFilled[i]) return i;
-
-        return -1;
-    }
-    public bool IsBinFilled(int binIndex)
-    {
-        EnsureBinList();
-
-        return binIndex >= 0
-               && binIndex < _binFilled.Count
-               && _binFilled[binIndex];
-    }
-    /// <summary>
-    /// Returns the Time.time value at which the given bin was marked filled,
-    /// or -1 if the bin has not been filled yet.
-    /// </summary>
-    public float GetBinCompletionTime(int binIndex)
-    {
-        if (_binCompletionTime == null || binIndex < 0 || binIndex >= _binCompletionTime.Length)
-            return -1f;
-        return _binCompletionTime[binIndex];
-    }
-    public void ResetBinsForPhase()
-    {
-        // Hard reset of bin span + allocation for a clean new phase/motif.
-        int want = Mathf.Max(1, maxLoopMultiplier);
-
-        _binFilled = Enumerable.Repeat(false, want).ToList();
-        _binCompletionTime = Enumerable.Repeat(-1f, want).ToArray();
-
-        // Allocation drives span (EffectiveLoopBins). Ensure we clear it too.
-        binAllocated = new bool[want];
-
-        // Harmony bookkeeping per-bin should restart clean.
-        InitializeBinChords(want);
-
-        ResetBinCursor();
-        loopMultiplier = 1;                    // tracks don't pre-expand; width grows on demand
-        _totalSteps    = BinSize() * loopMultiplier;
-    }
-    public void ResetBinStateForNewPhase()
-    {
-        // Cursor-mode
-        SetBinCursor(0);
-
-        // Loop span: force a single bin wide loop (no hidden carryover)
-        loopMultiplier = 1;
-
-        _binFilled.Clear();
-
-        _expansionCtrl?.ResetForNewPhase();
-        
-    }
-    /// <summary>
-    /// Single hard reset entry point for motif boundaries.
-    /// Clears loop content, bin allocation, burst state, and expansion/mapping flags.
-    /// Intended to be called exactly once by the motif authority (e.g., GameFlowManager).
-    /// </summary>
-    public void BeginNewMotifHardClear(string reason = "BeginNewMotif")
-    {
-        _binNoteSets = null;
-        Debug.LogWarning(
-            $"[TRK:CLEAR_LOOP] track={name} fn=BeginNewMotifHardClear reason={reason} " +
-            $"persistentCount={(persistentLoopNotes != null ? persistentLoopNotes.Count : -1)} " +
-            $"spawnedNotesCount={(_spawnedNotes != null ? _spawnedNotes.Count : -1)} " +
-            $"burstRemainingCount={_bursts?.Count ?? -1}\n" +
-            Environment.StackTrace);
-
-        persistentLoopNotes?.Clear();
-        _loopCacheDirtyPending = true;
-
-        _loopNotes?.Clear();
-        _spawnedNotes?.Clear();
-
-        _bursts?.Clear();
-
-        ResetBinStateForNewPhase();
-        ResetBinsForPhase();
-    }
-
     public void SetNoteSet(NoteSet noteSet)
     {
         _currentNoteSet = noteSet;
@@ -1007,73 +551,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (RemainingActiveWindowSec() <= 0f)
             Debug.LogWarning($"[NOTE:ZERO_WINDOW] {name} note={note} dur={durationTicks} — window=0 at dsp={AudioSettings.dspTime:F3} leaderStart={drumTrack?.leaderStartDspTime:F3} clipLen={drumTrack?.GetClipLengthInSeconds():F3}");
         midiVoice.PlayNoteTicks(note, durationTicks, velocity);
-    }
-
-    /// <summary>
-    /// Per-bin retune: snaps each note to the nearest tone in its bin's assigned chord
-    /// in the current HarmonyDirector progression. Use this instead of RetuneLoopToChord(chord0)
-    /// when a profile change should respect the full chord progression across bins.
-    /// </summary>
-    public void RetuneLoopToCurrentProgression(bool forceHarmonyDirector = false)
-    {
-        if (persistentLoopNotes == null || persistentLoopNotes.Count == 0) return;
-
-        var modified = new List<(int step, int note, int dur, float vel, int authoredRoot)>(persistentLoopNotes.Count);
-        foreach (var (step, note, dur, vel, authoredRoot) in persistentLoopNotes)
-        {
-            int bin = BinIndexForStep(step);
-
-            // When a new ChordProgressionProfile is being committed (forceHarmonyDirector=true),
-            // skip the NoteSet's chordRegion — it was baked from the OLD progression and would
-            // override the new one. Always read directly from HarmonyDirector in that case.
-            var ns = GetNoteSetForBin(bin);
-            var region = (!forceHarmonyDirector) ? ns?.chordRegion : null;
-            Chord chord;
-            Chord baseChord = default;
-            if (region != null && region.Count > 0)
-            {
-                chord    = region[bin % region.Count];
-                baseChord = region[0];
-            }
-            else
-            {
-                int chordIdx = Harmony_GetChordIndexForBin(bin);
-                if (_gfm == null) _gfm = GameFlowManager.Instance;
-                var hd = _gfm?.harmony;
-                if (chordIdx < 0 || hd == null || !hd.TryGetChordAt(chordIdx, out chord))
-                {
-                    modified.Add((step, note, dur, vel, authoredRoot));
-                    continue;
-                }
-                if (!hd.TryGetChordAt(0, out baseChord)) baseChord = chord;
-            }
-
-            if (step % BinSize() == 0)
-            {
-                if (GameFlowManager.VerboseLogging) Debug.Log($"[CHORD][TRK][Retune] track={name} step={step} bin={bin} chordRoot={chord.rootNote} intervals={(chord.intervals != null ? chord.intervals.Count : 0)} noteIn={note}");
-            }
-
-            var allowed = BuildChordTones(chord, lowestAllowedNote, highestAllowedNote);
-            if (allowed.Count == 0) { modified.Add((step, note, dur, vel, authoredRoot)); continue; }
-            allowed.Sort();
-
-            int rootDelta = (authoredRoot != int.MinValue) ? chord.rootNote - authoredRoot : chord.rootNote - baseChord.rootNote;
-            // Exact-register transposition: always apply the root delta. A pitch-class
-            // match with the target chord must not skip it — that discards the octave
-            // encoded in the progression. Octave-fit only if the result is unplayable.
-            int shifted = ShiftByOctavesIntoTrackRange(note + rootDelta);
-            int retuned = ShiftByOctavesIntoTrackRange(SnapToNearestChordTone(shifted, allowed));
-            modified.Add((step, retuned, dur, vel, authoredRoot));
-        }
-
-        RebuildLoopFromModifiedNotes(modified, transform.position);
-
-        // Force immediate cache rebuild so the scheduler uses retuned pitches from this
-        // frame onward. Without this a script-execution-order race between DrumTrack.Update
-        // (which fires OnLoopBoundary / retune) and InstrumentTrack.Update (which rebuilds
-        // via boundarySerial) can cause the first steps of the new loop to play old pitches.
-        RebuildLoopCache_FORCE();
-        _loopCacheDirtyPending = false;
     }
 
     private int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force, bool lightMarkerNow, int authoredRootMidi = int.MinValue, bool skipChordQuantize = false)
@@ -1241,66 +718,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         canonicalizeOwnMarkers: () => controller?.noteVisualizer?.CanonicalizeTrackMarkers(this, currentBurstId),
         spawnedCollectables: spawnedCollectables);
 
-    public float GetSecondsUntilNextLoopBoundaryDSP()
-    {
-        if (drumTrack == null) return 0f;
-
-        double dspNow = AudioSettings.dspTime;
-
-        // OnLoopBoundary is based on leaderStartDspTime + EffectiveLoopLengthSec.
-        double start = (drumTrack.leaderStartDspTime > 0.0) ? drumTrack.leaderStartDspTime : drumTrack.startDspTime;
-        if (start <= 0.0) return 0f;
-
-        float loopLen = drumTrack.GetLoopLengthInSeconds(); // this is EffectiveLoopLengthSec
-        if (loopLen <= 0f) return 0f;
-
-        double elapsed = dspNow - start;
-        if (elapsed < 0.0) elapsed = 0.0;
-
-        // Next leader boundary
-        double loopsCompleted = System.Math.Floor(elapsed / loopLen);
-        double nextBoundary = start + (loopsCompleted + 1.0) * loopLen;
-
-        double secs = nextBoundary - dspNow;
-        if (secs < 0.0) secs = 0.0;
-
-        return (float)secs;
-    }
-    public bool IsSaturatedForRepeatingNoteSet(NoteSet incoming)
-    {
-        if (incoming == null) return false; 
-        if (persistentLoopNotes == null || persistentLoopNotes.Count == 0) return false;
-        int activeBins = Mathf.Max(1, loopMultiplier); 
-        int bSz        = Mathf.Max(1, BinSize()); 
-        bool anyBinChecked = false;
-        var occupied = new HashSet<int>(persistentLoopNotes.Select(n => n.stepIndex));
-        
-        for (int b = 0; b < activeBins; b++) {
-            if (!IsBinAllocated(b)) continue;         // bin not yet reached — skip
-            if (!IsBinFilled(b)) return false;        // allocated but incomplete — not saturated
-            var binNoteSet = GetNoteSetForBin(b);
-            if (binNoteSet == null)
-            {
-                // No stored per-bin note set — using the incoming set as a reference would compare
-                // against the wrong step pattern (this bin was filled with a different set).
-                // The bin is already filled, so count it as satisfied and move on.
-                anyBinChecked = true;
-                continue;
-            }
-            binNoteSet.Initialize(this, bSz);
-            var allowed = binNoteSet.GetStepList();
-            if (allowed == null || allowed.Count == 0) continue;
-
-            foreach (int localStep in allowed) {
-                int absStep = b * bSz + (localStep % bSz);
-                if (!occupied.Contains(absStep)) return false;
-            }
-            anyBinChecked = true;
-        }
-        // If no filled bins exist yet, we are not saturated.
-        return anyBinChecked;
-    }
-    private void OnCollectableDestroyed(Collectable c) { 
+    private void OnCollectableDestroyed(Collectable c) {
         if (c == null) return; 
         if (c.assignedInstrumentTrack != this) return;
         if (c.burstId == 0) return;
@@ -1368,47 +786,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
       _totalSteps = loopMultiplier * BinSize();
     }
     
-    private void RebuildLoopFromModifiedNotes(List<(int, int, int, float, int)> modified, Vector3 _)
-    {
-        Debug.LogWarning(
-            $"[TRK:CLEAR_LOOP] track={name} fn=RebuildLoopFromModifiedNotes " +
-            $"modified={(modified != null ? modified.Count : -1)} " +
-            $"persistentBefore={(persistentLoopNotes != null ? persistentLoopNotes.Count : -1)}\n" +
-            Environment.StackTrace);
-
-        // Preserve original commit times — chord retuning changes pitch but not when the
-        // player collected the note. Restoring these keeps CommitTime01 non-zero in the
-        // ring glyph so squiggles are visible after a chord change.
-        var savedCommitTimes = new Dictionary<int, float>(_noteCommitTimes);
-
-        persistentLoopNotes.Clear();
-        _noteCommitTimes.Clear();
-        _loopCacheDirtyPending = true;
-        // Keep existing marker GameObjects alive — chord retune never changes step positions,
-        // only pitches. ForceSyncMarkersToPersistentLoop at the end will reposition/reconcile.
-        // Destroying here caused a deferred-destroy timing bug: markers appeared alive during
-        // the sync but were deleted end-of-frame, leaving the track visually empty.
-        _spawnedNotes.Clear();
-
-        if (modified != null)
-        {
-            foreach (var (step, note, dur, vel, authoredRoot) in modified)
-            {
-                // skipChordQuantize=true: notes in `modified` are already at their final pitch;
-                // re-quantizing here would double-process them and produce wrong results.
-                AddNoteToLoop(step, note, dur, vel, true, authoredRoot, skipChordQuantize: true);
-                if (savedCommitTimes.TryGetValue(step, out float originalTime))
-                    _noteCommitTimes[step] = originalTime;
-            }
-        }
-
-        // AddNoteToLoop above tries to update noteMarkers by key lookup, but those GameObjects
-        // were just destroyed by the _spawnedNotes loop above. Dead Transform entries remain in
-        // noteMarkers, so AddNoteToLoop finds them but skips creation (t != null fails).
-        // ForceSyncMarkersToPersistentLoop purges dead entries and re-creates any missing markers.
-        controller?.noteVisualizer?.ForceSyncMarkersToPersistentLoop(this);
-    }
-
     public void PruneSpawnedCollectables()
     {
         if (spawnedCollectables == null) return;

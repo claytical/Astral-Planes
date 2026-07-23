@@ -226,4 +226,43 @@ public partial class InstrumentTrack
             }
         }
     }
+
+    private void OnDisable()
+    {
+        Debug.LogWarning(
+            $"[TRACK:LIFECYCLE] DISABLE name={name} " +
+            $"goActiveSelf={gameObject.activeSelf} " +
+            $"goActiveInHierarchy={gameObject.activeInHierarchy} " +
+            $"componentEnabled={enabled}\n" +
+            Environment.StackTrace);
+        _expansionCtrl?.UnhookExpandBoundary();
+        if (controller != null)
+            controller.EndGravityVoidForPendingExpand(this);
+    }
+    private void OnEnable()
+    {
+        if (GameFlowManager.VerboseLogging) Debug.Log(
+            $"[TRACK:LIFECYCLE] ENABLE name={name} " +
+            $"goActiveSelf={gameObject.activeSelf} " +
+            $"goActiveInHierarchy={gameObject.activeInHierarchy} " +
+            $"componentEnabled={enabled}");
+    }
+    private void OnTransformParentChanged()
+    {
+        Debug.LogWarning(
+            $"[TRACK:LIFECYCLE] PARENT_CHANGED name={name} " +
+            $"parent={(transform.parent != null ? transform.parent.name : "null")} " +
+            $"goActiveSelf={gameObject.activeSelf} " +
+            $"goActiveInHierarchy={gameObject.activeInHierarchy}");
+    }
+    private void OnDestroy()
+    {
+        _expansionCtrl?.UnhookExpandBoundary();
+        if (controller != null)
+            controller.EndGravityVoidForPendingExpand(this);    }
+
+    private readonly List<Action> _nextFrameQueue = new();
+    private void EnqueueNextFrame(Action a) => _nextFrameQueue.Add(a);
+    public int BinSize() => drumTrack != null ? drumTrack.totalSteps : 16;
+    public int BinIndexForStep(int step) => Mathf.Clamp(step / BinSize(), 0, Mathf.Max(0, maxLoopMultiplier - 1));
 }
