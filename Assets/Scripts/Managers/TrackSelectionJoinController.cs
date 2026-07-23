@@ -110,7 +110,7 @@ public class TrackSelectionJoinController : MonoBehaviour
         if (GameFlowManager.Instance?.CurrentState != GameState.Selection) return;
 
         var assignedIds = new HashSet<int>();
-        foreach (var lp in FindObjectsOfType<LocalPlayer>())
+        foreach (var lp in FindObjectsByType<LocalPlayer>(FindObjectsSortMode.None))
         {
             var pi = lp.GetComponent<PlayerInput>();
             if (pi == null) continue;

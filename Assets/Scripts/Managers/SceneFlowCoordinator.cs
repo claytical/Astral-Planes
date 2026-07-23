@@ -329,7 +329,7 @@ public sealed class SceneFlowCoordinator
     {
         if (_gameFlow.activeDrumTrack == null) return;
 
-        var voices = UnityEngine.Object.FindObjectsOfType<MidiVoice>(includeInactive: true);
+        var voices = UnityEngine.Object.FindObjectsByType<MidiVoice>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (var v in voices)
         {
             if (v == null) continue;
@@ -349,29 +349,29 @@ public sealed class SceneFlowCoordinator
     {
         _gameFlow.activeDrumTrack = _gameFlow.activeDrumTrack
             ? _gameFlow.activeDrumTrack
-            : UnityEngine.Object.FindFirstObjectByType<DrumTrack>(FindObjectsInactive.Include);
+            : UnityEngine.Object.FindAnyObjectByType<DrumTrack>(FindObjectsInactive.Include);
         _gameFlow.controller = _gameFlow.controller
             ? _gameFlow.controller
-            : UnityEngine.Object.FindFirstObjectByType<InstrumentTrackController>(FindObjectsInactive.Include);
+            : UnityEngine.Object.FindAnyObjectByType<InstrumentTrackController>(FindObjectsInactive.Include);
         _gameFlow.dustGenerator = _gameFlow.dustGenerator
             ? _gameFlow.dustGenerator
-            : UnityEngine.Object.FindFirstObjectByType<CosmicDustGenerator>(FindObjectsInactive.Include);
+            : UnityEngine.Object.FindAnyObjectByType<CosmicDustGenerator>(FindObjectsInactive.Include);
         _gameFlow.noteViz = _gameFlow.noteViz
             ? _gameFlow.noteViz
-            : UnityEngine.Object.FindFirstObjectByType<NoteVisualizer>(FindObjectsInactive.Include);
+            : UnityEngine.Object.FindAnyObjectByType<NoteVisualizer>(FindObjectsInactive.Include);
         _gameFlow.harmony = _gameFlow.harmony
             ? _gameFlow.harmony
-            : UnityEngine.Object.FindFirstObjectByType<HarmonyDirector>(FindObjectsInactive.Include);
+            : UnityEngine.Object.FindAnyObjectByType<HarmonyDirector>(FindObjectsInactive.Include);
         _gameFlow.phaseTransitionManager = _gameFlow.phaseTransitionManager
             ? _gameFlow.phaseTransitionManager
-            : UnityEngine.Object.FindFirstObjectByType<PhaseTransitionManager>(FindObjectsInactive.Include);
+            : UnityEngine.Object.FindAnyObjectByType<PhaseTransitionManager>(FindObjectsInactive.Include);
         _gameFlow.spawnGrid = _gameFlow.spawnGrid
             ? _gameFlow.spawnGrid
-            : UnityEngine.Object.FindFirstObjectByType<SpawnGrid>(FindObjectsInactive.Include);
+            : UnityEngine.Object.FindAnyObjectByType<SpawnGrid>(FindObjectsInactive.Include);
 
         if (!_gameFlow.PlayerStatsGrid)
         {
-            var anchor = UnityEngine.Object.FindFirstObjectByType<PlayerStatsGridAnchor>(FindObjectsInactive.Include);
+            var anchor = UnityEngine.Object.FindAnyObjectByType<PlayerStatsGridAnchor>(FindObjectsInactive.Include);
             if (anchor) RegisterPlayerStatsGrid(anchor.transform);
         }
     }
@@ -434,7 +434,7 @@ public sealed class SceneFlowCoordinator
                 var allVehicles = _gameFlow.GetVehicles();
                 var vehicleList = allVehicles != null && allVehicles.Count > 0
                     ? new List<Vehicle>(allVehicles)
-                    : new List<Vehicle>(UnityEngine.Object.FindObjectsOfType<Vehicle>());
+                    : new List<Vehicle>(UnityEngine.Object.FindObjectsByType<Vehicle>(FindObjectsSortMode.None));
                 foreach (var v in vehicleList)
                 {
                     if (v == null || !v.isActiveAndEnabled) continue;

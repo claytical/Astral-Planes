@@ -86,7 +86,7 @@ public partial class GameFlowManager : MonoBehaviour
     public void SetupBinRingController()
     {
         if (binRingController == null)
-            binRingController = FindFirstObjectByType<BinRingController>(FindObjectsInactive.Include);
+            binRingController = FindAnyObjectByType<BinRingController>(FindObjectsInactive.Include);
         binRingController?.Setup(activeDrumTrack, controller?.tracks);
     }
 
@@ -250,38 +250,6 @@ public partial class GameFlowManager : MonoBehaviour
     public void BeginGeneratedTrackSetup()
     {
         SceneFlow.BeginGeneratedTrackSetup();
-    }
-    private void BindSceneVoicesToTimingAuthority()
-    {
-        if (activeDrumTrack == null) return;
-
-        // Bind all MidiVoices in scene that are NOT owned by an InstrumentTrack.
-        // InstrumentTrack already binds its own MidiVoice in Awake.
-        var voices = FindObjectsOfType<MidiVoice>(includeInactive: true);
-        foreach (var v in voices)
-        {
-            if (v == null) continue;
-
-            // If this voice lives under an InstrumentTrack, let InstrumentTrack binding stand.
-            if (v.GetComponentInParent<InstrumentTrack>() != null)
-                continue;
-
-            v.SetDrumTrack(activeDrumTrack);
-
-            // Optional: ensure it has a MidiStreamPlayer (common for Solo/FX child objects).
-            var player = v.GetComponent<MidiStreamPlayer>() ?? v.GetComponentInParent<MidiStreamPlayer>();
-            if (player != null)
-                v.SetMidiStreamPlayer(player);
-        }
-
-        // Also ensure SoloVoice has its DrumTrack reference, if it isn't manually set.
-        var solos = FindObjectsOfType<SoloVoice>(includeInactive: true);
-        foreach (var s in solos)
-        {
-            if (s == null) continue;
-            // SoloVoice already subscribes; this just prevents an unset reference case.
-            // (If drumTrack is [SerializeField], you can add a setter later if needed.)
-        }
     }
     private void Update()
     {

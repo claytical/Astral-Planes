@@ -16,6 +16,7 @@ public partial class Vehicle : MonoBehaviour
     private float _lastPressureFactor;
     private static readonly Collider2D[] _pressureHits = new Collider2D[8];
     private int _mineNodeLayerMask;
+    private ContactFilter2D _pressureFilter;
     public ShipMusicalProfile profile;
     [SerializeField] private VehicleConfig vehicleConfig;
     [HideInInspector] public float capacity = 10f;
@@ -142,6 +143,8 @@ public partial class Vehicle : MonoBehaviour
             rb = GetComponent<Rigidbody2D>();
             gfm = GameFlowManager.Instance;
             _mineNodeLayerMask = LayerMask.GetMask("MineNode");
+            _pressureFilter.SetLayerMask(_mineNodeLayerMask);
+            _pressureFilter.useTriggers = Physics2D.queriesHitTriggers;
             var col = GetComponent<Collider2D>();
             if (GameFlowManager.VerboseLogging) Debug.Log(
                 $"[VEHICLE:INIT] '{name}' layer={gameObject.layer} " +
@@ -262,8 +265,8 @@ public partial class Vehicle : MonoBehaviour
             _lastPressureFactor = 0f;
             return;
         }
-        int pCount = Physics2D.OverlapCircleNonAlloc(rb.position, profile.pressureInstabilityRadius,
-                                                     _pressureHits, _mineNodeLayerMask);
+        int pCount = Physics2D.OverlapCircle(rb.position, profile.pressureInstabilityRadius,
+                                             _pressureFilter, _pressureHits);
         if (pCount == 0) { _lastPressureFactor = 0f; return; }
 
         float minSqrDist = float.MaxValue;
