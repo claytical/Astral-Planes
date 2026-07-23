@@ -1,0 +1,327 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public sealed partial class NoteAscensionDirector
+{
+    [Tooltip("Ascend duration in drum loops (1 = one full loop).")]
+    [Min(1)] public int ascendLoops = 8;
+
+    private struct MarkerState
+    {
+        public GameObject go;
+        public float stepY;          // world-space Y increment per loop
+        public int loopsRemaining;
+        public int delayLoopsRemaining;
+        // Cached tag so we can clear isAscending on arrival without GetComponent each step.
+        public MarkerTag tag;
+        // The noteMarkers dictionary key step at the time this marker entered the ascension
+        // task. Uses the committed loop step, NOT tag.step (which can differ after reverse-
+        // order manual releases place a note at a different placeholder than its authored step).
+        public int committedStep;
+        // track.GetNoteCommitTime(committedStep) captured when ascension began for this marker.
+        // If the note is re-committed after this time, RemovePersistentNoteAtStep is skipped
+        // so a freshly collected note at the same step isn't erased by an older burst's ascent.
+        public float commitTimeAtStart;
+    }
+
+    private struct AscendTask
+    {
+        public List<MarkerState> markers;
+        public int delayLoopsRemaining;
+    }
+
+    private readonly Dictionary<InstrumentTrack, AscendTask> _ascendTasks = new();
+
+    /// <summary>
+    /// Reset all active ascension countdowns as if they are starting a new phrasing —
+    /// keeps markers in place visually but resets loopsRemaining to ascendLoops and
+    /// recomputes stepY from the marker's current position. Called on chord-progression
+    /// changes so notes don't arrive at the line mid-phrase.
+    /// </summary>
+    public void ResetPhrasing()
+    {
+        if (_ascendTasks.Count == 0) return;
+
+        float targetY = GetAscendTargetWorldY();
+        int   loops   = Mathf.Max(1, ascendLoops);
+
+        var keys = new List<InstrumentTrack>(_ascendTasks.Keys);
+        foreach (var trk in keys)
+        {
+            var task = _ascendTasks[trk];
+            for (int i = 0; i < task.markers.Count; i++)
+            {
+                var ms = task.markers[i];
+                if (ms.go == null) continue;
+
+                float remainingY = targetY - ms.go.transform.position.y;
+                ms.stepY         = remainingY / loops;
+                ms.loopsRemaining = loops;
+                ms.delayLoopsRemaining = 0;
+
+                // Refresh commit-time snapshot (same pattern as TriggerBurstAscend merge).
+                int mStep = ms.committedStep >= 0 ? ms.committedStep
+                           : (ms.tag != null ? ms.tag.step : -1);
+                ms.commitTimeAtStart = (ms.tag?.track != null && mStep >= 0)
+                    ? ms.tag.track.GetNoteCommitTime(mStep)
+                    : -1f;
+
+                task.markers[i] = ms;
+            }
+            task.delayLoopsRemaining = 0;
+            _ascendTasks[trk] = task;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Loop boundary — step all ascend tasks
+    // -------------------------------------------------------------------------
+
+    private void OnLoopBoundary()
+    {
+        // Retry any collapses that were deferred because notes were in transit.
+        if (_deferredCollapseControllers != null && _deferredCollapseControllers.Count > 0)
+        {
+            var deferred = new List<InstrumentTrackController>(_deferredCollapseControllers);
+            _deferredCollapseControllers.Clear();
+            foreach (var ctrl in deferred)
+                TryCollapseIfHighestBinEmpty(ctrl);
+        }
+
+        if (_ascendTasks.Count == 0) return;
+
+        var keys = new List<InstrumentTrack>(_ascendTasks.Keys);
+        HashSet<InstrumentTrackController> affectedControllers = null;
+
+        foreach (var trk in keys)
+        {
+            var task = _ascendTasks[trk];
+
+            if (task.delayLoopsRemaining > 0)
+            {
+                task.delayLoopsRemaining--;
+                _ascendTasks[trk] = task;
+                continue;
+            }
+
+            bool anyAlive = false;
+
+            for (int i = 0; i < task.markers.Count; i++)
+            {
+                var ms = task.markers[i];
+
+                if (ms.go == null) continue;
+
+                if (ms.delayLoopsRemaining > 0)
+                {
+                    ms.delayLoopsRemaining--;
+                    task.markers[i] = ms;
+                    anyAlive = true;
+                    continue;
+                }
+
+                var tf = ms.go.transform;
+                var pos = tf.position;
+                pos.y += ms.stepY;
+                tf.position = pos;
+
+                ms.loopsRemaining = Mathf.Max(0, ms.loopsRemaining - 1);
+
+                FadeMarkerParticles(ms.go, (float)ms.loopsRemaining / Mathf.Max(1, ascendLoops));
+
+                if (ms.loopsRemaining <= 0)
+                {
+                    // Fire ring-dot event before the marker is destroyed.
+                    if (ms.tag?.track != null)
+                    {
+                        int fireStep = ms.committedStep >= 0 ? ms.committedStep : ms.tag.step;
+                        OnNoteReachedAscent?.Invoke(ms.tag.track, fireStep, ms.go.transform.position);
+                    }
+
+                    // Arrived at ascent line — bump line charge
+                    LineCharge01 = Mathf.Min(1f, LineCharge01 + 0.25f);
+
+                    // Remove the note from the persistent loop so it stops playing.
+                    // Guard: if the note was re-committed after this ascension started
+                    // (e.g. a new collection landed at the same step in the same frame),
+                    // skip removal so the fresh note continues to play.
+                    if (ms.tag != null && ms.tag.track != null)
+                    {
+                        // Use committedStep — the noteMarkers key recorded at ascension
+                        // start — not tag.step, which drifts when notes are released in
+                        // reverse order (placeholder visual ≠ committed loop position).
+                        int removeStep = ms.committedStep >= 0 ? ms.committedStep : ms.tag.step;
+                        float currentCommit = ms.tag.track.GetNoteCommitTime(removeStep);
+                        bool noteRefreshed = currentCommit > ms.commitTimeAtStart;
+                        if (!noteRefreshed)
+                        {
+                            // Defer by 1 frame so InstrumentTrack.Update() can play the note
+                            // at the current bar boundary before it is removed, regardless of
+                            // script execution order (DrumTrack fires OnLoopBoundary before
+                            // InstrumentTrack runs, which otherwise silences step=0 permanently).
+                            StartCoroutine(RemovePersistentNoteNextFrame(ms.tag.track, removeStep, ms.commitTimeAtStart));
+                        }
+                        var ctrl = ms.tag.track.controller;
+                        if (ctrl != null)
+                        {
+                            affectedControllers ??= new HashSet<InstrumentTrackController>();
+                            affectedControllers.Add(ctrl);
+                        }
+                    }
+
+                    // Destroy the visual marker.
+                    Destroy(ms.go);
+                }
+                else
+                {
+                    anyAlive = true;
+                }
+
+                task.markers[i] = ms;
+            }
+
+            if (anyAlive)
+                _ascendTasks[trk] = task;
+            else
+                _ascendTasks.Remove(trk);
+        }
+
+        // After all notes are removed this boundary: collapse the loop if the
+        // highest active bin is now empty on every track.
+        if (affectedControllers != null)
+            foreach (var ctrl in affectedControllers)
+                TryCollapseIfHighestBinEmpty(ctrl);
+    }
+
+    private IEnumerator RemovePersistentNoteNextFrame(InstrumentTrack track, int step, float commitTimeAtStart)
+    {
+        yield return null;
+        if (track == null) yield break;
+        float currentCommit = track.GetNoteCommitTime(step);
+        if (currentCommit <= commitTimeAtStart)
+            track.RemovePersistentNoteAtStep(step);
+    }
+
+    private static void FadeMarkerParticles(GameObject go, float alpha)
+    {
+        if (go == null) return;
+        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>())
+        {
+            var main = ps.main;
+            var c    = main.startColor.color;
+            c.a      = alpha;
+            main.startColor = c;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Public API — called by NoteVisualizer / InstrumentTrack
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Enqueue an ascension animation for all markers belonging to the given
+    /// track and burst. Mirrors NoteVisualizer.TriggerBurstAscend().
+    /// </summary>
+    /// <param name="track">The InstrumentTrack whose markers should ascend.</param>
+    /// <param name="burstId">Only markers tagged with this burstId will be animated.</param>
+    /// <param name="markerLookup">
+    ///     Delegate that returns the live marker GameObjects for (track, burstId).
+    ///     NoteVisualizer supplies this so the director never needs to know about
+    ///     noteMarkers or trackRows directly.
+    /// </param>
+    /// <param name="committedStepResolver">
+    ///     Optional: given a marker GameObject, returns the loop step that note was
+    ///     actually committed at (the noteMarkers dictionary key). When null, falls
+    ///     back to tag.step — which can differ after reverse-order manual releases.
+    /// </param>
+    public void TriggerBurstAscend(
+        InstrumentTrack track,
+        int burstId,
+        Func<InstrumentTrack, int, IEnumerable<GameObject>> markerLookup,
+        int ascendLoopsOverride = -1,
+        Func<InstrumentTrack, GameObject, int> committedStepResolver = null)
+    {
+        if (track == null || markerLookup == null) return;
+        if (_drum == null) return;
+
+        float loopLen = _drum.GetLoopLengthInSeconds();
+        if (loopLen <= 0f) return; // drum transport not ready yet
+
+        int loops = Mathf.Max(1, ascendLoopsOverride > 0 ? ascendLoopsOverride : ascendLoops);
+        float targetY = GetAscendTargetWorldY();
+
+        // Build marker list for the new burst.
+        var newMarkers = new List<MarkerState>();
+        foreach (var go in markerLookup(track, burstId))
+        {
+            if (go == null) continue;
+
+            float totalY = targetY - go.transform.position.y;
+            float stepY = totalY / loops;
+
+            var tag = go.GetComponent<MarkerTag>();
+            if (tag != null) tag.isAscending = true;
+
+            // committedStep is the loop step this note lives at — authoritative for
+            // RemovePersistentNoteAtStep. tag.step may differ when reverse-order releases
+            // place a collectable into a placeholder that isn't its authored slot.
+            int committedStep = committedStepResolver != null
+                ? committedStepResolver(track, go)
+                : (tag != null ? tag.step : -1);
+
+            float commitTime = (track != null && committedStep >= 0)
+                ? track.GetNoteCommitTime(committedStep)
+                : -1f;
+
+            newMarkers.Add(new MarkerState
+            {
+                go = go,
+                stepY = stepY,
+                loopsRemaining = loops,
+                delayLoopsRemaining = 0,
+                tag = tag,
+                committedStep = committedStep,
+                commitTimeAtStart = commitTime,
+            });
+        }
+
+        if (newMarkers.Count == 0) return;
+
+        // If existing markers for this track are already ascending, reset their
+        // loopsRemaining and stepY so all notes on the track share the same countdown.
+        // This way a second burst for the same track refreshes the first burst's timer.
+        if (_ascendTasks.TryGetValue(track, out var existing))
+        {
+            var merged = new List<MarkerState>(existing.markers.Count + newMarkers.Count);
+            for (int i = 0; i < existing.markers.Count; i++)
+            {
+                var ms = existing.markers[i];
+                if (ms.go == null) continue; // prune destroyed markers
+                float remainingY = targetY - ms.go.transform.position.y;
+                ms.stepY = remainingY / loops;
+                ms.loopsRemaining = loops;
+                // Refresh committedStep — noteMarkers key can shift between bursts.
+                if (committedStepResolver != null && ms.go != null)
+                {
+                    int resolved = committedStepResolver(track, ms.go);
+                    if (resolved >= 0) ms.committedStep = resolved;
+                }
+                // Refresh commit-time snapshot since the ascension countdown is being reset.
+                int mStep = ms.committedStep >= 0 ? ms.committedStep
+                           : (ms.tag != null ? ms.tag.step : -1);
+                ms.commitTimeAtStart = (ms.tag?.track != null && mStep >= 0)
+                    ? ms.tag.track.GetNoteCommitTime(mStep)
+                    : -1f;
+                merged.Add(ms);
+            }
+            merged.AddRange(newMarkers);
+            _ascendTasks[track] = new AscendTask { markers = merged, delayLoopsRemaining = 0 };
+        }
+        else
+        {
+            _ascendTasks[track] = new AscendTask { markers = newMarkers, delayLoopsRemaining = 0 };
+        }
+    }
+}
