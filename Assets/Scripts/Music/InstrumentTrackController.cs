@@ -1,17 +1,15 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections.Generic;
-using System.Collections;
 using System.Linq;
-using MidiPlayerTK;
-using Object = UnityEngine.Object;
-using Random = UnityEngine.Random;
+
 public struct TransportFrame
 {
     public int barIndex;
     public int playheadBin;
     public int boundarySerial;
 }
-public class InstrumentTrackController : MonoBehaviour
+
+public partial class InstrumentTrackController : MonoBehaviour
 {
     [Header("Config")]
     [SerializeField] public InstrumentTrackControllerConfig config;
@@ -19,33 +17,16 @@ public class InstrumentTrackController : MonoBehaviour
     public NoteVisualizer noteVisualizer;
     private readonly Dictionary<InstrumentTrack, int> _loopHash = new();
     private bool _chordEventsSubscribed;
-    private Vector2Int _gravityVoidCenterGP;
-    private bool _gravityVoidHasCenterGP;
-    private readonly List<Vector2Int> _vehicleCellsScratch = new();
-    private readonly Dictionary<InstrumentTrack, bool> _allowAdvanceNextBurst = new Dictionary<InstrumentTrack, bool>();
     [Header("Gravity Void (Expansion Waiting)")]
     [Tooltip("Spawned when this track stages an expansion (waiting for expansion). Despawned when expansion commits.")]
     [SerializeField] private GameObject gravityVoidPrefab;
     [Tooltip("Optional parent for the spawned gravity void instance.")]
     [SerializeField] private Transform gravityVoidParent;
-    private GameObject _gravityVoidInstance;
-    private ParticleSystem[] _gravityVoidParticles;
-    // Cache prefab alpha per particle system so alpha doesn't compound.
-    private float[] _gravityVoidPrefabStartAlpha;
 // ---------------------------------------------------------------------
 // SFX: Collection "Pickup Tick" (A2)
 // ---------------------------------------------------------------------
     [SerializeField] private AudioSource pickupSfxSource;
 
-// Optionally track current outer radius for VFX scaling.
-    private int _gravityVoidCurrentOuterR;
-
-    private Coroutine _gravityVoidRoutine;
-    private InstrumentTrack _gravityVoidOwner;
-    private Vector3 _gravityVoidCenterWorld;
-    private Color _gravityVoidParticleTint;
-    private Color _gravityVoidDustImprintTint;
-    private int   _gravityVoidMaxRadiusRuntime   = -1;
     private double _lastTransportDsp;
 // ------------------------------------------------------------
 // Transport cache + guard against transient future-dated anchors
@@ -54,675 +35,72 @@ public class InstrumentTrackController : MonoBehaviour
     private TransportFrame _lastTransport;
     private double _lastTransportLeaderDsp; // leaderStartDspTime when the cache was written
     private GameFlowManager _gfm;
-    // ---------------------------------------------------------------------
-    // SFX: Commit "Placement Stinger" (A3)
-    // Fired when the carried note visually lands on the loop / marker lights.
-    // ---------------------------------------------------------------------
-    [SerializeField] private AudioSource commitSfxSource;
 
-    private float GetSecondsRemainingInCurrentBin() {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var drum = _gfm?.activeDrumTrack;
-        if (drum == null) return 0f; 
-        
-        double start = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime; 
-        
-        if (start <= 0.0) return 0f; 
-        
-        float clipLen = drum.GetClipLengthInSeconds();
-        
-        if (clipLen <= 0f) return 0f;
-        
-        double delta = AudioSettings.dspTime - start;
-        
-        if (delta < 0.0) return clipLen; 
-        
-        double into = delta % clipLen;
-        float rem = (float)(clipLen - into);
-        
-        return Mathf.Clamp(rem, 0f, clipLen);
-    }
-    /// <summary>
-    /// Call this at the *visual deposit / marker light* moment, not at pickup.
-    /// stepIndex is optional but useful later if you want per-step UI flashes.
-    /// </summary>
-    public void NotifyCommitted(InstrumentTrack track, int stepIndex)
-{
-    
-}
-    public void AllowAdvanceNextBurst(InstrumentTrack track)
+    private GravityVoidController _gravityVoid;
+    private BinFrontierAllocator _binAllocator;
+
+    private void EnsureGravityVoid()
     {
-        if (track == null) return;
-        // ByVoice chord groups advance together; NotifyBinFilled grants the token
-        // to all sibling voices simultaneously when the last one fills the bin.
-        var roleProfile = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
-        if (roleProfile != null && roleProfile.configSelectionMode == RoleConfigSelectionMode.ByVoice)
-            return;
-        _allowAdvanceNextBurst[track] = true;
+        if (_gravityVoid != null) return;
+        _gravityVoid = new GravityVoidController(
+            host: this,
+            getGfm: () => { if (_gfm == null) _gfm = GameFlowManager.Instance; return _gfm; },
+            getPrefab: () => gravityVoidPrefab,
+            getParent: () => gravityVoidParent,
+            getGravityVoidScale: () => config.gravityVoidScale,
+            getVoidRingWidthCells: () => config.voidRingWidthCells,
+            getGravityVoidImprintTickSeconds: () => config.gravityVoidImprintTickSeconds,
+            getPlayheadBin: () => GetTransportFrame().playheadBin);
     }
-    private bool ConsumeAllowAdvanceNextBurst(InstrumentTrack track)
+
+    private void EnsureBinAllocator()
     {
-        if (track == null) return false;
-
-        if (_allowAdvanceNextBurst.TryGetValue(track, out bool allowed) && allowed)
-        {
-            _allowAdvanceNextBurst[track] = false;
-            return true;
-        }
-        return false;
+        if (_binAllocator != null) return;
+        _binAllocator = new BinFrontierAllocator(getTracks: () => tracks);
     }
 
-    private void EnsurePickupSfxSource()
-{
-    if (pickupSfxSource != null) return;
-
-    // Dedicated 2D one-shot source (never touches drum loop sources).
-    var go = new GameObject("TrackPickupSFX");
-    go.transform.SetParent(transform, worldPositionStays: false);
-
-    pickupSfxSource = go.AddComponent<AudioSource>();
-    pickupSfxSource.playOnAwake = false;
-    pickupSfxSource.loop = false;
-    pickupSfxSource.spatialBlend = 0f; // 2D
-    pickupSfxSource.volume = 1f;       // volume scaled per PlayOneShot call
-}
-
-    private AudioClip GetPickupTickClip(MusicalRole role)
-{
-    switch (role)
-    {
-        case MusicalRole.Bass:    return config.pickupTickBass    != null ? config.pickupTickBass    : config.pickupTickDefault;
-        case MusicalRole.Lead:    return config.pickupTickLead    != null ? config.pickupTickLead    : config.pickupTickDefault;
-        case MusicalRole.Harmony: return config.pickupTickHarmony != null ? config.pickupTickHarmony : config.pickupTickDefault;
-        case MusicalRole.Groove:  return config.pickupTickGroove  != null ? config.pickupTickGroove  : config.pickupTickDefault;
-        default:                  return config.pickupTickDefault;
-    }
-}
-
-    private void PlayPickupTick(InstrumentTrack track)
-    {
-        if (track == null) return;
-
-        EnsurePickupSfxSource();
-        if (pickupSfxSource == null) return;
-
-        var clip = GetPickupTickClip(track.assignedRole);
-        if (clip == null) return; // nothing configured yet
-
-        float prevPitch = pickupSfxSource.pitch;
-        if (config.pickupTickPitchJitter > 0f)
-            pickupSfxSource.pitch = 1f + Random.Range(-config.pickupTickPitchJitter, config.pickupTickPitchJitter);
-
-        pickupSfxSource.PlayOneShot(clip, config.pickupTickVolume);
-        pickupSfxSource.pitch = prevPitch;
-    }
-    public void NotifyCollected(InstrumentTrack track)
-    {
-        PlayPickupTick(track);
-    }
     public void BeginGravityVoidForPendingExpand(InstrumentTrack ownerTrack, Vector3 centerWorld, Vector2Int centerGP)
     {
-        if (ownerTrack == null) return;
-
-        // Is this a repeat Begin for the same owner while already active?
-        bool sameOwner = (_gravityVoidOwner != null && ownerTrack == _gravityVoidOwner);
-        bool routineRunning = (_gravityVoidRoutine != null);
-
-        // Update owner + center every time (Begin acts as "refresh" too).
-        _gravityVoidOwner = ownerTrack;
-        _gravityVoidCenterWorld = centerWorld;
-        _gravityVoidCenterGP = centerGP;
-        _gravityVoidHasCenterGP = true;
-
-        var c = MusicalRoleProfileLibrary.GetProfile(ownerTrack.assignedRole)?.GetBaseColor() ?? ownerTrack.DisplayColor;
-        _gravityVoidDustImprintTint = c;
-        _gravityVoidParticleTint    = new Color(c.r, c.g, c.b, 1f);
-
-        // Spawn if needed, otherwise update visuals/position (must not destroy/recreate).
-        SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
-
-        // Recompute runtime parameters; these can change while pending.
-        _gravityVoidMaxRadiusRuntime = -1;
-
-        if (_gravityVoidOwner != null)
-        {
-            // Radius mapping: 1 bin = 1 radius cell (visualize incoming bin => current + 1).
-            int targetRadius = Mathf.Max(1, _gravityVoidOwner.loopMultiplier + 1);
-            _gravityVoidMaxRadiusRuntime = targetRadius;
-        }
-
-        // --- CRITICAL: don't restart the coroutine if it's already running for this owner. ---
-        // Restarting here is what looks like "respawn at the boundary".
-        if (sameOwner && routineRunning)
-        {
-            return;
-        }
-
-        // If owner changed, or routine is missing, (re)start cleanly.
-        if (_gravityVoidRoutine != null)
-        {
-            StopCoroutine(_gravityVoidRoutine);
-            _gravityVoidRoutine = null;
-        }
-
-        // Safety bubble: activate at the MineNode capture position while the void is expanding.
-        {
-            if (_gfm == null) _gfm = GameFlowManager.Instance;
-            var pool = _gfm?.activeDrumTrack?._starPool;
-
-            // Compute max outer radius from ring formula so VFX sizes correctly.
-            var motifRoles = pool?.GetAnyActiveStarMotifRoles();
-            int roleCount = (motifRoles != null && motifRoles.Count > 0) ? motifRoles.Count : 4;
-            int ringsPerSubseq = Mathf.Max(1, roleCount / 2);
-            int totalRings = roleCount + (Mathf.Max(1, _gravityVoidOwner.loopMultiplier) - 1) * ringsPerSubseq;
-            _gravityVoidMaxRadiusRuntime = totalRings * config.voidRingWidthCells;
-        }
-
-        _gravityVoidRoutine = StartCoroutine(GravityVoidGrowAndImprintRoutine());
+        EnsureGravityVoid();
+        _gravityVoid.BeginGravityVoidForPendingExpand(ownerTrack, centerWorld, centerGP);
     }
+
     public void EndGravityVoidForPendingExpand(InstrumentTrack ownerTrack)
     {
-        // If caller provides an owner, only allow the owner to end it.
-        if (ownerTrack != null && _gravityVoidOwner != null && ownerTrack != _gravityVoidOwner)
-        {
-            return;
-        }
-        _gravityVoidOwner = null;
-        _gravityVoidHasCenterGP = false;
-
-        if (_gravityVoidRoutine != null)
-        {
-            StopCoroutine(_gravityVoidRoutine);
-            _gravityVoidRoutine = null;
-        }
-        if (_gravityVoidInstance == null) return;
-        var explode = _gravityVoidInstance.GetComponent<Explode>();
-        if (explode != null) explode.Permanent();
-
-        DespawnGravityVoid();
-    }
-    private IEnumerator GravityVoidGrowAndImprintRoutine()
-    {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        if (_gfm?.dustGenerator == null) yield break;
-
-        var pool = _gfm?.activeDrumTrack?._starPool;
-        IReadOnlyList<MusicalRole> activeRoles = pool?.GetAnyActiveStarMotifRoles();
-        if (activeRoles == null || activeRoles.Count == 0)
-            activeRoles = new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove, MusicalRole.Rhythm };
-
-        int N            = activeRoles.Count;
-        int W            = config.voidRingWidthCells;
-        int ringsPerSubseq = Mathf.Max(1, N / 2);
-        int completedRings = 0;
-        int lastBurstBin   = -1;
-        float tick         = Mathf.Max(0.01f, config.gravityVoidImprintTickSeconds);
-
-        while (_gravityVoidOwner != null)
-        {
-            SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
-
-            int playheadBin = GetTransportFrame().playheadBin;
-            if (playheadBin != lastBurstBin && _gravityVoidHasCenterGP)
-            {
-                lastBurstBin   = playheadBin;
-                int ringsThisBin = (playheadBin == 0) ? N : ringsPerSubseq;
-                float growIn     = Mathf.Max(0.05f, GetSecondsRemainingInCurrentBin());
-
-                CollectVehicleGridCells();
-                ImprintVoidRings(activeRoles, N, W, ringsThisBin, completedRings, growIn);
-
-                completedRings           += ringsThisBin;
-                _gravityVoidCurrentOuterR = completedRings * W;
-            }
-
-            yield return new WaitForSeconds(tick);
-        }
-
-        _gravityVoidRoutine = null;
+        EnsureGravityVoid();
+        _gravityVoid.EndGravityVoidForPendingExpand(ownerTrack);
     }
 
-    private void CollectVehicleGridCells()
+    public void AllowAdvanceNextBurst(InstrumentTrack track)
     {
-        _vehicleCellsScratch.Clear();
-        var vehicleList = _gfm?.GetVehicles();
-        if (vehicleList == null || _gfm?.activeDrumTrack == null) return;
-        foreach (var v in vehicleList)
-        {
-            if (v != null && v.isActiveAndEnabled)
-                _vehicleCellsScratch.Add(_gfm.activeDrumTrack.WorldToGridPosition(v.transform.position));
-        }
+        EnsureBinAllocator();
+        _binAllocator.AllowAdvanceNextBurst(track);
     }
 
-    private void ImprintVoidRings(
-        IReadOnlyList<MusicalRole> activeRoles, int N, int W,
-        int ringsThisBin, int completedRingsBefore, float growIn)
+    public int GetBinForNextSpawn(InstrumentTrack track)
     {
-        var dustGen = _gfm?.dustGenerator;
-        if (dustGen == null) return;
-
-        for (int r = 0; r < ringsThisBin; r++)
-        {
-            int globalRingIdx = completedRingsBefore + r;
-            int innerR        = globalRingIdx * W;
-            int outerR        = innerR + W;
-            var ringRole      = activeRoles[globalRingIdx % N];
-            var roleProfile   = MusicalRoleProfileLibrary.GetProfile(ringRole);
-
-            dustGen.GrowVoidDustDiskFromGrid(
-                centerGP:                  _gravityVoidCenterGP,
-                outerRadiusCells:          outerR,
-                imprintRole:               ringRole,
-                hueRgb:                    roleProfile?.GetBaseColor() ?? _gravityVoidDustImprintTint,
-                energyAtCenter01:          1f,
-                falloffExp:                0.3f,
-                growInSeconds:             growIn,
-                fillWedges01To4:           4,
-                vehicleCells:              _vehicleCellsScratch,
-                vehicleNoSpawnRadiusCells: 1,
-                maxCellsThisCall:          -1,
-                innerRadiusCellsExclusive: innerR
-            );
-        }
+        EnsureBinAllocator();
+        return _binAllocator.GetBinForNextSpawn(track);
     }
 
-    private InstrumentTrack GetTrackForRole(MusicalRole role)
+    public bool IsChordGroupComplete(MusicalRole role, int binIndex)
     {
-        if (role == MusicalRole.None) return null;
-        if (tracks == null || tracks.Length == 0) return null;
-
-        for (int i = 0; i < tracks.Length; i++)
-        {
-            var t = tracks[i];
-            if (t != null && t.assignedRole == role)
-                return t;
-        }
-
-        return null;
-    }
-    public void PlayDustChordPluck(
-        MusicalRole role,
-        float phrase01 = 0f,
-        int chordSize = 4,
-        int durTicks = 180,
-        float vel127 = 24f)
-    {
-        try
-        {
-            if (role == MusicalRole.None)
-                return;
-
-            var track = GetTrackForRole(role);
-            if (track == null)
-                return;
-
-            if (_gfm == null) _gfm = GameFlowManager.Instance;
-            var harmony = _gfm?.harmony;
-            if (harmony == null)
-                return;
-
-            int playheadBin = GetTransportFrame().playheadBin;
-            int chordIdx = track.Harmony_GetChordIndexForBin(playheadBin);
-            if (chordIdx < 0)
-                return;
-
-            if (!harmony.TryGetChordAt(chordIdx, out var chord))
-                return;
-
-            if (chord.intervals == null || chord.intervals.Count == 0)
-                return;
-
-            var notes = BuildGravityVoidVoicing(
-                track.assignedRole,
-                chord,
-                Mathf.Max(1, chordSize),
-                track.lowestAllowedNote,
-                track.highestAllowedNote
-            );
-
-            if (notes == null || notes.Count == 0)
-                return;
-
-            phrase01 = Mathf.Clamp01(phrase01);
-
-            int noteIndex = Mathf.Clamp(
-                Mathf.RoundToInt(phrase01 * (notes.Count - 1)),
-                0,
-                notes.Count - 1
-            );
-
-            int midi = notes[noteIndex];
-
-            track.PlayNote127(midi, durTicks, vel127);
-        }
-        catch (System.Exception ex)
-        {
-            Debug.LogError($"[DUST] PlayDustChordPluck EXCEPTION: {ex}");
-        }
-    }
-    private List<int> BuildGravityVoidVoicing(
-        MusicalRole role,
-        Chord chord,
-        int targetCount,
-        int low,
-        int high)
-    {
-        // Build pitch classes from chord
-        var pcs = chord.intervals
-            .Select(i => (chord.rootNote + i) % 12)
-            .Distinct()
-            .ToList();
-
-        int rootPC  = chord.rootNote % 12;
-        int thirdPC = pcs.FirstOrDefault(pc => (pc - rootPC + 12) % 12 is 3 or 4);
-        int fifthPC = pcs.FirstOrDefault(pc => (pc - rootPC + 12) % 12 == 7);
-        int seventhPC = pcs.FirstOrDefault(pc => (pc - rootPC + 12) % 12 is 10 or 11);
-
-        List<int> priorityPCs = role switch
-        {
-            // --------------------------------------------------
-            // Bass: guide tones first, avoid root dominance
-            // --------------------------------------------------
-            MusicalRole.Bass => new()
-            {
-                thirdPC,
-                seventhPC,
-                fifthPC,
-                rootPC,
-                thirdPC
-            },
-
-            // --------------------------------------------------
-            // Harmony: classic shell → full stack
-            // --------------------------------------------------
-            MusicalRole.Harmony => new()
-            {
-                thirdPC,
-                seventhPC,
-                rootPC,
-                fifthPC,
-                seventhPC
-            },
-
-            // --------------------------------------------------
-            // Lead: color tones, higher tension
-            // --------------------------------------------------
-            MusicalRole.Lead => new()
-            {
-                seventhPC,
-                thirdPC,
-                fifthPC,
-                rootPC,
-                seventhPC
-            },
-
-            // --------------------------------------------------
-            // Groove / mid-perc tonal
-            // --------------------------------------------------
-            MusicalRole.Groove => new()
-            {
-                thirdPC,
-                fifthPC,
-                seventhPC,
-                rootPC,
-                thirdPC
-            },
-
-            _ => pcs
-        };
-
-        var result = new List<int>();
-        int octaveAnchor = (low + high) / 2;
-
-        foreach (int pc in priorityPCs)
-        {
-            if (result.Count >= targetCount) break;
-
-            int note = FitPitchClassToRange(pc, octaveAnchor, low, high);
-            if (!result.Contains(note))
-                result.Add(note);
-        }
-
-        return result;
-    }
-    private int FitPitchClassToRange(int pc, int anchor, int low, int high)
-    {
-        int note = anchor - ((anchor - pc + 120) % 12);
-        while (note < low)  note += 12;
-        while (note > high) note -= 12;
-        return Mathf.Clamp(note, low, high);
+        EnsureBinAllocator();
+        return _binAllocator.IsChordGroupComplete(role, binIndex);
     }
 
-    private void DespawnGravityVoid()
+    public void NotifyBinFilled(InstrumentTrack track, int binIndex)
     {
-        if (_gravityVoidInstance == null)
-            return;
-        Destroy(_gravityVoidInstance);
-
-        _gravityVoidInstance = null;
-        _gravityVoidParticles = null;
-
-        // Clear cached prefab alpha so the next spawn re-captures it
-        _gravityVoidPrefabStartAlpha = null;
-
-        // Reset VFX growth state
-        _gravityVoidCurrentOuterR = 0;
-
-        // Clear center bookkeeping (defensive; owner is cleared elsewhere)
-        _gravityVoidHasCenterGP = false;
-    }
-
-    private void SpawnOrUpdateGravityVoid(Vector3 worldPos, Color tint)
-{
-    if (gravityVoidPrefab == null) return;
-
-    if (_gravityVoidInstance == null)
-    {
-        var parent = (gravityVoidParent != null) ? gravityVoidParent : transform;
-        _gravityVoidInstance = Instantiate(gravityVoidPrefab, worldPos, Quaternion.identity, parent);
-
-        if (config.gravityVoidScale != 1f)
-            _gravityVoidInstance.transform.localScale *= config.gravityVoidScale;
-
-        _gravityVoidParticles = _gravityVoidInstance.GetComponentsInChildren<ParticleSystem>(true);
-
-        // Cache each particle system's prefab alpha ONCE so we can preserve it.
-        if (_gravityVoidParticles != null && _gravityVoidParticles.Length > 0)
-        {
-            _gravityVoidPrefabStartAlpha = new float[_gravityVoidParticles.Length];
-            for (int i = 0; i < _gravityVoidParticles.Length; i++)
-            {
-                var ps = _gravityVoidParticles[i];
-                if (ps == null) { _gravityVoidPrefabStartAlpha[i] = 1f; continue; }
-
-                var main = ps.main;
-
-                // startColor can be a gradient; this grabs a representative color.
-                // If your prefab uses gradients heavily and you need exactness, we can upgrade this,
-                // but for your use (white low-alpha ring), this is correct.
-                _gravityVoidPrefabStartAlpha[i] = main.startColor.color.a;
-            }
-        }
-    }
-    else
-    {
-        _gravityVoidInstance.transform.position = worldPos;
-    }
-
-    if (_gravityVoidParticles == null) return;
-
-    // ----- OPTIONAL: scale VFX outward to match current radius -----
-    // This assumes your prefab ring looks correct at "max" scale = config.gravityVoidScale.
-    // We scale from a small minimum up to full based on current outer radius.
-    if (_gravityVoidInstance != null && _gravityVoidMaxRadiusRuntime > 0)
-    {
-        float frac = Mathf.Clamp01((float)_gravityVoidCurrentOuterR / (float)_gravityVoidMaxRadiusRuntime);
-
-        // Keep a visible presence even at the start (so it doesn't look like "nothing happens").
-        const float minFrac = 0.15f;
-        float s = Mathf.Lerp(minFrac, 1f, frac);
-
-        // Preserve your authored prefab scale + config.gravityVoidScale multiplier.
-        // We apply a uniform multiplier on top.
-        Vector3 baseScale = Vector3.one * config.gravityVoidScale;
-        _gravityVoidInstance.transform.localScale = baseScale * s;
-    }
-
-    // ----- Keep particle-system duration/lifetime roughly matched to how long the
-    // pending burst is expected to take, so the ring's own animation cycle doesn't
-    // visibly finish and idle while it waits for the event-driven despawn. -----
-    float estimatedSeconds = EstimateGravityVoidDurationSeconds();
-
-    // ----- Tint particles without compounding alpha -----
-    for (int i = 0; i < _gravityVoidParticles.Length; i++)
-    {
-        var ps = _gravityVoidParticles[i];
-        if (ps == null) continue;
-
-        var main = ps.main;
-
-        float prefabA = 1f;
-        if (_gravityVoidPrefabStartAlpha != null && i >= 0 && i < _gravityVoidPrefabStartAlpha.Length)
-            prefabA = _gravityVoidPrefabStartAlpha[i];
-
-        Color outC = tint;
-        outC.a = prefabA * tint.a;      // preserve prefab alpha; tint.a is your multiplier
-
-        main.startColor = outC;
-
-        if (estimatedSeconds > 0f)
-        {
-            main.duration = estimatedSeconds;
-            if (main.startLifetime.mode == ParticleSystemCurveMode.Constant)
-                main.startLifetime = estimatedSeconds;
-        }
-    }
-}
-
-    // Estimates seconds until the pending/in-flight burst's last note should eject, purely
-    // as a cosmetic hint for the void particle system's duration. Actual despawn timing is
-    // event-driven (see InstrumentTrackCompositionSpawner.OnCompositionStepFired), so an
-    // imprecise estimate here only affects how the ring's animation cycles, not correctness.
-    private float EstimateGravityVoidDurationSeconds()
-    {
-        if (_gravityVoidOwner == null) return 0f;
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var drum = _gfm?.activeDrumTrack;
-        if (drum == null) return 0f;
-
-        int binSize = _gravityVoidOwner.BinSize();
-        if (binSize <= 0) return 0f;
-
-        int resolvedBin = _gravityVoidOwner.PendingIntendedTargetBin ?? Mathf.Max(0, _gravityVoidOwner.loopMultiplier);
-        int finalStep = (resolvedBin + 1) * binSize;
-
-        int leaderSteps = Mathf.Max(1, drum.GetLeaderSteps());
-        float stepDurationSec = drum.EffectiveLoopLengthSec / leaderSteps;
-
-        return Mathf.Max(0f, finalStep * stepDurationSec);
-    }
-
-    public void ResetControllerBinGuards()
-    {
-    }
-
-    // Shared precondition for both AllTracksMaxed paths below: resolves GameFlowManager
-    // and the motif's alternate chord profile, and confirms every track whose role is
-    // active in the current motif has reached its max loopMultiplier.
-    private bool TryGetAllTracksMaxedAltProfile(out GameFlowManager gfm, out ChordProgressionProfile alt)
-    {
-        gfm = null;
-        alt = null;
-        if (tracks == null) return false;
-
-        gfm = GameFlowManager.Instance;
-        if (gfm == null) return false;
-
-        var motif = gfm.phaseTransitionManager?.currentMotif;
-        var candidateAlt = motif?.alternateChordProgressionProfile;
-        if (candidateAlt == null) return false;
-
-        var activeRoles = motif.GetActiveRoles();
-        if (activeRoles == null || activeRoles.Count == 0) return false;
-
-        // Only check tracks whose role is active in the current motif.
-        foreach (var t in tracks)
-        {
-            if (t == null) continue;
-            if (!activeRoles.Contains(t.assignedRole)) continue;
-            if (t.loopMultiplier < t.maxLoopMultiplier) return false;
-        }
-
-        alt = candidateAlt;
-        return true;
-    }
-
-    public void CheckAndTriggerAllTracksMaxed()
-    {
-        if (!TryGetAllTracksMaxedAltProfile(out var gfm, out var alt)) return;
-        if (gfm.GhostCycleInProgress || gfm.BridgePending) return;
-
-        gfm.harmony?.SetActiveProfile(alt, applyImmediately: true);
-        gfm.BeginMotifBridge("AllTracksMaxed");
-    }
-
-    public void StageAltChordIfAllTracksMaxed()
-    {
-        if (!TryGetAllTracksMaxedAltProfile(out var gfm, out var alt)) return;
-        gfm.harmony?.SetActiveProfile(alt, applyImmediately: false);
-    }
-
-    public void StartSuperNodeCompletionSequence(InstrumentTrack track, int fromBin, int toBin,
-                                                   int ascendLoopsOverride, int binSz, DrumTrack drum)
-    {
-        if (track == null || fromBin >= toBin) return;
-        StartCoroutine(SuperNodeCompletionCoroutine(track, fromBin, toBin, ascendLoopsOverride, binSz, drum));
-    }
-
-    private IEnumerator SuperNodeCompletionCoroutine(InstrumentTrack track, int fromBin, int toBin,
-                                                      int ascendLoopsOverride, int binSz, DrumTrack drum)
-    {
-        yield return WaitForNextLoopBoundary(drum);
-
-        // N+1 boundary: visual cleanup loop — explode remaining gameplay objects and fade dust
-        // before the record appears next loop.
-        var gfm = GameFlowManager.Instance;
-        if (gfm != null)
-        {
-            foreach (var n in Object.FindObjectsByType<MineNode>(FindObjectsSortMode.None))
-            {
-                if (n == null) continue;
-                var ex = n.GetComponent<Explode>();
-                if (ex != null) ex.Permanent();
-                else Object.Destroy(n.gameObject);
-            }
-            gfm.activeDrumTrack?._starPool?.ExplodeAndClearAll();
-            gfm.dustGenerator?.HardStopRegrowthForBridge(hideTransientDust: true);
-            gfm.dustGenerator?.BeginSlowFadeAllDust(Mathf.Max(1f, GetEffectiveLoopLengthInSeconds()));
-        }
-
-        noteVisualizer?.TriggerStepRangeAscend(track, fromBin * binSz, toBin * binSz, ascendLoopsOverride);
-
-        yield return WaitForNextLoopBoundary(drum);
-
-        // N+2 boundary: record appears with alt chord.
-        CheckAndTriggerAllTracksMaxed();
-    }
-
-    private IEnumerator WaitForNextLoopBoundary(DrumTrack drum)
-    {
-        if (drum == null) yield break;
-        bool fired = false;
-        System.Action onBoundary = () => fired = true;
-        drum.OnLoopBoundary += onBoundary;
-        yield return new WaitUntil(() => fired);
-        drum.OnLoopBoundary -= onBoundary;
+        EnsureBinAllocator();
+        _binAllocator.NotifyBinFilled(track, binIndex);
     }
 
     void Start()
     {
         _gfm = GameFlowManager.Instance;
         if (_gfm == null || !_gfm.ReadyToPlay()) return;
+        EnsureGravityVoid();
+        EnsureBinAllocator();
         noteVisualizer?.Initialize(); // ← ensures playhead + mapping are active
         ResetAllCursorsAndGuards();
         EnsurePickupSfxSource();
@@ -737,156 +115,10 @@ public class InstrumentTrackController : MonoBehaviour
             }
         // Subscribe to the drum’s loop boundary so we (re)arm each loop
         var drum = _gfm.activeDrumTrack;
-        TrySubscribeChordEvents(); 
+        TrySubscribeChordEvents();
         if (drum != null)
             drum.OnLoopBoundary += ArmCohortsOnLoopBoundary;
         ArmCohortsOnLoopBoundary();
-    }
-    /// <summary>
-    /// Single source of truth for which bin is currently audible,
-    /// derived ONLY from DSP time and the drum clip length.
-    /// </summary>
-    public TransportFrame GetTransportFrame()
-    {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var drum = _gfm?.activeDrumTrack;
-        if (drum == null) return default;
-
-        double dspNow = AudioSettings.dspTime;
-
-        // Short-circuit: if called multiple times within the same DSP sample (multiple tracks per frame),
-        // return the cached result instead of recalculating.
-        // Also invalidate if leaderStartDspTime advanced mid-frame (loop boundary fired after some
-        // InstrumentTracks already ran Update), which would cause stale barIndex + fresh start mismatch.
-        double leaderDspNow = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
-        if (_hasLastTransport && dspNow == _lastTransportDsp && leaderDspNow == _lastTransportLeaderDsp)
-            return _lastTransport;
-
-        double start = leaderDspNow;
-        if (start <= 0.0) return default;
-
-        float clipLen = drum.GetClipLengthInSeconds();
-        if (clipLen <= 0f) return default;
-
-        // --- tolerate "start is slightly in the future" due to PlayScheduled lead time ---
-        const double kFutureStartEpsilon = 0.050; // 50ms
-        double delta = dspNow - start;
-
-        if (delta < 0.0)
-        {
-            if (delta > -kFutureStartEpsilon)
-            {
-                dspNow = start;
-                delta = 0.0;
-            }
-            else
-            {
-                return new TransportFrame
-                {
-                    barIndex = 0,
-                    playheadBin = 0,
-                    boundarySerial = drum.GetBoundarySerial()
-                };
-            }
-        }
-
-        int barIndex = (int)System.Math.Floor(delta / (double)clipLen);
-
-        // IMPORTANT: use committed/audible bins, not visual bins.
-        int leaderBins = Mathf.Max(1, drum.GetCommittedBinCount());
-        int playheadBin = (leaderBins <= 1) ? 0 : (barIndex % leaderBins);
-
-        var tf = new TransportFrame
-        {
-            barIndex = barIndex,
-            playheadBin = playheadBin,
-            boundarySerial = drum.GetBoundarySerial()
-        };
-
-        _lastTransport = tf;
-        _lastTransportDsp = dspNow;
-        _lastTransportLeaderDsp = leaderDspNow;
-        _hasLastTransport = true;
-        return tf;
-    }
-    /// <summary>
-    /// Returns the current playhead position as an absolute step within the current leader loop.
-    /// This is a continuous value (rawAbsStep) plus its floor (floorAbsStep) and total length (totalAbsSteps).
-    /// Safe to call during transient transport re-wiring; returns false if timing can't be resolved.
-    /// </summary>
-    public bool TryGetRawPlayheadAbsStep(out double rawAbsStep, out int floorAbsStep, out int totalAbsSteps)
-    {
-        rawAbsStep = 0;
-        floorAbsStep = 0;
-        totalAbsSteps = 0;
-
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var drum = _gfm?.activeDrumTrack;
-        if (drum == null) return false;
-
-        // NOTE: Manual release timing must be evaluated on the *leader* loop timeline.
-        // If GetLoopLengthInSeconds() is a single bin/bar length (e.g., 16 steps), then
-        // dividing it by leaderSteps (e.g., 64) makes stepDur 4x too small and rawAbsStep
-        // advances 4x too fast, effectively shrinking your window.
-        double baseLoopLen = drum.GetClipLengthInSeconds();
-        if (baseLoopLen <= 0.0) return false;
-
-        double dspNow = AudioSettings.dspTime;
-
-        double transportStart = (drum.leaderStartDspTime > 0.0) ? drum.leaderStartDspTime : drum.startDspTime;
-        if (transportStart <= 0.0) return false;
-
-        int leaderSteps = Mathf.Max(1, drum.GetLeaderSteps());
-        totalAbsSteps = leaderSteps;
-
-        int binSize = Mathf.Max(1, drum.totalSteps);
-        int leaderBins = Mathf.Max(1, Mathf.CeilToInt(leaderSteps / (float)binSize));
-        double leaderLoopLen = baseLoopLen * leaderBins;
-
-        // Effective loop boundary (leader loop)
-        double loops = System.Math.Floor((dspNow - transportStart) / leaderLoopLen);
-        double loopStart = transportStart + loops * leaderLoopLen;
-        if (loopStart > dspNow) loopStart -= leaderLoopLen;
-
-        double tPos = (dspNow - loopStart) % leaderLoopLen;
-        if (tPos < 0) tPos += leaderLoopLen;
-
-        // leaderLoopLen/leaderSteps == baseLoopLen/binSize
-        double stepDur = leaderLoopLen / totalAbsSteps;
-        rawAbsStep = tPos / stepDur;
-        floorAbsStep = (int)System.Math.Floor(rawAbsStep) % totalAbsSteps;
-        if (floorAbsStep < 0) floorAbsStep += totalAbsSteps;
-
-        return true;
-    }
-    
-    /// <summary>
-    /// Immediate re-sync of drum binning + note grid to the committed leader bins.
-    /// Call this when a track commits an expand/collapse mid-frame so the UI/audio
-    /// cannot spend a whole loop visually desynchronized.
-    /// </summary>
-    public void ResyncLeaderBinsNow()
-    {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var drum = _gfm?.activeDrumTrack;
-        if (drum == null) return;
-
-        int bins = Mathf.Max(1, GetMaxActiveLoopMultiplier());
-        drum.SetBinCount(bins);
-
-        if (noteVisualizer != null)
-        {
-            int baseSteps = Mathf.Max(1, drum.totalSteps);
-            noteVisualizer.RequestLeaderGridChange(bins * baseSteps);
-        }
-    }
-    public int GetCommittedLeaderBins()
-    {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var drum = _gfm?.activeDrumTrack;
-        if (drum == null) { if (GameFlowManager.VerboseLogging) Debug.Log("[ITC:GET_LEADER_BINS] drum=NULL → returning 1"); return 1; }
-        int count = drum.GetCommittedBinCount();
-        return Mathf.Max(1, count);
     }
 
     void Update()
@@ -900,7 +132,7 @@ public class InstrumentTrackController : MonoBehaviour
         _chordEventsSubscribed = false;
         TrySubscribeChordEvents();   // first attempt
     }
-  
+
     void OnDisable()
     {
         UnsubscribeChordEvents();
@@ -962,27 +194,6 @@ public class InstrumentTrackController : MonoBehaviour
         }
         _chordEventsSubscribed = false;
     }
-    public float GetEffectiveLoopLengthInSeconds()
-    {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var drum = _gfm != null ? _gfm.activeDrumTrack : null;
-        if (drum == null)
-            return 0f;
-
-        // IMPORTANT: use the *clip* length, not DrumTrack.GetLoopLengthInSeconds()
-        float clipLen = drum.GetClipLengthInSeconds();
-        int   totalSteps = drum.totalSteps;
-        if (clipLen <= 0f || totalSteps <= 0)
-            return clipLen;
-
-        // LeaderSteps already looks at track loopMultipliers
-        int leaderSteps = drum.GetLeaderSteps();
-        if (leaderSteps <= 0)
-            return clipLen;
-
-        float stepDuration = clipLen / totalSteps;
-        return stepDuration * leaderSteps;
-    }
     private void ArmCohortsOnLoopBoundary()
     {
         if (_gfm == null) _gfm = GameFlowManager.Instance;
@@ -1030,334 +241,5 @@ public class InstrumentTrackController : MonoBehaviour
             t.ArmAscensionCohort(0, endTrack);
 
         }
-    }
-    public int GetBinForNextSpawn(InstrumentTrack track)
-    {
-        if (track == null) return 0;
-        int trackMaxBinIndex = Mathf.Max(0, track.maxLoopMultiplier - 1);
-
-        // ByVoice chord tracks advance only when the whole chord group fills a bin — use cursor directly.
-        var byVoiceCheck = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
-        if (byVoiceCheck != null && byVoiceCheck.configSelectionMode == RoleConfigSelectionMode.ByVoice)
-        {
-            int cursor = track.GetBinCursor();
-            if (track.maxLoopMultiplier > 0) cursor %= track.maxLoopMultiplier;
-            return Mathf.Clamp(cursor, 0, trackMaxBinIndex);
-        }
-
-        // If expansion is already staged, redirect to density injection so SpawnCollectableBurst
-        // doesn't reject a frontier proposal and silently drop the burst.
-        if (track.IsExpansionPending)
-            return Mathf.Clamp(track.GetNextFilledBinForDensity(), 0, trackMaxBinIndex);
-
-        // Refill a bin emptied by note ascension before advancing/expanding.
-        int emptied = track.GetFirstEmptyAllocatedBin();
-        if (emptied >= 0) return emptied;
-
-        bool allowAdvance = ConsumeAllowAdvanceNextBurst(track); // consume exactly once
-        int globalFrontier = ComputeGlobalFrontier();
-        if (globalFrontier < 0) return 0;
-
-        int clampedGlobalFrontier = Mathf.Clamp(globalFrontier, 0, trackMaxBinIndex);
-        int trackFrontier = FrontierForTrack(track);
-
-        // If this track is behind the global frontier, hole-fill up to the frontier.
-        if (trackFrontier < clampedGlobalFrontier)
-            return TryFindHoleFillBin(track, clampedGlobalFrontier);
-
-        // Not allowed to advance — use next local bin deterministically.
-        if (!allowAdvance)
-            return Mathf.Clamp(track.GetNextBinForSpawn(), 0, trackMaxBinIndex);
-
-        // Allowed to advance: wrap cursor into capacity.
-        int cursorTarget = track.GetBinCursor();
-        if (track.maxLoopMultiplier > 0) cursorTarget %= track.maxLoopMultiplier;
-        cursorTarget = Mathf.Clamp(cursorTarget, 0, trackMaxBinIndex);
-
-        // Cursor is pushing beyond global frontier.
-        if (cursorTarget > clampedGlobalFrontier)
-        {
-            if (cursorTarget > trackMaxBinIndex)
-                return FindUnfilledOrDensityBin(track, trackMaxBinIndex);
-            return cursorTarget;
-        }
-
-        // Decide whether to advance based on whether cursor bin is already filled.
-        int proposed = track.IsBinFilled(cursorTarget) ? (clampedGlobalFrontier + 1) : cursorTarget;
-        if (proposed > trackMaxBinIndex)
-            return FindUnfilledOrDensityBin(track, trackMaxBinIndex);
-        return proposed;
-    }
-
-    // Frontier = furthest bin that is allocated OR filled, cross-checked with cursor estimate.
-    private int FrontierForTrack(InstrumentTrack t)
-    {
-        if (t == null) return -1;
-        int highest = Mathf.Max(t.GetHighestFilledBin(), t.GetHighestAllocatedBin());
-        int cursorBased = Mathf.Clamp(t.GetBinCursor() - 1, -1, Mathf.Max(0, t.maxLoopMultiplier - 1));
-        return Mathf.Max(highest, cursorBased);
-    }
-
-    private int ComputeGlobalFrontier()
-    {
-        int frontier = -1;
-        if (tracks != null)
-            for (int i = 0; i < tracks.Length; i++)
-                if (tracks[i]) frontier = Mathf.Max(frontier, FrontierForTrack(tracks[i]));
-        return frontier;
-    }
-
-    private int TryFindHoleFillBin(InstrumentTrack track, int upTo)
-    {
-        for (int b = 0; b <= upTo; b++)
-            if (!track.IsBinAllocated(b)) return b;
-        return upTo;
-    }
-
-    private int FindUnfilledOrDensityBin(InstrumentTrack track, int trackMaxBinIndex)
-    {
-        // Complete any allocated-but-unfilled bin before falling back to density injection.
-        for (int b = 0; b <= trackMaxBinIndex; b++)
-            if (track.IsBinAllocated(b) && !track.IsBinFilled(b)) return b;
-        return Mathf.Clamp(track.GetNextFilledBinForDensity(), 0, trackMaxBinIndex);
-    }
-
-    private void ResetAllCursorsAndGuards()
-        {
-            ResetControllerBinGuards();
-            if (tracks == null) return;
-            foreach (var t in tracks)
-                if (t) t.ResetBinsForPhase();
-        }
-    public bool AnyExpansionPending() {
-        if (tracks == null || tracks.Length == 0) return false;
-        foreach (var t in tracks) {
-            if (!t) continue;
-            if (t.IsExpansionPending) return true;
-        }
-        return false;
-    }
-
-    private int ForceDestroyAllCollectablesInFlight(string reason)
-    {
-        int destroyed = 0;
-        if (tracks == null) return destroyed;
-
-        foreach (var t in tracks)
-        {
-            if (t == null) continue;
-            destroyed += t.ForceDestroyCollectablesInFlight(reason);
-        }
-
-        return destroyed;
-    }
-    /// <summary>
-    /// Single authority entry point for motif boundaries.
-    /// This should be called exactly once when a new motif begins (after any bridge/ghost cycle),
-    /// and before any new note spawning occurs.
-    /// </summary>
-    public void BeginNewMotif(string reason = "BeginNewMotif") {
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[CTRL] BeginNewMotif reason={reason}");
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        _gfm?.activeDrumTrack.ResetBeatSequencingState("InstrumentTrackController/BeginNewMotif");
-        // Ensure no in-flight collectables from the prior motif can write late into tracks/visuals.
-        ForceDestroyAllCollectablesInFlight(reason);
-
-        // Reset controller-level guards/caches.
-        _allowAdvanceNextBurst.Clear();
-        _loopHash.Clear();
-
-        ResetControllerBinGuards();
-
-        // Hard reset all tracks (loop content, bins, allocation, burst state).
-        if (tracks != null)
-        {
-            foreach (var t in tracks)
-            {
-                if (!t) continue;
-                t.BeginNewMotifHardClear(reason);
-            }
-        }
-
-        // Hard reset visuals last (they mirror track state).
-        if (noteVisualizer != null)
-            noteVisualizer.BeginNewMotif_ClearAll(destroyMarkerGameObjects: true);
-
-        // BeginNewMotifHardClear resets loopMultiplier to 1 on every track, but
-        // DrumTrack._binCount still holds the previous motif's committed value. Without
-        // an immediate flush, InstrumentTrack.leaderBins = max(stale, 1) stays at the
-        // old count for the entire first leader loop, silencing tracks on bars 1-N.
-        ResyncLeaderBinsNow();
-    }
-    public void AdvanceOtherTrackCursors(InstrumentTrack leaderTrack, int by = 1)
-    {
-        if (tracks == null) return;
-        for (int i = 0; i < tracks.Length; i++)
-        {
-            var t = tracks[i];
-            if (!t || t == leaderTrack) continue;
-            t.AdvanceBinCursor(by); // silent bin reserved; visuals omitted by design
-        }
-    }
-    private void HandleAscensionCohortCompleted(InstrumentTrack track, int start, int end)
-    {
-
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var h = _gfm ? _gfm.harmony : null;
-        if (h == null) { Debug.LogWarning("[CHORD][CTRLR] HarmonyDirector is NULL"); return; }
-
-        // This is your “tick”: the armed cohort finished ascending on 'track'
-        // 1) Optionally: small flourish / feedback hook could go here
-
-        // 2) Ask HarmonyDirector to advance one chord and retune everyone
-        _gfm?.harmony?.AdvanceChordAndRetuneAll(1);
-    }
-    public void ConfigureTracksFromShips(List<ShipMusicalProfile> selectedShips)
-    {
-        AssignVoiceIndices();
-        if (tracks != null)
-            foreach (var t in tracks)
-                if (t != null) t.RefreshRoleColorsFromProfile();
-        UpdateVisualizer();
-    }
-
-    private void AssignVoiceIndices()
-    {
-        if (tracks == null) return;
-        var roleCounts = new Dictionary<MusicalRole, int>();
-        for (int i = 0; i < tracks.Length; i++)
-        {
-            var t = tracks[i];
-            if (t == null) continue;
-            if (!roleCounts.TryGetValue(t.assignedRole, out int count)) count = 0;
-            t.SetVoiceIndex(count);
-            roleCounts[t.assignedRole] = count + 1;
-        }
-    }
-
-    public bool IsChordGroupComplete(MusicalRole role, int binIndex)
-    {
-        if (tracks == null) return false;
-        bool found = false;
-        for (int i = 0; i < tracks.Length; i++)
-        {
-            var t = tracks[i];
-            if (t == null || t.assignedRole != role) continue;
-            found = true;
-            if (!t.IsBinFilled(binIndex)) return false;
-        }
-        return found;
-    }
-
-    public void NotifyBinFilled(InstrumentTrack track, int binIndex)
-    {
-        if (track == null) return;
-        var roleProfile = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
-        if (roleProfile == null || roleProfile.configSelectionMode != RoleConfigSelectionMode.ByVoice) return;
-        if (!IsChordGroupComplete(track.assignedRole, binIndex)) return;
-
-        // All voices filled this bin together — advance cursors for the whole group so
-        // the next GenerateNotes call returns the correct next bin.
-        // Do NOT grant _allowAdvanceNextBurst: that token feeds TrackExpansionController,
-        // which would passively spawn bin-1 collectables on the next drum downbeat.
-        // ByVoice tracks advance only through star pokes (MineNode ejection).
-        foreach (var t in tracks)
-        {
-            if (t == null || t.assignedRole != track.assignedRole) continue;
-            if (t.GetBinCursor() <= binIndex)
-                t.AdvanceBinCursor();
-        }
-    }
-    private IEnumerator FadeOutMidi(MidiStreamPlayer player, float duration)
-    {
-        float startVolume = player.MPTK_Volume;
-        float elapsed = 0f;
-
-        while (elapsed < duration)
-        {
-            elapsed += Time.deltaTime;
-            player.MPTK_Volume = Mathf.Lerp(startVolume, 0f, elapsed / duration);
-            yield return null;
-        }
-
-        player.MPTK_Volume = 0f;
-    }
-    public void UpdateVisualizer()
-    {
-        if (noteVisualizer == null || tracks == null) return;
-
-        foreach (var track in tracks)
-        {
-            if (track == null) continue;
-
-            int h = ComputeLoopHash(track);
-            if (_loopHash.TryGetValue(track, out var prev) && prev == h)
-                continue; // no loop change → no work this frame
-
-            _loopHash[track] = h;
-
-            // Subtractive-safe: removes stale markers (steps no longer in persistent loop),
-            // then ensures all remaining loop steps are represented.
-            noteVisualizer.ForceSyncMarkersToPersistentLoop(track);
-        }
-    }
-    private static int ComputeLoopHash(InstrumentTrack t)
-    {
-        if (t == null) return 0;
-
-        // Order-independent hash of loop steps (cheap + stable).
-        // This only considers (stepIndex), which is enough to detect shrink/expand membership changes.
-        unchecked
-        {
-            int h = 17;
-
-            var loop = t.GetPersistentLoopNotes();
-            if (loop == null) return h;
-
-            foreach (var (step, _, _, _, _) in loop.OrderBy(n => n.Item1))
-                h = h * 31 + step;
-
-            return h;
-        }
-    }
-    public int GetMaxActiveLoopMultiplier()
-    {
-        if (tracks == null || tracks.Length == 0) return 1;
-
-        int maxMul = 1;
-        foreach (var t in tracks)
-        {
-            if (t == null) continue;
-
-            // “Committed” means “this track’s authoritative loop span,” regardless of whether
-            // a particular bin is currently silent.
-            maxMul = Mathf.Max(maxMul, Mathf.Max(1, t.loopMultiplier));
-        }
-        return maxMul;
-    }
-    // Same "max loopMultiplier across tracks" concept as GetMaxActiveLoopMultiplier;
-    // kept as a separate name since callers use both, but delegates to avoid duplication.
-    public int GetMaxLoopMultiplier() => GetMaxActiveLoopMultiplier();
-
-    public void BeginGameOverFade()
-    {
-        foreach (var track in tracks)
-        {
-            if (track == null) continue;
-
-            var loopNotes = track.GetPersistentLoopNotes();
-            for (int i = 0; i < loopNotes.Count; i++)
-            {
-                var (step, note, _, velocity, authoredRootMidi) = loopNotes[i];
-                int longDuration = 1920; // ≈4 beats (1 bar) at 480 ticks per beat
-                loopNotes[i] = (step, note, longDuration, velocity, authoredRootMidi);            }
-            // Start fading out this track's MIDI stream
-            if (track.midiStreamPlayer != null)
-            {
-                track.StartCoroutine(FadeOutMidi(track.midiStreamPlayer, 2f));
-            }
-        }
-
-        
     }
 }
