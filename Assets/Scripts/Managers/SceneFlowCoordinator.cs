@@ -106,34 +106,22 @@ public sealed class SceneFlowCoordinator
         go.SetActive(false);
     }
 
-    public IEnumerator FadeScreenToBlack(float duration = 0.6f)
+    public IEnumerator FadeScreen(bool toBlack, float duration = 0.6f)
     {
         EnsureScreenFadeOverlay();
-        _screenFadeOverlay.gameObject.SetActive(true);
+        if (toBlack) _screenFadeOverlay.gameObject.SetActive(true);
 
+        float from = toBlack ? 0f : 1f;
+        float to = toBlack ? 1f : 0f;
         float elapsed = 0f;
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
-            _screenFadeOverlay.alpha = Mathf.Clamp01(elapsed / duration);
+            _screenFadeOverlay.alpha = Mathf.Lerp(from, to, Mathf.Clamp01(elapsed / duration));
             yield return null;
         }
-        _screenFadeOverlay.alpha = 1f;
-    }
-
-    public IEnumerator FadeScreenFromBlack(float duration = 0.6f)
-    {
-        EnsureScreenFadeOverlay();
-
-        float elapsed = 0f;
-        while (elapsed < duration)
-        {
-            elapsed += Time.deltaTime;
-            _screenFadeOverlay.alpha = 1f - Mathf.Clamp01(elapsed / duration);
-            yield return null;
-        }
-        _screenFadeOverlay.alpha = 0f;
-        _screenFadeOverlay.gameObject.SetActive(false);
+        _screenFadeOverlay.alpha = to;
+        if (!toBlack) _screenFadeOverlay.gameObject.SetActive(false);
     }
 
     public void RegisterPlayerStatsGrid(Transform grid)

@@ -25,23 +25,26 @@ public partial class PhaseStar
         if (AnyExpansionPendingGlobal())
         {
             Trace("OnCollisionEnter2D: expansion pending — ignoring poke, star stays armed");
-            Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=expansion-pending " +
-                      $"anyVehicleCarrying={Vehicle.AnyVehicleCarrying()} pendingTracks=({DebugExpansionPendingTracks()})");
+            if (GameFlowManager.VerboseLogging)
+                Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=expansion-pending " +
+                          $"anyVehicleCarrying={Vehicle.AnyVehicleCarrying()} pendingTracks=({DebugExpansionPendingTracks()})");
             return;
         }
 
         if (_state != PhaseStarState.WaitingForPoke)
         {
             Trace($"OnCollision: ignored, state={_state}");
-            Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=bad-state state={_state} isArmed={_isArmed} ejectionInFlight={_ejectionInFlight}");
+            if (GameFlowManager.VerboseLogging)
+                Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=bad-state state={_state} isArmed={_isArmed} ejectionInFlight={_ejectionInFlight}");
             return;
         }
 
         if (_ejectionInFlight)
         {
             Trace("OnCollision: ignored, busy flags");
-            Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=ejection-in-flight " +
-                      $"activeNode={(_activeNode ? _activeNode.name : "null")} activeSuperNode={(_activeSuperNode ? _activeSuperNode.name : "null")}");
+            if (GameFlowManager.VerboseLogging)
+                Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=ejection-in-flight " +
+                          $"activeNode={(_activeNode ? _activeNode.name : "null")} activeSuperNode={(_activeSuperNode ? _activeSuperNode.name : "null")}");
             return;
         }
         if (!IsEjectionReady())
@@ -66,22 +69,25 @@ public partial class PhaseStar
             else
             {
                 Trace("OnCollisionEnter2D: ignored poke — zap requirement not met yet");
-                Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=zaps-not-met " +
-                          $"zapState={_zapProgressState} zapped={zappedCount}/{RequiredZapCount}");
+                if (GameFlowManager.VerboseLogging)
+                    Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=zaps-not-met " +
+                              $"zapState={_zapProgressState} zapped={zappedCount}/{RequiredZapCount}");
                 return;
             }
         }
         if (_activeNode != null)
         {
             Trace("OnCollision: ignored, activeNode != null");
-            Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=active-node activeNode={_activeNode.name}");
+            if (GameFlowManager.VerboseLogging)
+                Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=active-node activeNode={_activeNode.name}");
             return;
         }
 
         if (Time.frameCount == _lastPokeFrame)
         {
             Trace("OnCollision: ignored, same frame");
-            Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=same-frame frame={Time.frameCount}");
+            if (GameFlowManager.VerboseLogging)
+                Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=same-frame frame={Time.frameCount}");
             return;
         }
 
@@ -104,17 +110,19 @@ public partial class PhaseStar
                 || Collectable.AnyLiveFromOtherTracks(_cachedTrack)))
         {
             Trace("OnCollisionEnter2D: new-bin expansion blocked — notes still in play");
-            Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=bin-full-notes-in-play " +
-                      $"track={_cachedTrack.name} binCursor={_cachedTrack.GetBinCursor()} loopMultiplier={_cachedTrack.loopMultiplier} " +
-                      $"vehicleCarryingThisTrack={Vehicle.AnyVehicleCarryingTrack(_cachedTrack)} " +
-                      $"liveOnThisTrack={Collectable.AnyLiveForTrack(_cachedTrack)} " +
-                      $"liveOnOtherTracks={Collectable.AnyLiveFromOtherTracks(_cachedTrack)}");
+            if (GameFlowManager.VerboseLogging)
+                Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=bin-full-notes-in-play " +
+                          $"track={_cachedTrack.name} binCursor={_cachedTrack.GetBinCursor()} loopMultiplier={_cachedTrack.loopMultiplier} " +
+                          $"vehicleCarryingThisTrack={Vehicle.AnyVehicleCarryingTrack(_cachedTrack)} " +
+                          $"liveOnThisTrack={Collectable.AnyLiveForTrack(_cachedTrack)} " +
+                          $"liveOnOtherTracks={Collectable.AnyLiveFromOtherTracks(_cachedTrack)}");
             return;
         }
 
         if (_disarmReason == PhaseStarDisarmReason.SiblingActive)
         {
-            Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=sibling-active previewRole={_previewRole}");
+            if (GameFlowManager.VerboseLogging)
+                Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=sibling-active previewRole={_previewRole}");
             return;
         }
         EjectActivePreviewShardAndFlow(coll);

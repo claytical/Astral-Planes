@@ -156,9 +156,6 @@ public sealed class StarPool : MonoBehaviour
         var roles = _activeMotif?.GetActiveRoles();
         if (roles == null || roles.Count == 0) return;
 
-        string activeSnapshot = string.Join(",", _activeStars.Select(kv => $"{kv.Key}:{(kv.Value == null ? "NULL" : kv.Value.name)}"));
-//        Debug.Log($"[StarPool] Tick activeStars=[{activeSnapshot}] remainingTotal={_remainingEjectionsTotal}");
-
         foreach (var role in roles)
         {
             // Budget is committed at EJECT time (CanStarCommitEjection), not at spawn —

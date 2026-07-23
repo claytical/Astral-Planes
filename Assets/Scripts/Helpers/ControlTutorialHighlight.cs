@@ -724,11 +724,6 @@ public class ControlTutorialHighlight : MonoBehaviour
         Clear(immediate: immediate, hideText: false);
         HighlightButton(pressAnySequence[_pressAnyIndex], immediate);
 
-        // If the target image is missing, you’ll *appear* stuck.
-        // This makes that obvious in the console.
-        // (Comment out if noisy.)
-        // Debug.Log($"[PressAny] Step {_pressAnyIndex}/{pressAnySequence.Length}: {pressAnySequence[_pressAnyIndex]}");
-
         return false;
     }
 
