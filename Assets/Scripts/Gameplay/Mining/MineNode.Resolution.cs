@@ -168,17 +168,17 @@ public partial class MineNode
         _carveDir = awayDir.normalized;
 
         _loopsSinceSpawn = 0;
-        _stunTimer = hitStunDuration;
+        _stunTimer = config.hitStunDuration;
         // Lock RunCorridorLookahead's commit window so it doesn't immediately overwrite the dash heading.
-        _nextDirectionDecisionAt = Time.time + hitStunDuration;
-        _pathCommitUntil        = Time.time + hitStunDuration;
+        _nextDirectionDecisionAt = Time.time + config.hitStunDuration;
+        _pathCommitUntil        = Time.time + config.hitStunDuration;
 
         _strength -= vehicle.GetForceAsDamage();
         _strength  = Mathf.Max(0, _strength);
 
         TransitionToFleeing();
 
-        float normalized  = (maxStrength > 0) ? (float)_strength / maxStrength : 0f;
+        float normalized  = (_maxStrength > 0) ? (float)_strength / _maxStrength : 0f;
         float scaleFactor = Mathf.Lerp(0.3f, 1.1f, normalized);
         StartCoroutine(ScaleSmoothly(_originalScale * scaleFactor, 0.1f));
 

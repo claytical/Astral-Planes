@@ -27,6 +27,11 @@ public class MineNodeLocomotionProfile : ScriptableObject
     [Header("Environment")]
     [Range(0f, 1f)] public float dustPenalty = 0.2f;
 
+    [Header("Combat & Lifespan")]
+    [Min(1)] public int strength = 100;
+    [Tooltip("Loops before this node expires. 0 = never (only used when no NoteSet override and no config default apply).")]
+    [Min(0)] public int expireAfterLoops = 0;
+
     public float EvaluateTargetSpeed(float intensity01)
     {
         return Mathf.Lerp(baseSpeed, Mathf.Max(baseSpeed, maxSpeed), Mathf.Clamp01(intensity01));

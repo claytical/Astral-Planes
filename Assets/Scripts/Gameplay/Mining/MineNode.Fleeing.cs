@@ -19,7 +19,7 @@ public partial class MineNode
             // Stunned: dash away on the heading locked at hit-time. No exit-seeking —
             // gapOnNearSide stays false, so the boundary clamp below stays fully closed.
             _stunTimer -= Time.fixedDeltaTime;
-            ApplyLocomotion(speed01, hitStunSpeedMultiplier);
+            ApplyLocomotion(speed01, config.hitStunSpeedMultiplier);
         }
         else
         {
@@ -36,7 +36,7 @@ public partial class MineNode
                 Vector2 toGap    = waypoint - _rb.position;
                 if (toGap.sqrMagnitude > 0.0001f)
                 {
-                    float gapBias = Mathf.Lerp(fleeTowardBoundaryWeight * 0.25f, fleeTowardBoundaryWeight, _decisionArchetype.fleeBias);
+                    float gapBias = Mathf.Lerp(config.fleeTowardBoundaryWeight * 0.25f, config.fleeTowardBoundaryWeight, _decisionArchetype.fleeBias);
                     // At the doorway, override corridor lookahead so it can't turn the node away.
                     int cellDist = Mathf.Abs(myCell.x - gapCell.x) + Mathf.Abs(myCell.y - gapCell.y);
                     if (cellDist < 3) gapBias = Mathf.Max(gapBias, 0.9f);

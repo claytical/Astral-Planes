@@ -20,3 +20,5 @@ MonoBehaviour:
   turnRate: 6
   hesitation: 0.4
   dustPenalty: 0.2
+  strength: 90
+  expireAfterLoops: 2

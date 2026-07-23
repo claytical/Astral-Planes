@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 // State drives physics path; Intent drives decision-making and animation.
@@ -14,30 +12,7 @@ public partial class MineNode : MonoBehaviour
 {
     public SpriteRenderer coreSprite;
     public SpriteRenderer outlineSprite;
-    public int maxStrength = 100;
-
-    public bool pruneCarvedPathOnLoopBoundary = true;
-    [Tooltip("Minimum carved path length before pruning runs.")]
-    [Min(2)] public int pruneMinPathCount = 8;
-
-    [Header("State Machine")]
-    [SerializeField] private float driftSpeedMultiplier = 0.35f;
-    [SerializeField] private MineNodeLocomotionProfile[] locomotionArchetypeProfiles = new MineNodeLocomotionProfile[4];
-    [SerializeField] private MineNodeLocomotionProfile defaultLocomotionProfile;
-    [SerializeField] private MineNodeDecisionArchetypeLibrary decisionArchetypeLibrary;
-
-    [Header("Flee Boundary Targeting")]
-    [Tooltip("How strongly fleeing node steers toward its sought border gap.")]
-    [SerializeField, Range(0f, 1f)] private float fleeTowardBoundaryWeight = 0.45f;
-
-    [Header("Hit Stun")]
-    [Tooltip("Seconds after any Vehicle hit during which the node dashes away from the vehicle instead of seeking an exit.")]
-    [SerializeField, Min(0f)] private float hitStunDuration = 0.8f;
-    [Tooltip("Speed multiplier applied while dashing away during the stun window.")]
-    [SerializeField, Min(1f)] private float hitStunSpeedMultiplier = 1.6f;
-
-    [Header("NoteSet-Driven Motion")]
-    [SerializeField] private bool driveCarvingMotionFromNoteSet = true;
+    [SerializeField] private MineNodeConfig config;
 
     [Header("Grid Containment")]
     [SerializeField] private bool debugSweepContainment = false;
@@ -47,12 +22,6 @@ public partial class MineNode : MonoBehaviour
     private int _hardCorrectionsThisTick;
 
     public bool didContainmentThisTick { get; private set; }
-
-    [Header("Expiry")]
-    [Tooltip("Fallback only — overridden at runtime by RoleMotifNoteSetConfig.mineNodeExpireAfterLoops. 0 = never.")]
-    [SerializeField, Min(0)] private int expireAfterLoops = 0;
-    [Tooltip("Radius in grid cells within which hidden dust matching this node's role is revealed on expiry.")]
-    [SerializeField, Min(0)] private int expireBlastRadiusCells = 5;
 
     public event System.Action<MineNode, MineNodeOutcome> OnResolved;
     public event System.Action<MineNodeBehaviorIntent> OnBehaviorIntentChanged;
@@ -70,6 +39,8 @@ public partial class MineNode : MonoBehaviour
     private int _stallHits = 0;
     private int _stepsPerLoop = 16;
     private int _strength;
+    private int _maxStrength;
+    private int _expireAfterLoops;
     private Vector3 _originalScale;
     private Color _lockedColor;
     private bool _depletedHandled, _resolvedFired;
@@ -77,7 +48,6 @@ public partial class MineNode : MonoBehaviour
     private Collider2D _col;
     private Rigidbody2D _rb;
     private DrumTrack _drumTrack;
-    private readonly List<Vector2Int> _carvedPath = new List<Vector2Int>();
     private NoteSet _noteSet;
     private InstrumentTrack _track;
     private MusicalRole _role;
@@ -143,9 +113,6 @@ public partial class MineNode : MonoBehaviour
         _spawnCell = spawnCell;
         _role = track != null ? track.assignedRole : default;
         _noteSet = noteSet;
-        // NoteSet value wins only when authored (>0); otherwise the prefab fallback stands.
-        if (noteSet != null && noteSet.expireAfterLoops > 0)
-            expireAfterLoops = noteSet.expireAfterLoops;
         _lockedColor = tint;
         _drumTrack = (track != null) ? track.drumTrack : null;
         // Prefer the motif-selected profile installed on the track; the library keeps only
@@ -156,6 +123,14 @@ public partial class MineNode : MonoBehaviour
         if (prof != null) _speed = prof.mineNodeSpeed;  // category speed is applied in FixedUpdateDrifting
         _activeLocomotionProfile = ResolveLocomotionProfile(prof);
         ResolveDecisionArchetype();
+        // Strength and expiration resolve through the same locomotion profile that drives speed.
+        // NoteSet value wins for expiration only when authored (>0); otherwise the role/archetype
+        // baseline stands, falling back to the config default if no profile resolved at all.
+        _maxStrength = _activeLocomotionProfile != null ? _activeLocomotionProfile.strength : config.defaultStrength;
+        int roleExpire = _activeLocomotionProfile != null ? _activeLocomotionProfile.expireAfterLoops : 0;
+        _expireAfterLoops = (noteSet != null && noteSet.expireAfterLoops > 0) ? noteSet.expireAfterLoops
+                           : roleExpire > 0 ? roleExpire
+                           : config.defaultExpireAfterLoops;
         _roleProfile = prof;
         _behaviorCategory = _role.GetBehaviorCategory();
         _orbitSign = UnityEngine.Random.value < 0.5f ? 1 : -1;
@@ -177,7 +152,6 @@ public partial class MineNode : MonoBehaviour
 
         var dust = GetComponent<MineNodeDustInteractor>();
         if (dust != null) dust.SetLevelAuthority(_drumTrack);
-        _carvedPath.Clear();
         if (coreSprite != null)
         {
             tint.a = 1;
@@ -204,32 +178,11 @@ public partial class MineNode : MonoBehaviour
     {
         if (_drumTrack == null) return;
 
-        if (!_depletedHandled)
-        {
-            _loopsSinceSpawn++;
-            if (expireAfterLoops > 0 && _loopsSinceSpawn >= expireAfterLoops)
-            {
-                HandleExpiry();
-                return;
-            }
-        }
+        if (_depletedHandled) return;
 
-        if (!pruneCarvedPathOnLoopBoundary) return;
-        if (_carvedPath.Count < pruneMinPathCount) return;
-        int before = _carvedPath.Count;
-        var compact = new List<Vector2Int>(before);
-        Vector2Int? last = null;
-        for (int i = 0; i < _carvedPath.Count; i++)
-        {
-            var cell = _carvedPath[i];
-            if (_drumTrack.HasDustAt(cell)) continue;
-            if (last.HasValue && last.Value == cell) continue;
-            compact.Add(cell);
-            last = cell;
-        }
-        if (compact.Count == before) return;
-        _carvedPath.Clear();
-        _carvedPath.AddRange(compact);
+        _loopsSinceSpawn++;
+        if (_expireAfterLoops > 0 && _loopsSinceSpawn >= _expireAfterLoops)
+            HandleExpiry();
     }
 
     private void Start()
@@ -237,9 +190,9 @@ public partial class MineNode : MonoBehaviour
         _rb = GetComponent<Rigidbody2D>();
         _dustInteractor = GetComponent<MineNodeDustInteractor>();
         _originalScale = transform.localScale;
-        _strength = maxStrength;
-        Debug.Assert(_track != null && _drumTrack != null,
-            $"[MineNode] {name} reached Start() without Initialize() — node will be inert.");
+        _strength = _maxStrength;
+        Debug.Assert(_track != null && _drumTrack != null && config != null,
+            $"[MineNode] {name} reached Start() without Initialize() or a missing config asset — node will be inert.");
     }
 
     private void Update()
@@ -275,10 +228,10 @@ public partial class MineNode : MonoBehaviour
         var explode = GetComponent<Explode>();
         if (explode != null) explode.ExpireExplode();
 
-        if (_dustGenerator != null && _drumTrack != null && expireBlastRadiusCells > 0)
+        if (_dustGenerator != null && _drumTrack != null && config.expireBlastRadiusCells > 0)
         {
             Vector2Int center = _drumTrack.WorldToGridPosition(transform.position);
-            _dustGenerator.RevealHiddenDustByRole(center, expireBlastRadiusCells, _role);
+            _dustGenerator.RevealHiddenDustByRole(center, config.expireBlastRadiusCells, _role);
         }
 
         FireResolvedOnce();
@@ -323,7 +276,7 @@ public partial class MineNode : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (!driveCarvingMotionFromNoteSet ||
+        if (!config.driveCarvingMotionFromNoteSet ||
             _rb == null ||
             _drumTrack == null ||
             _noteSet == null ||

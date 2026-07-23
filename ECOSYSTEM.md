@@ -229,11 +229,11 @@ corridor lookahead (wall avoidance)
 - `OnResolved` event → `PhaseStar` clears `_activeNode`; `StarPool` reads `WasCaptured`/expiry off the resolved star
 - `ReleaseHeldDustOnce()` on resolve **and** destroy → `CosmicDustGenerator.ReleaseHeldCells()` — the star-drained cells finally regrow (gray, `starDrainReleaseDelay`)
 - `InstrumentTrack.SpawnCollectableBurst(noteSet)` on depletion
-- Self-destructs after `expireAfterLoops` boundaries (default 3) without capture, refunding the ejection slot via `StarPool`
+- Self-destructs after N loop boundaries without capture (NoteSet motif override, else role/archetype baseline off `MineNodeLocomotionProfile`, else `MineNodeConfig.defaultExpireAfterLoops`), refunding the ejection slot via `StarPool`
 - `Explode` component → visual burst
 
 **Listens to:**
-- `DrumTrack.OnLoopBoundary` — prunes `_carvedPath` to only open cells (prevents ghost trail re-occupation)
+- `DrumTrack.OnLoopBoundary` — increments the loop counter that drives expiry
 
 **Collision:** `Vehicle` collision reduces strength; on zero → `HandleDepleted()`.
 
