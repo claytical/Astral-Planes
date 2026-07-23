@@ -370,8 +370,6 @@ public sealed class SceneFlowCoordinator
             foreach (var t in _gameFlow.controller.tracks)
                 if (t) t.ResetBinStateForNewPhase();
 
-        _gameFlow.controller?.ResetControllerBinGuards();
-
         if (_gameFlow.activeDrumTrack && _gameFlow.noteViz)
         {
             int leaderSteps = Mathf.Max(1, _gameFlow.activeDrumTrack.totalSteps);

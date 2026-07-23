@@ -110,9 +110,6 @@ public partial class InstrumentTrack
 
         collectable.BeginCarryThenDepositAtDsp(depositDsp, durationTicks: durationTicks, force: force, onArrived: () =>
         {
-            if (controller != null)
-                controller.NotifyCommitted(this, finalTargetStep);
-
             if (controller == null || controller.noteVisualizer == null || markerGo == null) return;
 
             controller.noteVisualizer.ScheduleFirstPlayConfirm(
