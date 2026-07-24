@@ -96,4 +96,49 @@ public abstract class TrackNode : MonoBehaviour
         _resolvedFired = true;
         return true;
     }
+
+    // ---------------------------------------------------------------
+    // Direction scan — shared "pick best of 8, jitter, set timers" control
+    // flow. Scoring formulas, reaction-delay/commit-duration sources, and
+    // jitter magnitude stay subclass-owned: DiscoveryTrackNode scores via
+    // DrumTrack grid lookups + decision-archetype tuning, SuperNodeTrackNode
+    // scores via Physics2D raycasts + fixed serialized floats. The gating
+    // logic deciding *when* to rescan (wall-ahead detection, rescan timers,
+    // behavior-intent broadcasting) also stays subclass-owned — the two
+    // systems detect "wall ahead" differently and only one broadcasts intent.
+    // ---------------------------------------------------------------
+    protected Vector2 _carveDir = Vector2.right;
+    protected float _nextDirectionDecisionAt;
+    protected float _pathCommitUntil;
+
+    protected abstract float ScoreDirection(Vector2 pos, Vector2 dir);
+    protected abstract float TurnJitterDegrees();
+    protected abstract float NextReactionDelay();
+    protected abstract float NextPathCommitDuration();
+
+    protected void RunDirectionScan(Vector2 pos)
+    {
+        float bestScore = float.MinValue;
+        Vector2 bestDir = _carveDir;
+
+        foreach (var dir in EightDirections)
+        {
+            float score = ScoreDirection(pos, dir);
+            if (score > bestScore) { bestScore = score; bestDir = dir; }
+        }
+
+        float jitter = Random.Range(-TurnJitterDegrees(), TurnJitterDegrees());
+        _carveDir = Rotate(bestDir.normalized, jitter).normalized;
+
+        _nextDirectionDecisionAt = Time.time + NextReactionDelay();
+        _pathCommitUntil = Time.time + NextPathCommitDuration();
+    }
+
+    protected static Vector2 Rotate(Vector2 v, float degrees)
+    {
+        float r = degrees * Mathf.Deg2Rad;
+        float c = Mathf.Cos(r);
+        float s = Mathf.Sin(r);
+        return new Vector2(c * v.x - s * v.y, s * v.x + c * v.y);
+    }
 }

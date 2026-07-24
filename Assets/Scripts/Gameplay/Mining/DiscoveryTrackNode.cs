@@ -50,7 +50,6 @@ public partial class DiscoveryTrackNode : TrackNode
     private DiscoveryTrackNodeLocomotionProfile _activeLocomotionProfile;
     private int _lastProcessedStep = -1;
     private float _rescanTimer = 0f;
-    private Vector2 _carveDir = Vector2.right;
     private DiscoveryTrackNodeDustInteractor _dustInteractor;
     private Camera _cam;
     private float _currentDesiredSpeed;
@@ -58,8 +57,6 @@ public partial class DiscoveryTrackNode : TrackNode
     private Vector2 _prevPhysicsPos;
     private bool _hasPrevPhysicsPos;
     private DiscoveryTrackNodeDecisionArchetypeLibrary.Archetype _decisionArchetype;
-    private float _nextDirectionDecisionAt;
-    private float _pathCommitUntil;
     private DiscoveryTrackNodeBehaviorIntent _behaviorIntent = DiscoveryTrackNodeBehaviorIntent.Thinking;
     private CosmicDustGenerator _dustGenerator;
     private DiscoveryTrackNodeBehaviorCategory _behaviorCategory;

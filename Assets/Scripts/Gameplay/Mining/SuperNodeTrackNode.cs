@@ -70,10 +70,6 @@ public class SuperNodeTrackNode : TrackNode
     private DrumTrack           _drum;
     private CosmicDustGenerator _dustGen;
 
-    private Vector2 _carveDir;
-    private float   _nextScanAt;
-    private float   _pathCommitUntil;
-
     private bool  _isInBurst;
     private float _burstTimer;
 
@@ -143,16 +139,16 @@ public class SuperNodeTrackNode : TrackNode
             main.simulationSpace = ParticleSystemSimulationSpace.World;
         }
 
-        _carveDir          = Random.insideUnitCircle.normalized;
-        _isInBurst         = true;
-        _burstTimer        = burstDuration;
-        _nextScanAt        = Time.time;
-        _pathCommitUntil   = 0f;
-        _lastStallCheckPos = transform.position;
-        _nextStallCheckAt  = Time.time + stallCheckInterval;
-        _stallHits         = 0;
+        _carveDir                = Random.insideUnitCircle.normalized;
+        _isInBurst               = true;
+        _burstTimer              = burstDuration;
+        _nextDirectionDecisionAt = Time.time;
+        _pathCommitUntil         = 0f;
+        _lastStallCheckPos       = transform.position;
+        _nextStallCheckAt        = Time.time + stallCheckInterval;
+        _stallHits               = 0;
 
-        RunDirectionScan();
+        RunDirectionScan(_rb != null ? _rb.position : (Vector2)transform.position);
     }
 
     private void OnDisable()
@@ -188,11 +184,11 @@ public class SuperNodeTrackNode : TrackNode
         // Rescan when commitment window expires and reaction delay has elapsed,
         // or immediately when non-matching dust is directly ahead
         bool commitExpired = Time.time >= _pathCommitUntil;
-        bool scanReady     = Time.time >= _nextScanAt;
+        bool scanReady     = Time.time >= _nextDirectionDecisionAt;
         bool wallAhead     = HasNonMatchingDustAhead(myPos, _carveDir);
 
         if ((commitExpired && scanReady) || wallAhead)
-            RunDirectionScan();
+            RunDirectionScan(myPos);
 
         float speedMult = _isInBurst ? burstSpeedMultiplier : pauseSpeedMultiplier;
         ApplyVelocityBlend(_carveDir * (_speed * speedMult));
@@ -214,33 +210,15 @@ public class SuperNodeTrackNode : TrackNode
         {
             _explode?.SetBurstDirection(_carveDir);
             _explode?.PreExplode();
-            RunDirectionScan();
+            RunDirectionScan(_rb != null ? _rb.position : (Vector2)transform.position);
         }
     }
 
-    private void RunDirectionScan()
-    {
-        Vector2 myPos     = _rb != null ? _rb.position : (Vector2)transform.position;
-        float   bestScore = float.MinValue;
-        Vector2 bestDir   = _carveDir;
+    protected override float TurnJitterDegrees() => turnJitterDeg;
+    protected override float NextReactionDelay() => Random.Range(reactionDelayMin, reactionDelayMax);
+    protected override float NextPathCommitDuration() => pathCommitDuration;
 
-        foreach (var dir in EightDirections)
-        {
-            float score = ScoreDirection(myPos, dir);
-            if (score > bestScore) { bestScore = score; bestDir = dir; }
-        }
-
-        float jitterRad = Random.Range(-turnJitterDeg, turnJitterDeg) * Mathf.Deg2Rad;
-        float cos = Mathf.Cos(jitterRad), sin = Mathf.Sin(jitterRad);
-        _carveDir = new Vector2(
-            bestDir.x * cos - bestDir.y * sin,
-            bestDir.x * sin + bestDir.y * cos).normalized;
-
-        _nextScanAt      = Time.time + Random.Range(reactionDelayMin, reactionDelayMax);
-        _pathCommitUntil = Time.time + pathCommitDuration;
-    }
-
-    private float ScoreDirection(Vector2 pos, Vector2 dir)
+    protected override float ScoreDirection(Vector2 pos, Vector2 dir)
     {
         float score = 0f;
 
@@ -310,7 +288,7 @@ public class SuperNodeTrackNode : TrackNode
                 _isInBurst       = true;
                 _burstTimer      = burstDuration;
                 _pathCommitUntil = 0f;
-                RunDirectionScan();
+                RunDirectionScan(myPos);
             }
         }
         else

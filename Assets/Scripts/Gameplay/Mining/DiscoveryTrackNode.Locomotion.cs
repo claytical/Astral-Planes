@@ -90,66 +90,67 @@ public partial class DiscoveryTrackNode
         if (wallAhead || _rescanTimer <= 0f)
         {
             _rescanTimer = 0.6f;
-
-            float bestScore = float.MinValue;
-            Vector2 bestDir = _carveDir;
-            foreach (var dir in EightDirections)
-            {
-                float score = 0f;
-                for (int i = 1; i <= 3; i++)
-                {
-                    var probe = myCell + new Vector2Int(Mathf.RoundToInt(dir.x * i), Mathf.RoundToInt(dir.y * i));
-                    if (!_drumTrack.HasDustAt(probe)) score += 1f;
-                    else break;
-                }
-                for (int d = 1; d <= 3; d++)
-                {
-                    var lc = myCell + new Vector2Int(Mathf.RoundToInt(-dir.y * d), Mathf.RoundToInt( dir.x * d));
-                    var rc = myCell + new Vector2Int(Mathf.RoundToInt( dir.y * d), Mathf.RoundToInt(-dir.x * d));
-                    if (_drumTrack.HasDustAt(lc) || _drumTrack.HasDustAt(rc))
-                    {
-                        score += 1.5f / d;
-                        break;
-                    }
-                }
-                float riskBias = Mathf.Lerp(-0.7f, 0.7f, _decisionArchetype.dustRiskTolerance);
-                score += riskBias * Mathf.Clamp01(score / 3f);
-                // Territory affinity
-                if (_dustGenerator != null)
-                {
-                    const float affinityWeight = 0.3f;
-                    var affinityProbe = myCell + new Vector2Int(Mathf.RoundToInt(dir.x * 2), Mathf.RoundToInt(dir.y * 2));
-                    if (_dustGenerator.GetZoneRole(affinityProbe) == _role) score += affinityWeight;
-                }
-                // Orbital bias (Harmony): 2.0 base + profile fine-tune; competes meaningfully with clearance scores
-                if (_behaviorCategory == DiscoveryTrackNodeBehaviorCategory.Orbital)
-                {
-                    float orbitalBias = 2.0f + (_roleProfile?.orbitalTurnBias ?? 0.6f);
-                    var perp = new Vector2(-_carveDir.y * _orbitSign, _carveDir.x * _orbitSign).normalized;
-                    score += orbitalBias * Mathf.Max(0f, Vector2.Dot(dir.normalized, perp));
-                }
-                // Proximity evasion (Lead/Darting): 7-cell category default; profile overrides if > 0
-                if (_behaviorCategory == DiscoveryTrackNodeBehaviorCategory.Darting && _trackedVehicle != null)
-                {
-                    float cells = (_roleProfile != null && _roleProfile.evasionCells > 0f) ? _roleProfile.evasionCells : 7f;
-                    float worldRadius = cells * GetCellSize();
-                    float dist = Vector2.Distance(_rb.position, _trackedVehicle.transform.position);
-                    if (dist < worldRadius)
-                    {
-                        Vector2 away = (_rb.position - (Vector2)_trackedVehicle.transform.position).normalized;
-                        score += 0.6f * Mathf.Max(0f, Vector2.Dot(dir.normalized, away));
-                    }
-                }
-                if (Vector2.Dot(dir, _carveDir) < -0.5f) score *= 0.1f;
-                if (score > bestScore) { bestScore = score; bestDir = dir; }
-            }
-            float jitter = UnityEngine.Random.Range(-_decisionArchetype.turnJitter, _decisionArchetype.turnJitter);
-            _carveDir = Rotate(bestDir.normalized, jitter).normalized;
-            _nextDirectionDecisionAt = Time.time + _decisionArchetype.SampleReactionDelay();
-            _pathCommitUntil = Time.time + Mathf.Max(0.05f, _decisionArchetype.pathCommitmentDuration * CategoryCommitScale());
+            RunDirectionScan(_rb.position);
             SetBehaviorIntent(DiscoveryTrackNodeBehaviorIntent.Committing);
         }
     }
+
+    protected override float ScoreDirection(Vector2 pos, Vector2 dir)
+    {
+        Vector2Int myCell = _drumTrack.WorldToGridPosition(pos);
+        float score = 0f;
+        for (int i = 1; i <= 3; i++)
+        {
+            var probe = myCell + new Vector2Int(Mathf.RoundToInt(dir.x * i), Mathf.RoundToInt(dir.y * i));
+            if (!_drumTrack.HasDustAt(probe)) score += 1f;
+            else break;
+        }
+        for (int d = 1; d <= 3; d++)
+        {
+            var lc = myCell + new Vector2Int(Mathf.RoundToInt(-dir.y * d), Mathf.RoundToInt( dir.x * d));
+            var rc = myCell + new Vector2Int(Mathf.RoundToInt( dir.y * d), Mathf.RoundToInt(-dir.x * d));
+            if (_drumTrack.HasDustAt(lc) || _drumTrack.HasDustAt(rc))
+            {
+                score += 1.5f / d;
+                break;
+            }
+        }
+        float riskBias = Mathf.Lerp(-0.7f, 0.7f, _decisionArchetype.dustRiskTolerance);
+        score += riskBias * Mathf.Clamp01(score / 3f);
+        // Territory affinity
+        if (_dustGenerator != null)
+        {
+            const float affinityWeight = 0.3f;
+            var affinityProbe = myCell + new Vector2Int(Mathf.RoundToInt(dir.x * 2), Mathf.RoundToInt(dir.y * 2));
+            if (_dustGenerator.GetZoneRole(affinityProbe) == _role) score += affinityWeight;
+        }
+        // Orbital bias (Harmony): 2.0 base + profile fine-tune; competes meaningfully with clearance scores
+        if (_behaviorCategory == DiscoveryTrackNodeBehaviorCategory.Orbital)
+        {
+            float orbitalBias = 2.0f + (_roleProfile?.orbitalTurnBias ?? 0.6f);
+            var perp = new Vector2(-_carveDir.y * _orbitSign, _carveDir.x * _orbitSign).normalized;
+            score += orbitalBias * Mathf.Max(0f, Vector2.Dot(dir.normalized, perp));
+        }
+        // Proximity evasion (Lead/Darting): 7-cell category default; profile overrides if > 0
+        if (_behaviorCategory == DiscoveryTrackNodeBehaviorCategory.Darting && _trackedVehicle != null)
+        {
+            float cells = (_roleProfile != null && _roleProfile.evasionCells > 0f) ? _roleProfile.evasionCells : 7f;
+            float worldRadius = cells * GetCellSize();
+            float dist = Vector2.Distance(_rb.position, _trackedVehicle.transform.position);
+            if (dist < worldRadius)
+            {
+                Vector2 away = (_rb.position - (Vector2)_trackedVehicle.transform.position).normalized;
+                score += 0.6f * Mathf.Max(0f, Vector2.Dot(dir.normalized, away));
+            }
+        }
+        if (Vector2.Dot(dir, _carveDir) < -0.5f) score *= 0.1f;
+        return score;
+    }
+
+    protected override float TurnJitterDegrees() => _decisionArchetype.turnJitter;
+    protected override float NextReactionDelay() => _decisionArchetype.SampleReactionDelay();
+    protected override float NextPathCommitDuration() =>
+        Mathf.Max(0.05f, _decisionArchetype.pathCommitmentDuration * CategoryCommitScale());
 
     // Returns the commit-duration multiplier for this category.
     // Deliberate (Bass): 2.5x base. Darting (Lead): 0.35x base. Others: 1x.
@@ -251,13 +252,5 @@ public partial class DiscoveryTrackNode
     {
         if (reflectX) _carveDir.x = -_carveDir.x;
         else          _carveDir.y = -_carveDir.y;
-    }
-
-    private static Vector2 Rotate(Vector2 v, float degrees)
-    {
-        float r = degrees * Mathf.Deg2Rad;
-        float c = Mathf.Cos(r);
-        float s = Mathf.Sin(r);
-        return new Vector2(c * v.x - s * v.y, s * v.x + c * v.y);
     }
 }
