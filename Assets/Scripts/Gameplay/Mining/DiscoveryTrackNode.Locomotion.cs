@@ -90,21 +90,10 @@ public partial class DiscoveryTrackNode
         if (wallAhead || _rescanTimer <= 0f)
         {
             _rescanTimer = 0.6f;
-            Vector2[] candidates =
-            {
-                Vector2.right,
-                new Vector2( 1f,  1f).normalized,
-                Vector2.up,
-                new Vector2(-1f,  1f).normalized,
-                Vector2.left,
-                new Vector2(-1f, -1f).normalized,
-                Vector2.down,
-                new Vector2( 1f, -1f).normalized,
-            };
 
             float bestScore = float.MinValue;
             Vector2 bestDir = _carveDir;
-            foreach (var dir in candidates)
+            foreach (var dir in EightDirections)
             {
                 float score = 0f;
                 for (int i = 1; i <= 3; i++)
@@ -188,26 +177,14 @@ public partial class DiscoveryTrackNode
         float align = (vMag > 0.0001f) ? Vector2.Dot(_rb.linearVelocity.normalized, _carveDir) : 0f;
         bool pressedNow = (vMag < kStallSpeed) || (align < kStuckDot);
 
-        bool confirmedStall = false;
-        if (Time.time >= _nextStallSampleTime)
-        {
-            Vector2 pos   = _rb.position;
-            float   moved = (pos - _lastPosForStall).magnitude;
-            if (_nextStallSampleTime > 0f)
-            {
-                if (moved < kStallDistanceEps && pressedNow) _stallHits++;
-                else _stallHits = Mathf.Max(0, _stallHits - 1);
-                confirmedStall = (_stallHits >= 1);
-            }
-            _lastPosForStall     = pos;
-            _nextStallSampleTime = Time.time + kStallSamplePeriod;
-        }
+        bool confirmedStall = TrySampleStall(_rb.position, kStallSamplePeriod, kStallDistanceEps,
+                                              requiredHits: 1, extraGate: pressedNow);
 
         if (!confirmedStall || Time.time < _nextEscapeAllowedTime) return;
 
         float recoveryScale = Mathf.Lerp(1.25f, 0.4f, _decisionArchetype.stallRecoveryAggressiveness);
         _nextEscapeAllowedTime = Time.time + (kEscapeCooldown * recoveryScale);
-        _stallHits = 0;
+        ResetStallSample();
 
         Vector2 fwd   = (_carveDir.sqrMagnitude > 0.001f) ? _carveDir.normalized : Vector2.right;
         Vector2 left  = new Vector2(-fwd.y,  fwd.x);
