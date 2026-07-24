@@ -5,7 +5,7 @@ using UnityEngine;
 /// <summary>
 /// Manages a pool of PhaseStar husks — one slot per distinct MusicalRole in the active motif.
 /// Spawns Stars reactively when role-colored dust exists and no Star for that role is live.
-/// Orchestrates pause/resume across Stars during active MineNode processing.
+/// Orchestrates pause/resume across Stars during active DiscoveryTrackNode processing.
 /// Owns the bridge gate — fires GameFlowManager.BeginMotifBridge when all ejections complete.
 /// </summary>
 [DisallowMultipleComponent]
@@ -20,7 +20,7 @@ public sealed partial class StarPool : MonoBehaviour
     private CosmicDustGenerator _dustGen;
 
     // ── Phase plan ────────────────────────────────────────────────────────────
-    // Total MineNode/SuperNode ejections still needed this motif (role-agnostic).
+    // Total DiscoveryTrackNode/SuperNode ejections still needed this motif (role-agnostic).
     // The player drives which roles eject by carving role-colored dust.
     private int _remainingEjectionsTotal;
     // Nodes the Vehicle successfully captured (burst had notes placed into the loop) this motif.
@@ -31,7 +31,7 @@ public sealed partial class StarPool : MonoBehaviour
     // At most one live Star per role.
     private readonly Dictionary<MusicalRole, PhaseStar> _activeStars = new();
 
-    // Stars that are paused while a sibling's MineNode is active.
+    // Stars that are paused while a sibling's DiscoveryTrackNode is active.
     private readonly List<PhaseStar> _pausedStars = new();
 
     // Role of the most recent ejecting Star — used for rollback when a burst had no notes.

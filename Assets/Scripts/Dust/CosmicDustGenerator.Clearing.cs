@@ -91,8 +91,8 @@ public partial class CosmicDustGenerator
         SetCellState(gp, DustCellState.Empty);
     }
 
-    // Carve mode (Vehicle/MineNode):
-    // - Role imprint changes are allowed before clearing (e.g. MineNode paint restore/promote).
+    // Carve mode (Vehicle/DiscoveryTrackNode):
+    // - Role imprint changes are allowed before clearing (e.g. DiscoveryTrackNode paint restore/promote).
     // - Regrow is normally scheduled, except for permanent clear systems that explicitly disable it.
     // - Void-grown exception applies: vehicle carve removes void-grow imprint so regrow can re-resolve role.
     // - Visual fade duration is caller-provided (resistance/tuning aware).

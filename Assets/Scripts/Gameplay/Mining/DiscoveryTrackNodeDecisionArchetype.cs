@@ -1,8 +1,8 @@
 using System;
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Astral Planes/Mine Node Decision Archetype Library", fileName = "MineNodeDecisionArchetypes")]
-public class MineNodeDecisionArchetypeLibrary : ScriptableObject
+[CreateAssetMenu(menuName = "Astral Planes/Discovery Track Node Decision Archetype Library", fileName = "DiscoveryTrackNodeDecisionArchetypes")]
+public class DiscoveryTrackNodeDecisionArchetypeLibrary : ScriptableObject
 {
     [Serializable]
     public struct Archetype

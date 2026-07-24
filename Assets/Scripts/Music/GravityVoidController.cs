@@ -123,7 +123,7 @@ public sealed class GravityVoidController
             _gravityVoidRoutine = null;
         }
 
-        // Safety bubble: activate at the MineNode capture position while the void is expanding.
+        // Safety bubble: activate at the DiscoveryTrackNode capture position while the void is expanding.
         {
             var gfm = _getGfm();
             var pool = gfm?.activeDrumTrack?._starPool;

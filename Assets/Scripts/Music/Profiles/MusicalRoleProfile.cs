@@ -27,7 +27,7 @@ public class MusicalRoleProfile : ScriptableObject
     [Header("Visuals & Styling")]
     public DustColorSet dustColors;
     [Range(0f, 1f)]
-    [Tooltip("Baseline alpha for this role when used as a semantic color (track / MineNode / imprints).")]
+    [Tooltip("Baseline alpha for this role when used as a semantic color (track / DiscoveryTrackNode / imprints).")]
     public float baseAlpha = 0.25f;
 
 
@@ -43,14 +43,14 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("How much this cell resists boost energy drain on contact. 0 = full drain rate, 1 = no drain.")]
     public float drainResistance01 = 0.50f;
 
-    [Header("MineNode Locomotion")]
-    [Tooltip("Base speed for this role's MineNode. Applied at init; category multipliers are layered on top in FixedUpdateDrifting.")]
+    [Header("DiscoveryTrackNode Locomotion")]
+    [Tooltip("Base speed for this role's DiscoveryTrackNode. Applied at init; category multipliers are layered on top in FixedUpdateDrifting.")]
     [Range(0f, 1f)] public float mineNodeSpeed = 0.5f;
 
     [Tooltip("Direct locomotion profile override for this role.")]
-    public MineNodeLocomotionProfile mineNodeLocomotionProfile;
+    public DiscoveryTrackNodeLocomotionProfile mineNodeLocomotionProfile;
 
-    [Header("MineNode Behavior Modifiers")]
+    [Header("DiscoveryTrackNode Behavior Modifiers")]
     [Tooltip("Orbital (Harmony): weight added to perpendicular-curve directions in corridor scoring. 0 = no orbital bias.")]
     [Range(0f, 1.5f)] public float orbitalTurnBias = 0.6f;
 
@@ -60,11 +60,11 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("Rhythmic (Groove): seconds at near-standstill after each burst.")]
     [Min(0.05f)] public float pauseDuration = 0.35f;
 
-    [Tooltip("MineNode only (Darting/Lead corridor scoring): grid-cell radius within which a Vehicle biases direction away. Collectables never use this — their evasion is collectableFleeRadiusCells.")]
+    [Tooltip("DiscoveryTrackNode only (Darting/Lead corridor scoring): grid-cell radius within which a Vehicle biases direction away. Collectables never use this — their evasion is collectableFleeRadiusCells.")]
     [Range(0f, 10f)] public float evasionCells = 3f;
 
     [Header("Collectable Movement")]
-    [Tooltip("Global speed multiplier for this role's collectable motion — scales drift, role pulses (bass slam, lead pulse, harmony surge), and flee. 1 = baseline feel (2.4 u/s drift). MIDI velocity still modulates drift ±25%. Does not affect MineNode speed.")]
+    [Tooltip("Global speed multiplier for this role's collectable motion — scales drift, role pulses (bass slam, lead pulse, harmony surge), and flee. 1 = baseline feel (2.4 u/s drift). MIDI velocity still modulates drift ±25%. Does not affect DiscoveryTrackNode speed.")]
     [Min(0f)] public float collectableSpeed = 1f;
 
     [Tooltip("Seconds to ramp from rest to full drift speed. Lower = snappier direction changes; also governs glide-to-rest and tether correction.")]

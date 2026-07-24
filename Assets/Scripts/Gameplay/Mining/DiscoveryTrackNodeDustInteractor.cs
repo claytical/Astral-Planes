@@ -2,10 +2,10 @@ using UnityEngine;
 using System.Collections.Generic;
 
 [RequireComponent(typeof(Rigidbody2D))]
-public class MineNodeDustInteractor : MonoBehaviour
+public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
 {
     [Header("Multipliers while in dust (node-specific)")]
-    [Tooltip("Environment feedback scalar consumed by MineNode locomotion while in dust.")]
+    [Tooltip("Environment feedback scalar consumed by DiscoveryTrackNode locomotion while in dust.")]
     [Range(0f, 1f)] public float dustDragScalar = 0.85f;
 
     [Tooltip("Extra braking applied per FixedUpdate while inside dust.")]
@@ -34,7 +34,7 @@ public class MineNodeDustInteractor : MonoBehaviour
     [Tooltip("Max BFS cells visited when searching for the nearest untinted dust cell.")]
     [SerializeField] private int huntBfsBudget = 600;
 
-    [Tooltip("How strongly the hunt direction biases _carveDir in MineNode. 0 = no bias, 1 = full override.")]
+    [Tooltip("How strongly the hunt direction biases _carveDir in DiscoveryTrackNode. 0 = no bias, 1 = full override.")]
     [SerializeField, Range(0f, 1f)] private float huntDirWeight = 0.55f;
 
     [Tooltip("Grid-cell radius around the node's current cell that counts as 'arrived' at the target.")]
@@ -74,7 +74,7 @@ public class MineNodeDustInteractor : MonoBehaviour
     private Rigidbody2D _rb;
     private GameFlowManager _gfm;
     private DrumTrack   _drumTrack;
-    private MineNode    _node;
+    private DiscoveryTrackNode    _node;
     private bool _prevInDust;
     private Vector2 _prevPos;
     private bool _hasPrevPos;
@@ -85,7 +85,7 @@ public class MineNodeDustInteractor : MonoBehaviour
 
     /// <summary>
     /// World-space direction toward the current MusicalRole.None hunt target.
-    /// Returns Vector2.zero when no target is known. MineNode.FixedUpdate blends
+    /// Returns Vector2.zero when no target is known. DiscoveryTrackNode.FixedUpdate blends
     /// this into _carveDir each tick.
     /// </summary>
     public Vector2 GetHuntDir() => _hasHuntTarget ? _huntDir : Vector2.zero;
@@ -97,7 +97,7 @@ public class MineNodeDustInteractor : MonoBehaviour
     {
         _rb          = GetComponent<Rigidbody2D>();
         if (_rb == null) TryGetComponent(out _rb);
-        _node        = GetComponent<MineNode>();
+        _node        = GetComponent<DiscoveryTrackNode>();
         _drumTrack   = (_node != null) ? _node.DrumTrack : null;
     }
 
@@ -290,7 +290,7 @@ public class MineNodeDustInteractor : MonoBehaviour
         }
 
         // No unpainted dust reachable within budget — clear target
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNodeDustInteractor] BFS exhausted ({huntBfsBudget} cells) from {fromCell} — no target found.");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DiscoveryTrackNodeDustInteractor] BFS exhausted ({huntBfsBudget} cells) from {fromCell} — no target found.");
         _hasHuntTarget = false;
     }
 

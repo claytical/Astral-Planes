@@ -159,7 +159,7 @@ public sealed class BinFrontierAllocator
         // the next GenerateNotes call returns the correct next bin.
         // Do NOT grant _allowAdvanceNextBurst: that token feeds TrackExpansionController,
         // which would passively spawn bin-1 collectables on the next drum downbeat.
-        // ByVoice tracks advance only through star pokes (MineNode ejection).
+        // ByVoice tracks advance only through star pokes (DiscoveryTrackNode ejection).
         var tracks = _getTracks();
         foreach (var t in tracks)
         {

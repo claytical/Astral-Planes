@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public partial class MineNode
+public partial class DiscoveryTrackNode
 {
     private void EnforceGridContainment(Vector2 fromPos, Vector2 toPos)
     {
@@ -24,7 +24,7 @@ public partial class MineNode
         }
 
         if (debugSweepContainment)
-            if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNode] blockedCell={hit.blockedCell} normal={wallNormal} target={target}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[DiscoveryTrackNode] blockedCell={hit.blockedCell} normal={wallNormal} target={target}");
     }
 
     private bool ShouldSkipBoundaryClampThisTick()
@@ -63,7 +63,7 @@ public partial class MineNode
             didContainmentThisTick = true;
             _hardCorrectionsThisTick++;
             if (assertSingleHardCorrectionPerTick && _hardCorrectionsThisTick > 1)
-                Debug.LogAssertion($"[MineNode] Multiple hard corrections in one tick on {name}: {_hardCorrectionsThisTick}", this);
+                Debug.LogAssertion($"[DiscoveryTrackNode] Multiple hard corrections in one tick on {name}: {_hardCorrectionsThisTick}", this);
         }
     }
 }

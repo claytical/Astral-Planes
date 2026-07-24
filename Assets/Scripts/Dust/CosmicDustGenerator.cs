@@ -137,7 +137,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
     private readonly MazeTopologyService _mazeTopologyService = new();
 
     private HashSet<Vector2Int> _permanentClearCells = new HashSet<Vector2Int>();
-    // Cells drained by a PhaseStar whose energy is "held" by a MineNode: no regrow
+    // Cells drained by a PhaseStar whose energy is "held" by a DiscoveryTrackNode: no regrow
     // until ReleaseHeldCells (node death) or a maze flush supersedes them.
     private readonly HashSet<Vector2Int> _heldRegrowCells = new HashSet<Vector2Int>();
     private Dictionary<Vector2Int, float> _carveAccumulator = new();
@@ -294,7 +294,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         // Init extracted systems (no pooling/legacy queues required).
         if (_tintDiffusionSystem == null)
             _tintDiffusionSystem = new CosmicDustTintDiffusionSystem(
-                cell => { // If a MineNode has imprinted this cell, keep that tint stable until something else changes it.
+                cell => { // If a DiscoveryTrackNode has imprinted this cell, keep that tint stable until something else changes it.
                     if (_imprints != null && _imprints.ContainsKey(cell)) 
                         return null; 
                     TryGetDustAt(cell, out var d); 
@@ -633,7 +633,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
     private Color GetCellVisualColor(Vector2Int cell)
     {
-        // MineNode imprint should override everything while it's present.
+        // DiscoveryTrackNode imprint should override everything while it's present.
         if (_imprints != null && _imprints.TryGetValue(cell, out var imp))
             return imp.color;
 
@@ -701,7 +701,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                     if (!d.isActiveAndEnabled) continue;
 
                     // Skip cells that carry a role imprint — their color is authoritative
-                    // (set by BuildMazeRoleImprints / MineNode carve). Overwriting them with
+                    // (set by BuildMazeRoleImprints / DiscoveryTrackNode carve). Overwriting them with
                     // config.mazeTint (a flat gray) would erase the 4-color Voronoi layout.
                     var gp = new Vector2Int(x, y);
                     if (_imprints != null && _imprints.TryGetValue(gp, out var imp)
@@ -801,7 +801,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         return false;
     }
 
-    // Paints existing dust with a role at reduced energy (MineNode exhaust trail).
+    // Paints existing dust with a role at reduced energy (DiscoveryTrackNode exhaust trail).
     // Does NOT create new dust — only paints cells that already have solid terrain.
     // energyFraction: 0-1, fraction of the role's maxEnergyUnits to assign (e.g. 0.4 = 40% charge).
     public void PaintDustExhaust(Vector2Int cell, MusicalRole role, float energyFraction = 0.4f)

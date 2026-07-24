@@ -39,7 +39,7 @@ public partial class DrumTrack : MonoBehaviour
     [HideInInspector]
     public List<MotifSnapshot> SessionPhases = new();
     [HideInInspector]
-    public List<MineNode> activeMineNodes = new List<MineNode>();
+    public List<DiscoveryTrackNode> activeMineNodes = new List<DiscoveryTrackNode>();
     [HideInInspector]
     public int currentStep;
 
@@ -307,7 +307,7 @@ public partial class DrumTrack : MonoBehaviour
         if (GameFlowManager.VerboseLogging) Debug.Log("[DrumTrack] StarPool created and initialized.");
     }
 
-    public void RegisterMineNode(MineNode obj)
+    public void RegisterMineNode(DiscoveryTrackNode obj)
     {
         if (!activeMineNodes.Contains(obj))
         {
@@ -315,7 +315,7 @@ public partial class DrumTrack : MonoBehaviour
         }
     }
 
-    public void UnregisterMineNode(MineNode obj)
+    public void UnregisterMineNode(DiscoveryTrackNode obj)
     {
         activeMineNodes.Remove(obj);
     }

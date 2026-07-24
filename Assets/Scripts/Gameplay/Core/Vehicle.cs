@@ -142,7 +142,7 @@ public partial class Vehicle : MonoBehaviour
         {
             rb = GetComponent<Rigidbody2D>();
             gfm = GameFlowManager.Instance;
-            _mineNodeLayerMask = LayerMask.GetMask("MineNode");
+            _mineNodeLayerMask = LayerMask.GetMask("DiscoveryTrackNode");
             _pressureFilter.SetLayerMask(_mineNodeLayerMask);
             _pressureFilter.useTriggers = Physics2D.queriesHitTriggers;
             var col = GetComponent<Collider2D>();

@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ea51f105660b54cd98926352589ee4d9, type: 3}
   m_Name: Harmony NodeLocomotionProfile
-  m_EditorClassIdentifier: Assembly-CSharp::MineNodeLocomotionProfile
+  m_EditorClassIdentifier: Assembly-CSharp::DiscoveryTrackNodeLocomotionProfile
   archetype: 1
   baseSpeed: 1.5
   maxSpeed: 3

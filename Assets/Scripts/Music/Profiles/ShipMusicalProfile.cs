@@ -98,10 +98,10 @@ public class ShipMusicalProfile : ScriptableObject
     [Range(0f, 1f)] public float plowSteeringPenalty01 = 0f;
 
     [Header("Archetype — Needle")]
-    [Tooltip("World-unit radius within which a MineNode triggers handling instability. 0 = disabled.")]
+    [Tooltip("World-unit radius within which a DiscoveryTrackNode triggers handling instability. 0 = disabled.")]
     [Min(0f)] public float pressureInstabilityRadius = 0f;
 
-    [Tooltip("Maximum authority reduction when a MineNode is at the inner edge of pressureInstabilityRadius. " +
+    [Tooltip("Maximum authority reduction when a DiscoveryTrackNode is at the inner edge of pressureInstabilityRadius. " +
              "0.55 → controls become ~45% effective at full pressure.")]
     [Range(0f, 1f)] public float pressureInstabilityStrength01 = 0f;
 

@@ -4,15 +4,15 @@ using UnityEngine;
 // Valid combinations: Drifting+Thinking, Drifting+Committing, Fleeing+Escaping.
 // A node in Fleeing always has Intent=Escaping. A Drifting node may be Thinking or Committing.
 // Mismatch (e.g. Drifting+Escaping) is representable but has undefined behavior.
-public enum MineNodeState { Drifting, Fleeing }
-public enum MineNodeBehaviorIntent { Thinking, Committing, Escaping }
-public enum MineNodeOutcome { Captured, Escaped, Expired }
+public enum DiscoveryTrackNodeState { Drifting, Fleeing }
+public enum DiscoveryTrackNodeBehaviorIntent { Thinking, Committing, Escaping }
+public enum DiscoveryTrackNodeOutcome { Captured, Escaped, Expired }
 
-public partial class MineNode : MonoBehaviour
+public partial class DiscoveryTrackNode : MonoBehaviour
 {
     public SpriteRenderer coreSprite;
     public SpriteRenderer outlineSprite;
-    [SerializeField] private MineNodeConfig config;
+    [SerializeField] private DiscoveryTrackNodeConfig config;
 
     [Header("Grid Containment")]
     [SerializeField] private bool debugSweepContainment = false;
@@ -23,14 +23,14 @@ public partial class MineNode : MonoBehaviour
 
     public bool didContainmentThisTick { get; private set; }
 
-    public event System.Action<MineNode, MineNodeOutcome> OnResolved;
-    public event System.Action<MineNodeBehaviorIntent> OnBehaviorIntentChanged;
+    public event System.Action<DiscoveryTrackNode, DiscoveryTrackNodeOutcome> OnResolved;
+    public event System.Action<DiscoveryTrackNodeBehaviorIntent> OnBehaviorIntentChanged;
 
     public bool WasCaptured { get; private set; }
     public bool WasEscaped  { get; private set; }
-    public MineNodeState State { get; private set; } = MineNodeState.Drifting;
+    public DiscoveryTrackNodeState State { get; private set; } = DiscoveryTrackNodeState.Drifting;
     public DrumTrack DrumTrack => _drumTrack;
-    public MineNodeLocomotionProfile ActiveLocomotionProfile => _activeLocomotionProfile;
+    public DiscoveryTrackNodeLocomotionProfile ActiveLocomotionProfile => _activeLocomotionProfile;
 
     private Vector2Int _spawnCell;
     private float _nextEscapeAllowedTime = 0f;
@@ -52,22 +52,22 @@ public partial class MineNode : MonoBehaviour
     private InstrumentTrack _track;
     private MusicalRole _role;
     private float _speed    = 0.5f;
-    private MineNodeLocomotionProfile _activeLocomotionProfile;
+    private DiscoveryTrackNodeLocomotionProfile _activeLocomotionProfile;
     private int _lastProcessedStep = -1;
     private float _rescanTimer = 0f;
     private Vector2 _carveDir = Vector2.right;
-    private MineNodeDustInteractor _dustInteractor;
+    private DiscoveryTrackNodeDustInteractor _dustInteractor;
     private Camera _cam;
     private float _currentDesiredSpeed;
     private bool _hasBeenStruck;
     private Vector2 _prevPhysicsPos;
     private bool _hasPrevPhysicsPos;
-    private MineNodeDecisionArchetypeLibrary.Archetype _decisionArchetype;
+    private DiscoveryTrackNodeDecisionArchetypeLibrary.Archetype _decisionArchetype;
     private float _nextDirectionDecisionAt;
     private float _pathCommitUntil;
-    private MineNodeBehaviorIntent _behaviorIntent = MineNodeBehaviorIntent.Thinking;
+    private DiscoveryTrackNodeBehaviorIntent _behaviorIntent = DiscoveryTrackNodeBehaviorIntent.Thinking;
     private CosmicDustGenerator _dustGenerator;
-    private MineNodeBehaviorCategory _behaviorCategory;
+    private DiscoveryTrackNodeBehaviorCategory _behaviorCategory;
     private MusicalRoleProfile _roleProfile;
     private Vehicle _trackedVehicle;
 
@@ -85,7 +85,7 @@ public partial class MineNode : MonoBehaviour
     private float _stunTimer;
 
     // Fleeing: sought border gap (side columns only — top/bottom are never escape walls)
-    private readonly MineNodeFleeGapFinder _fleeGapFinder = new MineNodeFleeGapFinder();
+    private readonly DiscoveryTrackNodeFleeGapFinder _fleeGapFinder = new DiscoveryTrackNodeFleeGapFinder();
 
     // Escape glide: once escaped, the node stops steering/containment and drifts
     // straight out through the gap until it is fully off-screen.
@@ -145,12 +145,12 @@ public partial class MineNode : MonoBehaviour
         _carveDir = new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad)).normalized;
         _nextDirectionDecisionAt = Time.time + _decisionArchetype.SampleReactionDelay();
         _pathCommitUntil = Time.time + Mathf.Max(0.05f, _decisionArchetype.pathCommitmentDuration * CategoryCommitScale());
-        SetBehaviorIntent(MineNodeBehaviorIntent.Committing);
+        SetBehaviorIntent(DiscoveryTrackNodeBehaviorIntent.Committing);
         _lastProcessedStep = -1;
         if (_drumTrack != null)
             _drumTrack.OnLoopBoundary += HandleLoopBoundary;
 
-        var dust = GetComponent<MineNodeDustInteractor>();
+        var dust = GetComponent<DiscoveryTrackNodeDustInteractor>();
         if (dust != null) dust.SetLevelAuthority(_drumTrack);
         if (coreSprite != null)
         {
@@ -188,11 +188,11 @@ public partial class MineNode : MonoBehaviour
     private void Start()
     {
         _rb = GetComponent<Rigidbody2D>();
-        _dustInteractor = GetComponent<MineNodeDustInteractor>();
+        _dustInteractor = GetComponent<DiscoveryTrackNodeDustInteractor>();
         _originalScale = transform.localScale;
         _strength = _maxStrength;
         Debug.Assert(_track != null && _drumTrack != null && config != null,
-            $"[MineNode] {name} reached Start() without Initialize() or a missing config asset — node will be inert.");
+            $"[DiscoveryTrackNode] {name} reached Start() without Initialize() or a missing config asset — node will be inert.");
     }
 
     private void Update()
@@ -216,14 +216,14 @@ public partial class MineNode : MonoBehaviour
     {
         if (_hasBeenStruck) return;
         _hasBeenStruck = true;
-        State = MineNodeState.Fleeing;
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNode] {name} — transitioning to Fleeing.");
+        State = DiscoveryTrackNodeState.Fleeing;
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DiscoveryTrackNode] {name} — transitioning to Fleeing.");
     }
 
     private void HandleExpiry()
     {
         if (_depletedHandled || _resolvedFired) return;
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNode] {name} — expired after {_loopsSinceSpawn} loops.");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DiscoveryTrackNode] {name} — expired after {_loopsSinceSpawn} loops.");
 
         var explode = GetComponent<Explode>();
         if (explode != null) explode.ExpireExplode();
@@ -242,8 +242,8 @@ public partial class MineNode : MonoBehaviour
     {
         if (_depletedHandled || _resolvedFired) return;
         WasEscaped = true;
-        SetBehaviorIntent(MineNodeBehaviorIntent.Escaping);
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNode] {name} — escaped through boundary.");
+        SetBehaviorIntent(DiscoveryTrackNodeBehaviorIntent.Escaping);
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DiscoveryTrackNode] {name} — escaped through boundary.");
         BeginEscapeGlide();
         FireResolvedOnce();
         StartCoroutine(CleanupAndDestroy(waitForFullEscape: true));
@@ -266,7 +266,7 @@ public partial class MineNode : MonoBehaviour
         // No capture, bounce, or boundary-trigger interaction on the way out.
         if (_col != null) _col.enabled = false;
         // Edge-hug / escape-push forces would drag the node back toward the wall.
-        if (_dustInteractor == null) _dustInteractor = GetComponent<MineNodeDustInteractor>();
+        if (_dustInteractor == null) _dustInteractor = GetComponent<DiscoveryTrackNodeDustInteractor>();
         if (_dustInteractor != null) _dustInteractor.enabled = false;
     }
 
@@ -295,8 +295,8 @@ public partial class MineNode : MonoBehaviour
 
         switch (State)
         {
-            case MineNodeState.Drifting: FixedUpdateDrifting(); break;
-            case MineNodeState.Fleeing:  FixedUpdateFleeing();  break;
+            case DiscoveryTrackNodeState.Drifting: FixedUpdateDrifting(); break;
+            case DiscoveryTrackNodeState.Fleeing:  FixedUpdateFleeing();  break;
         }
 
         _prevPhysicsPos = _rb.position;

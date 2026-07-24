@@ -230,7 +230,7 @@ public partial class CosmicDustGenerator
             return;
         }
 
-        // Held by a MineNode's energy economy: only ReleaseHeldCells may schedule regrow
+        // Held by a DiscoveryTrackNode's energy economy: only ReleaseHeldCells may schedule regrow
         // (it removes the cell from the set before requesting).
         if (_heldRegrowCells.Contains(gridPos))
             return;

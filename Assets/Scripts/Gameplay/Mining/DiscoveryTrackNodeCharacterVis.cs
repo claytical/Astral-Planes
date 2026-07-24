@@ -1,12 +1,12 @@
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
-public class MineNodeCharacterVis : MonoBehaviour
+public class DiscoveryTrackNodeCharacterVis : MonoBehaviour
 {
     [System.Serializable]
     private struct ArchetypeVisualProfile
     {
-        public MineNodeLocomotionArchetype archetype;
+        public DiscoveryTrackNodeLocomotionArchetype archetype;
         [Min(0f)] public float thinkingSpinDegPerSec;
         [Min(0f)] public float faceTurnDegPerSec;
         [Min(0f)] public float wobbleDeg;
@@ -36,8 +36,8 @@ public class MineNodeCharacterVis : MonoBehaviour
     [SerializeField] Transform spritePivotInner;
 
     Rigidbody2D _rb;
-    MineNode _mineNode;
-    MineNodeBehaviorIntent _intent = MineNodeBehaviorIntent.Thinking;
+    DiscoveryTrackNode _mineNode;
+    DiscoveryTrackNodeBehaviorIntent _intent = DiscoveryTrackNodeBehaviorIntent.Thinking;
     bool _isSwimming;
     float _facedAngle;
     float _wobblePhase;
@@ -45,7 +45,7 @@ public class MineNodeCharacterVis : MonoBehaviour
     private void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();
-        _mineNode = GetComponent<MineNode>();
+        _mineNode = GetComponent<DiscoveryTrackNode>();
         if (!outerSprite) outerSprite = GetComponentInChildren<SpriteRenderer>(true);
         if (!spritePivotOuter && outerSprite) spritePivotOuter = outerSprite.transform;
         if (innerSprite && !spritePivotInner) spritePivotInner = innerSprite.transform;
@@ -61,7 +61,7 @@ public class MineNodeCharacterVis : MonoBehaviour
         if (_mineNode != null) _mineNode.OnBehaviorIntentChanged -= HandleBehaviorIntentChanged;
     }
 
-    private void HandleBehaviorIntentChanged(MineNodeBehaviorIntent intent)
+    private void HandleBehaviorIntentChanged(DiscoveryTrackNodeBehaviorIntent intent)
     {
         _intent = intent;
     }
@@ -78,8 +78,8 @@ public class MineNodeCharacterVis : MonoBehaviour
         else
             _isSwimming = speed >= thinkToSwimSpeed;
 
-        bool thinkingAnim = _intent == MineNodeBehaviorIntent.Thinking || !_isSwimming;
-        bool escapeAnim = _intent == MineNodeBehaviorIntent.Escaping;
+        bool thinkingAnim = _intent == DiscoveryTrackNodeBehaviorIntent.Thinking || !_isSwimming;
+        bool escapeAnim = _intent == DiscoveryTrackNodeBehaviorIntent.Escaping;
 
         if (thinkingAnim)
         {

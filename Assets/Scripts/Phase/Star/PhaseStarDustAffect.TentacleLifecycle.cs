@@ -205,7 +205,7 @@ public partial class PhaseStarDustAffect
                 int drainedUnits = dust.ChipEnergy(dust.maxEnergyUnits);
                 if (drainedUnits > 0)
                 {
-                    // Drained energy is held by the MineNode the star builds from it;
+                    // Drained energy is held by the DiscoveryTrackNode the star builds from it;
                     // the cell regrows when that node dies (or the star is destroyed first).
                     Vector2 burstDir = starPos - tentacle.targetWorldPos; // blow toward the star
                     gen.ZapClearCellHeld(tentacle.targetCell, preDrainTint, burstDir);

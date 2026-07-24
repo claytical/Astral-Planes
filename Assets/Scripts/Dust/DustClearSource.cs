@@ -6,7 +6,7 @@ public enum DustClearSource
 {
     System = 0,          // internal maze ops / unspecified — always uses the base delay
     VehiclePlow,
-    StarDrain,           // held by the MineNode built from the drained energy; delay applies on release
+    StarDrain,           // held by the DiscoveryTrackNode built from the drained energy; delay applies on release
     Zap,                 // non-held zap fallback
     CollectableArrival,
     CollectablePlow,

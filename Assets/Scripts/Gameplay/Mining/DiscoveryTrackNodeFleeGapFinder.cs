@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// BFS gap-seek for a fleeing MineNode: finds the nearest reachable dust-free
+// BFS gap-seek for a fleeing DiscoveryTrackNode: finds the nearest reachable dust-free
 // side-column perimeter cell (a punched exit or player-carved hole) and picks
 // a steering waypoint short of it. Side walls only — top/bottom are never
 // treated as escape walls.
-public class MineNodeFleeGapFinder
+public class DiscoveryTrackNodeFleeGapFinder
 {
     private const int   kBfsBudget      = 600;
     private const float kRetargetPeriod = 0.5f;

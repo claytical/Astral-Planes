@@ -1,7 +1,7 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "MineNodeConfig", menuName = "Astral Planes/Mine Node Config")]
-public class MineNodeConfig : ScriptableObject
+[CreateAssetMenu(fileName = "DiscoveryTrackNodeConfig", menuName = "Astral Planes/Discovery Track Node Config")]
+public class DiscoveryTrackNodeConfig : ScriptableObject
 {
     [Header("Motion")]
     public float driftSpeedMultiplier = 0.35f;
@@ -24,14 +24,14 @@ public class MineNodeConfig : ScriptableObject
     public bool driveCarvingMotionFromNoteSet = true;
 
     [Header("Null-Profile Fallbacks")]
-    [Tooltip("Used only when no MineNodeLocomotionProfile resolves for this node's role (e.g. MusicalRole.None).")]
+    [Tooltip("Used only when no DiscoveryTrackNodeLocomotionProfile resolves for this node's role (e.g. MusicalRole.None).")]
     [Min(1)] public int defaultStrength = 100;
-    [Tooltip("Used only when no MineNodeLocomotionProfile resolves and no NoteSet override applies. 0 = never.")]
+    [Tooltip("Used only when no DiscoveryTrackNodeLocomotionProfile resolves and no NoteSet override applies. 0 = never.")]
     [Min(0)] public int defaultExpireAfterLoops = 0;
 
     [Header("Locomotion Archetype Library")]
     [Tooltip("Fallback bucket, indexed by role speed 0-1, used when a role's MusicalRoleProfile has no direct mineNodeLocomotionProfile override.")]
-    public MineNodeLocomotionProfile[] locomotionArchetypeProfiles = new MineNodeLocomotionProfile[4];
-    public MineNodeLocomotionProfile defaultLocomotionProfile;
-    public MineNodeDecisionArchetypeLibrary decisionArchetypeLibrary;
+    public DiscoveryTrackNodeLocomotionProfile[] locomotionArchetypeProfiles = new DiscoveryTrackNodeLocomotionProfile[4];
+    public DiscoveryTrackNodeLocomotionProfile defaultLocomotionProfile;
+    public DiscoveryTrackNodeDecisionArchetypeLibrary decisionArchetypeLibrary;
 }
