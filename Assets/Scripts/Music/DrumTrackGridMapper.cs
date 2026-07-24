@@ -427,7 +427,7 @@ public sealed class DrumTrackGridMapper
                     continue;
 
                 // Only validate cells that *should* belong to Collectables / notes.
-                // Do NOT touch Dust or MineNode occupancy here.
+                // Do NOT touch Dust or DiscoveryTrackNode occupancy here.
                 var cell = spawnGrid.GridCells[x, y];
                 if (cell.ObjectType != GridObjectType.Note)
                     continue;

@@ -308,7 +308,7 @@ public partial class CosmicDustGenerator
     /// <summary>
     /// Promotes hidden Solid cells within <paramref name="radiusCells"/> of <paramref name="centerGP"/>
     /// whose Voronoi role matches <paramref name="role"/> to their true role color,
-    /// firing OnRoleChanged so PhaseStar can target them (player retry path after MineNode expiry).
+    /// firing OnRoleChanged so PhaseStar can target them (player retry path after DiscoveryTrackNode expiry).
     /// </summary>
     public void RevealHiddenDustByRole(Vector2Int centerGP, int radiusCells, MusicalRole role)
     {

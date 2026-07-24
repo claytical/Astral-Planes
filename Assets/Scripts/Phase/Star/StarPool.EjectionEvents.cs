@@ -8,7 +8,7 @@ public sealed partial class StarPool
 
     // The most recent ejecting Star — kept alive briefly for its exit animation.
     private PhaseStar _lastEjectingStar;
-    // Set to true when the MineNode fires OnResolved (Vehicle destroys it).
+    // Set to true when the DiscoveryTrackNode fires OnResolved (Vehicle destroys it).
     // _mineNodePending only clears once this is true AND the resulting burst is cleared.
     // Prevents pre-ejection expansion bursts from prematurely releasing the gate.
     private bool _mineNodeResolved;
@@ -74,7 +74,7 @@ public sealed partial class StarPool
 
     // Only pause stars whose next ejection would expand their track's bin count.
     // Stars that would stay in the same bin are left active so concurrent same-bin
-    // MineNodes can coexist for distinct InstrumentTracks.
+    // DiscoveryTrackNodes can coexist for distinct InstrumentTracks.
     private void PauseExpansionConflicts(PhaseStar except)
     {
         foreach (var kvp in _activeStars)
@@ -125,7 +125,7 @@ public sealed partial class StarPool
         bool wasExpired   = hasRef && star.LastNodeWasExpired;
         bool wasEscaped   = hasRef && star.LastNodeWasEscaped;
         bool wasCaptured  = hasRef && star.LastNodeWasCaptured;
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] MineNode resolved role={role} captured={wasCaptured} escaped={wasEscaped} expired={wasExpired} superNode={wasSuperNode} emptyBurst={_ejectedBurstWasEmpty} CIF={AnyCollectablesInFlight()}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] DiscoveryTrackNode resolved role={role} captured={wasCaptured} escaped={wasEscaped} expired={wasExpired} superNode={wasSuperNode} emptyBurst={_ejectedBurstWasEmpty} CIF={AnyCollectablesInFlight()}");
 
         if (wasCaptured)
         {
@@ -140,7 +140,7 @@ public sealed partial class StarPool
         if (_mineNodePending && (_ejectedBurstWasEmpty || wasSuperNode || wasExpired || wasEscaped))
         {
             if (wasExpired || wasEscaped)
-                if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] MineNode {(wasExpired ? "expired" : "escaped")} — no harvest, spawning next star (remainingHarvests={_remainingEjectionsTotal})");
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] DiscoveryTrackNode {(wasExpired ? "expired" : "escaped")} — no harvest, spawning next star (remainingHarvests={_remainingEjectionsTotal})");
 
             _mineNodeResolved = false;
             _mineNodePending = false;
@@ -155,8 +155,8 @@ public sealed partial class StarPool
         // Only the ejected role's track is authoritative for rollback and the mine-node gate.
         bool isEjectedTrack = track.assignedRole == _lastEjectedRole;
 
-        // Only treat this as the MineNode's burst if OnResolved already fired.
-        // Pre-ejection expansion bursts arrive before the MineNode is destroyed, so
+        // Only treat this as the DiscoveryTrackNode's burst if OnResolved already fired.
+        // Pre-ejection expansion bursts arrive before the DiscoveryTrackNode is destroyed, so
         // _mineNodeResolved is still false when they clear.
         bool isMineBurst = isEjectedTrack && _mineNodeResolved;
         if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] HandleCollectableBurstCleared track={track.assignedRole} burstId={burstId} hadNotes={hadNotes} isEjected={isEjectedTrack} mineResolved={_mineNodeResolved} isMineBurst={isMineBurst} unresolved={HasUnresolvedMineNodeSequence()}");

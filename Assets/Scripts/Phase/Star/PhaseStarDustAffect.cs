@@ -361,7 +361,7 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
 
     private int DetermineDesiredTentacleCount()
     {
-        // Pool = the node payload: one tentacle per note the next MineNode will carry.
+        // Pool = the node payload: one tentacle per note the next DiscoveryTrackNode will carry.
         // Concurrency below the cap is governed by AssignIdleTentacleTargets' zap budget.
         return Mathf.Max(1, _star != null ? _star.GetDesiredTentacleCount() : fallbackTentaclesPerRole);
     }

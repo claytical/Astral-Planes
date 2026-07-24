@@ -10,8 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2994ff20f423f435cae9a573a87997ce, type: 3}
-  m_Name: MineNodeConfig
-  m_EditorClassIdentifier: Assembly-CSharp::MineNodeConfig
+  m_Name: DiscoveryTrackNodeConfig
+  m_EditorClassIdentifier: Assembly-CSharp::DiscoveryTrackNodeConfig
   driftSpeedMultiplier: 0.1
   fleeTowardBoundaryWeight: 0.303
   hitStunDuration: 0.8

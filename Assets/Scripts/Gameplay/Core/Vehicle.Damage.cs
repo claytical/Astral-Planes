@@ -44,7 +44,7 @@ public partial class Vehicle
 
     void OnCollisionEnter2D(Collision2D coll)
     {
-        var node = coll.gameObject.GetComponent<MineNode>();
+        var node = coll.gameObject.GetComponent<DiscoveryTrackNode>();
 
         // 🎯 Apply impact damage
         int damage = GetForceAsDamage();

@@ -71,7 +71,7 @@ public partial class PhaseStar : MonoBehaviour
     private Transform   _previewVisualB;   // second counter-rotating diamond
     private bool _isDisposing;
     private readonly PhaseStarInteractionState _interactionState = new();
-    // Cached impact data for the next MineNode spawn
+    // Cached impact data for the next DiscoveryTrackNode spawn
     Vector2 _lastImpactDir = Vector2.right;
     float _lastImpactStrength = 0f;
 
@@ -128,7 +128,7 @@ public partial class PhaseStar : MonoBehaviour
     private int _spawnTicket;
     private int _lastPokeFrame = -999999;
     private InstrumentTrack _cachedTrack;
-    private MineNode _activeNode;
+    private DiscoveryTrackNode _activeNode;
     private SuperNode _activeSuperNode;
     private readonly List<InstrumentTrack> _targets = new(4);
     private MusicalRole _attunedRole = MusicalRole.None;
@@ -147,7 +147,7 @@ public partial class PhaseStar : MonoBehaviour
     // state is single-slot — and mine ejections additionally need unspent harvest budget.
     // Null (unmanaged star) means always allowed.
     public Func<MusicalRole, bool, bool> CanCommitEjection;
-    // Fired when the Vehicle destroys the MineNode/SuperNode — the burst is now spawning.
+    // Fired when the Vehicle destroys the DiscoveryTrackNode/SuperNode — the burst is now spawning.
     // Safe to fire from a destroyed star (C# delegate, not Unity message).
     public event Action<PhaseStar, MusicalRole> OnMineNodeResolved;
     private bool _isArmed { get => _interactionState.Interaction.IsArmed; set => _interactionState.Interaction.IsArmed = value; }
@@ -160,7 +160,7 @@ public partial class PhaseStar : MonoBehaviour
         EnsurePreviewRing();
     }
 
-    // Cells drained via ZapClearCellHeld since the last node spawn. The next MineNode
+    // Cells drained via ZapClearCellHeld since the last node spawn. The next DiscoveryTrackNode
     // "holds" this batch; it regrows when that node dies. Released directly if the star
     // is destroyed before a node spawns.
     private readonly List<Vector2Int> _heldDrainCells = new();

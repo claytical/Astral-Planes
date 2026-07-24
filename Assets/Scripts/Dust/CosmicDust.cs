@@ -21,7 +21,7 @@ public partial class CosmicDust : MonoBehaviour {
     public event Action<float> OnClearVisualRequested;
 
     // Interaction-mode contract (implemented by CosmicDustGenerator):
-    // Carve: resistance-aware depletion used by Vehicle/MineNode interactions.
+    // Carve: resistance-aware depletion used by Vehicle/DiscoveryTrackNode interactions.
     // Zap: discrete PhaseStar consume-and-clear path.
     // Both modes converge on shared clear/regrow visuals here (Dissipate/Hide + Begin),
     // while the generator controls mode flags (imprint mutation, regrow scheduling, void-grow exceptions, fade duration source).

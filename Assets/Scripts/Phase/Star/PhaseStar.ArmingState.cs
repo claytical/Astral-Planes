@@ -108,7 +108,7 @@ public partial class PhaseStar
             return;
         }
 
-        // When resumed after a sibling MineNode flow, a non-ready dormant star must
+        // When resumed after a sibling DiscoveryTrackNode flow, a non-ready dormant star must
         // re-enter dormant wait so tentacle acquisition restarts. Showing dim alone
         // leaves tentacles disabled and the star appears stuck despite valid dust.
         if (_state == PhaseStarState.Dormant)
@@ -162,8 +162,8 @@ public partial class PhaseStar
         dust?.SetTentaclesActive(false);
 
         // Suppress the dim visual when the star is parked off-screen.
-        // NodeResolving: star is hidden (MineNode is alive); use Hidden.
-        // Also hide completely if a MineNode/SuperNode is still live, regardless of reason
+        // NodeResolving: star is hidden (DiscoveryTrackNode is alive); use Hidden.
+        // Also hide completely if a DiscoveryTrackNode/SuperNode is still live, regardless of reason
         // (e.g. ExpansionPending fires on a loop boundary while a node is active).
         // All other reasons: show dim so the star is faintly visible while waiting.
         if (!_burstOffScreen)

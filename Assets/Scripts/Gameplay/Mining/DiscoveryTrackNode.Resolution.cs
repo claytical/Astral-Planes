@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public partial class MineNode
+public partial class DiscoveryTrackNode
 {
     // Star-drained dust cells whose energy built this node; they regrow when it dies.
     private List<Vector2Int> _heldDustCells;
@@ -36,7 +36,7 @@ public partial class MineNode
         if (GetComponent<Explode>() != null) GetComponent<Explode>().PreExplode();
     }
 
-    private void SetBehaviorIntent(MineNodeBehaviorIntent intent)
+    private void SetBehaviorIntent(DiscoveryTrackNodeBehaviorIntent intent)
     {
         if (_behaviorIntent == intent) return;
         _behaviorIntent = intent;
@@ -120,9 +120,9 @@ public partial class MineNode
         if (_resolvedFired) return;
         _resolvedFired = true;
         ReleaseHeldDustOnce();
-        var outcome = WasCaptured ? MineNodeOutcome.Captured
-                    : WasEscaped  ? MineNodeOutcome.Escaped
-                                  : MineNodeOutcome.Expired;
+        var outcome = WasCaptured ? DiscoveryTrackNodeOutcome.Captured
+                    : WasEscaped  ? DiscoveryTrackNodeOutcome.Escaped
+                                  : DiscoveryTrackNodeOutcome.Expired;
         OnResolved?.Invoke(this, outcome);
     }
 

@@ -65,21 +65,21 @@ public sealed class DustImprintStore
         imp.role = imp.hiddenRole;
         this[gp] = imp;
         // hiddenRole is kept as permanent Voronoi ground-truth for the motif lifetime.
-        // RestoreVoronoiImprint() uses it to revert MineNode paint when a vehicle carves the cell.
+        // RestoreVoronoiImprint() uses it to revert DiscoveryTrackNode paint when a vehicle carves the cell.
         return true;
     }
 
     /// <summary>
-    /// Clears any MineNode paint on a cell and re-promotes its permanent Voronoi role.
+    /// Clears any DiscoveryTrackNode paint on a cell and re-promotes its permanent Voronoi role.
     /// Use this instead of PromoteHiddenRole when carving should revert to Voronoi regardless
-    /// of whether a MineNode has already painted the cell.
+    /// of whether a DiscoveryTrackNode has already painted the cell.
     /// Returns true if a Voronoi assignment existed and was applied, false otherwise.
     /// </summary>
     public bool RestoreVoronoiImprint(Vector2Int gp)
     {
         if (!TryGetValue(gp, out var imp) || imp.hiddenRole == MusicalRole.None) return false;
 
-        // Clear any MineNode paint so PromoteHiddenRole can re-apply the Voronoi role.
+        // Clear any DiscoveryTrackNode paint so PromoteHiddenRole can re-apply the Voronoi role.
         if (imp.role != MusicalRole.None)
         {
             imp.role = MusicalRole.None;

@@ -47,13 +47,13 @@ public class BoundaryWrap : MonoBehaviour
 
     [Header("Mine Boundary Bounce")]
     [Range(0.05f, 0.95f)]
-    [Tooltip("Velocity retained along the boundary normal when MineNodes rebound.")]
+    [Tooltip("Velocity retained along the boundary normal when DiscoveryTrackNodes rebound.")]
     public float mineReboundRestitution = 0.65f;
 
-    [Tooltip("Cooldown between MineNode bounces to avoid rapid frame-to-frame flip-flopping.")]
+    [Tooltip("Cooldown between DiscoveryTrackNode bounces to avoid rapid frame-to-frame flip-flopping.")]
     public float mineBounceCooldown = 0.08f;
 
-    [Tooltip("Small inward offset applied after MineNode reflection only when still intersecting.")]
+    [Tooltip("Small inward offset applied after DiscoveryTrackNode reflection only when still intersecting.")]
     public float mineInwardOffset = 0.08f;
 
     [Tooltip("Penetration depth threshold before falling back to hard positional clamp.")]
@@ -87,7 +87,7 @@ public class BoundaryWrap : MonoBehaviour
             return; // vehicles handled continuously in OnTriggerStay2D
         }
 
-        var mine = rb.GetComponent<MineNode>();
+        var mine = rb.GetComponent<DiscoveryTrackNode>();
         if (mine != null) { HandleMineNodeBoundary(mine, rb); return; }
 
         BounceRigidbody(rb);
@@ -99,11 +99,11 @@ public class BoundaryWrap : MonoBehaviour
         if (rb != null) _vehicleCache.Remove(rb);
     }
 
-    private void HandleMineNodeBoundary(MineNode mine, Rigidbody2D rb)
+    private void HandleMineNodeBoundary(DiscoveryTrackNode mine, Rigidbody2D rb)
     {
         bool isLeftOrRight = side == BoundarySide.Left || side == BoundarySide.Right;
 
-        // MineNode escape policy:
+        // DiscoveryTrackNode escape policy:
         // - Allowed escape sides: LEFT and RIGHT only (when a dust gap is present and node is Fleeing).
         // - TOP remains bounce-only by design.
         // - BOTTOM remains bounce-only (never an escape side).
@@ -119,7 +119,7 @@ public class BoundaryWrap : MonoBehaviour
         }
 
         // Left/Right + Drifting: bounce to keep it in play
-        if (mine.State == MineNodeState.Drifting) { BounceRigidbody(rb, true); return; }
+        if (mine.State == DiscoveryTrackNodeState.Drifting) { BounceRigidbody(rb, true); return; }
 
         // Left/Right + Fleeing + no dust at this position (gap): let it escape
         mine.HandleEscape();
@@ -363,7 +363,7 @@ public class BoundaryWrap : MonoBehaviour
     {
         if (_self == null) return;
 
-        var mine = rb.GetComponent<MineNode>();
+        var mine = rb.GetComponent<DiscoveryTrackNode>();
         bool isMineSoftCandidate = preferSoftForMine && mine != null;
 
         if (isMineSoftCandidate && TrySoftMineRebound(rb))

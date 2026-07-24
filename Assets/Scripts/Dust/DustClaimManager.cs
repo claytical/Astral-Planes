@@ -6,7 +6,7 @@ public enum DustClaimType
 {
     KeepClear = 10,       // PhaseStar / vehicle pockets
     Occupancy = 20,       // Collectable is sitting here
-    TemporaryCarve = 30,  // MineNode erosion / corridor
+    TemporaryCarve = 30,  // DiscoveryTrackNode erosion / corridor
     PeekHole = 40,        // micro-hole for visibility
 }
 

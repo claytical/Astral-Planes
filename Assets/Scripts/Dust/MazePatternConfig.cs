@@ -26,7 +26,7 @@ public sealed class DustTimingParams
     public float jailRegrowDelay = -1f;
     public float superNodeRegrowDelay = -1f;
     public float zapRegrowDelay = -1f;
-    [Tooltip("Delay applied when a MineNode dies and releases the star-drained cells it was holding.")]
+    [Tooltip("Delay applied when a DiscoveryTrackNode dies and releases the star-drained cells it was holding.")]
     public float starDrainReleaseDelay = -1f;
 
     /// <summary>Per-source delay, or -1 to fall back to the base regrowDelay.</summary>

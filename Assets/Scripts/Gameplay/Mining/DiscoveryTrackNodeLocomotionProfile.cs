@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public enum MineNodeLocomotionArchetype
+public enum DiscoveryTrackNodeLocomotionArchetype
 {
     Cautious,
     Balanced,
@@ -8,11 +8,11 @@ public enum MineNodeLocomotionArchetype
     Skittish
 }
 
-[CreateAssetMenu(menuName = "Astral Planes/Mine Node Locomotion Profile", fileName = "MineNodeLocomotionProfile")]
-public class MineNodeLocomotionProfile : ScriptableObject
+[CreateAssetMenu(menuName = "Astral Planes/Discovery Track Node Locomotion Profile", fileName = "DiscoveryTrackNodeLocomotionProfile")]
+public class DiscoveryTrackNodeLocomotionProfile : ScriptableObject
 {
     [Header("Identity")]
-    public MineNodeLocomotionArchetype archetype = MineNodeLocomotionArchetype.Balanced;
+    public DiscoveryTrackNodeLocomotionArchetype archetype = DiscoveryTrackNodeLocomotionArchetype.Balanced;
 
     [Header("Linear Motion")]
     [Min(0f)] public float baseSpeed = 1f;

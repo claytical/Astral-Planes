@@ -161,7 +161,7 @@ public partial class PhaseStar
         {
             _ejectionInFlight = false;
             _activeNode = null;
-            Debug.LogWarning($"[PhaseStar] MineNode spawn failed (no free grid cell) — recovering for retry. star={name} role={usedTrack.assignedRole}");
+            Debug.LogWarning($"[PhaseStar] DiscoveryTrackNode spawn failed (no free grid cell) — recovering for retry. star={name} role={usedTrack.assignedRole}");
             return false;
         }
 
@@ -183,9 +183,9 @@ public partial class PhaseStar
 
             _activeNode = null;
 
-            LastNodeWasCaptured = outcome == MineNodeOutcome.Captured;
-            LastNodeWasEscaped  = outcome == MineNodeOutcome.Escaped;
-            LastNodeWasExpired  = outcome == MineNodeOutcome.Expired;
+            LastNodeWasCaptured = outcome == DiscoveryTrackNodeOutcome.Captured;
+            LastNodeWasEscaped  = outcome == DiscoveryTrackNodeOutcome.Escaped;
+            LastNodeWasExpired  = outcome == DiscoveryTrackNodeOutcome.Expired;
 
             OnMineNodeResolved?.Invoke(this, _attunedRole);
 
@@ -393,7 +393,7 @@ public partial class PhaseStar
         return true;
     }
 
-    private MineNode DirectSpawnMineNode(Vector3 spawnFrom, InstrumentTrack track, Color color)
+    private DiscoveryTrackNode DirectSpawnMineNode(Vector3 spawnFrom, InstrumentTrack track, Color color)
     {
         if (track == null || _drum == null) return null;
 
@@ -401,7 +401,7 @@ public partial class PhaseStar
         if (cell.x < 0) return null;
         _drum.OccupySpawnCell(cell.x, cell.y, GridObjectType.Node);
         var go = Instantiate(_drum.mineNodePrefab, spawnFrom, Quaternion.identity);
-        var node = go.GetComponent<MineNode>();
+        var node = go.GetComponent<DiscoveryTrackNode>();
         if (!node)
         {
             Destroy(go);
@@ -420,7 +420,7 @@ public partial class PhaseStar
         var noteSet = _gfm != null ? _gfm.GenerateNotes(track, 0) : null;
         if (!TryResolveAuthoritativeZapCount(track.assignedRole, track, out _currentBurstRequiredZaps))
             _currentBurstRequiredZaps = Mathf.Max(1, GetNoteSetNoteCount(noteSet));
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[MineNode] Initializing track {track.name} with {track.assignedRole}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DiscoveryTrackNode] Initializing track {track.name} with {track.assignedRole}");
         node.Initialize(track, noteSet, color, cell, diamondSprite: visuals?.diamond);
         return node;
     }
@@ -462,7 +462,7 @@ public partial class PhaseStar
         return Mathf.Max(persistentTemplateCount, Mathf.Max(distinctStepCount, noteListCount));
     }
 
-    // Shared tail for MineNode/SuperNode resolution: park the star off-screen and hold
+    // Shared tail for DiscoveryTrackNode/SuperNode resolution: park the star off-screen and hold
     // the gate until the resulting collectable burst clears.
     private void EnterAwaitCollectableClear(Color tint, string logTag)
     {

@@ -95,7 +95,7 @@ public class MotifProfile : ScriptableObject
     /// N configs   → configs[binIndex % N] so each bin gets a distinct variation in round-robin order.
     ///
     /// This is deterministic: given the same binIndex you always get the same config,
-    /// which is essential for saturation detection and for MineNode re-spawns being
+    /// which is essential for saturation detection and for DiscoveryTrackNode re-spawns being
     /// consistent with what was originally placed.
     /// </summary>
     public RoleMotifNoteSetConfig GetConfigForRoleAtBin(MusicalRole role, int binIndex, int totalBins, int voiceIndex = 0)

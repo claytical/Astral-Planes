@@ -10,8 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cd57d10d8663941f796c44bfafab7547, type: 3}
-  m_Name: MineNodeDecisionArchetypes
-  m_EditorClassIdentifier: Assembly-CSharp::MineNodeDecisionArchetypeLibrary
+  m_Name: DiscoveryTrackNodeDecisionArchetypes
+  m_EditorClassIdentifier: Assembly-CSharp::DiscoveryTrackNodeDecisionArchetypeLibrary
   archetypes:
   - id: Skittish
     reactionDelayWindow: {x: 0.02, y: 0.15}

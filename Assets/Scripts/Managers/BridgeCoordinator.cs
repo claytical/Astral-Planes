@@ -163,7 +163,7 @@ public sealed class BridgeCoordinator
         foreach (var c in Object.FindObjectsByType<Collectable>(FindObjectsSortMode.None))
             if (c != null) Object.Destroy(c.gameObject);
 
-        foreach (var n in Object.FindObjectsByType<MineNode>(FindObjectsSortMode.None))
+        foreach (var n in Object.FindObjectsByType<DiscoveryTrackNode>(FindObjectsSortMode.None))
         {
             if (n == null) continue;
             var explode = n.GetComponent<Explode>();

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public partial class MineNode
+public partial class DiscoveryTrackNode
 {
     private void FixedUpdateFleeing()
     {

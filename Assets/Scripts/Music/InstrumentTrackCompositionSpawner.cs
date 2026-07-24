@@ -503,7 +503,7 @@ public sealed class InstrumentTrackCompositionSpawner
             _compositionStepListenerActive = true;
         }
 
-        // Spawn the origin effect at MineNode destruction time (now), not at first step launch.
+        // Spawn the origin effect at DiscoveryTrackNode destruction time (now), not at first step launch.
         var compositionSpawnEffectPrefab = _getCompositionSpawnEffectPrefab();
         if (_compositionSpawnEffect == null && compositionSpawnEffectPrefab != null)
         {
@@ -538,7 +538,7 @@ public sealed class InstrumentTrackCompositionSpawner
 
             var nv = controller?.noteVisualizer;
 
-            // Instantiate collectable at the MineNode origin.
+            // Instantiate collectable at the DiscoveryTrackNode origin.
             var go = UnityEngine.Object.Instantiate(collectablePrefab, launch.originWorld, Quaternion.identity, collectableParent);
             if (!go) continue;
             if (!go.TryGetComponent(out Collectable c)) { UnityEngine.Object.Destroy(go); continue; }

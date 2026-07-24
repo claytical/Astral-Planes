@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public partial class MineNode
+public partial class DiscoveryTrackNode
 {
     private void FixedUpdateDrifting()
     {
@@ -8,33 +8,33 @@ public partial class MineNode
 
         Vector2Int myCell = _drumTrack.WorldToGridPosition(_rb.position);
 
-        if (_behaviorCategory == MineNodeBehaviorCategory.Orbital)
+        if (_behaviorCategory == DiscoveryTrackNodeBehaviorCategory.Orbital)
         {
             UpdateOrbitSign(myCell);
             CheckOrbitTerritoryFlip(myCell);
         }
 
         float burstMult = 1f;
-        if (_behaviorCategory == MineNodeBehaviorCategory.Rhythmic)
+        if (_behaviorCategory == DiscoveryTrackNodeBehaviorCategory.Rhythmic)
         {
             UpdateBurstPause();
             burstMult = _isInBurst ? 2f : 0.05f;
         }
 
         // Skip direction decisions during Groove pause — node is nearly stationary
-        if (_behaviorCategory != MineNodeBehaviorCategory.Rhythmic || _isInBurst)
+        if (_behaviorCategory != DiscoveryTrackNodeBehaviorCategory.Rhythmic || _isInBurst)
             RunCorridorLookahead(myCell);
 
         // Category speed baselines × profile fine-tune; applied here so all paths use the same scale
         float catSpeedMult = _behaviorCategory switch {
-            MineNodeBehaviorCategory.Deliberate => 0.6f,
-            MineNodeBehaviorCategory.Darting    => 1.5f,
+            DiscoveryTrackNodeBehaviorCategory.Deliberate => 0.6f,
+            DiscoveryTrackNodeBehaviorCategory.Darting    => 1.5f,
             _                                   => 1.0f,
         };
         ApplyLocomotion(0f, config.driftSpeedMultiplier * burstMult * catSpeedMult);
 
         // Groove pause: actively damp velocity; kMinSpeedFloor inside ApplyLocomotion prevents a true stop otherwise
-        if (_behaviorCategory == MineNodeBehaviorCategory.Rhythmic && !_isInBurst)
+        if (_behaviorCategory == DiscoveryTrackNodeBehaviorCategory.Rhythmic && !_isInBurst)
             _rb.linearVelocity = Vector2.Lerp(_rb.linearVelocity, Vector2.zero, 0.25f);
 
         RunStallEscape(myCell);

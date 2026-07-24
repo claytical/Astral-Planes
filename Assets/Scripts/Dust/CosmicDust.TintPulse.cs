@@ -40,7 +40,7 @@ private bool _tintPulseActive = false;
     /// <summary>
     /// Syncs both the sprite renderer AND the particle system to _currentTint.
     /// Call after ApplyRoleAndCharge when the cell is already live (not growing in),
-    /// e.g. after MineNode tinting. ApplyRoleAndCharge alone only updates the sprite;
+    /// e.g. after DiscoveryTrackNode tinting. ApplyRoleAndCharge alone only updates the sprite;
     /// particles keep their birth color until explicitly refreshed.
     /// </summary>
     public void SyncParticleColor()

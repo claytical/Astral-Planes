@@ -23,7 +23,7 @@ public sealed partial class StarPool
             // every role with dust gets a star so the player chooses which roles spend the
             // nodesPerStar total. Leftover stars despawn when the budget hits zero.
 
-            // Only block this role's slot if its own MineNode sequence is pending.
+            // Only block this role's slot if its own DiscoveryTrackNode sequence is pending.
             if (role == _lastEjectedRole && (_mineNodePending || HasUnresolvedMineNodeSequence())) continue;
 
             bool hasKey = _activeStars.ContainsKey(role);
@@ -114,7 +114,7 @@ public sealed partial class StarPool
         _activeStars[role] = star;
         if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] _activeStars[{role}] = {star.name} (set in SpawnStarForRole, remainingTotal={_remainingEjectionsTotal})");
 
-        // If another role's MineNode is in flight, only pause this star if its next ejection
+        // If another role's DiscoveryTrackNode is in flight, only pause this star if its next ejection
         // would expand its bin count — same-bin stars are allowed to run concurrently.
         if (_mineNodePending && role != _lastEjectedRole)
         {

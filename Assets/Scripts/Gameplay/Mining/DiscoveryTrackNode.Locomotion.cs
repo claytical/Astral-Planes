@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public partial class MineNode
+public partial class DiscoveryTrackNode
 {
     private void ApplyLocomotion(float speedIntensity01, float speedScale)
     {
@@ -15,7 +15,7 @@ public partial class MineNode
         }
 
         float targetSpeed = Mathf.Max(profile.EvaluateTargetSpeed(speedIntensity01) * speedScale, kMinSpeedFloor);
-        if (_dustInteractor == null) _dustInteractor = GetComponent<MineNodeDustInteractor>();
+        if (_dustInteractor == null) _dustInteractor = GetComponent<DiscoveryTrackNodeDustInteractor>();
         if (_dustInteractor != null && _dustInteractor.IsInDustAtCurrentCell())
         {
             float drag = Mathf.Clamp01(_dustInteractor.dustDragScalar);
@@ -37,7 +37,7 @@ public partial class MineNode
             _rb.AddForce(-_rb.linearVelocity * profile.braking, ForceMode2D.Force);
     }
 
-    private MineNodeLocomotionProfile ResolveLocomotionProfile(MusicalRoleProfile roleProfile)
+    private DiscoveryTrackNodeLocomotionProfile ResolveLocomotionProfile(MusicalRoleProfile roleProfile)
     {
         if (roleProfile != null && roleProfile.mineNodeLocomotionProfile != null)
             return roleProfile.mineNodeLocomotionProfile;
@@ -57,13 +57,13 @@ public partial class MineNode
     {
         if (Time.time < _nextDirectionDecisionAt || Time.time < _pathCommitUntil)
         {
-            if (_behaviorIntent != MineNodeBehaviorIntent.Committing)
-                SetBehaviorIntent(MineNodeBehaviorIntent.Committing);
+            if (_behaviorIntent != DiscoveryTrackNodeBehaviorIntent.Committing)
+                SetBehaviorIntent(DiscoveryTrackNodeBehaviorIntent.Committing);
             return;
         }
 
-        if (_behaviorIntent != MineNodeBehaviorIntent.Thinking)
-            SetBehaviorIntent(MineNodeBehaviorIntent.Thinking);
+        if (_behaviorIntent != DiscoveryTrackNodeBehaviorIntent.Thinking)
+            SetBehaviorIntent(DiscoveryTrackNodeBehaviorIntent.Thinking);
 
         _rescanTimer -= Time.fixedDeltaTime;
 
@@ -133,14 +133,14 @@ public partial class MineNode
                     if (_dustGenerator.GetZoneRole(affinityProbe) == _role) score += affinityWeight;
                 }
                 // Orbital bias (Harmony): 2.0 base + profile fine-tune; competes meaningfully with clearance scores
-                if (_behaviorCategory == MineNodeBehaviorCategory.Orbital)
+                if (_behaviorCategory == DiscoveryTrackNodeBehaviorCategory.Orbital)
                 {
                     float orbitalBias = 2.0f + (_roleProfile?.orbitalTurnBias ?? 0.6f);
                     var perp = new Vector2(-_carveDir.y * _orbitSign, _carveDir.x * _orbitSign).normalized;
                     score += orbitalBias * Mathf.Max(0f, Vector2.Dot(dir.normalized, perp));
                 }
                 // Proximity evasion (Lead/Darting): 7-cell category default; profile overrides if > 0
-                if (_behaviorCategory == MineNodeBehaviorCategory.Darting && _trackedVehicle != null)
+                if (_behaviorCategory == DiscoveryTrackNodeBehaviorCategory.Darting && _trackedVehicle != null)
                 {
                     float cells = (_roleProfile != null && _roleProfile.evasionCells > 0f) ? _roleProfile.evasionCells : 7f;
                     float worldRadius = cells * GetCellSize();
@@ -158,7 +158,7 @@ public partial class MineNode
             _carveDir = Rotate(bestDir.normalized, jitter).normalized;
             _nextDirectionDecisionAt = Time.time + _decisionArchetype.SampleReactionDelay();
             _pathCommitUntil = Time.time + Mathf.Max(0.05f, _decisionArchetype.pathCommitmentDuration * CategoryCommitScale());
-            SetBehaviorIntent(MineNodeBehaviorIntent.Committing);
+            SetBehaviorIntent(DiscoveryTrackNodeBehaviorIntent.Committing);
         }
     }
 
@@ -167,8 +167,8 @@ public partial class MineNode
     private float CategoryCommitScale()
     {
         return _behaviorCategory switch {
-            MineNodeBehaviorCategory.Deliberate => 2.5f,
-            MineNodeBehaviorCategory.Darting    => 0.35f,
+            DiscoveryTrackNodeBehaviorCategory.Deliberate => 2.5f,
+            DiscoveryTrackNodeBehaviorCategory.Darting    => 0.35f,
             _                                   => 1f,
         };
     }
