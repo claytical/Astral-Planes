@@ -13,6 +13,9 @@ public class DiscoveryTrackNodeCharacterVis : MonoBehaviour
     [SerializeField] Transform spritePivotOuter;
     [SerializeField] Transform spritePivotInner;
 
+    const float kDefaultThinkToSwimSpeed = 0.12f; // used only when no locomotion profile has resolved yet
+    const float kDefaultSwimToThinkSpeed = 0.06f;
+
     Rigidbody2D _rb;
     DiscoveryTrackNode _mineNode;
     DiscoveryTrackNodeBehaviorIntent _intent = DiscoveryTrackNodeBehaviorIntent.Thinking;
@@ -86,25 +89,17 @@ public class DiscoveryTrackNodeCharacterVis : MonoBehaviour
         spinRate = config.defaultThinkingSpinDegPerSec;
         faceTurnRate = config.defaultFaceTurnDegPerSec;
         wobbleRange = config.defaultWobbleDeg;
-        thinkToSwimSpeed = config.defaultThinkToSwimSpeed;
-        swimToThinkSpeed = config.defaultSwimToThinkSpeed;
 
         var locomotion = _mineNode != null ? _mineNode.ActiveLocomotionProfile : null;
-        if (locomotion == null) return;
+        if (locomotion == null)
+        {
+            thinkToSwimSpeed = kDefaultThinkToSwimSpeed;
+            swimToThinkSpeed = kDefaultSwimToThinkSpeed;
+            return;
+        }
 
         swimToThinkSpeed = Mathf.Max(0f, locomotion.baseSpeed * 0.1f);
         thinkToSwimSpeed = Mathf.Max(swimToThinkSpeed, locomotion.baseSpeed * 0.25f);
-
-        var profiles = config.archetypeVisualProfiles;
-        if (profiles == null) return;
-        for (int i = 0; i < profiles.Length; i++)
-        {
-            if (profiles[i].archetype != locomotion.archetype) continue;
-            if (profiles[i].thinkingSpinDegPerSec > 0f) spinRate = profiles[i].thinkingSpinDegPerSec;
-            if (profiles[i].faceTurnDegPerSec > 0f) faceTurnRate = profiles[i].faceTurnDegPerSec;
-            if (profiles[i].wobbleDeg > 0f) wobbleRange = profiles[i].wobbleDeg;
-            return;
-        }
     }
 
     private void ApplyRotation(float baseDeg, float wobbleOffsetDeg)

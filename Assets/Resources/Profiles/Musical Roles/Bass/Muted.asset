@@ -26,7 +26,7 @@ MonoBehaviour:
   orbitalTurnBias: 0.6
   burstDuration: 0.4
   pauseDuration: 0.35
-  evasionCells: 3
+  evasionCells: 1.5
   collectableSpeed: 1
   collectableAccelSeconds: 0.75
   collectableBounceRecoverSeconds: 0.45

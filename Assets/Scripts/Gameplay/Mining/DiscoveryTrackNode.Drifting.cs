@@ -25,13 +25,7 @@ public partial class DiscoveryTrackNode
         if (_behaviorCategory != DiscoveryTrackNodeBehaviorCategory.Rhythmic || _isInBurst)
             RunCorridorLookahead(myCell);
 
-        // Category speed baselines × profile fine-tune; applied here so all paths use the same scale
-        float catSpeedMult = _behaviorCategory switch {
-            DiscoveryTrackNodeBehaviorCategory.Deliberate => 0.6f,
-            DiscoveryTrackNodeBehaviorCategory.Darting    => 1.5f,
-            _                                   => 1.0f,
-        };
-        ApplyLocomotion(0f, config.driftSpeedMultiplier * burstMult * catSpeedMult);
+        ApplyLocomotion(0f, burstMult);
 
         // Groove pause: actively damp velocity; kMinSpeedFloor inside ApplyLocomotion prevents a true stop otherwise
         if (_behaviorCategory == DiscoveryTrackNodeBehaviorCategory.Rhythmic && !_isInBurst)

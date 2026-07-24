@@ -56,7 +56,6 @@ public partial class DiscoveryTrackNode : TrackNode
     private bool _hasBeenStruck;
     private Vector2 _prevPhysicsPos;
     private bool _hasPrevPhysicsPos;
-    private DiscoveryTrackNodeDecisionArchetypeLibrary.Archetype _decisionArchetype;
     private DiscoveryTrackNodeBehaviorIntent _behaviorIntent = DiscoveryTrackNodeBehaviorIntent.Thinking;
     private CosmicDustGenerator _dustGenerator;
     private DiscoveryTrackNodeBehaviorCategory _behaviorCategory;
@@ -94,6 +93,15 @@ public partial class DiscoveryTrackNode : TrackNode
     private const float kStallSamplePeriod = 0.40f; // how often distance is sampled to confirm stall
     private const float kStallDistanceEps  = 0.12f; // minimum travel over sample period to not count as stalled
     private const float kEscapeCooldown    = 0.30f;
+    private const int   kDefaultStrength   = 150;   // used only when no DiscoveryTrackNodeLocomotionProfile resolves (e.g. MusicalRole.None); matches prior config asset default
+    private const float kDefaultReactionDelay              = 0.175f;
+    private const float kDefaultPathCommitmentDuration     = 0.75f;
+    private const float kDefaultTurnJitter                 = 8f;
+    private const float kDefaultFleeCommitment01           = 0.6f;
+    private const float kDefaultStallRecoveryAggressiveness = 0.6f;
+    private const float kDefaultDustRiskTolerance          = 0.5f;
+    private const float kDefaultHitStunDuration            = 0.8f;
+    private const float kDefaultHitStunSpeedMultiplier     = 1.6f;
 
     public MusicalRole GetImprintRole() => _role;
     public MusicalRoleProfile RoleProfile => _roleProfile;
@@ -114,15 +122,13 @@ public partial class DiscoveryTrackNode : TrackNode
             : MusicalRoleProfileLibrary.GetProfile(_role);
         if (prof != null) _speed = prof.mineNodeSpeed;  // category speed is applied in FixedUpdateDrifting
         _activeLocomotionProfile = ResolveLocomotionProfile(prof);
-        ResolveDecisionArchetype();
         // Strength and expiration resolve through the same locomotion profile that drives speed.
         // NoteSet value wins for expiration only when authored (>0); otherwise the role/archetype
         // baseline stands, falling back to the config default if no profile resolved at all.
-        _maxStrength = _activeLocomotionProfile != null ? _activeLocomotionProfile.strength : config.defaultStrength;
+        _maxStrength = _activeLocomotionProfile != null ? _activeLocomotionProfile.strength : kDefaultStrength;
         int roleExpire = _activeLocomotionProfile != null ? _activeLocomotionProfile.expireAfterLoops : 0;
         _expireAfterLoops = (noteSet != null && noteSet.expireAfterLoops > 0) ? noteSet.expireAfterLoops
-                           : roleExpire > 0 ? roleExpire
-                           : config.defaultExpireAfterLoops;
+                           : roleExpire;
         _roleProfile = prof;
         _behaviorCategory = _role.GetBehaviorCategory();
         _orbitSign = UnityEngine.Random.value < 0.5f ? 1 : -1;
@@ -135,8 +141,10 @@ public partial class DiscoveryTrackNode : TrackNode
 
         float a = UnityEngine.Random.Range(0f, 360f);
         _carveDir = new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad)).normalized;
-        _nextDirectionDecisionAt = Time.time + _decisionArchetype.SampleReactionDelay();
-        _pathCommitUntil = Time.time + Mathf.Max(0.05f, _decisionArchetype.pathCommitmentDuration * CategoryCommitScale());
+        float initialReactionDelay = _activeLocomotionProfile != null ? _activeLocomotionProfile.SampleReactionDelay() : kDefaultReactionDelay;
+        float initialPathCommitmentDuration = _activeLocomotionProfile != null ? _activeLocomotionProfile.pathCommitmentDuration : kDefaultPathCommitmentDuration;
+        _nextDirectionDecisionAt = Time.time + initialReactionDelay;
+        _pathCommitUntil = Time.time + Mathf.Max(0.05f, initialPathCommitmentDuration);
         SetBehaviorIntent(DiscoveryTrackNodeBehaviorIntent.Committing);
         _lastProcessedStep = -1;
         SubscribeLoopBoundary(_drumTrack);

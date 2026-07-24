@@ -14,27 +14,27 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RiffAsset
   riff:
     id: herewego-hiphop-1
-    authoredRootMidi: 61
+    authoredRootMidi: 49
     loopSteps: 16
     events:
     - step: 0
-      midiNote: 61
+      midiNote: 49
       durSteps: 12
       velocity01: 0.61417323
     - step: 6
-      midiNote: 59
+      midiNote: 47
       durSteps: 4
       velocity01: 0.48818898
     - step: 10
-      midiNote: 52
+      midiNote: 40
       durSteps: 2
       velocity01: 0.7322835
     - step: 12
-      midiNote: 59
+      midiNote: 47
       durSteps: 4
       velocity01: 0.48818898
     - step: 14
-      midiNote: 62
+      midiNote: 50
       durSteps: 2
       velocity01: 0.5511811
     overlapPolicy: 1

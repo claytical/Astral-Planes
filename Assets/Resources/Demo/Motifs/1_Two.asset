@@ -23,7 +23,7 @@ MonoBehaviour:
   resetFirstCarryOnStart: 0
   bpm: 75
   stepsPerLoop: 16
-  nodesPerStar: 4
+  nodesPerStar: 6
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
   mazePattern: {fileID: 11400000, guid: a6ec550cd7f5743ea8637890719fdde7, type: 2}
   roleGeoConfigs: []
