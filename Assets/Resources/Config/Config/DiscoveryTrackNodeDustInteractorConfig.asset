@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d07ee208fb04b3bb333761937480300, type: 3}
+  m_Name: DiscoveryTrackNodeDustInteractorConfig
+  m_EditorClassIdentifier: Assembly-CSharp::DiscoveryTrackNodeDustInteractorConfig
+  dustDragScalar: 0.85
+  extraBrake: 0
+  exhaustPaintRole: 0
+  exhaustEnergyFraction: 0.4
+  carveIntervalSeconds: 0.08
+  edgeHugForce: 2
+  escapePushForce: 5
+  huntBfsBudget: 600
+  huntDirWeight: 0.55
+  arrivalRadiusCells: 1
+  retargetInterval: 0.35

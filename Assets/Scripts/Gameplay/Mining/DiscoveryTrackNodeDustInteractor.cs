@@ -4,45 +4,12 @@ using System.Collections.Generic;
 [RequireComponent(typeof(Rigidbody2D))]
 public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
 {
-    [Header("Multipliers while in dust (node-specific)")]
-    [Tooltip("Environment feedback scalar consumed by DiscoveryTrackNode locomotion while in dust.")]
-    [Range(0f, 1f)] public float dustDragScalar = 0.85f;
-
-    [Tooltip("Extra braking applied per FixedUpdate while inside dust.")]
-    public float extraBrake = 0.25f;
-
-    [Header("Exhaust Role Painting")]
-    [Tooltip("Paints adjacent dust with this node's role via exhaust. " +
-             "Painted cells become eligible for PhaseStar drain. " +
-             "Because painting does not update the cell's hidden imprint, " +
-             "carving a painted cell re-rolls its role via neighbor-plurality / least-dense.")]
-    public bool exhaustPaintRole = false;
-
-    [Tooltip("Fraction of maxEnergyUnits to assign when exhaust-painting a cell (0=empty, 1=full).")]
-    [SerializeField, Range(0f, 1f)] private float exhaustEnergyFraction = 0.4f;
-
-    [SerializeField] private float edgeHugForce = 2f;
-
-    [Tooltip("Force applied to push the node back out when it is grid-inside a dust cell.")]
-    [SerializeField] private float escapePushForce = 12f;
+    [SerializeField] private DiscoveryTrackNodeDustInteractorConfig config;
 
     // ---------------------------------------------------------------
     // Role-hunter: BFS to find nearest dust cell not already our role,
     // steer toward it, paint it on arrival.
     // ---------------------------------------------------------------
-    [Header("Role Hunter")]
-    [Tooltip("Max BFS cells visited when searching for the nearest untinted dust cell.")]
-    [SerializeField] private int huntBfsBudget = 600;
-
-    [Tooltip("How strongly the hunt direction biases _carveDir in DiscoveryTrackNode. 0 = no bias, 1 = full override.")]
-    [SerializeField, Range(0f, 1f)] private float huntDirWeight = 0.55f;
-
-    [Tooltip("Grid-cell radius around the node's current cell that counts as 'arrived' at the target.")]
-    [SerializeField] private int arrivalRadiusCells = 1;
-
-    [Tooltip("Seconds between retarget BFS ticks when no target is held.")]
-    [SerializeField] private float retargetInterval = 0.35f;
-
     private bool       _hasHuntTarget;
     private Vector2Int _huntTargetCell;
     private Vector2    _huntDir;          // normalized world-space direction toward target
@@ -67,8 +34,6 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
     // ---------------------------------------------------------------
     // Existing carve state
     // ---------------------------------------------------------------
-    private float carveIntervalSeconds = 0.08f;
-
     private float _carveTimer;
     private int   _dustCellsCarved = 0;
     private Rigidbody2D _rb;
@@ -91,7 +56,10 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
     public Vector2 GetHuntDir() => _hasHuntTarget ? _huntDir : Vector2.zero;
 
     /// <summary>Weight applied when blending hunt direction into _carveDir.</summary>
-    public float HuntDirWeight => huntDirWeight;
+    public float HuntDirWeight => config != null ? config.huntDirWeight : 0f;
+
+    /// <summary>Environment feedback scalar consumed by DiscoveryTrackNode locomotion while in dust.</summary>
+    public float dustDragScalar => config != null ? config.dustDragScalar : 0f;
 
     void Awake()
     {
@@ -99,11 +67,13 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
         if (_rb == null) TryGetComponent(out _rb);
         _node        = GetComponent<DiscoveryTrackNode>();
         _drumTrack   = (_node != null) ? _node.DrumTrack : null;
+        Debug.Assert(config != null,
+            $"[DiscoveryTrackNodeDustInteractor] {name} has no config asset assigned — dust interaction will be inert.");
     }
 
     void FixedUpdate()
     {
-        if (_rb == null || _drumTrack == null) return;
+        if (_rb == null || _drumTrack == null || config == null) return;
 
         Vector2    worldPos = _rb.position;
         Vector2Int cell     = _drumTrack.CellOf(worldPos);
@@ -119,14 +89,14 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
         if (inDust)
         {
             if (_rb.linearVelocity.sqrMagnitude > 0.0001f)
-                _rb.AddForce(-_rb.linearVelocity * extraBrake, ForceMode2D.Force);
+                _rb.AddForce(-_rb.linearVelocity * config.extraBrake, ForceMode2D.Force);
 
             // Push back toward the nearest open (non-dust) neighboring cell so the node
             // can't remain embedded in a wall — this is the complement of the edge-hug force.
             Vector2 escapeDir = SumNeighborDirections(cell, requireDust: false);
             if (escapeDir.sqrMagnitude > 0.0001f)
             {
-                _rb.AddForce(escapeDir.normalized * escapePushForce, ForceMode2D.Force);
+                _rb.AddForce(escapeDir.normalized * config.escapePushForce, ForceMode2D.Force);
 
                 // Hard wall: cancel any velocity component pushing deeper into the dust wall.
                 // This prevents driving forces from overpowering the escape push and tunneling through.
@@ -137,7 +107,7 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
             }
         }
 
-        if (!exhaustPaintRole)
+        if (!config.exhaustPaintRole)
         {
             _prevPos = _rb.position;
             _hasPrevPos = true;
@@ -158,7 +128,7 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
 
         if (!_hasHuntTarget && _retargetTimer <= 0f)
         {
-            _retargetTimer = retargetInterval;
+            _retargetTimer = config.retargetInterval;
             HuntTick(cell);
         }
 
@@ -180,7 +150,7 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
         // Carve interval: exhaust-paint adjacent neighbors
         // ---------------------------------------------------------------
         _carveTimer += Time.fixedDeltaTime;
-        if (_carveTimer < carveIntervalSeconds) return;
+        if (_carveTimer < config.carveIntervalSeconds) return;
         _carveTimer = 0f;
 
         if (_gfm == null) _gfm = GameFlowManager.Instance;
@@ -196,7 +166,7 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
             if (!_drumTrack.HasDustAt(neighbor)) continue;
             if (IsAlreadyNodeRole(neighbor)) continue; // already our color — skip
 
-            gen.PaintDustExhaust(neighbor, role, exhaustEnergyFraction);
+            gen.PaintDustExhaust(neighbor, role, config.exhaustEnergyFraction);
             _dustCellsCarved++;
         }
 
@@ -206,7 +176,7 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
         {
             Vector2 edgeDir = SumNeighborDirections(cell, requireDust: true);
             if (edgeDir.sqrMagnitude > 0.0001f)
-                _rb.AddForce(edgeDir.normalized * edgeHugForce, ForceMode2D.Force);
+                _rb.AddForce(edgeDir.normalized * config.edgeHugForce, ForceMode2D.Force);
         }
 
         _prevPos = _rb.position;
@@ -260,7 +230,7 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
         _bfsVisited.Add(fromCell);
 
         int visited = 0;
-        while (_bfsQueue.Count > 0 && visited < huntBfsBudget)
+        while (_bfsQueue.Count > 0 && visited < config.huntBfsBudget)
         {
             var cell = _bfsQueue.Dequeue();
             visited++;
@@ -290,7 +260,7 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
         }
 
         // No unpainted dust reachable within budget — clear target
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[DiscoveryTrackNodeDustInteractor] BFS exhausted ({huntBfsBudget} cells) from {fromCell} — no target found.");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DiscoveryTrackNodeDustInteractor] BFS exhausted ({config.huntBfsBudget} cells) from {fromCell} — no target found.");
         _hasHuntTarget = false;
     }
 
@@ -309,7 +279,7 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
         if (gen == null || _node == null) return;
 
         MusicalRole role = _node.GetImprintRole();
-        gen.PaintDustExhaust(_huntTargetCell, role, exhaustEnergyFraction);
+        gen.PaintDustExhaust(_huntTargetCell, role, config.exhaustEnergyFraction);
         _dustCellsCarved++;
     }
 
@@ -317,7 +287,7 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
     {
         int dx = Mathf.Abs(currentCell.x - targetCell.x);
         int dy = Mathf.Abs(currentCell.y - targetCell.y);
-        return dx <= arrivalRadiusCells && dy <= arrivalRadiusCells;
+        return dx <= config.arrivalRadiusCells && dy <= config.arrivalRadiusCells;
     }
 
     private bool IsAlreadyNodeRole(Vector2Int gp)
