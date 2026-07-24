@@ -33,6 +33,9 @@ public sealed class GravityVoidController
     private Color _gravityVoidParticleTint;
     private Color _gravityVoidDustImprintTint;
     private int _gravityVoidMaxRadiusRuntime = -1;
+    // Last duration actually applied to the particle systems; avoids re-touching
+    // main.duration/startLifetime (illegal while playing) when nothing has changed.
+    private float _gravityVoidAppliedDurationSeconds = -1f;
 
     public GravityVoidController(
         MonoBehaviour host,
@@ -261,6 +264,7 @@ public sealed class GravityVoidController
 
         // Reset VFX growth state
         _gravityVoidCurrentOuterR = 0;
+        _gravityVoidAppliedDurationSeconds = -1f;
 
         // Clear center bookkeeping (defensive; owner is cleared elsewhere)
         _gravityVoidHasCenterGP = false;
@@ -330,6 +334,12 @@ public sealed class GravityVoidController
         // visibly finish and idle while it waits for the event-driven despawn. -----
         float estimatedSeconds = EstimateGravityVoidDurationSeconds();
 
+        // Unity forbids changing main.duration/startLifetime while a particle system is
+        // playing, so only touch them (via a brief stop/restart) when the estimate has
+        // actually moved; otherwise leave the already-applied duration alone.
+        bool applyDuration = estimatedSeconds > 0f &&
+            Mathf.Abs(estimatedSeconds - _gravityVoidAppliedDurationSeconds) > 0.01f;
+
         // ----- Tint particles without compounding alpha -----
         for (int i = 0; i < _gravityVoidParticles.Length; i++)
         {
@@ -347,13 +357,23 @@ public sealed class GravityVoidController
 
             main.startColor = outC;
 
-            if (estimatedSeconds > 0f)
+            if (applyDuration)
             {
+                bool wasPlaying = ps.isPlaying;
+                if (wasPlaying)
+                    ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
                 main.duration = estimatedSeconds;
                 if (main.startLifetime.mode == ParticleSystemCurveMode.Constant)
                     main.startLifetime = estimatedSeconds;
+
+                if (wasPlaying)
+                    ps.Play(true);
             }
         }
+
+        if (applyDuration)
+            _gravityVoidAppliedDurationSeconds = estimatedSeconds;
     }
 
     // Estimates seconds until the pending/in-flight burst's last note should eject, purely
