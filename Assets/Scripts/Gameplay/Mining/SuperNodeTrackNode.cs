@@ -1,7 +1,7 @@
 using UnityEngine;
 
 [DisallowMultipleComponent]
-public class SuperNodeTrackNode : MonoBehaviour
+public class SuperNodeTrackNode : TrackNode
 {
     [SerializeField] private SpriteRenderer _renderer;
     [SerializeField] private Explode        _explode;
@@ -64,9 +64,6 @@ public class SuperNodeTrackNode : MonoBehaviour
 
     private float _spawnTime;
     private bool  _collected;
-    private bool  _resolved;
-    private int   _loopsLived;
-    private int   _lifetimeLoops;
     private float _speed;
 
     private Rigidbody2D         _rb;
@@ -82,25 +79,15 @@ public class SuperNodeTrackNode : MonoBehaviour
 
     private Vector2 _lastStallCheckPos;
     private float   _nextStallCheckAt;
-    private int     _stallHits;
+    // Shadows TrackNode._stallHits — RunStallCheck below still owns its own
+    // stall detection/escape; unified onto the base's TrySampleStall in Phase C2.
+    private new int _stallHits;
 
     private float _facedAngle;
     private float _wobblePhase;
 
     private static readonly RaycastHit2D[] _lookaheadBuffer = new RaycastHit2D[8];
     private static readonly Collider2D[]   _fleeBuffer      = new Collider2D[16];
-
-    private static readonly Vector2[] _scanDirs = new Vector2[]
-    {
-        Vector2.right,
-        new Vector2( 1f,  1f).normalized,
-        Vector2.up,
-        new Vector2(-1f,  1f).normalized,
-        Vector2.left,
-        new Vector2(-1f, -1f).normalized,
-        Vector2.down,
-        new Vector2( 1f, -1f).normalized,
-    };
 
     private void Reset()
     {
@@ -129,13 +116,13 @@ public class SuperNodeTrackNode : MonoBehaviour
 
     public void Setup(InstrumentTrack track, float difficulty01, DrumTrack drum)
     {
-        AssignedTrack  = track;
-        _drum          = drum;
-        _spawnTime     = Time.time;
-        _loopsLived    = 0;
+        AssignedTrack     = track;
+        _drum             = drum;
+        _spawnTime        = Time.time;
+        _loopsSinceSpawn  = 0;
 
-        _speed         = Mathf.Lerp(minSpeed, maxSpeed, difficulty01);
-        _lifetimeLoops = Mathf.RoundToInt(Mathf.Lerp(maxLifetimeLoops, minLifetimeLoops, difficulty01));
+        _speed            = Mathf.Lerp(minSpeed, maxSpeed, difficulty01);
+        _expireAfterLoops = Mathf.RoundToInt(Mathf.Lerp(maxLifetimeLoops, minLifetimeLoops, difficulty01));
 
         if (track != null)
         {
@@ -145,7 +132,7 @@ public class SuperNodeTrackNode : MonoBehaviour
 
         if (drum != null)
         {
-            drum.OnLoopBoundary += OnLoopBoundary;
+            SubscribeLoopBoundary(drum);
             _dustGen = drum.GetComponentInChildren<CosmicDustGenerator>()
                        ?? Object.FindAnyObjectByType<CosmicDustGenerator>();
         }
@@ -170,12 +157,12 @@ public class SuperNodeTrackNode : MonoBehaviour
 
     private void OnDisable()
     {
-        if (_drum != null) _drum.OnLoopBoundary -= OnLoopBoundary;
+        UnsubscribeLoopBoundary();
     }
 
     private void OnDestroy()
     {
-        if (_drum != null) _drum.OnLoopBoundary -= OnLoopBoundary;
+        UnsubscribeLoopBoundary();
     }
 
     private void FixedUpdate()
@@ -237,7 +224,7 @@ public class SuperNodeTrackNode : MonoBehaviour
         float   bestScore = float.MinValue;
         Vector2 bestDir   = _carveDir;
 
-        foreach (var dir in _scanDirs)
+        foreach (var dir in EightDirections)
         {
             float score = ScoreDirection(myPos, dir);
             if (score > bestScore) { bestScore = score; bestDir = dir; }
@@ -437,26 +424,19 @@ public class SuperNodeTrackNode : MonoBehaviour
         Resolve(wasCaught: true);
     }
 
-    private void Expire()
+    protected override void Expire()
     {
         _collected = true;
         Resolve(wasCaught: false);
     }
 
+    protected override bool IsResolvedOrHandled => _collected;
+
     private void Resolve(bool wasCaught)
     {
-        if (_resolved) return;
-        _resolved = true;
+        if (!TryMarkResolved()) return;
         OnResolved?.Invoke(wasCaught);
         _explode?.Permanent();
         if (_explode == null) Destroy(gameObject);
-    }
-
-    private void OnLoopBoundary()
-    {
-        if (_collected) return;
-        _loopsLived++;
-        if (_loopsLived >= _lifetimeLoops)
-            Expire();
     }
 }
