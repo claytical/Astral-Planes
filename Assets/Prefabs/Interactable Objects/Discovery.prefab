@@ -68,16 +68,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e57fdc6c382d84fbd9a88b06e96a0172, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  dustDragScalar: 0.85
-  extraBrake: 0
-  exhaustPaintRole: 0
-  exhaustEnergyFraction: 0.4
-  edgeHugForce: 2
-  escapePushForce: 5
-  huntBfsBudget: 600
-  huntDirWeight: 0.55
-  arrivalRadiusCells: 1
-  retargetInterval: 0.35
+  config: {fileID: 11400000, guid: a3416aa415c5470fb21ce2d4a75d42c6, type: 2}
 --- !u!114 &1784781495894534207
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -90,17 +81,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: faa4693963b0b40518ccad23f88e8645, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  config: {fileID: 11400000, guid: 45ea7ca1235d4457abeac443261c0831, type: 2}
   outerSprite: {fileID: 2442014530722922072}
   innerSprite: {fileID: 2442014530722922072}
-  defaultThinkingSpinDegPerSec: 480
-  defaultFaceTurnDegPerSec: 420
-  defaultWobbleDeg: 12
-  wobbleHzRange: {x: 2.5, y: 4.5}
-  innerCounterFactor: -0.4
-  escapeSpinBoost: 1.2
-  defaultThinkToSwimSpeed: 0.12
-  defaultSwimToThinkSpeed: 0.06
-  archetypeVisualProfiles: []
   spritePivotOuter: {fileID: 0}
   spritePivotInner: {fileID: 0}
 --- !u!114 &8668376557347016044
