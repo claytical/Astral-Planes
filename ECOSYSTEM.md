@@ -209,8 +209,30 @@ Readiness is **zap-count-only** — there is no charge/threshold gate. `_display
 
 ---
 
+### TrackNode
+`Assets/Scripts/Gameplay/Mining/TrackNode.cs`
+
+Abstract `MonoBehaviour` base shared by `DiscoveryTrackNode` and `SuperNodeTrackNode` — two independently-built "wandering node" AIs that echoed each other's shape without sharing code. Extracted in two passes: lifecycle/sampling plumbing first (proven against `DiscoveryTrackNode` alone before `SuperNodeTrackNode` was touched), then the direction-scan skeleton once both subclasses inherited it.
+
+**Owns:**
+- `EightDirections` — the 8-direction scan table both subclasses independently declared before this refactor.
+- Loop-boundary expiry: `SubscribeLoopBoundary`/`UnsubscribeLoopBoundary` + `HandleLoopBoundary()` (increments a counter, calls abstract `Expire()` once `_expireAfterLoops` is hit), gated by abstract `IsResolvedOrHandled`.
+- `TrySampleStall(...)` — periodic low-movement *sampling* only (timer + hit-count decay). What to do about a confirmed stall stays subclass-owned.
+- `TryMarkResolved()` / `ResolvedFired` — an internal resolve-once guard. Each subclass's public `OnResolved` event keeps its own signature and consumers (`Action<DiscoveryTrackNode, DiscoveryTrackNodeOutcome>` vs. `Action<bool>`) — not unified.
+- `RunDirectionScan(Vector2 pos)` — "pick best of 8 directions, jitter, set reaction/commit timers," backed by four abstract hooks (`ScoreDirection`, `TurnJitterDegrees`, `NextReactionDelay`, `NextPathCommitDuration`) so each subclass keeps its own scoring source.
+- `Rotate()` — shared vector-rotation math helper.
+
+**Explicitly does not own** (deliberate, not an oversight — re-attempting these merges was the top regression risk identified when this base was designed):
+- The direction-scoring **formula** — `DiscoveryTrackNode` scores via `DrumTrack` grid dust lookups + decision-archetype category biases; `SuperNodeTrackNode` scores via `Physics2D.Raycast` against `CosmicDust` colliders + role-color matching. Same control-flow shape, genuinely different math.
+- Gap-finding — `DiscoveryTrackNodeFleeGapFinder` (BFS to a side-column exit) has no `SuperNodeTrackNode` counterpart; it never seeks a boundary exit.
+- Stall-escape *direction* logic and cooldown — `DiscoveryTrackNode` biases toward grid center via decision-archetype aggressiveness, `SuperNodeTrackNode` does a random 140–200° flip.
+- Boundary/rect clamping — camera-viewport single-hard-correction-per-tick invariant vs. play-area rect with flat velocity damp.
+- "When to rescan" gating — wall-ahead detection, rescan timers, and `DiscoveryTrackNode`'s `SetBehaviorIntent` broadcasting all stay in each subclass's own `FixedUpdate`/`RunCorridorLookahead`.
+
+---
+
 ### DiscoveryTrackNode
-`Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.cs`
+`Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.cs` — inherits `TrackNode`
 
 A destructible shard whose `NoteSet` is its behavior engine. It does **not** carve dust — it navigates existing open corridors (contained by dust walls) and re-tints nearby solid cells with its role via `DiscoveryTrackNodeDustInteractor` → `CosmicDustGenerator.PaintDustExhaust()`.
 
@@ -218,10 +240,10 @@ A destructible shard whose `NoteSet` is its behavior engine. It does **not** car
 
 **Movement loop (FixedUpdate):**
 ```
-corridor lookahead (wall avoidance)
-  → same-role dust affinity bias (CosmicDustGenerator cell query)
+corridor lookahead (wall avoidance, gates into TrackNode.RunDirectionScan on rescan)
+  → same-role dust affinity bias (CosmicDustGenerator cell query, inside ScoreDirection override)
   → flee-vehicle avoidance
-  → stall escape
+  → stall escape (TrackNode.TrySampleStall for detection, direction stays here)
   → move + paint role exhaust (CosmicDustGenerator.PaintDustExhaust — tints, never clears)
 ```
 
@@ -240,7 +262,7 @@ corridor lookahead (wall avoidance)
 ---
 
 ### SuperNode
-`Assets/Scripts/Gameplay/Mining/SuperNode.cs`, `SuperNodeTrackNode.cs`, `SuperNodeShard.cs`, `SuperNodeSteeringMath.cs`
+`Assets/Scripts/Gameplay/Mining/SuperNode.cs`, `SuperNodeTrackNode.cs` (inherits `TrackNode`), `SuperNodeSteeringMath.cs`
 
 DiscoveryTrackNode's alternate ejection outcome — a multi-track "bonus round" instead of a single mineable shard. `PhaseStar` picks one of the two mutually exclusive paths per poke (`ShouldSpawnSuperNodeForTrack`, `PhaseStar.EjectionLogic.cs:353-386`): a SuperNode requires `MotifProfile.alternateChordProgressionProfile` to be set **and** the target track already at `maxLoopMultiplier`. Prefab naming is not obvious from the class names: the SuperNode prefab is `Assets/Prefabs/Interactable Objects/Major Discovery.prefab` (wired via `Star.prefab.superNodePrefab`), and the `SuperNodeTrackNode` prefab is `Assets/Prefabs/Interactable Objects/Ideas.prefab`.
 
@@ -248,7 +270,7 @@ DiscoveryTrackNode's alternate ejection outcome — a multi-track "bonus round" 
 
 **`SuperNode.Initialize`** spawns one `SuperNodeTrackNode` chaser per shard track in a ring around the spawn point and tracks `_pendingChaseCount`. If there are no shard tracks, it resolves synchronously in the same frame.
 
-**`SuperNodeTrackNode` movement** (`FixedUpdate`): dust-seeking wander — flees nearby vehicles, cycles burst/pause speed, raycast-scores directions favoring dust matching its `AssignedTrack.assignedRole`, wall-hugs, stall-escapes, and expires on a loop-boundary timer. On matching-role dust contact it carves the cell (`CarveCellPreserveGray`, tagged `DustClearSource.SuperNode`, gray regrow — never feeds the star). On vehicle contact, `Collect()` calls `AssignedTrack.InstantFillAllBins(toMaxCapacity:true)` and fires the completion sequence.
+**`SuperNodeTrackNode` movement** (`FixedUpdate`): dust-seeking wander — flees nearby vehicles, cycles burst/pause speed, raycast-scores directions favoring dust matching its `AssignedTrack.assignedRole` (via `TrackNode.RunDirectionScan` + its own `ScoreDirection` override), wall-hugs, stall-escapes, and expires on a loop-boundary timer (via `TrackNode`'s shared expiry counter). On matching-role dust contact it carves the cell (`CarveCellPreserveGray`, tagged `DustClearSource.SuperNode`, gray regrow — never feeds the star). On vehicle contact, `Collect()` calls `AssignedTrack.InstantFillAllBins(toMaxCapacity:true)` and fires the completion sequence.
 
 **Resolution:** each `SuperNodeTrackNode.OnResolved` decrements `SuperNode._pendingChaseCount`; at zero, `SuperNode.OnResolved` fires and it despawns. `PhaseStar`'s subscriber mirrors the fill/advance logic for the *target* track, fires the shared `OnMineNodeResolved`, and enters the same await-collectable-clear tail DiscoveryTrackNode uses.
 
