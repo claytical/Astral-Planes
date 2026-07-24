@@ -83,7 +83,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   config: {fileID: 11400000, guid: 45ea7ca1235d4457abeac443261c0831, type: 2}
   outerSprite: {fileID: 2442014530722922072}
-  innerSprite: {fileID: 2442014530722922072}
+  innerSprite: {fileID: 3197535283754970742}
   spritePivotOuter: {fileID: 0}
   spritePivotInner: {fileID: 0}
 --- !u!114 &8668376557347016044
@@ -112,7 +112,7 @@ MonoBehaviour:
   tintTrails: 1
 --- !u!212 &2442014530722922072
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -159,7 +159,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 100
   m_MaskInteraction: 2
-  m_Sprite: {fileID: 1211849485947851915, guid: cb35d248eb2024670b99d050f204beda,
+  m_Sprite: {fileID: 1211849485947851915, guid: 2567647a21ff74869b8d376521716000,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -170,6 +170,7 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!50 &4561843143948562615
 Rigidbody2D:
   serializedVersion: 5
@@ -235,7 +236,7 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.4, y: 0.78}
+    oldSize: {x: 0.42, y: 0.81}
     newSize: {x: 1.28, y: 1.15}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
@@ -286,7 +287,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &3197535283754970742
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -333,7 +334,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 1211849485947851915, guid: cb35d248eb2024670b99d050f204beda,
+  m_Sprite: {fileID: -7233868419342923855, guid: 77d43200dcc0742699b7b608603f6ac0,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -344,3 +345,4 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []

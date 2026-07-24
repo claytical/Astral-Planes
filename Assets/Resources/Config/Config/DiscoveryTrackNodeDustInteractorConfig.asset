@@ -14,12 +14,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DiscoveryTrackNodeDustInteractorConfig
   dustDragScalar: 0.85
   extraBrake: 0
-  exhaustPaintRole: 0
-  exhaustEnergyFraction: 0.4
-  carveIntervalSeconds: 0.08
-  edgeHugForce: 2
   escapePushForce: 5
-  huntBfsBudget: 600
-  huntDirWeight: 0.55
-  arrivalRadiusCells: 1
-  retargetInterval: 0.35
+  exhaustEnergyFraction: 0.15

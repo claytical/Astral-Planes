@@ -10,15 +10,22 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ea51f105660b54cd98926352589ee4d9, type: 3}
-  m_Name: Groove NodeLocomotionProfile
+  m_Name: Bass Discovery Profile
   m_EditorClassIdentifier: Assembly-CSharp::DiscoveryTrackNodeLocomotionProfile
-  archetype: 3
-  baseSpeed: 2
-  maxSpeed: 6
-  acceleration: 10
+  baseSpeed: 1
+  maxSpeed: 4
+  acceleration: 5
   braking: 2
-  turnRate: 3
+  turnRate: 2
   hesitation: 0.1
   dustPenalty: 0.2
-  strength: 110
-  expireAfterLoops: 3
+  strength: 180
+  expireAfterLoops: 5
+  reactionDelayWindow: {x: 0.2, y: 0.35}
+  pathCommitmentDuration: 1.8
+  turnJitter: 3
+  fleeCommitment01: 0.45
+  stallRecoveryAggressiveness: 0.35
+  dustRiskTolerance: 0.35
+  hitStunDuration: 1.1
+  hitStunSpeedMultiplier: 1.3

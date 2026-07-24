@@ -39,18 +39,7 @@ public partial class DiscoveryTrackNode
 
     private DiscoveryTrackNodeLocomotionProfile ResolveLocomotionProfile(MusicalRoleProfile roleProfile)
     {
-        if (roleProfile != null && roleProfile.mineNodeLocomotionProfile != null)
-            return roleProfile.mineNodeLocomotionProfile;
-
-        var archetypeProfiles = config != null ? config.locomotionArchetypeProfiles : null;
-        int count = archetypeProfiles != null ? archetypeProfiles.Length : 0;
-        if (count > 0)
-        {
-            int idx = Mathf.Clamp(Mathf.RoundToInt(_speed * (count - 1)), 0, count - 1);
-            if (archetypeProfiles[idx] != null)
-                return archetypeProfiles[idx];
-        }
-        return config != null ? config.defaultLocomotionProfile : null;
+        return roleProfile != null ? roleProfile.mineNodeLocomotionProfile : null;
     }
 
     private void RunCorridorLookahead(Vector2Int myCell)
@@ -115,7 +104,29 @@ public partial class DiscoveryTrackNode
                 break;
             }
         }
-        float riskBias = Mathf.Lerp(-0.7f, 0.7f, _decisionArchetype.dustRiskTolerance);
+        // Boundary awareness: top/bottom are always solid; left/right are a porous border —
+        // solid only where CosmicDust is actually present, mirroring BoundaryWrap's live dust
+        // check at the screen edge. HasDustAt returns false past the grid edge, so without this
+        // term any direction pointed off-grid (including top/bottom) scores as open space.
+        int gridW = Mathf.Max(1, _drumTrack.GetSpawnGridWidth());
+        int gridH = Mathf.Max(1, _drumTrack.GetSpawnGridHeight());
+        Vector2Int edgeProbe = myCell + new Vector2Int(Mathf.RoundToInt(dir.x * 3), Mathf.RoundToInt(dir.y * 3));
+        bool towardTopBottom = edgeProbe.y < 0 || edgeProbe.y >= gridH;
+        bool towardLeftRight = edgeProbe.x < 0 || edgeProbe.x >= gridW;
+        if (towardTopBottom)
+        {
+            score -= 2f;
+        }
+        else if (towardLeftRight)
+        {
+            int edgeX = edgeProbe.x < 0 ? 0 : gridW - 1;
+            int rowY  = Mathf.Clamp(myCell.y, 0, gridH - 1);
+            if (_drumTrack.HasDustAt(new Vector2Int(edgeX, rowY)))
+                score -= 2f;
+        }
+
+        float dustRiskTolerance = _activeLocomotionProfile != null ? _activeLocomotionProfile.dustRiskTolerance : kDefaultDustRiskTolerance;
+        float riskBias = Mathf.Lerp(-0.7f, 0.7f, dustRiskTolerance);
         score += riskBias * Mathf.Clamp01(score / 3f);
         // Territory affinity
         if (_dustGenerator != null)
@@ -131,10 +142,10 @@ public partial class DiscoveryTrackNode
             var perp = new Vector2(-_carveDir.y * _orbitSign, _carveDir.x * _orbitSign).normalized;
             score += orbitalBias * Mathf.Max(0f, Vector2.Dot(dir.normalized, perp));
         }
-        // Proximity evasion (Lead/Darting): 7-cell category default; profile overrides if > 0
-        if (_behaviorCategory == DiscoveryTrackNodeBehaviorCategory.Darting && _trackedVehicle != null)
+        // Proximity evasion: every role reacts to the player now, scaled by its own evasionCells.
+        if (_trackedVehicle != null)
         {
-            float cells = (_roleProfile != null && _roleProfile.evasionCells > 0f) ? _roleProfile.evasionCells : 7f;
+            float cells = (_roleProfile != null && _roleProfile.evasionCells > 0f) ? _roleProfile.evasionCells : 3f;
             float worldRadius = cells * GetCellSize();
             float dist = Vector2.Distance(_rb.position, _trackedVehicle.transform.position);
             if (dist < worldRadius)
@@ -147,21 +158,14 @@ public partial class DiscoveryTrackNode
         return score;
     }
 
-    protected override float TurnJitterDegrees() => _decisionArchetype.turnJitter;
-    protected override float NextReactionDelay() => _decisionArchetype.SampleReactionDelay();
-    protected override float NextPathCommitDuration() =>
-        Mathf.Max(0.05f, _decisionArchetype.pathCommitmentDuration * CategoryCommitScale());
+    protected override float TurnJitterDegrees() =>
+        _activeLocomotionProfile != null ? _activeLocomotionProfile.turnJitter : kDefaultTurnJitter;
 
-    // Returns the commit-duration multiplier for this category.
-    // Deliberate (Bass): 2.5x base. Darting (Lead): 0.35x base. Others: 1x.
-    private float CategoryCommitScale()
-    {
-        return _behaviorCategory switch {
-            DiscoveryTrackNodeBehaviorCategory.Deliberate => 2.5f,
-            DiscoveryTrackNodeBehaviorCategory.Darting    => 0.35f,
-            _                                   => 1f,
-        };
-    }
+    protected override float NextReactionDelay() =>
+        _activeLocomotionProfile != null ? _activeLocomotionProfile.SampleReactionDelay() : kDefaultReactionDelay;
+
+    protected override float NextPathCommitDuration() =>
+        Mathf.Max(0.05f, _activeLocomotionProfile != null ? _activeLocomotionProfile.pathCommitmentDuration : kDefaultPathCommitmentDuration);
 
     private float GetCellSize()
     {
@@ -183,7 +187,8 @@ public partial class DiscoveryTrackNode
 
         if (!confirmedStall || Time.time < _nextEscapeAllowedTime) return;
 
-        float recoveryScale = Mathf.Lerp(1.25f, 0.4f, _decisionArchetype.stallRecoveryAggressiveness);
+        float stallRecoveryAggressiveness = _activeLocomotionProfile != null ? _activeLocomotionProfile.stallRecoveryAggressiveness : kDefaultStallRecoveryAggressiveness;
+        float recoveryScale = Mathf.Lerp(1.25f, 0.4f, stallRecoveryAggressiveness);
         _nextEscapeAllowedTime = Time.time + (kEscapeCooldown * recoveryScale);
         ResetStallSample();
 
@@ -211,28 +216,9 @@ public partial class DiscoveryTrackNode
             _carveDir = Rotate(fwd, UnityEngine.Random.Range(150f, 210f)).normalized;
         }
 
-        float jitter = Mathf.Lerp(kEscapeJitterDeg * 0.5f, kEscapeJitterDeg * 1.5f, _decisionArchetype.stallRecoveryAggressiveness);
+        float jitter = Mathf.Lerp(kEscapeJitterDeg * 0.5f, kEscapeJitterDeg * 1.5f, stallRecoveryAggressiveness);
         _carveDir = Rotate(_carveDir, UnityEngine.Random.Range(-jitter, jitter)).normalized;
         _rb.linearVelocity *= 0.5f;
-    }
-
-    private void ResolveDecisionArchetype()
-    {
-        _decisionArchetype = default;
-        var library = config != null ? config.decisionArchetypeLibrary : null;
-        if (library == null)
-        {
-            _decisionArchetype.id = "Steady";
-            _decisionArchetype.reactionDelayWindow = new Vector2(0.1f, 0.25f);
-            _decisionArchetype.pathCommitmentDuration = 0.75f;
-            _decisionArchetype.turnJitter = 8f;
-            _decisionArchetype.fleeBias = 0.6f;
-            _decisionArchetype.stallRecoveryAggressiveness = 0.6f;
-            _decisionArchetype.dustRiskTolerance = 0.5f;
-            return;
-        }
-
-        library.TryGet("Steady", out _decisionArchetype);
     }
 
     private void CacheAuthoredStepsFromNoteSet()

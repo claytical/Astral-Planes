@@ -167,10 +167,11 @@ public partial class DiscoveryTrackNode
         _carveDir = awayDir.normalized;
 
         _loopsSinceSpawn = 0;
-        _stunTimer = config.hitStunDuration;
+        float hitStunDuration = _activeLocomotionProfile != null ? _activeLocomotionProfile.hitStunDuration : kDefaultHitStunDuration;
+        _stunTimer = hitStunDuration;
         // Lock RunCorridorLookahead's commit window so it doesn't immediately overwrite the dash heading.
-        _nextDirectionDecisionAt = Time.time + config.hitStunDuration;
-        _pathCommitUntil        = Time.time + config.hitStunDuration;
+        _nextDirectionDecisionAt = Time.time + hitStunDuration;
+        _pathCommitUntil        = Time.time + hitStunDuration;
 
         _strength -= vehicle.GetForceAsDamage();
         _strength  = Mathf.Max(0, _strength);

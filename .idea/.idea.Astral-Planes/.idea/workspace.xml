@@ -6,9 +6,48 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Discovery.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Discovery.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Ideas.prefab" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Ideas.prefab.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/Bass NodeLocomotionProfile.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Config/Bass NodeLocomotionProfile.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/DiscoveryTrackNodeCharacterVisConfig.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Config/DiscoveryTrackNodeCharacterVisConfig.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/DiscoveryTrackNodeConfig.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Config/DiscoveryTrackNodeConfig.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/DiscoveryTrackNodeDecisionArchetypes.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/DiscoveryTrackNodeDecisionArchetypes.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/DiscoveryTrackNodeDustInteractorConfig.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Config/DiscoveryTrackNodeDustInteractorConfig.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/Groove NodeLocomotionProfile.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Config/Groove NodeLocomotionProfile.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/Harmony NodeLocomotionProfile.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Config/Harmony NodeLocomotionProfile.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/Lead NodeLocomotionProfile.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Config/Lead NodeLocomotionProfile.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/1_Two.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/1_Two.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Contrabass.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Contrabass.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Dope.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Dope.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Finger.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Finger.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Floor.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Floor.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Hip Hop Sub.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Hip Hop Sub.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Muted.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Muted.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Street.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Street.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Detroit Keys.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Detroit Keys.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Light Keys.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Light Keys.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Rob Otto.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Rob Otto.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Soul Oohs.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Soul Oohs.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Still Sky.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Still Sky.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Under Pad.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Under Pad.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Contact.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Contact.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Palm Guitar.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Palm Guitar.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Steel Jazz.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Steel Jazz.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.Drifting.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.Drifting.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.Fleeing.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.Fleeing.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.Locomotion.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.Locomotion.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.Resolution.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.Resolution.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeCharacterVis.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeCharacterVis.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeCharacterVisConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeCharacterVisConfig.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeConfig.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeDecisionArchetype.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeDecisionArchetype.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeDustInteractor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeDustInteractor.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeDustInteractorConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeDustInteractorConfig.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeLocomotionProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeLocomotionProfile.cs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -301,7 +340,7 @@
       <workItem from="1783970322056" duration="95875000" />
       <workItem from="1784402198304" duration="21661000" />
       <workItem from="1784689139456" duration="50731000" />
-      <workItem from="1784849120685" duration="4252000" />
+      <workItem from="1784849120685" duration="18026000" />
     </task>
     <servers />
   </component>

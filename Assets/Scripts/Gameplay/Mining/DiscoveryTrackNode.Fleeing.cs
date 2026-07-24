@@ -19,7 +19,8 @@ public partial class DiscoveryTrackNode
             // Stunned: dash away on the heading locked at hit-time. No exit-seeking —
             // gapOnNearSide stays false, so the boundary clamp below stays fully closed.
             _stunTimer -= Time.fixedDeltaTime;
-            ApplyLocomotion(speed01, config.hitStunSpeedMultiplier);
+            float hitStunSpeedMultiplier = _activeLocomotionProfile != null ? _activeLocomotionProfile.hitStunSpeedMultiplier : kDefaultHitStunSpeedMultiplier;
+            ApplyLocomotion(speed01, hitStunSpeedMultiplier);
         }
         else
         {
@@ -36,7 +37,7 @@ public partial class DiscoveryTrackNode
                 Vector2 toGap    = waypoint - _rb.position;
                 if (toGap.sqrMagnitude > 0.0001f)
                 {
-                    float gapBias = Mathf.Lerp(config.fleeTowardBoundaryWeight * 0.25f, config.fleeTowardBoundaryWeight, _decisionArchetype.fleeBias);
+                    float gapBias = _activeLocomotionProfile != null ? _activeLocomotionProfile.fleeCommitment01 : kDefaultFleeCommitment01;
                     // At the doorway, override corridor lookahead so it can't turn the node away.
                     int cellDist = Mathf.Abs(myCell.x - gapCell.x) + Mathf.Abs(myCell.y - gapCell.y);
                     if (cellDist < 3) gapBias = Mathf.Max(gapBias, 0.9f);

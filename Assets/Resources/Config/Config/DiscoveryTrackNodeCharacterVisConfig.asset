@@ -18,6 +18,3 @@ MonoBehaviour:
   wobbleHzRange: {x: 2.5, y: 4.5}
   innerCounterFactor: -0.4
   escapeSpinBoost: 1.2
-  defaultThinkToSwimSpeed: 0.12
-  defaultSwimToThinkSpeed: 0.06
-  archetypeVisualProfiles: []
