@@ -52,7 +52,7 @@ public partial class DiscoveryTrackNode
         var dt = _drumTrack;
         if (dt != null)
         {
-            dt.OnLoopBoundary -= HandleLoopBoundary;
+            UnsubscribeLoopBoundary();
             _drumTrack.FreeSpawnCell(_spawnCell.x, _spawnCell.y);
             dt.UnregisterMineNode(this);
         }
@@ -117,8 +117,7 @@ public partial class DiscoveryTrackNode
 
     private void FireResolvedOnce()
     {
-        if (_resolvedFired) return;
-        _resolvedFired = true;
+        if (!TryMarkResolved()) return;
         ReleaseHeldDustOnce();
         var outcome = WasCaptured ? DiscoveryTrackNodeOutcome.Captured
                     : WasEscaped  ? DiscoveryTrackNodeOutcome.Escaped

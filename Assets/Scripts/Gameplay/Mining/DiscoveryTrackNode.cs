@@ -8,7 +8,7 @@ public enum DiscoveryTrackNodeState { Drifting, Fleeing }
 public enum DiscoveryTrackNodeBehaviorIntent { Thinking, Committing, Escaping }
 public enum DiscoveryTrackNodeOutcome { Captured, Escaped, Expired }
 
-public partial class DiscoveryTrackNode : MonoBehaviour
+public partial class DiscoveryTrackNode : TrackNode
 {
     public SpriteRenderer coreSprite;
     public SpriteRenderer outlineSprite;
@@ -34,17 +34,12 @@ public partial class DiscoveryTrackNode : MonoBehaviour
 
     private Vector2Int _spawnCell;
     private float _nextEscapeAllowedTime = 0f;
-    private Vector2 _lastPosForStall;
-    private float _nextStallSampleTime = 0f;
-    private int _stallHits = 0;
     private int _stepsPerLoop = 16;
     private int _strength;
     private int _maxStrength;
-    private int _expireAfterLoops;
     private Vector3 _originalScale;
     private Color _lockedColor;
-    private bool _depletedHandled, _resolvedFired;
-    private int _loopsSinceSpawn;
+    private bool _depletedHandled;
     private Collider2D _col;
     private Rigidbody2D _rb;
     private DrumTrack _drumTrack;
@@ -147,8 +142,7 @@ public partial class DiscoveryTrackNode : MonoBehaviour
         _pathCommitUntil = Time.time + Mathf.Max(0.05f, _decisionArchetype.pathCommitmentDuration * CategoryCommitScale());
         SetBehaviorIntent(DiscoveryTrackNodeBehaviorIntent.Committing);
         _lastProcessedStep = -1;
-        if (_drumTrack != null)
-            _drumTrack.OnLoopBoundary += HandleLoopBoundary;
+        SubscribeLoopBoundary(_drumTrack);
 
         var dust = GetComponent<DiscoveryTrackNodeDustInteractor>();
         if (dust != null) dust.SetLevelAuthority(_drumTrack);
@@ -174,16 +168,7 @@ public partial class DiscoveryTrackNode : MonoBehaviour
         _trackedVehicle = (vehicles != null && vehicles.Count > 0) ? vehicles[0] : null;
     }
 
-    private void HandleLoopBoundary()
-    {
-        if (_drumTrack == null) return;
-
-        if (_depletedHandled) return;
-
-        _loopsSinceSpawn++;
-        if (_expireAfterLoops > 0 && _loopsSinceSpawn >= _expireAfterLoops)
-            HandleExpiry();
-    }
+    protected override bool IsResolvedOrHandled => _depletedHandled;
 
     private void Start()
     {
@@ -220,9 +205,9 @@ public partial class DiscoveryTrackNode : MonoBehaviour
         if (GameFlowManager.VerboseLogging) Debug.Log($"[DiscoveryTrackNode] {name} — transitioning to Fleeing.");
     }
 
-    private void HandleExpiry()
+    protected override void Expire()
     {
-        if (_depletedHandled || _resolvedFired) return;
+        if (_depletedHandled || ResolvedFired) return;
         if (GameFlowManager.VerboseLogging) Debug.Log($"[DiscoveryTrackNode] {name} — expired after {_loopsSinceSpawn} loops.");
 
         var explode = GetComponent<Explode>();
@@ -240,7 +225,7 @@ public partial class DiscoveryTrackNode : MonoBehaviour
 
     public void HandleEscape()
     {
-        if (_depletedHandled || _resolvedFired) return;
+        if (_depletedHandled || ResolvedFired) return;
         WasEscaped = true;
         SetBehaviorIntent(DiscoveryTrackNodeBehaviorIntent.Escaping);
         if (GameFlowManager.VerboseLogging) Debug.Log($"[DiscoveryTrackNode] {name} — escaped through boundary.");
@@ -305,13 +290,13 @@ public partial class DiscoveryTrackNode : MonoBehaviour
 
     private void OnDisable()
     {
-        if (_drumTrack != null) _drumTrack.OnLoopBoundary -= HandleLoopBoundary;
+        UnsubscribeLoopBoundary();
     }
 
     private void OnDestroy()
     {
         ReleaseHeldDustOnce();
-        if (_drumTrack != null) _drumTrack.OnLoopBoundary -= HandleLoopBoundary;
+        UnsubscribeLoopBoundary();
         if (_drumTrack != null) _drumTrack.activeMineNodes.Remove(this);
     }
 
