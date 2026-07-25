@@ -4,7 +4,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-public class ControlTutorialDirector : MonoBehaviour
+public partial class ControlTutorialDirector : MonoBehaviour
 {
     public static ControlTutorialDirector Instance { get; private set; }
 
@@ -334,6 +334,18 @@ public class ControlTutorialDirector : MonoBehaviour
         mini.Clear(immediate: true, hideText: true);
     }
 
+    /// Removes a player's mini highlight (e.g. they backed out of ship select) and destroys it.
+    public void UnregisterMini(LocalPlayer lp)
+    {
+        if (!lp) return;
+        if (_mini.TryGetValue(lp, out var mini))
+        {
+            _mini.Remove(lp);
+            if (mini) Destroy(mini.gameObject);
+        }
+        _tutorialPlayers.Remove(lp);
+    }
+
     // ======================================================================
     // Primary tutorial gating
     // ======================================================================
@@ -365,6 +377,30 @@ public class ControlTutorialDirector : MonoBehaviour
         _desiredMode = PrimaryMode.Hidden;
         _primaryTutorialRunning = false;
         ApplyDesiredPrimaryMode();
+    }
+
+    /// Re-shows the "Press South to Join" prompt without a scene reload — used when the last
+    /// joined player backs out of ship select mid-scene (TrackSelection's own OnSceneLoaded
+    /// handler covers the normal case of a fresh scene load).
+    public void ShowJoinPrompt()
+    {
+        _desiredMode = PrimaryMode.JoinSouth;
+        ApplyDesiredPrimaryMode();
+    }
+
+    /// Aborts an in-progress tutorial (player held East to back out). Unlike
+    /// HandlePrimaryTutorialFinished, this does NOT proceed into gameplay — the caller
+    /// (GameFlowManager.AbortTutorialSession) is responsible for tearing down players and
+    /// returning to the join screen.
+    public void AbortPrimaryTutorial()
+    {
+        _primaryTutorialRunning = false;
+
+        foreach (var lp in new List<LocalPlayer>(_mini.Keys))
+            UnregisterMini(lp);
+        _tutorialPlayers.Clear();
+
+        if (primaryInstance) primaryInstance.HideAndClear(immediate: true);
     }
 
     private void HandlePrimaryTutorialFinished()

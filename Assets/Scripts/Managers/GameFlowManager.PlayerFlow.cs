@@ -4,6 +4,20 @@ public partial class GameFlowManager
 {
     public void RegisterPlayer(LocalPlayer player) => SessionState.RegisterPlayer(player);
 
+    /// <summary>Removes a single player backing out of ship select. Re-shows the join prompt if that was the last one.</summary>
+    public void UnregisterPlayer(LocalPlayer player)
+    {
+        if (SessionState.UnregisterPlayer(player))
+            ControlTutorialDirector.Instance?.ShowJoinPrompt();
+    }
+
+    /// <summary>Aborts an in-progress tutorial (held-East back-out): tears down all joined players and returns to the join screen.</summary>
+    public void AbortTutorialSession()
+    {
+        ControlTutorialDirector.Instance?.AbortPrimaryTutorial();
+        StartCoroutine(SceneFlow.ReturnToJoinScreen());
+    }
+
     public bool ReadyToPlay() => SessionState.ReadyToPlay();
 
     private void SetBridgeVisualMode(bool on)

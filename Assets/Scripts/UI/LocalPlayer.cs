@@ -15,6 +15,7 @@ public partial class LocalPlayer : MonoBehaviour
     private PlayerStats _ui;
     private PlayerInput _playerInput;
     private InputAction _confirmAction;
+    private InputAction _leaveAction;
     private InputAction _releaseAction;
     [Header("Gameplay Input")]
     [SerializeField] private string releaseActionName = "ReleaseNote";
@@ -72,6 +73,10 @@ public partial class LocalPlayer : MonoBehaviour
         // If it was already released before we got here, the first real press will confirm.
         if (_confirmAction.ReadValue<float>() <= 0f)
             _confirmEnabled = true;
+
+        _leaveAction = _playerInput.actions["Leave"];
+        _leaveAction.started  += ctx => HandleLeavePressed();
+        _leaveAction.canceled += ctx => HandleLeaveReleased();
 
         // Optional: manual note release action
         _releaseAction = _playerInput.actions.FindAction(releaseActionName, throwIfNotFound: false);

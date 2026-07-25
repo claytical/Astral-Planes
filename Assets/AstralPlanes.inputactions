@@ -161,6 +161,17 @@
                 },
                 {
                     "name": "",
+                    "id": "ef2d067c-1b6d-4a16-8b4b-e3f129db189e",
+                    "path": "<Gamepad>/buttonEast",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
+                    "action": "Leave",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "4b40a9b2-8579-4c3f-83ed-4b72d69497e7",
                     "path": "<Gamepad>/dpad/down",
                     "interactions": "",
