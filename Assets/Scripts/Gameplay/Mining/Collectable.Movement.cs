@@ -370,9 +370,7 @@ public partial class Collectable
     {
         lock (_lock)
         {
-            if (_occupantByCell.TryGetValue(cell, out var occ) && occ != null) return false;
-            if (_reservedByCell.TryGetValue(cell, out var res) && res != null) return false;
-            return true;
+            return !(_occupantByCell.TryGetValue(cell, out var occ) && occ != null);
         }
     }
 
@@ -392,19 +390,6 @@ public partial class Collectable
             if (_occupantByCell.TryGetValue(_currentCell, out var c) && c == this)
                 _occupantByCell.Remove(_currentCell);
         }
-    }
-
-    private void ClearReservation()
-    {
-        if (!_hasReservation) return;
-
-        lock (_lock)
-        {
-            if (_reservedByCell.TryGetValue(_reservedCell, out var c) && c == this)
-                _reservedByCell.Remove(_reservedCell);
-        }
-
-        _hasReservation = false;
     }
 
     // While a timeline-armed movement intent is live, the note plows through dust

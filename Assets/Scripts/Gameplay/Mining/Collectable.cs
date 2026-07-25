@@ -20,15 +20,22 @@ public partial class Collectable : MonoBehaviour
     [Tooltip("Authoritative burst bin assigned at spawn; used to resolve absolute sequencer step on deposit.")]
     public int intendedBin = -1;
 
-    [Header("Spawn Intent")]
-    public bool isTrappedInDust = false;
+    [Header("Tuning")]
+    [Tooltip("Non-role-varying tuning knobs shared by every spawned Collectable. Per-role movement tuning stays on MusicalRoleProfile.")]
+    [SerializeField] private CollectableTuning tuning;
+
+    private void EnsureTuning()
+    {
+        if (tuning != null) return;
+        Debug.LogError($"{gameObject.name}: CollectableTuning not assigned on the Note prefab — using ScriptableObject field defaults as a fallback. Assign a CollectableTuning asset in the Inspector.");
+        tuning = ScriptableObject.CreateInstance<CollectableTuning>();
+    }
+
     // ---- Dust collision tuning ----
-    public float dustCollisionEnterImpulse = 0.85f;
-    public float dustCollisionStayForce = 2.25f;
+    private float dustCollisionEnterImpulse => tuning.dustCollision.dustCollisionEnterImpulse;
+    private float dustCollisionStayForce => tuning.dustCollision.dustCollisionStayForce;
 // ---- Spawn Arrival Intro ----
-    [Header("Spawn Arrival")]
-    [Tooltip("Fade time for dust cells carved along the arrival flight path.")]
-    [SerializeField] private float arrivalCarveFadeSeconds = 0.15f;
+    private float arrivalCarveFadeSeconds => tuning.dustCollision.arrivalCarveFadeSeconds;
     private Coroutine _spawnArrivalRoutine;
     private bool _inSpawnArrival;              // in protected flight: vehicles pass through, no collection
     private Collider2D[] _solidColliders;      // non-trigger colliders, disabled during flight
@@ -56,27 +63,10 @@ public partial class Collectable : MonoBehaviour
             if (_solidColliders[i] != null) _solidColliders[i].enabled = !on;
     }
 // ---- Deposit timing knobs ----
-    [Header("Deposit Timing")]
-    [Tooltip("How long the tether travel should take under normal circumstances (seconds).")]
-    [SerializeField] private float depositTravelSeconds = 1.6f;   // readable default
-
-    [Tooltip("Hard minimum travel time, unless the deposit moment is sooner than this.")]
-    [SerializeField] private float minDepositTravelSeconds = 1.0f;
-
-    [Tooltip("Hard maximum travel time (prevents overly slow zips).")]
-    [SerializeField] private float maxDepositTravelSeconds = 2.2f;
-
-    [Tooltip("Maximum readable orbit time before launch (seconds).")]
-    [SerializeField] private float maxOrbitSeconds = 1.10f;
-
-    [Tooltip("If the deposit moment is this soon, skip orbit and just travel (seconds).")]
-    [SerializeField] private float imminentNoOrbitThreshold = 0.28f;
-
-    [Tooltip("Small safety margin in DSP scheduling (seconds).")]
-    [SerializeField] private float dspEpsilon = 0.010f;
-
-    [Tooltip("Minimum lead time so travel doesn't start 'late' due to frame jitter.")]
-    [SerializeField] private float carryMinLeadSeconds = 0.02f;
+    private float depositTravelSeconds => tuning.depositTiming.depositTravelSeconds;
+    private float minDepositTravelSeconds => tuning.depositTiming.minDepositTravelSeconds;
+    private float maxDepositTravelSeconds => tuning.depositTiming.maxDepositTravelSeconds;
+    private float carryMinLeadSeconds => tuning.depositTiming.carryMinLeadSeconds;
     public int amount = 5;
     private int noteDurationTicks = 4; // 🎵 Default to 1/16th note duration
     private int assignedNote;          // 🎵 The MIDI note value
@@ -96,20 +86,25 @@ public partial class Collectable : MonoBehaviour
         [Range(0f, 0.2f)]
         public float localOffsetJitter = 0.05f;
     }
+
+    private float absorbGrowSeconds => tuning.absorbVfx.absorbGrowSeconds;
+    private float absorbHoldSeconds => tuning.absorbVfx.absorbHoldSeconds;
+    private float absorbShrinkSeconds => tuning.absorbVfx.absorbShrinkSeconds;
+    private float absorbScalePeakMultiplier => tuning.absorbVfx.absorbScalePeakMultiplier;
+
     private GameFlowManager _gfm;
     private Transform _carryParent;
     // Idempotency flags
     private bool _handled;            // prevents double processing on trigger
     private bool _destroyNotified;    // prevents double OnDestroyed
 
-    [SerializeField] private float pulseSpeed = 1.6f;
-    [SerializeField] private float minAlpha = 0.25f;
-    [SerializeField] private float maxAlpha = 0.65f;
-    [SerializeField] private float pulseScale = 1.08f;
+    private float pulseSpeed => tuning.idlePulse.pulseSpeed;
+    private float minAlpha => tuning.idlePulse.minAlpha;
+    private float maxAlpha => tuning.idlePulse.maxAlpha;
+    private float pulseScale => tuning.idlePulse.pulseScale;
     private Coroutine _pulseRoutine;
     // Collectable.cs (top-level in class)
     static readonly Dictionary<Vector2Int, Collectable> _occupantByCell = new();
-    static readonly Dictionary<Vector2Int, Collectable> _reservedByCell = new();
     static readonly object _lock = new object(); // optional; Unity main thread makes this mostly unnecessary
     private static readonly Dictionary<InstrumentTrack, int> _s_liveByTrack = new();
 
@@ -137,50 +132,19 @@ public partial class Collectable : MonoBehaviour
     private DustClaimManager _dustClaims;
     private DustClaimManager GetDustClaims() => _dustClaims != null ? _dustClaims : (_dustClaims = FindAnyObjectByType<DustClaimManager>());
     Vector2Int _currentCell;
-    Vector2Int _reservedCell;
 
-// ---- Carry Orbit ----
-    [Header("Carry Orbit")]
-    [SerializeField] private float carryOrbitRadius = 0.55f;
-    [SerializeField] private float carryOrbitAngularSpeed = 3.0f; // radians/sec
-    [SerializeField] private float carryOrbitFollowLerp = 18f;
-    [SerializeField] private float carryOrbitVerticalBias = 0.05f; // small upward bias so it reads above vehicle
-
-    private int _carryOrbitIndex = -1;
-    private bool _registeredInCarryOrbit;
-
-// Vehicle transform -> carried collectables (for spacing)
-    private static readonly Dictionary<Transform, List<Collectable>> _carryOrbitByCollector = new();    
     private Transform _collector;
     private Coroutine _carryRoutine;
     private bool _inCarry;
 
 // ---- Note Trail (Manual Release) ----
-    [Header("Note Trail (Manual Release)")]
-    [Tooltip("How quickly the note lerps toward its trail slot position (world space).")]
-    [SerializeField] private float trailFollowLerp = 12f;
-
-    [Tooltip("Scale pulse min when idle in trail.")]
-    [SerializeField] private float trailIdleScaleMin = 0.85f;
-
-    [Tooltip("Scale pulse max at full release-ready glow.")]
-    [SerializeField] private float trailReadyScaleMax = 1.25f;
-
-    [Tooltip("Glow pulse speed (radians/sec) when release window is near.")]
-    [SerializeField] private float trailReadyPulseSpeed = 6f;
-
-    [Header("Trail Drift (Autonomous Motion)")]
-    [Tooltip("Max world-space radius of idle drift orbit around the slot position.")]
-    [SerializeField] private float trailDriftRadius = 0.18f;
-
-    [Tooltip("Speed of the drift orbit (radians/sec). Each collectable gets a random phase.")]
-    [SerializeField] private float trailDriftSpeed = 1.1f;
-
-    [Tooltip("How strongly the energy is pulled toward its tether's far-end (the note world). 0 = no pull.")]
-    [SerializeField] private float trailTetherPull = 0.06f;
-
-    [Tooltip("Drift radius shrinks to this fraction as release pulse approaches 1 (energy focuses).")]
-    [SerializeField] private float trailDriftFocusMul = 0.15f;
+    private float trailFollowLerp => tuning.noteTrail.trailFollowLerp;
+    private float trailIdleScaleMin => tuning.noteTrail.trailIdleScaleMin;
+    private float trailReadyScaleMax => tuning.noteTrail.trailReadyScaleMax;
+    private float trailReadyPulseSpeed => tuning.noteTrail.trailReadyPulseSpeed;
+    private float trailDriftRadius => tuning.noteTrail.trailDriftRadius;
+    private float trailDriftSpeed => tuning.noteTrail.trailDriftSpeed;
+    private float trailDriftFocusMul => tuning.noteTrail.trailDriftFocusMul;
 
     private Vector3 _trailWorldTarget;
     private bool _trailFollowActive;
@@ -189,7 +153,6 @@ public partial class Collectable : MonoBehaviour
     private Vector3 _trailBaseScale;
     private bool _trailBaseScaleCaptured;
     private float _trailDriftPhase;      // randomised per-instance so collectables don't orbit in sync
-    bool _hasReservation;
     public bool ReportedCollected { get; private set; }
 
     /// <summary>
@@ -197,8 +160,6 @@ public partial class Collectable : MonoBehaviour
     /// double-decrement burst remaining. The commit path already handles burst accounting.
     /// </summary>
     public void MarkAsReportedCollected() => ReportedCollected = true;
-    public delegate void OnCollectedHandler(int duration, float force);
-    public event OnCollectedHandler OnCollected;   // informational; does not call the track
     public event Action OnDestroyed;               // for bookkeeping (track cleans lists, etc.)
     public void BindMarkerAtSpawn(Transform marker, int anchorStep)
     {
@@ -213,9 +174,8 @@ public partial class Collectable : MonoBehaviour
 
     private Camera _cam;
     private Rigidbody2D _rb;
-    private const float kBaseLinearSpeed = 2.4f; // world units/sec of linear drift at multiplier 1.0
     private float _profileSpeedMul = 1f;    // profile collectableSpeed — global multiplier on all motion
-    private float _speed;                   // kBaseLinearSpeed × multiplier × velocity modulation, resolved at Initialize
+    private float _speed;                   // tuning.baseMotion.baseLinearSpeed × multiplier × velocity modulation, resolved at Initialize
     private float _steerAccel = 20f;        // _speed / collectableAccelSeconds — full speed on every note length
     private System.Random _rng;
     private MusicalRole _role = MusicalRole.None;
@@ -266,6 +226,7 @@ public partial class Collectable : MonoBehaviour
 
     private void Initialize(int note, int duration, InstrumentTrack track, NoteSet noteSet, List<int> steps)
     {
+        EnsureTuning();
         assignedNote              = note;
         noteDurationTicks         = duration;
         assignedInstrumentTrack   = track;
@@ -302,7 +263,7 @@ public partial class Collectable : MonoBehaviour
         // Speed: global role multiplier × base linear speed × MIDI-velocity modulation (±25%).
         _profileSpeedMul = _roleProfile != null ? Mathf.Max(0f, _roleProfile.collectableSpeed) : 1f;
         float velMod = Mathf.Lerp(0.75f, 1.25f, Mathf.Clamp01(spawnVelocity127 / 127f));
-        _speed = kBaseLinearSpeed * _profileSpeedMul * velMod;
+        _speed = tuning.baseMotion.baseLinearSpeed * _profileSpeedMul * velMod;
 
         // Steering accel: reach full speed in collectableAccelSeconds, on every note length.
         // Duration-derived pulse speeds (bass slam, harmony surge) can exceed _speed, so
@@ -344,8 +305,6 @@ public partial class Collectable : MonoBehaviour
 
         StartCoroutine(MovementRoutine());
 
-        ClearReservation();
-
         var dt = assignedInstrumentTrack ? assignedInstrumentTrack.drumTrack : null;
         if (dt != null)
         {
@@ -376,17 +335,14 @@ public partial class Collectable : MonoBehaviour
     private void OnDestroy()
     {
         MarkNoLongerLive();
-        ClearReservation();
         UnbindTimelineStep();
         UnregisterOccupant();
-        UnregisterCarryOrbit();
         GetDustClaims()?.ReleaseOwner($"Collectable#{_id}");
         NotifyDestroyedOnce();
     }
 
     private void OnDisable()
     {
-        ClearReservation();
         UnbindTimelineStep();
         UnregisterOccupant();
         GetDustClaims()?.ReleaseOwner($"Collectable Released");

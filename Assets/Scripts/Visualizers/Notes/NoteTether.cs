@@ -270,6 +270,15 @@ private int     _cachedHash  = 0;
     // ghost cue) ride the same 0..1 timeline as the tether's own width/color pulse.
     public float ReleaseProgress01 => _releaseProgress01;
 
+    private bool _isApproaching = true;
+
+    // True while progress is rising toward the release window; false during the post-step
+    // grace decay (pending notes only — armed releases have no decay phase and stay true
+    // the whole time they're shown). Drives the manual-release cue's visibility — see
+    // Vehicle.NoteTrailVisuals.UpdateVehicleTether.
+    public bool IsApproaching => _isApproaching;
+    public void SetApproaching(bool approaching) => _isApproaching = approaching;
+
     // Whether the tether line is currently drawn (see SetTimingState). RebuildCurve() runs every
     // Update() regardless, so _points/EvaluatePosition01 stay valid even while hidden — callers
     // that only want to show something while the cable itself is visible should check this.

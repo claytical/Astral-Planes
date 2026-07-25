@@ -189,39 +189,13 @@ MonoBehaviour:
   energySprite: {fileID: 212503362928707232}
   burstId: 0
   intendedBin: -1
-  isTrappedInDust: 0
-  dustCollisionEnterImpulse: 0.85
-  dustCollisionStayForce: 2.25
-  arrivalCarveFadeSeconds: 0.15
-  depositTravelSeconds: 1.6
-  minDepositTravelSeconds: 1
-  maxDepositTravelSeconds: 2.2
-  maxOrbitSeconds: 1.1
-  imminentNoOrbitThreshold: 0.28
-  dspEpsilon: 0.01
-  carryMinLeadSeconds: 0.02
+  tuning: {fileID: 11400000, guid: a10c6671840244754b12bc10d233155f, type: 2}
   amount: 10
   ribbonMarker: {fileID: 0}
   intendedStep: -1
   carrySettings:
     localOffset: {x: 0, y: 0.65, z: 0}
     localOffsetJitter: 0.075
-  pulseSpeed: 1.6
-  minAlpha: 0.25
-  maxAlpha: 0.65
-  pulseScale: 1.1
-  carryOrbitRadius: 0.25
-  carryOrbitAngularSpeed: 4
-  carryOrbitFollowLerp: 15
-  carryOrbitVerticalBias: 0.05
-  trailFollowLerp: 12
-  trailIdleScaleMin: 0.85
-  trailReadyScaleMax: 1.25
-  trailReadyPulseSpeed: 6
-  trailDriftRadius: 0.18
-  trailDriftSpeed: 1.1
-  trailTetherPull: 0.06
-  trailDriftFocusMul: 0.15
   sharedTargetSteps: 
 --- !u!114 &8925877091113225264
 MonoBehaviour:

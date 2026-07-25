@@ -87,6 +87,8 @@ public class BinRingController : MonoBehaviour
     // completion ring rather than at spawn time.
     private void OnCollectableBurstCleared(InstrumentTrack track, int burstId, bool hadNotes)
     {
+        if (!hadNotes) return; // no notes committed — nothing changed, nothing to show
+
         if (_ringApplicator == null)
             _ringApplicator = GameFlowManager.Instance?.GetMotifRingGlyphApplicator();
         if (_ringApplicator == null) return;

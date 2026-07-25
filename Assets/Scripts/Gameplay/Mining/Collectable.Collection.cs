@@ -110,8 +110,6 @@ public partial class Collectable
                 _rb.bodyType = RigidbodyType2D.Dynamic;
         }
 
-        RegisterCarryOrbit();
-
         int baseSteps   = Mathf.Max(1, drumTrack.totalSteps);
         int leaderSteps = Mathf.Max(1, drumTrack.GetLeaderSteps());
 
@@ -151,7 +149,6 @@ public partial class Collectable
             0;
         assignedInstrumentTrack.PlayQuantizedNoteForStep(stepToReportBase, assignedNote, noteDurationTicks, force);
         float velocity127 = ComputeHitVelocity127(vehicle);
-        OnCollected?.Invoke(noteDurationTicks, force);
 
         if (vehicle.ManualNoteReleaseEnabled)
         {
@@ -180,7 +177,7 @@ public partial class Collectable
         _trailDriftPhase = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
         if (!_trailBaseScaleCaptured) { _trailBaseScale = transform.localScale; _trailBaseScaleCaptured = true; }
         if (_trailFollowRoutine != null) StopCoroutine(_trailFollowRoutine);
-        _trailFollowRoutine = StartCoroutine(TrailFollowRoutine());
+        _trailFollowRoutine = StartCoroutine(AbsorbThenTrailFollowRoutine(vehicle));
     }
 
     private void HandleAutoDeposit(int stepToReportBase, float velocity127, float force, int baseSteps, DrumTrack drumTrack)

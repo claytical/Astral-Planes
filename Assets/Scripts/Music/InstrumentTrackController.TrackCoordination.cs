@@ -96,7 +96,7 @@ public partial class InstrumentTrackController
         AssignVoiceIndices();
         if (tracks != null)
             foreach (var t in tracks)
-                if (t != null) t.RefreshRoleColorsFromProfile();
+                if (t != null) t.RefreshRoleColorsFromProfile(ResolveMotifRoleProfile(t));
         UpdateVisualizer();
     }
 

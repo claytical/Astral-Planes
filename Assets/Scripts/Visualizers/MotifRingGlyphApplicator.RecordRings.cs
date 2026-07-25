@@ -244,6 +244,51 @@ public partial class MotifRingGlyphApplicator
         RefreshPlayAreaFit(_recordRings.Count);
     }
 
+    /// <summary>
+    /// Render gray/unlit placeholder rings for a motif that hasn't been played yet — no
+    /// snapshot data exists, so ring count comes directly from <paramref name="ringCount"/>
+    /// (the motif's nodesPerStar) rather than recorded bins. Used for the "next up" locked
+    /// entry in the PhaseLibrary carousel: selectable, but nothing to preview-play.
+    /// </summary>
+    public void ApplyLockedPreview(int ringCount, float alphaScale = 1f)
+    {
+        StopAllCoroutines();
+        _recordFadingOut   = false;
+        _gameplayFadingOut = false;
+        DestroyList(_recordRings);
+
+        if (config == null) return;
+
+        ringCount = Mathf.Max(0, ringCount);
+        int segs  = Mathf.Max(16, config.segments);
+        alphaScale = Mathf.Clamp01(alphaScale);
+
+        for (int i = 0; i < ringCount; i++)
+        {
+            float innerR = RingInnerRadius(i);
+            float outerR = innerR + config.ringThickness;
+
+            var entry = BuildRingEntry($"LockedRing_{i}", innerR, outerR, segs,
+                config.remainingRingColor, default, -1,
+                new List<MotifSnapshot.NoteEntry>(), 0,
+                config.remainingRingAlpha * alphaScale, config.remainingContourAlpha * alphaScale);
+            _recordRings.Add(entry);
+
+            StartCoroutine(AnimateMeshFill(
+                entry.Fill.GetComponent<MeshFilter>().sharedMesh,
+                entry.FullTris, segs, delay: i * config.ringStaggerDelay, config.ringAppearDuration));
+
+            StartCoroutine(AnimateSingleRing(
+                entry.Contour, entry.ContourPoints,
+                i * config.ringStaggerDelay, config.ringAppearDuration,
+                entry.Root.transform, 0f,
+                new List<NoteAnimInfo>(), null,
+                shouldStop: () => _recordFadingOut));
+        }
+
+        RefreshPlayAreaFit(_recordRings.Count);
+    }
+
     private IEnumerator SpinRingContinuous(Transform t, float rotDegPerSec)
     {
         while (!_recordFadingOut)

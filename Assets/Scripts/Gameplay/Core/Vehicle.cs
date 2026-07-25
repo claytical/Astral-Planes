@@ -450,4 +450,6 @@ public partial class Vehicle : MonoBehaviour
     {
         return baseSprite.sprite;
     }
+
+    public Bounds GetVisualBounds() => baseSprite != null ? baseSprite.bounds : default;
 }

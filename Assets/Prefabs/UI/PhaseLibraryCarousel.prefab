@@ -25,7 +25,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2018841000974329430}
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -60,9 +60,10 @@ MonoBehaviour:
   trackSelectionScene: TrackSelection
   inputCooldown: 0.2
   unselectedAlpha: 0.25
-  maxRecordRadius: 1.75
+  maxRecordRadius: 3
   pressToStartCue: {fileID: 0}
   previewPlayer: {fileID: 3751250523553378462}
+  phaseLibrary: {fileID: 11400000, guid: 4660cb6f322234453bcc49b92f037354, type: 2}
   onMotifConfirmed:
     m_PersistentCalls:
       m_Calls: []

@@ -286,7 +286,7 @@ public partial class Vehicle
                 UpdateVehicleTether(viz);
 
                 if (_vehicleTether.IsShown)
-                    viz?.SetManualReleaseCuePosition(transform, _vehicleTether.EvaluatePosition01(_vehicleTether.ReleaseProgress01));
+                    viz?.SetManualReleaseCuePosition(transform, _vehicleTether.EvaluatePosition01(_vehicleTether.ReleaseProgress01), _vehicleTether.IsApproaching);
                 else
                     viz?.ClearManualReleaseCue(transform);
             }
@@ -310,6 +310,7 @@ public partial class Vehicle
             _vehicleTether.BindByStep(a.note.track, a.targetAbsStep, viz);
             _vehicleTether.SetReleaseProgress(pulse);
             _vehicleTether.SetTimingState(pulse, inWin, atExact);
+            _vehicleTether.SetApproaching(inWin);
             return;
         }
 
@@ -380,12 +381,14 @@ public partial class Vehicle
                 }
                 _vehicleTether.SetReleaseProgress(notePulse);
                 _vehicleTether.SetTimingState(notePulse, noteInWindow, atExact);
+                _vehicleTether.SetApproaching(inArmWin);
                 return;
             }
         }
 
         _vehicleTether.SetReleaseProgress(notePulse);
         _vehicleTether.SetTimingState(notePulse, noteInWindow, false);
+        _vehicleTether.SetApproaching(false);
     }
 
     private void UpdateVehiclePlacementResonance(float pulse01, InstrumentTrack cueTrack, bool isAuthoritative = true)

@@ -105,8 +105,9 @@ public partial class NoteVisualizer
 
     // Places (creating if needed) the manual-release ghost cue at worldPos. Position/visibility
     // are owned by the caller (Vehicle.TickNoteTrail rides the vehicle's NoteTether curve) —
-    // this method only manages the per-vehicle cue GameObject lifecycle.
-    public void SetManualReleaseCuePosition(Transform vehicle, Vector3 worldPos)
+    // this method only manages the per-vehicle cue GameObject lifecycle. Position keeps
+    // updating even while hidden so the cue is correctly placed the moment it reappears.
+    public void SetManualReleaseCuePosition(Transform vehicle, Vector3 worldPos, bool visible)
     {
         if (releaseCuePrefab == null || vehicle == null) return;
         if (!isActiveAndEnabled) return;
@@ -123,6 +124,9 @@ public partial class NoteVisualizer
         {
             cue.transform.position = worldPos;
         }
+
+        var sr = cue.GetComponentInChildren<SpriteRenderer>();
+        if (sr != null) sr.enabled = visible;
     }
 
     public void UpdateCarryHighlights(HashSet<InstrumentTrack> carried)
