@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: waiting
   displayName: waiting
-  keyRootMidi: 58
+  keyRootMidi: 70
   entryDrumLoops:
   - {fileID: 8300000, guid: a6b537cd91fc44bc2a4357aa1a154bea, type: 3}
   - {fileID: 8300000, guid: 4999a62c67b26451cb5ebf6ca5f3582e, type: 3}

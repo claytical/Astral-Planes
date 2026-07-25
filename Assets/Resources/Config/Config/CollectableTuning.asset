@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0c4542c71a7504f45860964528c7a7d9, type: 3}
+  m_Name: CollectableTuning
+  m_EditorClassIdentifier: Assembly-CSharp::CollectableTuning
+  baseMotion:
+    baseLinearSpeed: 2.4
+  depositTiming:
+    depositTravelSeconds: 1.6
+    minDepositTravelSeconds: 1
+    maxDepositTravelSeconds: 2.2
+    carryMinLeadSeconds: 0.02
+  absorbVfx:
+    absorbGrowSeconds: 0.08
+    absorbHoldSeconds: 0.5
+    absorbShrinkSeconds: 0.1
+    absorbScalePeakMultiplier: 1.1
+  idlePulse:
+    pulseSpeed: 1.6
+    minAlpha: 0.25
+    maxAlpha: 0.65
+    pulseScale: 1.1
+  noteTrail:
+    trailFollowLerp: 12
+    trailIdleScaleMin: 0.85
+    trailReadyScaleMax: 1.25
+    trailReadyPulseSpeed: 6
+    trailDriftRadius: 0.18
+    trailDriftSpeed: 1.1
+    trailDriftFocusMul: 0.15
+  dustCollision:
+    dustCollisionEnterImpulse: 0.85
+    dustCollisionStayForce: 2.25
+    arrivalCarveFadeSeconds: 0.15

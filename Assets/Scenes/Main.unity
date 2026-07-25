@@ -1937,11 +1937,6 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
-      propertyPath: maxRecordRadius
-      value: 3
-      objectReference: {fileID: 0}
-    - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
-        type: 3}
       propertyPath: pressToStartCue
       value: 
       objectReference: {fileID: 1057326950}
@@ -1950,6 +1945,46 @@ PrefabInstance:
       propertyPath: midiStreamPlayer
       value: 
       objectReference: {fileID: 921184574}
+    - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: m_Pivot.x
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: m_Pivot.y
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: m_AnchorMin.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
       propertyPath: m_LocalPosition.x
@@ -1984,6 +2019,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_LocalRotation.z
       value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}

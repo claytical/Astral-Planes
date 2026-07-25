@@ -22,15 +22,15 @@ MonoBehaviour:
       durSteps: 2
       velocity01: 0.78740156
     - step: 2
-      midiNote: 70
+      midiNote: 59
       durSteps: 1
       velocity01: 0.78740156
     - step: 3
-      midiNote: 70
+      midiNote: 59
       durSteps: 1
       velocity01: 0.78740156
     - step: 8
-      midiNote: 67
+      midiNote: 56
       durSteps: 2
       velocity01: 0.78740156
     - step: 10
@@ -54,4 +54,4 @@ MonoBehaviour:
       durSteps: 1
       velocity01: 0.78740156
     overlapPolicy: 1
-    octaveShift: 0
+    octaveShift: -1

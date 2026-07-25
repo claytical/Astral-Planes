@@ -39,6 +39,20 @@ public partial class InstrumentTrackController : MonoBehaviour
     private GravityVoidController _gravityVoid;
     private BinFrontierAllocator _binAllocator;
 
+    // Resolves the role profile the CURRENT motif's RoleMotifNoteSetConfig assigns to this
+    // track's role, falling back to the library default only when no motif is active yet.
+    // Callers must pass this into RefreshRoleColorsFromProfile() rather than calling it with
+    // no argument — the no-argument fallback picks an arbitrary same-role profile via
+    // MusicalRoleProfileLibrary and will silently clobber a correctly-configured motif profile
+    // if it runs after PhaseTransitionManager has already applied one.
+    private MusicalRoleProfile ResolveMotifRoleProfile(InstrumentTrack t)
+    {
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var motif = _gfm?.phaseTransitionManager?.currentMotif;
+        var cfg = motif?.GetConfigForRoleAtBin(t.assignedRole, 0, t.maxLoopMultiplier, t.voiceIndex);
+        return cfg?.roleProfile;
+    }
+
     private void EnsureGravityVoid()
     {
         if (_gravityVoid != null) return;
@@ -109,7 +123,7 @@ public partial class InstrumentTrackController : MonoBehaviour
         foreach (var t in tracks)
             if (t != null)
             {
-                t.RefreshRoleColorsFromProfile();
+                t.RefreshRoleColorsFromProfile(ResolveMotifRoleProfile(t));
                 t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted; // avoid dupes
                 t.OnAscensionCohortCompleted += HandleAscensionCohortCompleted;
             }

@@ -13,11 +13,11 @@ MonoBehaviour:
   m_Name: Lead Discovery Profile
   m_EditorClassIdentifier: Assembly-CSharp::DiscoveryTrackNodeLocomotionProfile
   baseSpeed: 4
-  maxSpeed: 6
+  maxSpeed: 10
   acceleration: 20
-  braking: 3
+  braking: 5
   turnRate: 8
-  hesitation: 0.4
+  hesitation: 0.1
   dustPenalty: 0.395
   strength: 90
   expireAfterLoops: 2

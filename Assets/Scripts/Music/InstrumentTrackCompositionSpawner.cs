@@ -276,6 +276,11 @@ public sealed class InstrumentTrackCompositionSpawner
             {
                 _beginGravityVoidForPendingExpandIfEligible(voidPos);
 
+                // Spawn the origin effect now, at DiscoveryTrackNode destruction time, rather than
+                // waiting for the deferred commit at the next loop boundary — otherwise it only ever
+                // appears for the first time right at that boundary, reading as a restart/recreate.
+                SpawnOriginEffectIfNeeded(voidPos);
+
                 foreach (var t in controller.tracks)
                 {
                     if (GameFlowManager.VerboseLogging) Debug.Log($"[RECOMPUTE] Attempting to recompute track {t}");
@@ -504,18 +509,26 @@ public sealed class InstrumentTrackCompositionSpawner
         }
 
         // Spawn the origin effect at DiscoveryTrackNode destruction time (now), not at first step launch.
-        var compositionSpawnEffectPrefab = _getCompositionSpawnEffectPrefab();
-        if (_compositionSpawnEffect == null && compositionSpawnEffectPrefab != null)
-        {
-            Vector3 effectPos = originWorld ?? _getHostPosition();
-            _compositionSpawnEffect = UnityEngine.Object.Instantiate(compositionSpawnEffectPrefab, effectPos, Quaternion.identity);
-            var main = _compositionSpawnEffect.main;
-            main.startColor = new ParticleSystem.MinMaxGradient(_getDisplayColor());
-            main.stopAction = ParticleSystemStopAction.Destroy;
-            _compositionSpawnEffect.Play();
-        }
+        // No-op if an expansion-staged burst already spawned it earlier (see SpawnBurst's STAGE_EXPAND branch).
+        SpawnOriginEffectIfNeeded(originWorld ?? _getHostPosition());
 
         if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:COMP] QUEUED track={name} burstId={burstId} count={queued} targetBin={targetBin}");
+    }
+
+    // Instantiates the composition-burst origin VFX at the given position, unless one is
+    // already alive for this track (idempotent — safe to call from both the immediate
+    // spawn path and the expansion-staging path without double-spawning).
+    private void SpawnOriginEffectIfNeeded(Vector3 effectPos)
+    {
+        var compositionSpawnEffectPrefab = _getCompositionSpawnEffectPrefab();
+        if (_compositionSpawnEffect != null || compositionSpawnEffectPrefab == null) return;
+
+        _compositionSpawnEffect = UnityEngine.Object.Instantiate(compositionSpawnEffectPrefab, effectPos, Quaternion.identity);
+        var main = _compositionSpawnEffect.main;
+        main.startColor = new ParticleSystem.MinMaxGradient(_getDisplayColor());
+        main.stopAction = ParticleSystemStopAction.Destroy;
+        main.loop = true; // outlives its short authored cycle until the burst's manual Stop() ends it
+        _compositionSpawnEffect.Play();
     }
 
     /// <summary>
@@ -547,7 +560,6 @@ public sealed class InstrumentTrackCompositionSpawner
             c.intendedStep = launch.absStep;
             c.intendedBin = _getBurstTargetBinOrZero(launch.burstId);
             _assignInstrumentTrack(c);
-            c.isTrappedInDust = launch.cellHasDust;
             c.spawnVelocity127 = launch.velocity127;
 
             _hookCollectableDestroyHandler(c);

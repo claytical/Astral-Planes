@@ -39,6 +39,8 @@ public partial class Collectable
         NoteSet noteSet,
         List<int> steps)
     {
+        EnsureTuning();
+
         assignedNote            = note;
         noteDurationTicks       = duration;
         assignedInstrumentTrack = track;
