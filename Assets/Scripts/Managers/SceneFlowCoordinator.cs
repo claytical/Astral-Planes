@@ -69,6 +69,19 @@ public sealed class SceneFlowCoordinator
         yield return _gameFlow.StartCoroutine(TransitionToScene("Main"));
     }
 
+    /// <summary>
+    /// Lighter than QuitToSelection(): aborts the current session (tutorial back-out) by
+    /// destroying all joined players and reloading TrackSelection directly, rather than Main.
+    /// This preserves any pending PhaseLibraryStartConfig motif choice, since it's only
+    /// consumed by HandleTrackSceneSetupAsync() on the GeneratedTrack path.
+    /// </summary>
+    public IEnumerator ReturnToJoinScreen()
+    {
+        yield return _session.DestroyPlayersForSelection();
+        Hangar.Instance?.ResetForNewSession();
+        yield return _gameFlow.StartCoroutine(TransitionToScene("TrackSelection"));
+    }
+
     public IEnumerator TransitionToScene(string sceneName)
     {
         SceneManager.LoadScene(sceneName, LoadSceneMode.Single);

@@ -27,6 +27,10 @@ using UnityEngine.SceneManagement;
 ///      - With Steam: physical-A maps to buttonSouth (Xbox remapping) → joins on south.
 ///      - Without Steam (editor / raw HID): physical-A maps to buttonEast → joins on east.
 ///      Both paths land the player in the same flow; confirm (Choose) is south-only everywhere.
+///   4. buttonEast is overloaded once the player is joined (see LocalPlayer.LeaveFlow.cs — it's
+///      also "back"). To avoid a tap-join instantly consuming the same press a hold-back needs,
+///      East's join is deferred to release (tap = join, sustained hold = back out to the
+///      carousel/Main scene). See UpdateHoldBackToCarousel(). South/Start joins stay instant.
 ///
 /// Requires PlayerInputManager.joinBehavior = JoinPlayersManually in the TrackSelection scene.
 /// Self-installs via RuntimeInitializeOnLoadMethod — no scene setup needed.
@@ -36,6 +40,13 @@ public class TrackSelectionJoinController : MonoBehaviour
     private readonly HashSet<int> _excludedIds = new();
     private float _lastJoinTime = float.MinValue;
     private const float GraceSeconds = 0.5f;
+
+    // Held (not tapped) East, while nobody has joined yet, backs out to the carousel (Main
+    // scene) instead of joining. A quick tap still joins immediately, so raw-HID controllers
+    // (whose only join button is East, see class doc) are unaffected.
+    private int _holdBackDeviceId = -1;
+    private float _holdBackStartTime;
+    private const float HoldBackSeconds = 1.5f;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void RegisterHook()
@@ -121,16 +132,17 @@ public class TrackSelectionJoinController : MonoBehaviour
                 assignedIds.Add(dev.deviceId);
         }
 
-        // buttonSouth, buttonEast, and startButton are valid join triggers.
-        // With Steam remapping, physical-A → buttonSouth; without Steam (editor/raw HID),
-        // physical-A → buttonEast. Accepting both ensures joining works in either context.
-        // Confirm (Choose action) remains south-only so east never fires a premature confirm.
+        UpdateHoldBackToCarousel(pim, assignedIds);
+
+        // buttonSouth and startButton are instant join triggers. buttonEast is handled by
+        // UpdateHoldBackToCarousel above: a quick tap joins (same as before), a sustained hold
+        // backs out to the carousel instead — see that method for why East can't also be
+        // instant here.
         var candidates = InputSystem.devices
             .OfType<Gamepad>()
             .Where(gp => !assignedIds.Contains(gp.deviceId) &&
                          !_excludedIds.Contains(gp.deviceId) &&
                          (gp.buttonSouth.wasPressedThisFrame ||
-                          gp.buttonEast.wasPressedThisFrame  ||
                           gp.startButton.wasPressedThisFrame))
             .OrderBy(g => g.deviceId)
             .ToList();
@@ -148,7 +160,6 @@ public class TrackSelectionJoinController : MonoBehaviour
         {
             string btn = null;
             if      (gp.buttonSouth.wasPressedThisFrame && usedButtons.Add("south")) btn = "south";
-            else if (gp.buttonEast.wasPressedThisFrame  && usedButtons.Add("east"))  btn = "east";
             else if (gp.startButton.wasPressedThisFrame && usedButtons.Add("start")) btn = "start";
 
             if (btn == null) continue;
@@ -169,5 +180,69 @@ public class TrackSelectionJoinController : MonoBehaviour
             _lastJoinTime = now;
             assignedIds.Add(gp.deviceId);
         }
+    }
+
+    // East can't be both "instant join" and "hold to back out" on the same press — the instant
+    // join would consume the press before a hold duration could ever be measured. So East's
+    // join is deferred to release: release before HoldBackSeconds = tap = join (matches prior
+    // behavior for raw-HID controllers, whose only join button is East); held past
+    // HoldBackSeconds = back out to the carousel (Main scene) instead.
+    private void UpdateHoldBackToCarousel(PlayerInputManager pim, HashSet<int> assignedIds)
+    {
+        if (assignedIds.Count > 0)
+        {
+            CancelHoldBack();
+            return;
+        }
+
+        if (_holdBackDeviceId >= 0)
+        {
+            var held = InputSystem.devices.OfType<Gamepad>()
+                .FirstOrDefault(g => g.deviceId == _holdBackDeviceId);
+
+            if (held == null || _excludedIds.Contains(held.deviceId) || !held.buttonEast.isPressed)
+            {
+                // Released before the hold threshold (or device vanished) — treat as a tap: join.
+                bool releasedNotDisconnected = held != null && !held.buttonEast.isPressed;
+                CancelHoldBack();
+
+                if (releasedNotDisconnected && Time.unscaledTime - _lastJoinTime >= GraceSeconds)
+                {
+                    if (GameFlowManager.VerboseLogging)
+                        Debug.Log($"[JoinController] East tap-join: {held.name} | id={held.deviceId}");
+                    pim.JoinPlayer(pairWithDevices: new InputDevice[] { held });
+                    _lastJoinTime = Time.unscaledTime;
+                }
+                return;
+            }
+
+            float elapsed = Time.unscaledTime - _holdBackStartTime;
+            ControlTutorialDirector.Instance?.UpdateAbortHoldUI(elapsed / HoldBackSeconds);
+
+            if (elapsed >= HoldBackSeconds)
+            {
+                if (GameFlowManager.VerboseLogging)
+                    Debug.Log($"[JoinController] East hold-back: returning to carousel (Main).");
+                ControlTutorialDirector.Instance?.EndAbortHoldUI();
+                _holdBackDeviceId = -1;
+                SceneManager.LoadScene("Main");
+            }
+            return;
+        }
+
+        var starter = InputSystem.devices.OfType<Gamepad>()
+            .FirstOrDefault(gp => !_excludedIds.Contains(gp.deviceId) && gp.buttonEast.wasPressedThisFrame);
+        if (starter == null) return;
+
+        _holdBackDeviceId = starter.deviceId;
+        _holdBackStartTime = Time.unscaledTime;
+        ControlTutorialDirector.Instance?.BeginAbortHoldUI("Hold East to pick a different motif...");
+    }
+
+    private void CancelHoldBack()
+    {
+        if (_holdBackDeviceId < 0) return;
+        _holdBackDeviceId = -1;
+        ControlTutorialDirector.Instance?.CancelAbortHoldUI();
     }
 }

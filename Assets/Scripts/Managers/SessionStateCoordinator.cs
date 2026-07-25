@@ -39,6 +39,13 @@ public sealed class SessionStateCoordinator
         _players.Add(player);
     }
 
+    /// <summary>Removes a single player (e.g. backing out of ship select). Returns true if no players remain.</summary>
+    public bool UnregisterPlayer(LocalPlayer player)
+    {
+        _players.Remove(player);
+        return _players.Count == 0;
+    }
+
     public bool ReadyToPlay() => _currentState == GameState.Playing && _players.Count > 0;
 
     public void SetCurrentState(GameState state)

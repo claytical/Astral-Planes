@@ -137,6 +137,10 @@ public class PlayerSelect : MonoBehaviour
     {
         return _chosenPlane;
     }
+    public void ReleasePlane()
+    {
+        if (_chosenPlane != null) _hangar?.MarkPlaneInUse(_chosenPlane, false);
+    }
     public string GetCurrentShipName()
     {
         return _currentShipName; // or however you're storing it internally
