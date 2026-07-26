@@ -83,6 +83,7 @@ public class Boundaries : MonoBehaviour
         // AddWrap(topBoundary,    BoundaryWrap.WrapAxis.Vertical,   BoundaryWrap.BoundarySide.Top,    bottomBoundary);
         // AddWrap(bottomBoundary, BoundaryWrap.WrapAxis.Vertical,   BoundaryWrap.BoundarySide.Bottom, topBoundary);
         StartCoroutine(AlignBottomToNoteVisualizerWhenReady());
+        StartCoroutine(AlignTopToPlayerStatsGridWhenReady());
     }
 
     private void AddWrap(
@@ -135,6 +136,43 @@ public class Boundaries : MonoBehaviour
         bottomBoundary.transform.position =
             new Vector3(0f, centerY, 0f);
         bottomBoundary.size =
+            new Vector2(screenHalfWidth * 2f, thickness);
+    }
+
+    private System.Collections.IEnumerator AlignTopToPlayerStatsGridWhenReady()
+    {
+        while (GameFlowManager.Instance == null ||
+               GameFlowManager.Instance.PlayerStatsGrid == null)
+        {
+            yield return null;
+        }
+
+        yield return null;
+        if (GameFlowManager.VerboseLogging) Debug.Log("[BOUNDARIES] Aligning to PlayerStatsGrid");
+        AlignTopToPlayerStatsGrid(GameFlowManager.Instance.PlayerStatsGrid as RectTransform);
+        // Re-lock DrumTrack play area now that Canvas layout is final and the anchor Y is valid.
+        GameFlowManager.Instance?.activeDrumTrack?.RefreshPlayAreaLock();
+    }
+
+    private void AlignTopToPlayerStatsGrid(RectTransform grid)
+    {
+        if (!topBoundary || grid == null || mainCamera == null)
+            return;
+
+        float screenHalfWidth = mainCamera.orthographicSize * mainCamera.aspect;
+
+        float thickness = topBoundary.size.y;
+        if (thickness <= 0f) thickness = 1f;
+
+        var corners = new Vector3[4];
+        grid.GetWorldCorners(corners);
+        float bottomY = corners[0].y; // bottom-left corner of GameStats
+
+        float centerY = bottomY + (thickness * 0.5f);
+
+        topBoundary.transform.position =
+            new Vector3(0f, centerY, 0f);
+        topBoundary.size =
             new Vector2(screenHalfWidth * 2f, thickness);
     }
 }

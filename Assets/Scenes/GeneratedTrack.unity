@@ -191,17 +191,12 @@ MonoBehaviour:
   failureExplosionPrefab: {fileID: 6341629909758884825, guid: 3ead2d5ca9a4544288f49bb92e9a1d96,
     type: 3}
   failureColor: {r: 1, g: 0.12, b: 0.05, a: 1}
-  releaseCueLookaheadSteps: 8
-  releaseCueArcHeight: 0.8
   trackRows:
   - {fileID: 728040985}
   - {fileID: 1373048478}
   - {fileID: 197216900}
   - {fileID: 371719000}
-  binStripParent: {fileID: 150479618}
   firstPlayConfirmOrbPrefab: {fileID: 296242526}
-  firstPlayConfirmTravelSeconds: 1
-  firstPlayConfirmEmitCount: 24
   playheadTrailEnabled: 1
   playheadTrailEmitPerWorldUnit: 45
   playheadTrailMaxEmitPerFrame: 160
@@ -218,10 +213,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 04665b15e8a34407c83562f95fd11fbc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NoteAscensionDirector
-  lineOfAscent: {fileID: 423220218}
   ascendLoops: 8
-  ascendLineWorldPadding: 0
   firstPlayConfirmEmitCount: 6
+  lineOfAscent: {fileID: 423220218}
+  ascendLineWorldPadding: 0
   lineChargeDecaySpeed: 0.5
 --- !u!1 &48689784
 GameObject:
@@ -10692,9 +10687,6 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 342701840}
-  ascensionCohort:
-    stepsRemainingSerialized: 
-    armed: 0
   assignedRole: 0
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1798320910}
@@ -11231,9 +11223,6 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 627412778}
-  ascensionCohort:
-    stepsRemainingSerialized: 
-    armed: 0
   assignedRole: 1
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1849649912}
@@ -11351,9 +11340,6 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 652946507}
-  ascensionCohort:
-    stepsRemainingSerialized: 
-    armed: 0
   assignedRole: 3
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 608598250}
@@ -11933,9 +11919,6 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 996539885}
-  ascensionCohort:
-    stepsRemainingSerialized: 
-    armed: 0
   assignedRole: 5
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 134273149}
@@ -12362,6 +12345,7 @@ MonoBehaviour:
   activeMineNodes: []
   currentStep: 0
   _playAreaBottomAnchor: {fileID: 45202785}
+  _playAreaTopAnchor: {fileID: 1758545868}
   _starPool: {fileID: 0}
 --- !u!4 &1354683683
 Transform:
@@ -12411,7 +12395,6 @@ MonoBehaviour:
     type: 3}
   gravityVoidParent: {fileID: 1354683683}
   pickupSfxSource: {fileID: 480221064}
-  commitSfxSource: {fileID: 480221064}
 --- !u!82 &1354683685
 AudioSource:
   m_ObjectHideFlags: 0
@@ -13503,9 +13486,6 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 1583544669}
-  ascensionCohort:
-    stepsRemainingSerialized: 
-    armed: 0
   assignedRole: 5
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 134273149}
@@ -13887,9 +13867,6 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 1690824281}
-  ascensionCohort:
-    stepsRemainingSerialized: 
-    armed: 0
   assignedRole: 2
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 1752260332}
@@ -14192,8 +14169,8 @@ GameObject:
   - component: {fileID: 1758545868}
   - component: {fileID: 1758545870}
   - component: {fileID: 1758545869}
-  - component: {fileID: 1758545871}
   - component: {fileID: 1758545872}
+  - component: {fileID: 1758545873}
   m_Layer: 5
   m_Name: GameStats
   m_TagString: PlayersUI
@@ -14258,30 +14235,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1758545867}
   m_CullTransparentMesh: 1
---- !u!114 &1758545871
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1758545867}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8a8695521f0d02e499659fee002a26c2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_Padding:
-    m_Left: 20
-    m_Right: 0
-    m_Top: 0
-    m_Bottom: 0
-  m_ChildAlignment: 0
-  m_StartCorner: 0
-  m_StartAxis: 0
-  m_CellSize: {x: 400, y: 60}
-  m_Spacing: {x: 100, y: 0}
-  m_Constraint: 1
-  m_ConstraintCount: 5
 --- !u!114 &1758545872
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14294,6 +14247,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d9c579801622342ffa17bd846ccc95fe, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+--- !u!114 &1758545873
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1758545867}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a8695521f0d02e499659fee002a26c2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.GridLayoutGroup
+  m_Padding:
+    m_Left: 0
+    m_Right: 0
+    m_Top: 0
+    m_Bottom: 0
+  m_ChildAlignment: 0
+  m_StartCorner: 0
+  m_StartAxis: 0
+  m_CellSize: {x: 400, y: 100}
+  m_Spacing: {x: 0, y: 0}
+  m_Constraint: 0
+  m_ConstraintCount: 2
 --- !u!1001 &1798320908
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -14649,9 +14626,6 @@ MonoBehaviour:
   collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
     type: 3}
   collectableParent: {fileID: 1889521209}
-  ascensionCohort:
-    stepsRemainingSerialized: 
-    armed: 0
   assignedRole: 5
   controller: {fileID: 1354683684}
   midiStreamPlayer: {fileID: 134273149}

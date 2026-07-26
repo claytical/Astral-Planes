@@ -27,15 +27,18 @@ public sealed class DustResistanceResolver
 
     public DustResistanceProfile Resolve(Vector2Int cell, MusicalRole fallbackRole, string context)
     {
-        // Determine the most authoritative role for this cell, from most to least specific:
-        //   hidden imprint (pre-reveal true identity) > revealed imprint role > caller fallback
+        // Determine the most authoritative role for this cell:
+        //   revealed imprint role (already assigned, visible) > hidden imprint
+        //   (pre-reveal true identity, only used while still gray) > caller fallback
         MusicalRole role = fallbackRole;
 
-        if (_imprints.TryGetValue(cell, out var imp) && imp.role != MusicalRole.None)
-            role = imp.role;
-
-        if (_imprints.TryGetValue(cell, out var hiddenImp2) && hiddenImp2.hiddenRole != MusicalRole.None)
-            role = hiddenImp2.hiddenRole;
+        if (_imprints.TryGetValue(cell, out var imp))
+        {
+            if (imp.role != MusicalRole.None)
+                role = imp.role;
+            else if (imp.hiddenRole != MusicalRole.None)
+                role = imp.hiddenRole;
+        }
 
         // Live profile is always authoritative when a role is known.
         if (role != MusicalRole.None)

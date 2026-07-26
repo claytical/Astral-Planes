@@ -5,7 +5,7 @@ using UnityEngine.SceneManagement;
 public partial class LocalPlayer
 {
     private Coroutine _leaveHoldCo;
-    private const float HoldToLeaveSeconds = 1.5f;
+    private const float HoldToLeaveSeconds = 3f;
 
     // Same "Leave" action (East on gamepad) means two different things depending on context:
     // instant leave during plain ship select, or a hold-to-confirm session abort mid-tutorial.
@@ -32,7 +32,7 @@ public partial class LocalPlayer
 
     private IEnumerator HoldToLeaveRoutine()
     {
-        ControlTutorialDirector.Instance.BeginAbortHoldUI();
+        ControlTutorialDirector.Instance.BeginAbortHoldUI("Quitting", HoldToLeaveSeconds);
 
         float t = 0f;
         while (t < HoldToLeaveSeconds)
@@ -66,5 +66,43 @@ public partial class LocalPlayer
 
         GameFlowManager.Instance.UnregisterPlayer(this);
         Destroy(gameObject);
+    }
+
+    // Gameplay abort: holding East during Play (South-only now owns ReleaseNote, see
+    // AstralPlanes.inputactions) fully quits the run back to Main, same as the GameOver
+    // quit path (LocalPlayer.Input.cs:OnQuit) — unlike the tutorial's lighter
+    // ReturnToJoinScreen(), a live run has an active track/dust/vehicles that need the full
+    // teardown QuitToSelection() already does.
+    private Coroutine _playLeaveHoldCo;
+
+    private void HandlePlayLeavePressed()
+    {
+        if (_playLeaveHoldCo == null)
+            _playLeaveHoldCo = StartCoroutine(HoldToAbortGameplayRoutine());
+    }
+
+    private void HandlePlayLeaveReleased()
+    {
+        if (_playLeaveHoldCo == null) return;
+        StopCoroutine(_playLeaveHoldCo);
+        _playLeaveHoldCo = null;
+        _ui?.CancelAbortHold();
+    }
+
+    private IEnumerator HoldToAbortGameplayRoutine()
+    {
+        _ui?.BeginAbortHold("Giving Up", HoldToLeaveSeconds);
+
+        float t = 0f;
+        while (t < HoldToLeaveSeconds)
+        {
+            t += Time.unscaledDeltaTime;
+            _ui?.UpdateAbortHold(t / HoldToLeaveSeconds);
+            yield return null;
+        }
+
+        _playLeaveHoldCo = null;
+        _ui?.EndAbortHold();
+        GameFlowManager.Instance.QuitToSelection();
     }
 }

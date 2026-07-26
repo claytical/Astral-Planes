@@ -13,6 +13,8 @@ public partial class Vehicle : MonoBehaviour
     private bool  _isDead;
     private bool  _isActivePlow;
     private float _plowVelocityDrain;
+    private float _plowResistance01; // current tick's chip resistance (0=light, 1=max); feeds the fuel-bar "heaviness" FX
+    private float _collisionResistance01; // current tick's physical dust-contact resistance (0=light, 1=max); feeds the fuel-bar "heaviness" FX
     private float _lastPressureFactor;
     private static readonly Collider2D[] _pressureHits = new Collider2D[8];
     private int _mineNodeLayerMask;

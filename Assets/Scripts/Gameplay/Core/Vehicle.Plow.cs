@@ -88,6 +88,8 @@ public partial class Vehicle
     private void DoPlowTick()
     {
         _plowVelocityDrain = 0f;
+        _plowResistance01  = 0f;
+        _collisionResistance01 = 0f;
         if (gfm == null || gfm.dustGenerator == null || drumTrack == null) return;
         if (gfm.BridgePending || gfm.GhostCycleInProgress) return;
         if (!boosting) return;
@@ -132,6 +134,7 @@ public partial class Vehicle
                 gen.SuppressCellColliderForPlow(cell);
                 gen.ChipDustByVehicle(cell, chipAmount, fade, profile.carveResistanceBypass01, profile);
                 _isActivePlow = true;
+                _plowResistance01 = Mathf.Max(_plowResistance01, effectiveRes);
             }
         }
 

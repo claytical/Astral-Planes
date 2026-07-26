@@ -297,7 +297,7 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "East",
+                    "name": "Leave",
                     "type": "Button",
                     "id": "5cb2e281-da56-4061-a52c-3eb068b8b7d0",
                     "expectedControlType": "",
@@ -546,18 +546,18 @@
                     "interactions": "",
                     "processors": "",
                     "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
-                    "action": "East",
+                    "action": "Leave",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
                 {
                     "name": "",
                     "id": "c80896d5-ffd2-4618-a06a-c312b864ff7f",
-                    "path": "<Keyboard>/rightArrow",
-                    "interactions": "Press(behavior=2)",
+                    "path": "<Keyboard>/escape",
+                    "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "East",
+                    "action": "Leave",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -690,17 +690,6 @@
                     "processors": "",
                     "groups": ";Keyboard and Mouse",
                     "action": "South",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "2203073d-3a96-4f34-ba87-56f934e624a6",
-                    "path": "<Gamepad>/buttonEast",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "ReleaseNote",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },

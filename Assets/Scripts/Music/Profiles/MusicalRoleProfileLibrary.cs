@@ -9,11 +9,17 @@ public static class MusicalRoleProfileLibrary
     {
         _roleToProfile = new Dictionary<MusicalRole, MusicalRoleProfile>();
         var profiles = Resources.LoadAll<MusicalRoleProfile>("Profiles/Musical Roles");
+        System.Array.Sort(profiles, (a, b) => string.CompareOrdinal(a.name, b.name));
         foreach (var profile in profiles)
         {
             if (!_roleToProfile.ContainsKey(profile.role))
             {
                 _roleToProfile.Add(profile.role, profile);
+            }
+            else
+            {
+                Debug.LogWarning($"[MusicalRoleProfileLibrary] Duplicate profile for role {profile.role}: " +
+                    $"'{profile.name}' ignored, '{_roleToProfile[profile.role].name}' already registered.");
             }
         }
 

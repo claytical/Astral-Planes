@@ -38,9 +38,12 @@ public partial class CosmicDust
         float bypass = vehicle.profile != null ? vehicle.profile.carveResistanceBypass01 : 0f;
         float liveResistance = gen.GetLiveCarveResistance01(gp);
         float effectiveResistance = liveResistance * (1f - Mathf.Clamp01(bypass));
+        vehicle.ReportCollisionResistance(effectiveResistance);
 
         float energyCostMul = Mathf.Lerp(1f, 5f, liveResistance);
-        vehicle.DrainEnergy(drainPerSec * Mathf.Lerp(0.1f, 1.0f, drainRes) * energyCostMul * dt);
+        // drainResistance01: 0 = full drain rate, 1 = no drain (see MusicalRoleProfile.cs) — Lerp
+        // must run from full (1.0) down to minimal (0.1) as drainRes rises, not the reverse.
+        vehicle.DrainEnergy(drainPerSec * Mathf.Lerp(1.0f, 0.1f, drainRes) * energyCostMul * dt);
 
         if (effectiveResistance >= 1f) return;
 
