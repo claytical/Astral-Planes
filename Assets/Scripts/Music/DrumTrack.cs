@@ -46,6 +46,9 @@ public partial class DrumTrack : MonoBehaviour
     [Tooltip("Optional RectTransform whose top world-Y overrides DrumTrackConfig.uiBottomPaddingPx for grid bottom — set to NoteVisualizer RT for pixel-perfect alignment with the physical boundary.")]
     [SerializeField] private RectTransform _playAreaBottomAnchor;
 
+    [Tooltip("Optional RectTransform whose bottom world-Y overrides the maze's top boundary — set to GameStats RT for pixel-perfect alignment so the maze never overlaps the player-stats grid.")]
+    [SerializeField] private RectTransform _playAreaTopAnchor;
+
     public int completedLoops { get; private set; } = 0;
     private float _gridCheckTimer;
     private readonly float _gridCheckInterval = 10f;
@@ -109,7 +112,8 @@ public partial class DrumTrack : MonoBehaviour
         () => _spawnGrid,
         () => _dust,
         () => _gfm,
-        () => _playAreaBottomAnchor);
+        () => _playAreaBottomAnchor,
+        () => _playAreaTopAnchor);
 
     public bool TryGetPlayAreaWorld(out PlayArea area) => _gridMapper.TryGetPlayAreaWorld(out area);
     public Vector2 GridToWorldPosition(Vector2Int cell) => _gridMapper.GridToWorldPosition(cell);

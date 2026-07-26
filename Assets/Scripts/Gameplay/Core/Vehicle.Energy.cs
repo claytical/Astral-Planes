@@ -25,6 +25,9 @@ public partial class Vehicle
     ConsumeEnergy(amount);
 }
 
+    public void ReportCollisionResistance(float resistance01) =>
+        _collisionResistance01 = Mathf.Max(_collisionResistance01, Mathf.Clamp01(resistance01));
+
     private void ApplyShipProfile(ShipMusicalProfile p, bool refillEnergy = true)
     {
         profile = p;
@@ -91,7 +94,7 @@ public partial class Vehicle
             // Update UI
             if (playerStatsUI != null)
             {
-                playerStatsUI.UpdateFuel(energyLevel, capacity);
+                playerStatsUI.UpdateFuel(energyLevel, capacity, Mathf.Max(_plowResistance01, _collisionResistance01));
             }
         }
 }

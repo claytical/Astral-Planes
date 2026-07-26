@@ -7,6 +7,7 @@ public class DrumTrackConfig : ScriptableObject
     public int referenceWidthPx = 1920;
     public int referenceColumns = 36;
     public int uiBottomPaddingPx = 160;
+    public int uiTopPaddingPx = 52;
     public float gridPadding = 0f;
     public bool autoSizeSpawnGridToScreen = true;
     public bool lockPlayAreaAfterInit = true;

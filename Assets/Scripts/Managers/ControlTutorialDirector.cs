@@ -130,6 +130,7 @@ public partial class ControlTutorialDirector : MonoBehaviour
             try { Destroy(primaryInstance.gameObject); } catch { }
             primaryInstance = null;
         }
+        _abortHoldPrompt = null;
 
         if (!primaryPrefab)
         {
@@ -159,6 +160,9 @@ public partial class ControlTutorialDirector : MonoBehaviour
         // Ensure callback wired once per instance
         primaryInstance.OnTutorialFinished -= HandlePrimaryTutorialFinished;
         primaryInstance.OnTutorialFinished += HandlePrimaryTutorialFinished;
+
+        // Optional: authored in the Editor as a child of this same (Primary) sub-hierarchy.
+        _abortHoldPrompt = go.GetComponentInChildren<AbortHoldPrompt>(true);
     }
 
     private Transform FindAnchorInScene(string anchorName)

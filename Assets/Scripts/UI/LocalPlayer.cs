@@ -16,6 +16,7 @@ public partial class LocalPlayer : MonoBehaviour
     private PlayerInput _playerInput;
     private InputAction _confirmAction;
     private InputAction _leaveAction;
+    private InputAction _playLeaveAction;
     private InputAction _releaseAction;
     [Header("Gameplay Input")]
     [SerializeField] private string releaseActionName = "ReleaseNote";
@@ -74,9 +75,16 @@ public partial class LocalPlayer : MonoBehaviour
         if (_confirmAction.ReadValue<float>() <= 0f)
             _confirmEnabled = true;
 
-        _leaveAction = _playerInput.actions["Leave"];
+        // "Leave" exists in both Selection and Play maps (different meanings — see
+        // LocalPlayer.LeaveFlow.cs) — qualify both lookups so each resolves to its own map's
+        // action instance rather than an ambiguous bare-name match.
+        _leaveAction = _playerInput.actions["Selection/Leave"];
         _leaveAction.started  += ctx => HandleLeavePressed();
         _leaveAction.canceled += ctx => HandleLeaveReleased();
+
+        _playLeaveAction = _playerInput.actions["Play/Leave"];
+        _playLeaveAction.started  += ctx => HandlePlayLeavePressed();
+        _playLeaveAction.canceled += ctx => HandlePlayLeaveReleased();
 
         // Optional: manual note release action
         _releaseAction = _playerInput.actions.FindAction(releaseActionName, throwIfNotFound: false);

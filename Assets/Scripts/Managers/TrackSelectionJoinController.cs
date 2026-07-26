@@ -236,7 +236,7 @@ public class TrackSelectionJoinController : MonoBehaviour
 
         _holdBackDeviceId = starter.deviceId;
         _holdBackStartTime = Time.unscaledTime;
-        ControlTutorialDirector.Instance?.BeginAbortHoldUI("Hold East to pick a different motif...");
+        ControlTutorialDirector.Instance?.BeginAbortHoldUI("Back to Motif Selection", HoldBackSeconds);
     }
 
     private void CancelHoldBack()

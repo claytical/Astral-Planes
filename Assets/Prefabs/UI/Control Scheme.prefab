@@ -334,6 +334,7 @@ RectTransform:
   m_Children:
   - {fileID: 2326198307773148161}
   - {fileID: 6834812357514772542}
+  - {fileID: 7356685222012087282}
   - {fileID: 5160461783104007715}
   - {fileID: 8337832348138819811}
   - {fileID: 2972734006020924910}
@@ -664,44 +665,44 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   stickImage: {fileID: 3657848449506087739}
   boostImage: {fileID: 5995420900909758051}
-  instructionText: {fileID: 8806483350426262609}
   northImage: {fileID: 7076166063158768462}
   eastImage: {fileID: 652848520466277469}
   westImage: {fileID: 1741931341880838632}
   southImage: {fileID: 5802559630031275860}
   arrowsImage: {fileID: 7465947410740371477}
   startImage: {fileID: 6592055603358532050}
-  driftText: Fly
-  boostText: Push
-  releaseText: Commit
   baseTint: {r: 1, g: 1, b: 1, a: 0.55}
   highlightTint: {r: 0, g: 1, b: 0.9721277, a: 1}
   tintLerpSpeed: 12
   pulseAmount: 0.06
   pulseSpeed: 3
   scaleReturnSpeed: 16
-  tutorialSequence: 010000000200000003000000
-  pressAnySequence: 04000000
-  instructionGroup: {fileID: 1640874604516882173}
-  labelFadeInSeconds: 0.12
-  labelFadeOutSeconds: 0.12
-  labelAttentionScale: 0.06
-  labelScaleLerpSpeed: 14
-  deactivateLabelWhenHidden: 1
-  stepConfirmClip: {fileID: 8300000, guid: cdec88e5cf531a34fa7ffb2147d99e85, type: 3}
-  stepConfirmVolume: 0.716
-  hideTextOnClear: 1
-  controlSchemePivot: {fileID: 0}
   stickRotationMaxZ: 30
   boostRotationMaxX: 50
   buttonPressScale: 0.85
   pivotLerpSpeed: 8
   rootFadeInSeconds: 0.35
-  rootFadeOutSeconds: 0.25
   rootAlphaPulseAmount: 0.07
   rootAlphaPulseSpeed: 1.5
   flyMaxDistance: 150
   flyPositionSpeed: 6
+  stepConfirmClip: {fileID: 8300000, guid: cdec88e5cf531a34fa7ffb2147d99e85, type: 3}
+  stepConfirmVolume: 0.716
+  instructionGroup: {fileID: 1640874604516882173}
+  labelFadeInSeconds: 0.12
+  labelAttentionScale: 0.06
+  labelScaleLerpSpeed: 14
+  deactivateLabelWhenHidden: 1
+  pressAnySequence: 04000000
+  driftText: Fly
+  boostText: Push
+  releaseText: Commit
+  instructionText: {fileID: 8806483350426262609}
+  labelFadeOutSeconds: 0.12
+  hideTextOnClear: 1
+  controlSchemePivot: {fileID: 0}
+  rootFadeOutSeconds: 0.25
+  tutorialSequence: 010000000200000003000000
 --- !u!225 &2987831516447571478
 CanvasGroup:
   m_ObjectHideFlags: 0
@@ -1055,3 +1056,162 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!1001 &5711787685792509583
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 6506567910312980477}
+    m_Modifications:
+    - target: {fileID: 2495365184134354958, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_fontSize
+      value: 72
+      objectReference: {fileID: 0}
+    - target: {fileID: 2495365184134354958, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_fontSizeBase
+      value: 21.3
+      objectReference: {fileID: 0}
+    - target: {fileID: 2495365184134354958, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_TextWrappingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2495365184134354958, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_enableAutoSizing
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_Pivot.x
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_Pivot.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_AnchorMin.x
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 1200
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 200
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -200
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4047018172536722556, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_Name
+      value: Abort Hold Prompt
+      objectReference: {fileID: 0}
+    - target: {fileID: 4047018172536722556, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7492270020444343518, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7492270020444343518, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+        type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: b7c7f6c6f2bca41a08eac968ea801eae, type: 3}
+--- !u!224 &7356685222012087282 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 2980374255192606077, guid: b7c7f6c6f2bca41a08eac968ea801eae,
+    type: 3}
+  m_PrefabInstance: {fileID: 5711787685792509583}
+  m_PrefabAsset: {fileID: 0}

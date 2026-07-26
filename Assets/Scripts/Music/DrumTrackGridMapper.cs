@@ -15,6 +15,7 @@ public sealed class DrumTrackGridMapper
     private readonly Func<CosmicDustGenerator> _dust;
     private readonly Func<GameFlowManager> _gfm;
     private readonly Func<RectTransform> _playAreaBottomAnchor;
+    private readonly Func<RectTransform> _playAreaTopAnchor;
 
     private DrumTrack.PlayArea _lockedPlayArea;
     private bool _hasLockedPlayArea;
@@ -27,13 +28,15 @@ public sealed class DrumTrackGridMapper
         Func<SpawnGrid> spawnGrid,
         Func<CosmicDustGenerator> dust,
         Func<GameFlowManager> gfm,
-        Func<RectTransform> playAreaBottomAnchor)
+        Func<RectTransform> playAreaBottomAnchor,
+        Func<RectTransform> playAreaTopAnchor)
     {
         _config = config;
         _spawnGrid = spawnGrid;
         _dust = dust;
         _gfm = gfm;
         _playAreaBottomAnchor = playAreaBottomAnchor;
+        _playAreaTopAnchor = playAreaTopAnchor;
     }
 
     private static bool IsFinite(float v) => !float.IsNaN(v) && !float.IsInfinity(v);
@@ -121,6 +124,25 @@ public sealed class DrumTrackGridMapper
             // Only override when Canvas layout has been applied (rect has non-zero width).
             if (corners[2].x - corners[0].x > 0.001f)
                 bottom = corners[1].y;  // top-left corner — same source as NoteVisualizer.GetTopWorldY()
+        }
+
+        // Reserve a top viewport band for UI derived from config.uiTopPaddingPx.
+        float uiTopV = Screen.height > 0 ? Mathf.Clamp01(config.uiTopPaddingPx / (float)Screen.height) : 0f;
+        if (uiTopV > 0f)
+        {
+            float uiTopWorld = cam.orthographic
+                ? Mathf.Lerp(halfH, -halfH, uiTopV)
+                : cam.ViewportToWorldPoint(new Vector3(0f, 1f - uiTopV, z)).y;
+            top = Mathf.Min(top, uiTopWorld);
+        }
+        var topAnchor = _playAreaTopAnchor();
+        if (topAnchor != null)
+        {
+            var topCorners = new Vector3[4];
+            topAnchor.GetWorldCorners(topCorners);
+            // Only override when Canvas layout has been applied (rect has non-zero width).
+            if (topCorners[2].x - topCorners[0].x > 0.001f)
+                top = topCorners[0].y;  // bottom-left corner of GameStats — mirrors bottom anchor's corners[1]
         }
         // Validate.
         if (!IsFinite(left) || !IsFinite(right) || !IsFinite(bottom) || !IsFinite(top)) return false;
@@ -395,8 +417,9 @@ public sealed class DrumTrackGridMapper
 
         float cellPx  = config.referenceWidthPx / (float)config.referenceColumns; // e.g. 1920/36 ≈ 53.33
         int   refCols = config.referenceColumns;
-        // Derive reference row count from the reference height (1080) minus the reference UI padding.
-        int   refUsableH = 1080 - Mathf.Max(0, config.uiBottomPaddingPx);
+        // Derive reference row count from the reference height (1080) minus the reference UI padding
+        // reserved at both the bottom (NoteVisualizer) and top (GameStats) of the screen.
+        int   refUsableH = 1080 - Mathf.Max(0, config.uiBottomPaddingPx) - Mathf.Max(0, config.uiTopPaddingPx);
         int   refRows    = Mathf.Max(1, Mathf.RoundToInt(refUsableH / cellPx));
 
         int sh = Mathf.Max(1, Screen.height);
