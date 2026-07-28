@@ -48,6 +48,22 @@ public partial class CosmicDustGenerator
         return cfg;
     }
 
+    // Geo shape (Archipelago/Ridge/etc.) is authored per-ROLE, not per-voice — two voices of the
+    // same role (e.g. two Bass variants) share the same shape and roleIndex, but get independently
+    // seeded/evicted territories within it (see SelectRoleSeedsWithGeo/PostProcessGeoImprints).
+    // This maps each voice's role to its first-appearance index among the distinct roles in
+    // voicesList, so existing single-voice-per-role content resolves identically to before.
+    private static Dictionary<MusicalRole, int> BuildRoleIndexByRole(List<RoleVoiceKey> voicesList)
+    {
+        var map = new Dictionary<MusicalRole, int>();
+        for (int i = 0; i < voicesList.Count; i++)
+        {
+            var r = voicesList[i].role;
+            if (!map.ContainsKey(r)) map[r] = map.Count;
+        }
+        return map;
+    }
+
     private void ClearMaze()
     {
         try
@@ -140,9 +156,9 @@ public partial class CosmicDustGenerator
 
         _imprints.EnsureAllocated(cells.Count * 2);
 
-        IReadOnlyList<MusicalRole> roles = (_roleDensity.ActiveRoles != null && _roleDensity.ActiveRoles.Count > 0)
-            ? _roleDensity.ActiveRoles
-            : new List<MusicalRole>
+        IReadOnlyList<RoleVoiceKey> voices = (_roleDensity.ActiveVoices != null && _roleDensity.ActiveVoices.Count > 0)
+            ? _roleDensity.ActiveVoices
+            : new List<RoleVoiceKey>
             {
                 MusicalRole.Bass,
                 MusicalRole.Harmony,
@@ -151,8 +167,8 @@ public partial class CosmicDustGenerator
                 MusicalRole.Rhythm
             };
 
-        var rolesList = roles is List<MusicalRole> rl ? rl : new List<MusicalRole>(roles);
-        if (rolesList.Count == 0)
+        var voicesList = voices is List<RoleVoiceKey> vl ? vl : new List<RoleVoiceKey>(voices);
+        if (voicesList.Count == 0)
             return;
 
         foreach (var (gp, _) in cells)
@@ -170,37 +186,38 @@ public partial class CosmicDustGenerator
 
         var occupied = BuildOccupiedCells(cells);
 
-        if (rolesList.Count == 1)
+        if (voicesList.Count == 1)
         {
-            MusicalRole onlyRole = rolesList[0];
+            RoleVoiceKey onlyVoice = voicesList[0];
             for (int i = 0; i < occupied.Count; i++)
-                _imprints.SetHiddenRole(occupied[i], onlyRole);
+                _imprints.SetHiddenRole(occupied[i], onlyVoice.role, onlyVoice.voiceIndex);
 
-            if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden single role={onlyRole}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden single voice={onlyVoice}");
             return;
         }
 
-        var (seedCells, seedRoles, actualSeedCount) = SelectRoleSeedsWithGeo(occupied, rolesList, starCell);
+        var (seedCells, seedVoices, actualSeedCount) = SelectRoleSeedsWithGeo(occupied, voicesList, starCell);
 
-        AssignHiddenImprintsByNearestSeed(occupied, seedCells, seedRoles, actualSeedCount);
-        PostProcessGeoImprints(occupied, seedCells, seedRoles, actualSeedCount, rolesList);
+        AssignHiddenImprintsByNearestSeed(occupied, seedCells, seedVoices, actualSeedCount);
+        PostProcessGeoImprints(occupied, seedCells, seedVoices, actualSeedCount, voicesList);
 
-        var counts = new Dictionary<MusicalRole, int>();
+        var counts = new Dictionary<RoleVoiceKey, int>();
         for (int i = 0; i < actualSeedCount; i++)
-            counts[seedRoles[i]] = 0;
+            counts[seedVoices[i]] = 0;
 
         int hiddenCount = 0;
         foreach (var kv in _imprints)
         {
             if (kv.Value.hiddenRole == MusicalRole.None) continue;
             hiddenCount++;
-            if (!counts.ContainsKey(kv.Value.hiddenRole))
-                counts[kv.Value.hiddenRole] = 0;
-            counts[kv.Value.hiddenRole]++;
+            var key = new RoleVoiceKey(kv.Value.hiddenRole, kv.Value.hiddenVoiceIndex);
+            if (!counts.ContainsKey(key))
+                counts[key] = 0;
+            counts[key]++;
         }
 
         string summary = string.Join(", ", counts.Select(kv => $"{kv.Key}={kv.Value}"));
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden Voronoi roles={hiddenCount}, seeds={actualSeedCount}, distribution=({summary})");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden Voronoi voices={hiddenCount}, seeds={actualSeedCount}, distribution=({summary})");
     }
 
     private static List<Vector2Int> BuildOccupiedCells(List<(Vector2Int cell, Vector3 world)> cells)
@@ -214,7 +231,7 @@ public partial class CosmicDustGenerator
     private void AssignHiddenImprintsByNearestSeed(
         List<Vector2Int> occupied,
         Vector2Int[] seedCells,
-        MusicalRole[] seedRoles,
+        RoleVoiceKey[] seedVoices,
         int actualSeedCount)
     {
         for (int i = 0; i < occupied.Count; i++)
@@ -234,18 +251,20 @@ public partial class CosmicDustGenerator
                 }
             }
 
-            _imprints.SetHiddenRole(gp, seedRoles[bestSeed]);
+            _imprints.SetHiddenRole(gp, seedVoices[bestSeed].role, seedVoices[bestSeed].voiceIndex);
         }
     }
 
-    // Geo-aware seed selection. Returns an expanded seed list where Archipelago roles appear
-    // seedCount times, Ridge roles appear twice, and Ring roles get radius-based positions.
-    private (Vector2Int[] seedCells, MusicalRole[] seedRoles, int actualSeedCount) SelectRoleSeedsWithGeo(
+    // Geo-aware seed selection. Returns an expanded seed list where Archipelago voices appear
+    // seedCount times, Ridge voices appear twice, and Ring voices get radius-based positions.
+    private (Vector2Int[] seedCells, RoleVoiceKey[] seedVoices, int actualSeedCount) SelectRoleSeedsWithGeo(
         List<Vector2Int> occupied,
-        List<MusicalRole> rolesList,
+        List<RoleVoiceKey> voicesList,
         Vector2Int starCell)
     {
-        if (occupied.Count == 0) return (System.Array.Empty<Vector2Int>(), System.Array.Empty<MusicalRole>(), 0);
+        if (occupied.Count == 0) return (System.Array.Empty<Vector2Int>(), System.Array.Empty<RoleVoiceKey>(), 0);
+
+        var roleIndexByRole = BuildRoleIndexByRole(voicesList);
 
         int minX = occupied[0].x, maxX = occupied[0].x;
         int minY = occupied[0].y, maxY = occupied[0].y;
@@ -265,45 +284,45 @@ public partial class CosmicDustGenerator
         }
         maxDistFromStar = Mathf.Sqrt(maxDistFromStar);
 
-        var slotRoles = new List<MusicalRole>();
-        for (int ri = 0; ri < rolesList.Count; ri++)
+        // Desired slot count per voice, then interleaved round-robin (not appended as sequential
+        // per-voice blocks) so that if occupied.Count ever truncates the list below, every active
+        // voice loses slots evenly instead of the last voice in voicesList order losing all of its own.
+        var desiredCounts = new int[voicesList.Count];
+        for (int vi = 0; vi < voicesList.Count; vi++)
         {
-            MusicalRole role = rolesList[ri];
-            MazeGeoFeature feature = ResolveGeoFeature(role, ri);
-            MazeRoleGeoConfig cfg = ResolveGeoConfig(role);
-
-            switch (feature)
+            var voice = voicesList[vi];
+            int roleIdx = roleIndexByRole[voice.role];
+            MazeGeoFeature feature = ResolveGeoFeature(voice.role, roleIdx);
+            MazeRoleGeoConfig cfg = ResolveGeoConfig(voice.role);
+            desiredCounts[vi] = feature switch
             {
-                case MazeGeoFeature.Archipelago:
-                    int n = cfg != null ? Mathf.Clamp(cfg.seedCount, 2, 8) : 3;
-                    for (int k = 0; k < n; k++) slotRoles.Add(role);
-                    break;
-                case MazeGeoFeature.Ridge:
-                    slotRoles.Add(role);
-                    slotRoles.Add(role);
-                    break;
-                default:
-                    slotRoles.Add(role);
-                    break;
-            }
+                MazeGeoFeature.Archipelago => cfg != null ? Mathf.Clamp(cfg.seedCount, 2, 8) : 3,
+                MazeGeoFeature.Ridge => 2,
+                _ => 1,
+            };
         }
+        int maxCount = desiredCounts.Length > 0 ? desiredCounts.Max() : 0;
+        var slotVoices = new List<RoleVoiceKey>();
+        for (int round = 0; round < maxCount; round++)
+            for (int vi = 0; vi < voicesList.Count; vi++)
+                if (round < desiredCounts[vi]) slotVoices.Add(voicesList[vi]);
 
-        int totalSlots = Mathf.Min(slotRoles.Count, occupied.Count);
+        int totalSlots = Mathf.Min(slotVoices.Count, occupied.Count);
         var seedCells = new Vector2Int[totalSlots];
-        var seedRoles = new MusicalRole[totalSlots];
+        var seedVoices = new RoleVoiceKey[totalSlots];
         var chosen = new HashSet<Vector2Int>();
 
-        var ringRoles = new List<MusicalRole>();
-        for (int ri = 0; ri < rolesList.Count; ri++)
-            if (ResolveGeoFeature(rolesList[ri], ri) == MazeGeoFeature.Rings)
-                ringRoles.Add(rolesList[ri]);
+        var ringVoices = new List<RoleVoiceKey>();
+        for (int vi = 0; vi < voicesList.Count; vi++)
+            if (ResolveGeoFeature(voicesList[vi].role, roleIndexByRole[voicesList[vi].role]) == MazeGeoFeature.Rings)
+                ringVoices.Add(voicesList[vi]);
 
         int filled = 0;
-        if (ringRoles.Count > 0 && maxDistFromStar > 0f)
+        if (ringVoices.Count > 0 && maxDistFromStar > 0f)
         {
-            for (int k = 0; k < ringRoles.Count && filled < totalSlots; k++)
+            for (int k = 0; k < ringVoices.Count && filled < totalSlots; k++)
             {
-                float targetRadius = (k + 0.5f) * (maxDistFromStar / ringRoles.Count);
+                float targetRadius = (k + 0.5f) * (maxDistFromStar / ringVoices.Count);
                 int bestIdx = -1;
                 float bestDelta = float.MaxValue;
                 for (int i = 0; i < occupied.Count; i++)
@@ -315,16 +334,16 @@ public partial class CosmicDustGenerator
                 }
                 if (bestIdx < 0) continue;
                 seedCells[filled] = occupied[bestIdx];
-                seedRoles[filled] = ringRoles[k];
+                seedVoices[filled] = ringVoices[k];
                 chosen.Add(occupied[bestIdx]);
                 filled++;
             }
         }
 
         bool widerX = (maxX - minX) >= (maxY - minY);
-        for (int ri = 0; ri < rolesList.Count && filled < totalSlots; ri++)
+        for (int vi = 0; vi < voicesList.Count && filled < totalSlots; vi++)
         {
-            if (ResolveGeoFeature(rolesList[ri], ri) != MazeGeoFeature.Ridge) continue;
+            if (ResolveGeoFeature(voicesList[vi].role, roleIndexByRole[voicesList[vi].role]) != MazeGeoFeature.Ridge) continue;
             for (int pass = 0; pass < 2 && filled < totalSlots; pass++)
             {
                 int bestIdx2 = -1;
@@ -338,7 +357,7 @@ public partial class CosmicDustGenerator
                 }
                 if (bestIdx2 < 0) continue;
                 seedCells[filled] = occupied[bestIdx2];
-                seedRoles[filled] = rolesList[ri];
+                seedVoices[filled] = voicesList[vi];
                 chosen.Add(occupied[bestIdx2]);
                 filled++;
             }
@@ -346,14 +365,14 @@ public partial class CosmicDustGenerator
 
         for (int s = 0; s < totalSlots && filled < totalSlots; s++)
         {
-            MusicalRole slotRole = slotRoles[s];
+            RoleVoiceKey slotVoice = slotVoices[s];
             bool alreadyFilledBySpecialPass = false;
             int specialCount = 0;
             for (int f = 0; f < filled; f++)
-                if (seedRoles[f] == slotRole) specialCount++;
+                if (seedVoices[f].Equals(slotVoice)) specialCount++;
             int slotsBeforeS = 0;
             for (int k = 0; k < s; k++)
-                if (slotRoles[k] == slotRole) slotsBeforeS++;
+                if (slotVoices[k].Equals(slotVoice)) slotsBeforeS++;
             if (slotsBeforeS < specialCount) { alreadyFilledBySpecialPass = true; }
             if (alreadyFilledBySpecialPass) continue;
 
@@ -385,30 +404,41 @@ public partial class CosmicDustGenerator
 
             if (bestIdx3 < 0) break;
             seedCells[filled] = occupied[bestIdx3];
-            seedRoles[filled] = slotRole;
+            seedVoices[filled] = slotVoice;
             chosen.Add(occupied[bestIdx3]);
             filled++;
         }
 
-        string geoSummary = string.Join(", ", System.Linq.Enumerable.Range(0, rolesList.Count)
-            .Select(ri => $"{rolesList[ri]}={ResolveGeoFeature(rolesList[ri], ri)}"));
+        string geoSummary = string.Join(", ", System.Linq.Enumerable.Range(0, voicesList.Count)
+            .Select(vi => $"{voicesList[vi]}={ResolveGeoFeature(voicesList[vi].role, roleIndexByRole[voicesList[vi].role])}"));
         if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] SelectRoleSeedsWithGeo: pattern={_activePatternType}, seeds={filled}, geoFeatures=({geoSummary})");
 
-        return (seedCells, seedRoles, filled);
+        return (seedCells, seedVoices, filled);
     }
 
     private void PostProcessGeoImprints(
         List<Vector2Int> occupied,
         Vector2Int[] seedCells,
-        MusicalRole[] seedRoles,
+        RoleVoiceKey[] seedVoices,
         int seedCount,
-        List<MusicalRole> rolesList)
+        List<RoleVoiceKey> voicesList)
     {
-        for (int ri = 0; ri < rolesList.Count; ri++)
+        // Every voice's eviction/glade decision below is computed by reading _imprints, but the
+        // decision is only ever applied to cells whose ORIGINAL hidden voice equals that voice's
+        // own. So no two voices' decisions can ever target the same cell — but if writes were
+        // applied immediately, voices processed later in voicesList order would see earlier
+        // voices' evictions and could re-evict cells that were just handed to them, leaving the
+        // LAST voice in voicesList systematically starved of territory. Deferring every write
+        // until all voices have been evaluated against the same pre-loop snapshot removes that
+        // order dependency.
+        var pendingReassignments = new List<(Vector2Int cell, RoleVoiceKey newVoice)>();
+        var roleIndexByRole = BuildRoleIndexByRole(voicesList);
+
+        for (int vi = 0; vi < voicesList.Count; vi++)
         {
-            MusicalRole role = rolesList[ri];
-            MazeGeoFeature feature = ResolveGeoFeature(role, ri);
-            MazeRoleGeoConfig cfg = ResolveGeoConfig(role);
+            RoleVoiceKey voice = voicesList[vi];
+            MazeGeoFeature feature = ResolveGeoFeature(voice.role, roleIndexByRole[voice.role]);
+            MazeRoleGeoConfig cfg = ResolveGeoConfig(voice.role);
 
             if (feature == MazeGeoFeature.Island || feature == MazeGeoFeature.Archipelago)
             {
@@ -418,12 +448,13 @@ public partial class CosmicDustGenerator
                 for (int i = 0; i < occupied.Count; i++)
                 {
                     Vector2Int gp = occupied[i];
-                    if (!_imprints.TryGetValue(gp, out var geoImp) || geoImp.hiddenRole != role)
-                        continue;
+                    if (!_imprints.TryGetValue(gp, out var geoImp)) continue;
+                    var geoVoice = new RoleVoiceKey(geoImp.hiddenRole, geoImp.hiddenVoiceIndex);
+                    if (!geoVoice.Equals(voice)) continue;
 
                     float minOwnSeedDistSq = float.MaxValue;
                     for (int s = 0; s < seedCount; s++)
-                        if (seedRoles[s] == role)
+                        if (seedVoices[s].Equals(voice))
                         {
                             float d = (gp - seedCells[s]).sqrMagnitude;
                             if (d < minOwnSeedDistSq) minOwnSeedDistSq = d;
@@ -435,29 +466,30 @@ public partial class CosmicDustGenerator
                     int bestOtherSeed = -1;
                     for (int s = 0; s < seedCount; s++)
                     {
-                        if (seedRoles[s] == role) continue;
+                        if (seedVoices[s].Equals(voice)) continue;
                         float d = (gp - seedCells[s]).sqrMagnitude;
                         if (d < bestOtherDist) { bestOtherDist = d; bestOtherSeed = s; }
                     }
                     if (bestOtherSeed >= 0)
-                        _imprints.SetHiddenRole(gp, seedRoles[bestOtherSeed]);
+                        pendingReassignments.Add((gp, seedVoices[bestOtherSeed]));
                 }
             }
             else if (feature == MazeGeoFeature.Glade)
             {
-                MusicalRole softRole = role;
+                RoleVoiceKey softVoice = voice;
                 float softestResistance = float.MaxValue;
-                for (int ri2 = 0; ri2 < rolesList.Count; ri2++)
+                for (int vi2 = 0; vi2 < voicesList.Count; vi2++)
                 {
-                    if (rolesList[ri2] == role) continue;
-                    var prof = MusicalRoleProfileLibrary.GetProfile(rolesList[ri2]);
+                    if (voicesList[vi2].Equals(voice)) continue;
+                    var prof = _roleDensity.GetResolvedRoleProfile(voicesList[vi2]);
                     float r = prof != null ? prof.carveResistance01 : 0.5f;
-                    if (r < softestResistance) { softestResistance = r; softRole = rolesList[ri2]; }
+                    if (r < softestResistance) { softestResistance = r; softVoice = voicesList[vi2]; }
                 }
 
                 var territory = new List<Vector2Int>();
                 for (int i = 0; i < occupied.Count; i++)
-                    if (_imprints.TryGetValue(occupied[i], out var gladeImp) && gladeImp.hiddenRole == role)
+                    if (_imprints.TryGetValue(occupied[i], out var gladeImp)
+                        && gladeImp.hiddenRole == voice.role && gladeImp.hiddenVoiceIndex == voice.voiceIndex)
                         territory.Add(occupied[i]);
 
                 if (territory.Count == 0) continue;
@@ -473,11 +505,14 @@ public partial class CosmicDustGenerator
                     for (int i = 0; i < territory.Count; i++)
                     {
                         if ((territory[i] - center).sqrMagnitude <= gladeRadiusSq)
-                            _imprints.SetHiddenRole(territory[i], softRole);
+                            pendingReassignments.Add((territory[i], softVoice));
                     }
                 }
             }
         }
+
+        foreach (var (cell, newVoice) in pendingReassignments)
+            _imprints.SetHiddenRole(cell, newVoice.role, newVoice.voiceIndex);
     }
 
     public void ResetMazeGenerationFlag()

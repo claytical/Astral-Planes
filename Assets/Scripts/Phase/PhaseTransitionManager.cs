@@ -152,15 +152,30 @@ public class PhaseTransitionManager : MonoBehaviour
 
         if (!string.IsNullOrEmpty(motifId) && _chapterMotifs != null)
         {
-            int idx = _chapterMotifs.FindIndex(m => m != null && m.motifId == motifId);
-            if (idx >= 0)
+            int matchCount = 0;
+            for (int i = 0; i < _chapterMotifs.Count; i++)
             {
-                resolvedIndex = idx;
+                if (_chapterMotifs[i] != null && _chapterMotifs[i].motifId == motifId)
+                    matchCount++;
+            }
+
+            if (matchCount > 1)
+            {
+                Debug.LogWarning($"[MOTIF] JumpToMotif: motifId '{motifId}' is ambiguous " +
+                                  $"({matchCount} matches) in current phase; trusting stored index {fallbackIndex} by {who}");
             }
             else
             {
-                Debug.LogWarning($"[MOTIF] JumpToMotif: motifId '{motifId}' not found in current phase " +
-                                  $"(count={_chapterMotifs.Count}); falling back to stored index {fallbackIndex} by {who}");
+                int idx = _chapterMotifs.FindIndex(m => m != null && m.motifId == motifId);
+                if (idx >= 0)
+                {
+                    resolvedIndex = idx;
+                }
+                else
+                {
+                    Debug.LogWarning($"[MOTIF] JumpToMotif: motifId '{motifId}' not found in current phase " +
+                                      $"(count={_chapterMotifs.Count}); falling back to stored index {fallbackIndex} by {who}");
+                }
             }
         }
 

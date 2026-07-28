@@ -72,7 +72,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
     private DustResistanceResolver _resistanceBacking;
     private DustResistanceResolver _resistance => _resistanceBacking ??= new DustResistanceResolver(
         _imprints,
-        cell => { TryGetDustAt(cell, out var d); return d; });
+        cell => { TryGetDustAt(cell, out var d); return d; },
+        role => _roleDensity.GetResolvedRoleProfile(role));
 
     private DustRoleDensityTracker _roleDensityBacking;
     private DustRoleDensityTracker _roleDensity => _roleDensityBacking ??= new DustRoleDensityTracker(
@@ -444,7 +445,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             ClearCellFlag(gp, CellFlags.ForceGrayRegrow);
 
             // --- Color from role profile (authoritative source) ---
-            var roleProfile = MusicalRoleProfileLibrary.GetProfile(regrowRole);
+            var roleProfile = _roleDensity.GetResolvedRoleProfile(regrowRole);
             Color regrowTint = (roleProfile != null) ? roleProfile.GetRandomVoiceColor() : config.mazeTint;
 
             // Write / update the imprint so future regrows of this cell remember the role.
@@ -468,7 +469,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             dust.ApplyRoleAndCharge(regrowRole, regrowTint, regrowTint.a, maxUnits);
 
             if (regrowRole == MusicalRole.None)
-                _imprints.ApplyHiddenHintToDust(gp, dust);
+                _imprints.ApplyHiddenHintToDust(gp, dust, _roleDensity.GetResolvedRoleProfile);
 
             Color denyColor = Color.darkGray;
             if (roleProfile != null)
@@ -665,7 +666,11 @@ public partial class CosmicDustGenerator : MonoBehaviour
     {
         return config.mazeTint;
     }
-    public void ApplyActiveRoles(IReadOnlyList<MusicalRole> roles) => _roleDensity.SetActiveRoles(roles);
+    public void ApplyActiveRoles(MotifProfile motif)
+    {
+        _roleDensity.SetActiveRoles(motif?.GetActiveRoles());
+        _roleDensity.SetActiveVoices(motif);
+    }
 
     public MusicalRole GetZoneRole(Vector2Int cell) => _registry.GetZoneRole(cell);
 
@@ -807,7 +812,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
     public void PaintDustExhaust(Vector2Int cell, MusicalRole role, float energyFraction = 0.4f)
     {
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
-        var profile = MusicalRoleProfileLibrary.GetProfile(role);
+        var profile = _roleDensity.GetResolvedRoleProfile(role);
         if (profile == null) return;
 
         Color color = profile.GetBaseColor();

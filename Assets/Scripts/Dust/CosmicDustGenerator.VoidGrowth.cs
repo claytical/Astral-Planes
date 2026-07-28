@@ -110,7 +110,7 @@ public partial class CosmicDustGenerator
                     HasDustAt(gp))
                 {
                     existingDust.ApplyRoleAndCharge(MusicalRole.None, config.mazeTint, c.a);
-                    _imprints.ApplyHiddenHintToDust(gp, existingDust);
+                    _imprints.ApplyHiddenHintToDust(gp, existingDust, _roleDensity.GetResolvedRoleProfile);
                     var resistance = ResolveResistanceProfile(gp, imprintRole, context: "GrowVoidDustDisk:existing");
                     existingDust.clearing.drainResistance01 = resistance.drainResistance01;
                     continue;
@@ -314,7 +314,7 @@ public partial class CosmicDustGenerator
     {
         if (radiusCells <= 0 || _gridState.CellState == null) return;
 
-        var profile = MusicalRoleProfileLibrary.GetProfile(role);
+        var profile = _roleDensity.GetResolvedRoleProfile(role);
         if (profile == null) return;
         Color roleColor = profile.GetBaseColor();
 
@@ -376,7 +376,7 @@ public partial class CosmicDustGenerator
             var resistance = ResolveResistanceProfile(gp, role, context: "VoidGrowCellNow");
             dust.clearing.drainResistance01 = resistance.drainResistance01;
             dust.ApplyRoleAndCharge(role, tintWithAlpha, tintWithAlpha.a);
-            if (role == MusicalRole.None) _imprints.ApplyHiddenHintToDust(gp, dust);
+            if (role == MusicalRole.None) _imprints.ApplyHiddenHintToDust(gp, dust, _roleDensity.GetResolvedRoleProfile);
             dust.SetFeedbackColors(Color.white, Color.darkGray);
             dust.regrowAlphaCapped = true;
             dust.Begin();

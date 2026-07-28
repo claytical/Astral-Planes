@@ -12,9 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f8571c45382984a839a6b50b6bbc8220, type: 3}
   m_Name: Circus-Harmony-NoteSetConfig-2
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
-  id: circus-harmony-2
+  id: circus-groove-2
   roleProfile: {fileID: 11400000, guid: 75ad6b5f437434258911fa7a877f3549, type: 2}
   riff: {fileID: 11400000, guid: 50f1a1d9b7aaa4178b3b5c47372209f0, type: 2}
-  mineNodeTintBudget: 20
   mineNodeExpireAfterLoops: 8
   ascendLoops: 8

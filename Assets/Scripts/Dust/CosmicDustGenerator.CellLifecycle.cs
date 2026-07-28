@@ -142,7 +142,7 @@ public partial class CosmicDustGenerator
         if (source == DustClearSource.VehiclePlow &&
             _imprints != null && _imprints.TryGetValue(cell, out var imp) && imp.hiddenRole != MusicalRole.None)
         {
-            var roleProfile = MusicalRoleProfileLibrary.GetProfile(imp.hiddenRole);
+            var roleProfile = _roleDensity.GetResolvedRoleProfile(imp.hiddenRole);
             if (roleProfile != null && roleProfile.regrowthDelay >= 0f)
                 return roleProfile.regrowthDelay;
         }

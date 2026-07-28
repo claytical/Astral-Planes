@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
   m_Name: Descent
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
-  motifId: bounce-all
-  displayName: Bounce Together
+  motifId: descent
+  displayName: Descent
   keyRootMidi: 60
   entryDrumLoops:
   - {fileID: 8300000, guid: a3d75543643e94c08a9c329af1bdcb26, type: 3}

@@ -10,23 +10,23 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 73a7dafb875bb4538b4ac52124a92a37, type: 3}
-  m_Name: Rob Otto
-  m_EditorClassIdentifier: 
-  role: 1
+  m_Name: Guitar Wah
+  m_EditorClassIdentifier: Assembly-CSharp::MusicalRoleProfile
+  role: 2
   dustColors:
-    baseColor: {r: 0.50980395, g: 0.9490196, b: 0.65882355, a: 1}
-    shadowColor: {r: 0, g: 0.5566038, b: 0.12223455, a: 1}
-  baseAlpha: 0.5
-  maxEnergyUnits: 4
-  carveResistance01: 0.55
-  drainResistance01: 0.4
+    baseColor: {r: 0.9372549, g: 0.31372547, b: 0.6402022, a: 1}
+    shadowColor: {r: 0.36862746, g: 0.086274505, b: 0.27977395, a: 0.83137256}
+  baseAlpha: 0.25
+  maxEnergyUnits: 1
+  carveResistance01: 0.7
+  drainResistance01: 0.5
   mineNodeSpeed: 0.5
-  mineNodeLocomotionProfile: {fileID: 11400000, guid: f19ac05ceb9f240339b920df3ef68d58,
+  mineNodeLocomotionProfile: {fileID: 11400000, guid: 729b36cbed0cf40df8012d4b5b1866b2,
     type: 2}
   orbitalTurnBias: 0.6
   burstDuration: 0.4
   pauseDuration: 0.35
-  evasionCells: 2.5
+  evasionCells: 3
   collectableSpeed: 1
   collectableAccelSeconds: 0.12
   collectableBounceRecoverSeconds: 0.45
@@ -41,7 +41,7 @@ MonoBehaviour:
   collectableFleeSpeedMul: 1.3
   configSelectionMode: 0
   chordVoiceColors: []
-  midiPreset: 11
-  lowestNote: 24
+  midiPreset: 26
+  lowestNote: 45
   highestNote: 84
-  regrowthDelay: 0.6
+  regrowthDelay: -1
