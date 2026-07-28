@@ -9,6 +9,7 @@ public partial class CosmicDust
     public int currentEnergyUnits => _currentEnergyUnits;
     public float Charge01 => (float)_currentEnergyUnits / Mathf.Max(1, _maxEnergyUnits);
     public MusicalRole Role { get; private set; } = MusicalRole.None;
+    public int VoiceIndex { get; private set; } = 0;
     private const float kSolidAlphaFloor = .55f;
 
     public void EnsureMinSolidAlpha(float minAlpha)
@@ -26,9 +27,10 @@ public partial class CosmicDust
 
     // maxUnits: pass > 0 to update the cell's max energy units (from a role profile).
     // Pass -1 (default) to keep the current max.
-    public void ApplyRoleAndCharge(MusicalRole r, Color roleColorRgb, float charge, int maxUnits = -1)
+    public void ApplyRoleAndCharge(MusicalRole r, Color roleColorRgb, float charge, int maxUnits = -1, int voiceIndex = 0)
     {
         Role = r;
+        VoiceIndex = voiceIndex;
         if (r != MusicalRole.None) _hiddenHintColor = Color.clear;
         OnRoleChanged?.Invoke(Role);
         if (maxUnits > 0) _maxEnergyUnits = maxUnits;

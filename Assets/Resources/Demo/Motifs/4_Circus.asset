@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
   m_Name: 4_Circus
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
-  motifId: herewego
-  displayName: herewego
-  keyRootMidi: 61
+  motifId: circus
+  displayName: Circus
+  keyRootMidi: 43
   entryDrumLoops:
   - {fileID: 8300000, guid: 2c9e9f60fcefa467f95614209d77fdc3, type: 3}
   intensityDrumLoops:
@@ -43,7 +43,6 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d5ca7227b07b04a079fed9abe0a914f7, type: 2}
   - {fileID: 11400000, guid: edb1db8261b764cc3bf59e25cfda5fc7, type: 2}
   - {fileID: 11400000, guid: df62691353d4845fbaaac8afa0c7fe98, type: 2}
-  - {fileID: 11400000, guid: df62691353d4845fbaaac8afa0c7fe98, type: 2}
   - {fileID: 11400000, guid: 0798f301ad1a044a7aaadf17ff05b06a, type: 2}
   - {fileID: 11400000, guid: 9bfeedf9cb45b4744b2ac1148914e766, type: 2}
   - {fileID: 11400000, guid: 5e8054b513de74a0ab4963f207d36f78, type: 2}
@@ -55,4 +54,4 @@ MonoBehaviour:
   trapShape: 0
   trapRadius: 3
   trapGrowSeconds: 0.4
-  trapRole: 0
+  trapRole: 1

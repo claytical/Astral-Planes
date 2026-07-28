@@ -17,12 +17,14 @@ public sealed class DustResistanceResolver
 {
     private readonly DustImprintStore _imprints;
     private readonly Func<Vector2Int, CosmicDust> _tryGetDustAt;
+    private readonly Func<MusicalRole, MusicalRoleProfile> _resolveRoleProfile;
     private readonly HashSet<string> _loggedInvalidResistanceContexts = new HashSet<string>();
 
-    public DustResistanceResolver(DustImprintStore imprints, Func<Vector2Int, CosmicDust> tryGetDustAt)
+    public DustResistanceResolver(DustImprintStore imprints, Func<Vector2Int, CosmicDust> tryGetDustAt, Func<MusicalRole, MusicalRoleProfile> resolveRoleProfile)
     {
         _imprints = imprints;
         _tryGetDustAt = tryGetDustAt;
+        _resolveRoleProfile = resolveRoleProfile;
     }
 
     public DustResistanceProfile Resolve(Vector2Int cell, MusicalRole fallbackRole, string context)
@@ -43,7 +45,7 @@ public sealed class DustResistanceResolver
         // Live profile is always authoritative when a role is known.
         if (role != MusicalRole.None)
         {
-            var roleProfile = MusicalRoleProfileLibrary.GetProfile(role);
+            var roleProfile = _resolveRoleProfile(role);
             if (roleProfile != null)
                 return Validate(new DustResistanceProfile
                 {

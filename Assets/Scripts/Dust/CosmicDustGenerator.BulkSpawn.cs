@@ -94,7 +94,7 @@ public partial class CosmicDustGenerator
                             // inert gray cells and the star cannot drain them while dormant.
                             // Full charge (1f) — plow energy system requires non-zero units to chip.
                             dust.ApplyRoleAndCharge(MusicalRole.None, cellColor, 1f);
-                            _imprints.ApplyHiddenHintToDust(grid, dust);
+                            _imprints.ApplyHiddenHintToDust(grid, dust, _roleDensity.GetResolvedRoleProfile);
                         }
 
                         // Use the role's shadow color as the deny feedback color.
@@ -103,7 +103,7 @@ public partial class CosmicDustGenerator
                         Color denyColor = Color.darkGray;
                         if (_imprints != null && _imprints.TryGetValue(grid, out var imp) && imp.role != MusicalRole.None)
                         {
-                            var rp = MusicalRoleProfileLibrary.GetProfile(imp.role);
+                            var rp = _roleDensity.GetResolvedRoleProfile(imp.role);
                             if (rp != null)
                             {
                                 var shadow = rp.dustColors.shadowColor;

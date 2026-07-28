@@ -10,6 +10,8 @@ public struct DustImprint
     public int   maxEnergyUnits;
     public MusicalRole role;
     public MusicalRole hiddenRole; // permanent Voronoi ground-truth; None = not set
+    public int voiceIndex;         // voice within role; 0 for every existing single-voice motif
+    public int hiddenVoiceIndex;   // voice pair to hiddenRole, promoted together
 }
 
 /// <summary>
@@ -63,6 +65,7 @@ public sealed class DustImprintStore
         if (imp.role != MusicalRole.None) return false; // already colored — no-op
 
         imp.role = imp.hiddenRole;
+        imp.voiceIndex = imp.hiddenVoiceIndex;
         this[gp] = imp;
         // hiddenRole is kept as permanent Voronoi ground-truth for the motif lifetime.
         // RestoreVoronoiImprint() uses it to revert DiscoveryTrackNode paint when a vehicle carves the cell.
@@ -89,21 +92,22 @@ public sealed class DustImprintStore
         return true;
     }
 
-    public void SetHiddenRole(Vector2Int gp, MusicalRole role)
+    public void SetHiddenRole(Vector2Int gp, MusicalRole role, int voiceIndex = 0)
     {
         TryGetValue(gp, out var imp);
         imp.hiddenRole = role;
+        imp.hiddenVoiceIndex = voiceIndex;
         this[gp] = imp;
     }
 
-    public void ApplyHiddenHintToDust(Vector2Int gp, CosmicDust dust)
+    public void ApplyHiddenHintToDust(Vector2Int gp, CosmicDust dust, System.Func<MusicalRole, MusicalRoleProfile> resolveRoleProfile = null)
     {
         if (!TryGetValue(gp, out var imp) || imp.hiddenRole == MusicalRole.None)
         {
             dust.SetHiddenHintColor(Color.clear);
             return;
         }
-        var profile = MusicalRoleProfileLibrary.GetProfile(imp.hiddenRole);
+        var profile = resolveRoleProfile != null ? resolveRoleProfile(imp.hiddenRole) : MusicalRoleProfileLibrary.GetProfile(imp.hiddenRole);
         dust.SetHiddenHintColor(profile != null ? profile.GetBaseColor() : Color.clear);
     }
 }

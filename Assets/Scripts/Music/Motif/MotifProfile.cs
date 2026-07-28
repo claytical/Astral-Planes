@@ -119,8 +119,9 @@ public class MotifProfile : ScriptableObject
 
         // ByVoice roles: voice 0 always gets config[0], voice 1 gets config[1], etc.
         // Bins within a voice all use the same authored RiffAsset (chord tone stays constant).
-        var roleProfile = MusicalRoleProfileLibrary.GetProfile(role);
-        if (roleProfile != null && roleProfile.configSelectionMode == RoleConfigSelectionMode.ByVoice)
+        // Read the mode off the actually-matched config's own profile, not an arbitrary
+        // same-role profile from MusicalRoleProfileLibrary (which can differ from this motif's).
+        if (matches[0].roleProfile != null && matches[0].roleProfile.configSelectionMode == RoleConfigSelectionMode.ByVoice)
         {
             int idx = Mathf.Abs(voiceIndex) % matches.Count;
             return matches[idx];
@@ -144,6 +145,44 @@ public class MotifProfile : ScriptableObject
             var cfg = roleNoteConfigs[i];
             if (cfg != null && cfg.role != MusicalRole.None && seen.Add(cfg.role))
                 result.Add(cfg.role);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Returns distinct (role, voiceIndex) voices present in roleNoteConfigs, in first-appearance
+    /// role order. A role only produces more than one voice (index &gt; 0) when it has multiple
+    /// configs AND its profile's configSelectionMode is ByVoice — the same flag GetConfigForRoleAtBin
+    /// and InstrumentTrackController.ResolveMotifRoleProfile already use to pin per-voice configs, so
+    /// what the player hears (voice-panned chord identity) and what they'll see (maze territory) stay
+    /// consistent. Every currently-shipped motif is ByBin, so this returns exactly GetActiveRoles()'s
+    /// roles at voice 0 for all existing content.
+    /// </summary>
+    public List<RoleVoiceKey> GetActiveVoices()
+    {
+        var configsByRole = new Dictionary<MusicalRole, List<RoleMotifNoteSetConfig>>();
+        var roleOrder = new List<MusicalRole>();
+        for (int i = 0; i < roleNoteConfigs.Count; i++)
+        {
+            var cfg = roleNoteConfigs[i];
+            if (cfg == null || cfg.role == MusicalRole.None) continue;
+            if (!configsByRole.TryGetValue(cfg.role, out var list))
+            {
+                list = new List<RoleMotifNoteSetConfig>();
+                configsByRole[cfg.role] = list;
+                roleOrder.Add(cfg.role);
+            }
+            list.Add(cfg);
+        }
+
+        var result = new List<RoleVoiceKey>();
+        foreach (var role in roleOrder)
+        {
+            var configs = configsByRole[role];
+            bool byVoice = configs.Count > 1 && configs[0].roleProfile != null
+                && configs[0].roleProfile.configSelectionMode == RoleConfigSelectionMode.ByVoice;
+            if (!byVoice) { result.Add(new RoleVoiceKey(role, 0)); continue; }
+            for (int v = 0; v < configs.Count; v++) result.Add(new RoleVoiceKey(role, v));
         }
         return result;
     }
