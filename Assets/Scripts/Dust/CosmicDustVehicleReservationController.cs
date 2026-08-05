@@ -188,6 +188,29 @@ public sealed class CosmicDustVehicleReservationController
         }
     }
 
+    // Short decaying "wake" behind a moving vehicle: claims a recently-visited cell for a few
+    // seconds so backtracking never gets boxed in, without carving a permanent scar. Distinct from
+    // SetVehicleKeepClear (which protects the vehicle's *current* footprint) — this protects a
+    // trailing history of past cells. Reuses KeepClear rather than a new claim type since the
+    // veto semantics are identical; DustClaimManager's own TTL (Claim.expiresAt) does the decay.
+    public void ClaimTrailCell(int ownerId, Vector2Int cell, float ttlSeconds)
+    {
+        var dustClaims = _dustClaims();
+        if (dustClaims == null) return;
+        dustClaims.ClaimCell($"VehicleTrail#{ownerId}", cell, DustClaimType.KeepClear, seconds: Mathf.Max(0.01f, ttlSeconds), refresh: true);
+    }
+
+    // Called when a cell ages out of the trail's ring buffer. TTL expiry alone is passive (only
+    // checked lazily on the next IsBlocked/ClaimCell/ReleaseCell for that cell), so explicitly
+    // release and request regrow here rather than relying on it to happen on its own.
+    public void ReleaseTrailCell(int ownerId, Vector2Int cell)
+    {
+        var dustClaims = _dustClaims();
+        dustClaims?.ReleaseCell($"VehicleTrail#{ownerId}", cell, DustClaimType.KeepClear);
+        if (_isPermanentClearCell(cell)) return;
+        _requestRegrowCellAt(cell);
+    }
+
     public void SetReservedVehicleCells(IReadOnlyList<Vector2Int> cells)
     {
         _reservedVehicleCells.Clear();

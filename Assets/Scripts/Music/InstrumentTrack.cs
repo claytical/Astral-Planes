@@ -14,8 +14,10 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     [Header("Track Settings")]
     public Color trackColor;
     // Canonical display color: prefers the MusicalRoleProfile's voice color so spawned
-    // objects match the profile palette rather than the raw Inspector field.
-    public Color DisplayColor => MusicalRoleProfileLibrary.GetProfile(assignedRole)?.GetColorForVoice(voiceIndex) ?? trackColor;
+    // objects match the profile palette rather than the raw Inspector field. Prefers the
+    // motif-resolved _activeProfile (same precedence as lowestAllowedNote/highestAllowedNote
+    // below) over the library's arbitrary first-loaded same-role profile.
+    public Color DisplayColor => (_activeProfile ?? MusicalRoleProfileLibrary.GetProfile(assignedRole))?.GetColorForVoice(voiceIndex) ?? trackColor;
     public GameObject collectablePrefab; // Prefab to spawn
     public Transform collectableParent; // Parent object for organization
     [Header("Musical Role Assignment")]
@@ -337,6 +339,9 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             var (note, duration, vel127f) = _tmpStepNotes[i];
             int vel127 = Mathf.Clamp(Mathf.RoundToInt(vel127f), 1, 127);
             PlayNote127(note, duration, vel127);
+
+            if (controller != null && controller.noteVisualizer != null)
+                controller.noteVisualizer.RegisterNotePlayTint(this, DisplayColor, TicksToSeconds(duration));
         }
     }
 
@@ -551,6 +556,13 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (RemainingActiveWindowSec() <= 0f)
             Debug.LogWarning($"[NOTE:ZERO_WINDOW] {name} note={note} dur={durationTicks} — window=0 at dsp={AudioSettings.dspTime:F3} leaderStart={drumTrack?.leaderStartDspTime:F3} clipLen={drumTrack?.GetClipLengthInSeconds():F3}");
         midiVoice.PlayNoteTicks(note, durationTicks, velocity);
+    }
+
+    private float TicksToSeconds(int durationTicks)
+    {
+        return (drumTrack != null && drumTrack.drumLoopBPM > 0f)
+            ? durationTicks * (60f / (drumTrack.drumLoopBPM * 480f))
+            : 0f;
     }
 
     private int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force, bool lightMarkerNow, int authoredRootMidi = int.MinValue, bool skipChordQuantize = false)

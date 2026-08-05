@@ -2,6 +2,8 @@ using UnityEngine;
 
 public class Boundaries : MonoBehaviour
 {
+    public static Boundaries Instance { get; private set; }
+
     public BoxCollider2D topBoundary;
     public BoxCollider2D bottomBoundary;
     public BoxCollider2D leftBoundary;
@@ -26,6 +28,7 @@ public class Boundaries : MonoBehaviour
 
     void Awake()
     {
+        Instance = this;
         if (GameFlowManager.VerboseLogging) Debug.Log($"[BOUNDARIES] Awake on {gameObject.name}");
     }
 

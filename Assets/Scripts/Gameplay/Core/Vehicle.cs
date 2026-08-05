@@ -227,6 +227,7 @@ public partial class Vehicle : MonoBehaviour
         _isActivePlow = false;   // always reset; DoPlowTick sets true only when cells are carved
 
         DoPlowTick();
+        UpdateScoutingPreview();
         RefreshVehicleKeepClearIfNeeded();
 
         if (!boosting) _plowVelocityDrain = 0f;
@@ -252,7 +253,11 @@ public partial class Vehicle : MonoBehaviour
     UpdateDistanceCovered();
     ClampAngularVelocity();
     audioManager.AdjustPitch(rb.linearVelocity.magnitude * 0.1f);
-    if (vehicleConfig.enableRecovery)
+    // Suspended during motif bridges/path-choice transitions (gfm.BridgePending) and ghost
+    // cycles: a vehicle deliberately carried off-screen through a maze exit looks identical to
+    // one that's drifted out of bounds by accident, and this system was snapping it straight
+    // back to its last near-edge position every ~0.75s, fighting the scripted exit/entry travel.
+    if (vehicleConfig.enableRecovery && !gfm.BridgePending && !gfm.GhostCycleInProgress)
     {
         UpdateSafeAnchor();
         RecoverIfNeeded();

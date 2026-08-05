@@ -159,10 +159,11 @@ public partial class CosmicDustGenerator
 
     private void DespawnDustAtAndMarkPermanent(Vector2Int gridPos)
     {
-        bool wasAlreadyPermanent = _permanentClearCells.Contains(gridPos);
-        _permanentClearCells.Add(gridPos);
-
+        // DespawnDustAt no-ops on cells already in _permanentClearCells (its own idempotency
+        // guard for repeat calls), so it must run BEFORE this cell is added to that set — not
+        // after — or the actual hide/collider-disable/state-clear work never happens.
         DespawnDustAt(gridPos);
+        _permanentClearCells.Add(gridPos);
         _regrow?.CancelRegrow(gridPos);
     }
 

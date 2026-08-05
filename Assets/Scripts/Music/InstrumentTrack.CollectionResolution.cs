@@ -116,6 +116,8 @@ public partial class InstrumentTrack
                 source: collectable.transform, track: this, step: finalTargetStep,
                 dspTime: depositDsp, noteDuration: durationTicks, color: DisplayColor);
 
+            controller.noteVisualizer.RegisterNotePlayTint(this, DisplayColor, TicksToSeconds(durationTicks));
+
             controller.noteVisualizer.RegisterCollectedMarker(this, collectable.burstId, finalTargetStep, markerGo);
 
             var tag = markerGo.GetComponent<MarkerTag>() ?? markerGo.AddComponent<MarkerTag>();

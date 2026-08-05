@@ -126,8 +126,16 @@ public partial class CosmicDustGenerator
                 if (_regrowthScheduler.VoidGrowCoroutines.ContainsKey(gp))
                     continue;
 
+                // Ripple: cells nearer the ring's inner edge (u≈0) start growing sooner than
+                // cells near the outer edge (u≈1), so the ring visibly sweeps outward instead
+                // of every cell popping in on the same frame. Delayed cells get a shorter tween
+                // so they still finish around the same time as early ones.
+                float rippleWindowSeconds = growInSeconds * config.voidRingRippleFraction;
+                float startDelaySeconds = u * rippleWindowSeconds;
+                float effectiveGrowIn = Mathf.Max(0.05f, growInSeconds - startDelaySeconds);
+
                 SetCellFlag(gp, CellFlags.VoidGrow);
-                _regrowthScheduler.VoidGrowCoroutines[gp] = StartCoroutine(VoidGrowCellNow(gp, spawnRole, spawnColor, growInSeconds));
+                _regrowthScheduler.VoidGrowCoroutines[gp] = StartCoroutine(VoidGrowCellNow(gp, spawnRole, spawnColor, effectiveGrowIn, startDelaySeconds));
             }
         }
 
@@ -241,7 +249,7 @@ public partial class CosmicDustGenerator
     public void SpawnDustAtCells(
         IReadOnlyList<Vector2Int> cells,
         MusicalRole role, Color hue, float energy01, float growInSeconds,
-        bool hideRole = false)
+        bool hideRole = false, bool solid = false)
     {
         if (cells == null || cells.Count == 0) return;
         EnsureCellGrid();
@@ -266,7 +274,14 @@ public partial class CosmicDustGenerator
                 spawnColor.a = c.a;
             }
 
-            _imprints[gp] = new DustImprint { color = spawnColor, role = spawnRole, hiddenRole = hiddenRole2 };
+            var imprint = new DustImprint { color = spawnColor, role = spawnRole, hiddenRole = hiddenRole2 };
+            if (solid)
+            {
+                imprint.carveResistance01 = 1f;
+                imprint.drainResistance01 = 1f;
+            }
+            _imprints[gp] = imprint;
+            if (solid) SetCellFlag(gp, CellFlags.Solid);
 
             if (TryGetCellGo(gp, out var existingGo) && existingGo != null &&
                 existingGo.TryGetComponent<CosmicDust>(out var existingDust) &&
@@ -275,7 +290,8 @@ public partial class CosmicDustGenerator
                 existingDust.ApplyRoleAndCharge(MusicalRole.None, config.mazeTint, c.a);
                 _imprints.ApplyHiddenHintToDust(gp, existingDust);
                 var res = ResolveResistanceProfile(gp, role, context: "SpawnDustAtCells:existing");
-                existingDust.clearing.drainResistance01 = res.drainResistance01;
+                existingDust.clearing.drainResistance01 = solid ? 1f : res.drainResistance01;
+                if (solid) existingDust.SetSpriteSuppressed(true);
                 continue;
             }
 
@@ -340,9 +356,13 @@ public partial class CosmicDustGenerator
     /// never explicitly "cleared" by gameplay — this bridges that gap so the
     /// collider doesn't linger as an invisible wall.
     /// </summary>
-    private IEnumerator VoidGrowCellNow(Vector2Int gp, MusicalRole role, Color tintWithAlpha, float growInSeconds)
+    private IEnumerator VoidGrowCellNow(Vector2Int gp, MusicalRole role, Color tintWithAlpha, float growInSeconds, float startDelaySeconds = 0f)
     {
         if (!IsInBounds(gp)) { _regrowthScheduler.VoidGrowCoroutines.Remove(gp); yield break; }
+
+        // Ripple delay: wait before evaluating vetoes/spawning so a cell delayed by A1's ring
+        // ripple checks current state rather than stale state from ring-imprint time.
+        if (startDelaySeconds > 0f) yield return new WaitForSeconds(startDelaySeconds);
 
         bool veto0_perm        = _permanentClearCells.Contains(gp);
         bool veto0_spawnBlocked = IsDustSpawnBlocked(gp);
@@ -371,6 +391,8 @@ public partial class CosmicDustGenerator
         {
             dust.PrepareForReuse();
             dust.InitializeVisuals(DustTimings);
+            if (HasCellFlag(gp, CellFlags.Solid))
+                dust.SetSpriteSuppressed(true);
 
             dust.SetGrowInDuration(config.voidDustGrowInSeconds);
             var resistance = ResolveResistanceProfile(gp, role, context: "VoidGrowCellNow");
@@ -444,7 +466,7 @@ public partial class CosmicDustGenerator
 
     private static void EnsureDustSpriteRendererEnabled(CosmicDust dust)
     {
-        if (dust == null) return;
+        if (dust == null || dust.suppressSpriteRenderer) return;
         var spriteRenderer = dust.GetComponentInChildren<SpriteRenderer>(true);
         if (spriteRenderer != null)
             spriteRenderer.enabled = true;

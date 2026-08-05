@@ -115,7 +115,7 @@ public partial class LocalPlayer
             }
         }
 
-        plane.Move(_virtualStick * friction);
+        if (!_inputLocked) plane.Move(_virtualStick * friction);
     }
 
     private void Update()

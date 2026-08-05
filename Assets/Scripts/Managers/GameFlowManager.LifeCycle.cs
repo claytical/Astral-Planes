@@ -14,6 +14,7 @@ public partial class GameFlowManager
             SessionState = new SessionStateCoordinator(this);
             BridgeFlow = new BridgeCoordinator(this, SessionState);
             SceneFlow = new SceneFlowCoordinator(this, SessionState, BridgeFlow);
+            PathChoice = new PathChoiceCoordinator(this, SessionState, SceneFlow);
             localPlayers = SessionState.MutablePlayers;
             SceneManager.sceneLoaded += OnSceneLoaded;
             return;

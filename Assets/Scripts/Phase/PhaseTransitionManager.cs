@@ -28,6 +28,49 @@ public class PhaseTransitionManager : MonoBehaviour
     public int FirstPhaseIndex  => 0;
     public int PhaseCount       => (chapterLibrary != null && chapterLibrary.phases != null) ? chapterLibrary.phases.Count : 0;
 
+    /// <summary>Indices after currentMotifIndex within the current phase's motif list, in order, not wrapped.</summary>
+    public IReadOnlyList<int> GetRemainingMotifIndices()
+    {
+        var result = new List<int>();
+        if (_chapterMotifs == null) return result;
+        for (int i = currentMotifIndex + 1; i < _chapterMotifs.Count; i++)
+            result.Add(i);
+        return result;
+    }
+
+    public int RemainingMotifCount => Mathf.Max(0, (_chapterMotifs?.Count ?? 0) - (currentMotifIndex + 1));
+
+    /// <summary>
+    /// Phase indices after currentPhaseIndex. Mirrors AdvancePhase's wrap semantics: if
+    /// loopChapters is true and we're on the last phase, "remaining" is every phase except
+    /// the current one (so a choice is still offered on the loop-around); if loopChapters is
+    /// false and we're on the last phase, returns empty (nothing left to choose between).
+    /// </summary>
+    public IReadOnlyList<int> GetRemainingPhaseIndices()
+    {
+        var result = new List<int>();
+        if (chapterLibrary == null || chapterLibrary.phases == null) return result;
+
+        int count = chapterLibrary.phases.Count;
+        int next = currentPhaseIndex + 1;
+
+        if (next < count)
+        {
+            for (int i = next; i < count; i++) result.Add(i);
+            return result;
+        }
+
+        if (loopChapters)
+        {
+            for (int i = 0; i < count; i++)
+                if (i != currentPhaseIndex) result.Add(i);
+        }
+
+        return result;
+    }
+
+    public int RemainingPhaseCount => GetRemainingPhaseIndices().Count;
+
     /// <summary>
     /// Advances to the next phase, respecting loopChapters and holdOnLastChapter settings.
     /// Calls StartChapter internally, which resets the motif index and applies the new motif.
@@ -272,7 +315,12 @@ public class PhaseTransitionManager : MonoBehaviour
         if (gfm == null || noteSetFactory == null) return;
 
         var controller = gfm.controller;
-        if (controller == null || controller.tracks == null) return;
+        if (controller == null) return;
+
+        // Rebuild tracks for this motif's active voices before configuring NoteSets on them —
+        // track construction is motif-driven (RoleVoiceKey per active voice), not scene-authored.
+        controller.RebuildTracksForMotif(currentMotif);
+        if (controller.tracks == null) return;
 
         foreach (var track in controller.tracks)
         {

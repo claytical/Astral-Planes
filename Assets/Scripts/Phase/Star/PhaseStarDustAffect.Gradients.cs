@@ -128,8 +128,10 @@ public partial class PhaseStarDustAffect
         );
     }
 
-    private static Color GetRoleColor(MusicalRole role)
+    private Color GetRoleColor(MusicalRole role)
     {
+        if (_star != null) return _star.GetResolvedRoleColor(role);
+
         var rp = MusicalRoleProfileLibrary.GetProfile(role);
         return rp != null
             ? new Color(rp.dustColors.baseColor.r, rp.dustColors.baseColor.g, rp.dustColors.baseColor.b, 1f)

@@ -19,6 +19,18 @@ public sealed class MazeTopologyService
         MazePatternConfig config,
         Context context)
     {
+        return BuildSolidCells(config, context, out _);
+    }
+
+    // Same as above, but also returns the porous-border gap cell groups computed in this same
+    // pass (one list per exit) so callers can place something at each opening without a second,
+    // independently-randomized call to BuildPorousBorderCells producing a mismatched layout.
+    public HashSet<Vector2Int> BuildSolidCells(
+        MazePatternConfig config,
+        Context context,
+        out List<List<Vector2Int>> gapGroupsOut)
+    {
+        gapGroupsOut = new List<List<Vector2Int>>();
         config?.Validate();
         if (context == null) return new HashSet<Vector2Int>();
 
@@ -99,7 +111,8 @@ public sealed class MazeTopologyService
                 width,
                 height,
                 config.porousBorder.exitCount,
-                context.IsCellAvailable);
+                context.IsCellAvailable,
+                out gapGroupsOut);
             foreach (var border in borderCells)
             {
                 if (!context.IsBlocked(border))

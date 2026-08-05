@@ -114,6 +114,7 @@ public partial class CosmicDust
         StopAllVisualCoroutines();
         _isBreaking = false;
         regrowAlphaCapped = false;
+        suppressSpriteRenderer = false;
         _isDespawned = false;
         _nonBoostClearSeconds = 0f;
         _growInOverride = -1f;

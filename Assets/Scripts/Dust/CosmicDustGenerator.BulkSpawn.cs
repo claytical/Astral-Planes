@@ -70,6 +70,8 @@ public partial class CosmicDustGenerator
 
                         dust.PrepareForReuse();
                         dust.InitializeVisuals(DustTimings);
+                        if (HasCellFlag(grid, CellFlags.Solid))
+                            dust.SetSpriteSuppressed(true);
                         dust.SetGrowInDuration(config.hexGrowInSeconds);
 
                         // GetCellVisualColor reads from _imprints if available, otherwise config.mazeTint.

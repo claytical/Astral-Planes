@@ -44,4 +44,4 @@ MonoBehaviour:
   midiPreset: 30
   lowestNote: 36
   highestNote: 84
-  regrowthDelay: -1
+  regrowthDelay: 0.4

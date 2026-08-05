@@ -1,8 +1,30 @@
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 public partial class Vehicle
 {
+    // Decaying trail: recently-visited cells stay briefly protected from regrowth so backtracking
+    // never gets boxed in. Distinct from the keep-clear pocket below, which only protects the
+    // vehicle's *current* cell.
+    private readonly Queue<Vector2Int> _trailCells = new Queue<Vector2Int>();
+    private Vector2Int _lastTrailCell;
+    private bool _hasLastTrailCell;
+
+    private void UpdateVehicleTrail(CosmicDustGenerator gen, int ownerId, Vector2Int centerCell)
+    {
+        if (_hasLastTrailCell && centerCell == _lastTrailCell) return;
+        _hasLastTrailCell = true;
+        _lastTrailCell = centerCell;
+
+        gen.ClaimVehicleTrailCell(ownerId, centerCell, vehicleConfig.trailDecaySeconds);
+        _trailCells.Enqueue(centerCell);
+
+        int maxLength = Mathf.Max(1, vehicleConfig.trailLength);
+        while (_trailCells.Count > maxLength)
+            gen.ReleaseVehicleTrailCell(ownerId, _trailCells.Dequeue());
+    }
+
     private void RefreshVehicleKeepClearIfNeeded() {
         if (gfm.BridgePending || gfm.GhostCycleInProgress) return;
 
@@ -18,6 +40,7 @@ public partial class Vehicle
         int ownerId = _id;
 
         Vector2Int centerCell = drum.WorldToGridPosition(rb.position);
+        UpdateVehicleTrail(gen, ownerId, centerCell);
 
         if (!boosting)
         {
@@ -83,6 +106,47 @@ public partial class Vehicle
             forceRemoveFadeSeconds: Mathf.Max(0.01f, vehicleConfig.spawnRestPocketFadeSeconds)
         );
         gen.ReleaseVehicleKeepClear(ownerId);
+    }
+
+    // Shallow lookahead depth for the scouting preview — deliberately much shorter than the
+    // actual plow footprint so it reads as "what's just ahead," not "see the whole maze."
+    private const int kScoutingPreviewDepthCells = 2;
+
+    // Non-destructive resistance telegraph: tints upcoming solid cells by predicted resistance
+    // before contact, so route choice is visible instead of discovered by draining fuel. Runs
+    // whenever the vehicle isn't boosting — boosting already gives direct carve feedback via
+    // DoPlowTick, so showing both would be redundant.
+    private void UpdateScoutingPreview()
+    {
+        if (boosting) return;
+        if (gfm == null || gfm.dustGenerator == null || drumTrack == null) return;
+        if (gfm.BridgePending || gfm.GhostCycleInProgress) return;
+
+        Vector2 dir = rb.linearVelocity.sqrMagnitude > 0.01f ? rb.linearVelocity : _lastNonZeroInput;
+        if (dir.sqrMagnitude < 0.0001f) return;
+
+        var gen = gfm.dustGenerator;
+        float cellSize  = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
+        Vector2 forward = dir.normalized;
+        Vector2 perp    = new Vector2(-forward.y, forward.x);
+        int halfW       = Mathf.Max(0, profile.plowHalfWidthCells);
+
+        for (int d = 1; d <= kScoutingPreviewDepthCells; d++)
+        {
+            for (int s = -halfW; s <= halfW; s++)
+            {
+                Vector2    sampleWorld = rb.position
+                    + forward * (d * cellSize)
+                    + perp    * (s * cellSize);
+                Vector2Int cell = drumTrack.WorldToGridPosition(sampleWorld);
+                if (!gen.TryGetCellState(cell, out var cellState) || cellState != DustCellState.Solid) continue;
+
+                float resistance = gen.GetLiveCarveResistance01(cell);
+                if (resistance <= 0f) continue;
+                if (gen.TryGetDustAt(cell, out var dust) && dust != null)
+                    dust.PreviewResistance(resistance);
+            }
+        }
     }
 
     private void DoPlowTick()

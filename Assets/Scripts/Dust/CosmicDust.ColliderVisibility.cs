@@ -112,7 +112,7 @@ public partial class CosmicDust
         }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        if (visual.sprite != null && !visual.sprite.enabled)
+        if (visual.sprite != null && !visual.sprite.enabled && !suppressSpriteRenderer)
             Debug.LogWarning($"[{nameof(CosmicDust)}] Collider enabled while sprite renderer is disabled on '{name}'. Re-enabling visuals.", this);
 #endif
     }
@@ -121,6 +121,14 @@ public partial class CosmicDust
     // In the simplified model, we only toggle sprite visibility.
     // Particles stay enabled; their "presence" is driven by emission rate (SetEmissionMultiplier).
     if (visual.sprite != null)
-        visual.sprite.enabled = enabled;
+        visual.sprite.enabled = enabled && !suppressSpriteRenderer;
 }
+    // Called for CellFlags.Solid path-choice maze walls, whose particle-only look must survive
+    // the normal spawn/collider lifecycle (which otherwise force the sprite back on).
+    public void SetSpriteSuppressed(bool suppressed)
+    {
+        suppressSpriteRenderer = suppressed;
+        if (suppressed && visual.sprite != null)
+            visual.sprite.enabled = false;
+    }
 }

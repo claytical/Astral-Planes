@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
+using MidiPlayerTK;
 
 public struct TransportFrame
 {
@@ -15,6 +16,11 @@ public partial class InstrumentTrackController : MonoBehaviour
     [SerializeField] public InstrumentTrackControllerConfig config;
     public InstrumentTrack[] tracks;
     public NoteVisualizer noteVisualizer;
+    [Header("Dynamic Track Spawning")]
+    [Tooltip("Instantiated once per active voice (RoleVoiceKey) in the current motif by RebuildTracksForMotif.")]
+    [SerializeField] private InstrumentTrack trackPrefab;
+    [Tooltip("Instantiated once per spawned InstrumentTrack so each voice gets its own dedicated MIDI channel 0, avoiding channel-sharing bookkeeping.")]
+    [SerializeField] private MidiStreamPlayer midiStreamPlayerPrefab;
     private readonly Dictionary<InstrumentTrack, int> _loopHash = new();
     private bool _chordEventsSubscribed;
     [Header("Gravity Void (Expansion Waiting)")]
@@ -109,6 +115,79 @@ public partial class InstrumentTrackController : MonoBehaviour
         _binAllocator.NotifyBinFilled(track, binIndex);
     }
 
+    // Per-track wiring applied both to tracks present at controller Start() and to tracks
+    // freshly spawned by RebuildTracksForMotif — kept as one method so the two paths can't drift.
+    private void WireTrack(InstrumentTrack t)
+    {
+        t.RefreshRoleColorsFromProfile(ResolveMotifRoleProfile(t));
+        t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted; // avoid dupes
+        t.OnAscensionCohortCompleted += HandleAscensionCohortCompleted;
+    }
+
+    // Tears down every existing InstrumentTrack (and its dedicated MidiStreamPlayer) and spawns
+    // exactly one fresh InstrumentTrack per active voice in the given motif, replacing the old
+    // fixed scene-wired tracks[] array. Called from PhaseTransitionManager at motif start, before
+    // NoteSet bins are configured for the (now-existing) tracks.
+    public void RebuildTracksForMotif(MotifProfile motif)
+    {
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _gfm?.activeDrumTrack;
+
+        UnsubscribeChordEvents();
+        if (tracks != null)
+        {
+            foreach (var t in tracks)
+            {
+                if (t == null) continue;
+                if (t.midiStreamPlayer != null) Destroy(t.midiStreamPlayer.gameObject);
+                Destroy(t.gameObject);
+            }
+        }
+
+        var voices = motif?.GetActiveVoices();
+        if (voices == null || voices.Count == 0)
+        {
+            tracks = System.Array.Empty<InstrumentTrack>();
+            return;
+        }
+
+        if (trackPrefab == null)
+        {
+            Debug.LogError("[ITC] RebuildTracksForMotif: trackPrefab not assigned; no tracks created.");
+            tracks = System.Array.Empty<InstrumentTrack>();
+            return;
+        }
+
+        var built = new List<InstrumentTrack>(voices.Count);
+        foreach (var voice in voices)
+        {
+            var track = Instantiate(trackPrefab, transform);
+            track.gameObject.SetActive(false);
+            track.assignedRole = voice.role;
+            track.controller = this;
+            track.drumTrack = drum;
+
+            if (midiStreamPlayerPrefab != null)
+                track.midiStreamPlayer = Instantiate(midiStreamPlayerPrefab, track.transform);
+            else
+                Debug.LogError("[ITC] RebuildTracksForMotif: midiStreamPlayerPrefab not assigned; track will be silent.");
+
+            track.gameObject.SetActive(true);
+            built.Add(track);
+        }
+
+        tracks = built.ToArray();
+        AssignVoiceIndices();
+
+        foreach (var t in tracks)
+            if (t != null) WireTrack(t);
+
+        TrySubscribeChordEvents();
+        noteVisualizer?.Initialize();
+        UpdateVisualizer();
+        _gfm?.SetupBinRingController();
+    }
+
     void Start()
     {
         _gfm = GameFlowManager.Instance;
@@ -122,11 +201,7 @@ public partial class InstrumentTrackController : MonoBehaviour
         // Subscribe to ascension-complete events
         foreach (var t in tracks)
             if (t != null)
-            {
-                t.RefreshRoleColorsFromProfile(ResolveMotifRoleProfile(t));
-                t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted; // avoid dupes
-                t.OnAscensionCohortCompleted += HandleAscensionCohortCompleted;
-            }
+                WireTrack(t);
         // Subscribe to the drum’s loop boundary so we (re)arm each loop
         var drum = _gfm.activeDrumTrack;
         TrySubscribeChordEvents();
