@@ -119,6 +119,11 @@ public partial class MotifRingGlyphApplicator
         }
         transform.rotation = Quaternion.identity;
 
+        // Rotating onto the X axis takes the ring stack out of the flat plane it was
+        // solid on — drop collision here so the vehicle can phase through for the
+        // remainder of the exit (tilt + scale-down).
+        if (_ringCollider != null) _ringCollider.enabled = false;
+
         // Phase 2: tilt X axis to tiltDeg over rollDuration; rings keep spinning
         elapsed = 0f;
         while (elapsed < rollDuration)

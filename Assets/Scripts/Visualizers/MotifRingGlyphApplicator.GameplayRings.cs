@@ -22,6 +22,9 @@ public partial class MotifRingGlyphApplicator
     {
         if (config == null) return;
 
+        EnsureRingCollider();
+        _ringCollider.enabled = true;
+
         int   idx    = _gameplayRings.Count;
         float innerR = RingInnerRadius(idx);
         float outerR = innerR + config.ringThickness;
@@ -56,7 +59,9 @@ public partial class MotifRingGlyphApplicator
         if (transform.localScale.sqrMagnitude < 0.0001f)
             _pendingDeformationCount = 0;
 
-        RefreshPlayAreaFit(_gameplayRings.Count + _remainingRings.Count);
+        int totalRingCount = _gameplayRings.Count + _remainingRings.Count;
+        RefreshPlayAreaFit(totalRingCount);
+        UpdateRingColliderRadius(_gameplayRings.Count);
     }
 
     /// <summary>
@@ -250,7 +255,9 @@ public partial class MotifRingGlyphApplicator
                 shouldStop: () => _gameplayFadingOut));
         }
 
-        RefreshPlayAreaFit(_gameplayRings.Count + _remainingRings.Count);
+        int totalRingCount = _gameplayRings.Count + _remainingRings.Count;
+        RefreshPlayAreaFit(totalRingCount);
+        UpdateRingColliderRadius(_gameplayRings.Count);
     }
 
     /// <summary>Destroy all gameplay rings immediately and hide the record.</summary>
@@ -268,5 +275,6 @@ public partial class MotifRingGlyphApplicator
         _gameplayFadingOut       = false;
         _clearingGameplayRings   = false;
         transform.localScale     = Vector3.zero;
+        if (_ringCollider != null) _ringCollider.enabled = false;
     }
 }
