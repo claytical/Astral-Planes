@@ -26,7 +26,7 @@ MonoBehaviour:
   entryLoopCount: 16
   resetFirstCarryOnStart: 0
   bpm: 135
-  stepsPerLoop: 16
+  stepsPerLoop: 32
   nodesPerStar: 12
   starBehavior: {fileID: 11400000, guid: 9dd08ed983d384107aaff4f28fa8803d, type: 2}
   mazePattern: {fileID: 11400000, guid: 050d70a4230ab433db3d2c8c77d7b9e3, type: 2}

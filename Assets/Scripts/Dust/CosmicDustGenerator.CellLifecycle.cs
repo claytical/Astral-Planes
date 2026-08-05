@@ -67,6 +67,7 @@ public partial class CosmicDustGenerator
     public void CarveDustByVehicle(Vector2Int cell, float fadeSeconds, ShipMusicalProfile shipProfile = null)
     {
         if (!IsInBounds(cell)) return;
+        if (HasCellFlag(cell, CellFlags.Solid)) return; // bypass-proof: no ship carveResistanceBypass01 can defeat this
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
 
         var cellDust = _gridState.CellDust?[cell.x, cell.y];
@@ -78,6 +79,7 @@ public partial class CosmicDustGenerator
     public void ChipDustByVehicle(Vector2Int cell, int energyAmount, float fadeSeconds, float resistanceBypass01 = 0f, ShipMusicalProfile shipProfile = null)
     {
         if (!IsInBounds(cell)) return;
+        if (HasCellFlag(cell, CellFlags.Solid)) return; // bypass-proof: no ship carveResistanceBypass01 can defeat this
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
 
         var cellGo = _gridState.CellGo?[cell.x, cell.y];

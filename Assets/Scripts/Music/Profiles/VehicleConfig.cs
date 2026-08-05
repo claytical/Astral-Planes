@@ -58,6 +58,12 @@ public class VehicleConfig : ScriptableObject
     [Tooltip("Seconds between keep-clear refreshes while boosting. Throttles the grid query to avoid per-frame overhead.")]
     public float vehicleKeepClearRefreshSeconds = 0.10f;
 
+    [Header("Trail (Decaying Wake)")]
+    [Tooltip("How long a recently-visited cell stays protected from regrowth behind the vehicle.")]
+    public float trailDecaySeconds = 3f;
+    [Tooltip("How many recently-visited cells stay protected at once (oldest is released as new ones are added).")]
+    public int trailLength = 6;
+
     [Header("Spawn Pocket")]
     [Tooltip("Carves a small pocket at spawn so the vehicle is not born intersecting dust colliders.")]
     public bool carveSpawnRestPocket = true;

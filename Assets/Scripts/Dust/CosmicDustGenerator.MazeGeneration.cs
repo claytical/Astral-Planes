@@ -96,12 +96,23 @@ public partial class CosmicDustGenerator
         Vector2Int starCell,
         HashSet<Vector2Int> reservedCells)
     {
+        return BuildMazeGrowthFromConfig(config, starCell, reservedCells, out _);
+    }
+
+    // Same as above, but also returns the porous-border gap cell groups computed in this same
+    // pass (see MazeTopologyService.BuildSolidCells's out-param overload).
+    private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthFromConfig(
+        MazePatternConfig config,
+        Vector2Int starCell,
+        HashSet<Vector2Int> reservedCells,
+        out List<List<Vector2Int>> gapGroupsOut)
+    {
         config?.Validate();
-        if (drums == null) return new List<(Vector2Int, Vector3)>();
+        if (drums == null) { gapGroupsOut = new List<List<Vector2Int>>(); return new List<(Vector2Int, Vector3)>(); }
 
         int w = drums.GetSpawnGridWidth();
         int h = drums.GetSpawnGridHeight();
-        if (w <= 0 || h <= 0) return new List<(Vector2Int, Vector3)>();
+        if (w <= 0 || h <= 0) { gapGroupsOut = new List<List<Vector2Int>>(); return new List<(Vector2Int, Vector3)>(); }
 
         Func<int, List<Vector2Int>> getDirsByRow = row => GetHexDirections(row);
         Func<int, int, bool> isCellAvailable = (x, y) => drums.IsSpawnCellAvailable(x, y);
@@ -125,7 +136,7 @@ public partial class CosmicDustGenerator
             NormalizeCell = toroidal ? WrapCell : null
         };
 
-        var solidCells = _mazeTopologyService.BuildSolidCells(config, context);
+        var solidCells = _mazeTopologyService.BuildSolidCells(config, context, out gapGroupsOut);
         var growth = new List<(Vector2Int cell, Vector3 world)>(solidCells.Count);
         foreach (var gp in solidCells)
         {

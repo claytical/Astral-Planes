@@ -1308,8 +1308,11 @@ MonoBehaviour:
   vehiclePhaseInFxPrefab: {fileID: 4807525718738022760, guid: 5962a9437261f4908b0f4999318283dd,
     type: 3}
   vehiclePhaseInDelaySeconds: 1.2
+  pathExitVisualPrefab: {fileID: 2567590292593330884, guid: dcf1116fb59d94ad6b7c608af44d1053,
+    type: 3}
+  pathExitParticleSpeed: 3
   demoMode: 0
-  verboseLogging: 0
+  verboseLogging: 1
   harmony: {fileID: 1151719980}
   controller: {fileID: 0}
   activeDrumTrack: {fileID: 0}

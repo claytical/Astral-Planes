@@ -81,7 +81,7 @@ public sealed class BridgeCoordinator
             while (AudioSettings.dspTime < loopBoundaryDsp)
                 yield return null;
 
-        yield return _gameFlow.StartCoroutine(_gameFlow.SceneFlow.StartNextMotifInPhase());
+        yield return _gameFlow.StartCoroutine(_gameFlow.PathChoice.RunPathChoiceAndAdvance());
         _session.SetGhostCycleInProgress(false);
         _session.SetBridgePending(false);
     }

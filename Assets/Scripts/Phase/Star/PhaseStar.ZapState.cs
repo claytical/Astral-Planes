@@ -157,9 +157,19 @@ public partial class PhaseStar
         dust?.SetAcquisitionEnabled(false, "ready-latched-keep-disabled");
     }
 
+    // Public wrapper so PhaseStarDustAffect (tentacle visuals) shares this star's own
+    // motif-correct role→color resolution instead of duplicating an ambiguous library lookup.
+    public Color GetResolvedRoleColor(MusicalRole role) => ResolveRoleColor(role, _cachedTrack);
+
     private Color ResolveRoleColor(MusicalRole role, InstrumentTrack fallbackTrack = null)
     {
-        var roleProfile = MusicalRoleProfileLibrary.GetProfile(role);
+        // Prefer the track's motif-resolved profile (set via InstrumentTrackController's
+        // ResolveMotifRoleProfile) — same pattern as Collectable.cs/DiscoveryTrackNode.cs. When no
+        // track is cached yet (e.g. before this star has attuned), resolve directly from the
+        // assigned motif instead of jumping straight to the library's arbitrary same-role profile.
+        var roleProfile = fallbackTrack?.ActiveProfile
+            ?? _assignedMotif?.GetConfigForRoleAtBin(role, 0, 1, fallbackTrack?.voiceIndex ?? 0)?.roleProfile
+            ?? MusicalRoleProfileLibrary.GetProfile(role);
         if (roleProfile != null)
         {
             int voiceIdx = fallbackTrack?.voiceIndex ?? 0;

@@ -70,4 +70,51 @@ public partial class NoteVisualizer
         }
     }
 
+    public void RegisterNotePlayTint(InstrumentTrack track, Color color, float durationSeconds)
+    {
+        if (track == null || durationSeconds <= 0f) return;
+        _activeNoteTints.Add(new ActiveNoteTint
+        {
+            track = track,
+            color = color,
+            endDsp = AudioSettings.dspTime + durationSeconds
+        });
+    }
+
+    private void UpdateAmbientLineTint()
+    {
+        if (firstPlayConfirmOrbPrefab == null) return;
+
+        double now = AudioSettings.dspTime;
+        for (int i = _activeNoteTints.Count - 1; i >= 0; i--)
+            if (_activeNoteTints[i].endDsp <= now) _activeNoteTints.RemoveAt(i);
+
+        Color target;
+        bool holdActive = _activeNoteTints.Count > 0;
+        if (holdActive)
+        {
+            Vector3 sum = Vector3.zero;
+            foreach (var t in _activeNoteTints)
+                sum += new Vector3(t.color.r, t.color.g, t.color.b);
+            Vector3 avg = sum / _activeNoteTints.Count;
+            target = new Color(avg.x, avg.y, avg.z, 1f);
+        }
+        else
+        {
+            target = Color.white;
+        }
+
+        float speed = holdActive ? ambientSnapSpeed : ambientFadeToWhiteSpeed;
+        _ambientTintColor = Color.Lerp(_ambientTintColor, target, 1f - Mathf.Exp(-speed * Time.deltaTime));
+
+        var col = firstPlayConfirmOrbPrefab.colorOverLifetime;
+        col.enabled = true;
+        var g = new Gradient();
+        g.SetKeys(
+            new[] { new GradientColorKey(_ambientTintColor, 0f), new GradientColorKey(_ambientTintColor, 1f) },
+            new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) }
+        );
+        col.color = g;
+    }
+
 }

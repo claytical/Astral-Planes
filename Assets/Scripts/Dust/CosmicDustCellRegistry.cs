@@ -10,6 +10,9 @@ public enum CellFlags
     ZapForceGray    = 1 << 1,
     VoidGrow        = 1 << 2,
     PlayerCarved    = 1 << 3,
+    // Bypass-proof "this cell can never be carved" marker — distinct from the transient,
+    // ship-bypassable DustImprint.carveResistance01. See CosmicDustGenerator.CellLifecycle.cs.
+    Solid           = 1 << 4,
 }
 
 /// <summary>

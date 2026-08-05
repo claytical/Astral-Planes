@@ -28,6 +28,30 @@ public partial class GameFlowManager : MonoBehaviour
              "Gives the player a moment to orient before the star walks in.")]
     [SerializeField, Min(0f)] private float vehiclePhaseInDelaySeconds = 1.2f;
 
+    [Header("Path Choice")]
+    [Tooltip("Optional visual marker instantiated at each tunnel exit during the path-choice " +
+             "interstitial (the exit trigger itself has no renderer). Purely decorative — " +
+             "leave unassigned for invisible exits.")]
+    [SerializeField] private GameObject pathExitVisualPrefab;
+    public GameObject PathExitVisualPrefab => pathExitVisualPrefab;
+
+    [Tooltip("Speed (world units/sec) the exit particle effect's Velocity Over Lifetime module " +
+             "is driven at. Direction is computed per exit (inward from whichever border side " +
+             "it's on, toward the player) — this only controls magnitude.")]
+    [SerializeField, Min(0f)] private float pathExitParticleSpeed = 3f;
+    public float PathExitParticleSpeed => pathExitParticleSpeed;
+
+    [Tooltip("World units past the true screen edge a vehicle must clear before it counts as " +
+             "off-screen — used both when carrying vehicles out through a chosen exit and when " +
+             "staging them for their off-screen entry into the next maze.")]
+    [SerializeField, Min(0f)] private float pathTransitionOffscreenMargin = 2f;
+    public float PathTransitionOffscreenMargin => pathTransitionOffscreenMargin;
+
+    [Tooltip("Max seconds to drive a vehicle off-screen through a chosen exit, or in from " +
+             "off-screen at the start of the next maze, before giving up and proceeding anyway.")]
+    [SerializeField, Min(0f)] private float pathTransitionTravelTimeout = 3f;
+    public float PathTransitionTravelTimeout => pathTransitionTravelTimeout;
+
     public static GameFlowManager Instance { get; private set; }
     public bool demoMode = true;
 
@@ -70,6 +94,7 @@ public partial class GameFlowManager : MonoBehaviour
     public SessionStateCoordinator SessionState { get; private set; }
     public BridgeCoordinator BridgeFlow { get; private set; }
     public SceneFlowCoordinator SceneFlow { get; private set; }
+    public PathChoiceCoordinator PathChoice { get; private set; }
     
     public void RegisterRingGlyphApplicator(MotifRingGlyphApplicator applicator)
     {

@@ -34,6 +34,11 @@ public partial class NoteVisualizer : MonoBehaviour
     public Dictionary<(InstrumentTrack, int), Transform> noteMarkers = new();
     [Header("First-Play Confirm FX")]
     [SerializeField] private ParticleSystem firstPlayConfirmOrbPrefab;
+    [Header("Ambient Line Tint")]
+    [Tooltip("How fast the ambient tint snaps to a new blended color while notes are active.")]
+    [SerializeField] private float ambientSnapSpeed = 14f;
+    [Tooltip("How fast the ambient tint eases back to white once no notes are active.")]
+    [SerializeField] private float ambientFadeToWhiteSpeed = 4f;
     [Header("Playhead Trail (Particles)")]
     [SerializeField] private bool playheadTrailEnabled = true;
 
@@ -88,6 +93,16 @@ public partial class NoteVisualizer : MonoBehaviour
     private readonly List<FirstPlayConfirmRequest> _firstPlayRequests = new();
     private Color stepColor;
 
+    private struct ActiveNoteTint
+    {
+        public InstrumentTrack track;
+        public Color color;
+        public double endDsp;
+    }
+
+    private readonly List<ActiveNoteTint> _activeNoteTints = new();
+    private Color _ambientTintColor = Color.white;
+
     public void Initialize()
         {
             isInitialized = true;
@@ -115,6 +130,8 @@ public partial class NoteVisualizer : MonoBehaviour
         ascensionDirector?.ClearAllTasks();
         _stepBurst.Clear();
         _ghostNoteSteps.Clear();
+        _activeNoteTints.Clear();
+        _ambientTintColor = Color.white;
         _hasLastPlayheadParticleWorldPos = false;
         _lastPlayheadParticleWorldPos = Vector3.zero;
         //_trackStepWorldPositions.Clear();
@@ -203,6 +220,7 @@ public partial class NoteVisualizer : MonoBehaviour
         TickPlayheadEnergy();
         MovePlayheadLine(leaderStartDsp);
         ProcessFirstPlayConfirmFx();
+        UpdateAmbientLineTint();
         UpdatePlayheadParticleTrailWorld();
         ComputeCurrentStepState(leaderStartDsp, out int currentStep, out bool shimmer, out float maxVelocity);
         stepColor = ComputeStepColor(currentStep);

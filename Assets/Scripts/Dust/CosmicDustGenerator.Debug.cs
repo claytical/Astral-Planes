@@ -54,7 +54,8 @@ public partial class CosmicDustGenerator
             }
 
             // Case 2: Collider enabled but sprite renderer disabled → invisible wall.
-            if (d.visual.sprite != null && !d.visual.sprite.enabled)
+            // (Deliberately suppressed path-choice walls are excluded — that's intended.)
+            if (d.visual.sprite != null && !d.visual.sprite.enabled && !d.suppressSpriteRenderer)
             {
                 bool colEnabled = false;
                 var cols = go.GetComponentsInChildren<Collider2D>(true);

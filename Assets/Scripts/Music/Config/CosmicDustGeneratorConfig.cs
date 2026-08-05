@@ -31,6 +31,8 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     [Header("Void Grow")]
     [Tooltip("Sprite scale-in and tint fade duration for gravity void dust.")]
     [Range(0.1f, 2f)] public float voidDustGrowInSeconds = 0.40f;
+    [Tooltip("Fraction of a ring burst's growInSeconds spent rippling outward from the inner edge before each cell starts its own grow-in tween. 0 = old synchronous pop.")]
+    [Range(0f, 0.6f)] public float voidRingRippleFraction = 0.35f;
 
     [Header("Zap Clear")]
     [Tooltip("Visual fade duration when a star zap clears a dust cell.")]
@@ -42,6 +44,10 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     
     [Header("Visual")]
     public Color mazeTint = new Color(0.7f, 0.7f, 0.7f, 0.25f);
+    [Tooltip("Color for the bypass-proof 'Solid' dust type (CellFlags.Solid) — uncarveable " +
+             "walls used by the path-choice interstitial maze and its resealed losing tunnels. " +
+             "Deliberately high-contrast against mazeTint so it reads as impassable.")]
+    public Color solidDustTint = new Color(0.05f, 0.05f, 0.08f, 1f);
 
     [Header("Topology")]
     [Tooltip("When enabled, the dust grid wraps toroidally — cells at one edge connect to the opposite edge.")]

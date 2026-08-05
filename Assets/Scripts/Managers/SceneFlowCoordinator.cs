@@ -390,7 +390,289 @@ public sealed class SceneFlowCoordinator
         }
     }
 
-    public IEnumerator StartNextPhaseMazeAndStar(bool doHardReset = true)
+    /// <summary>
+    /// Applies a path-choice interstitial's outcome: jumps PhaseTransitionManager to the chosen
+    /// motif or phase, repositions every vehicle to the mirrored entry edge of wherever they
+    /// exited the interstitial, then runs the ordinary maze/star regeneration. Mirrors
+    /// StartNextMotifInPhase line-for-line except for the PTM call and the edge reposition.
+    /// </summary>
+    /// <param name="exitAnchorCell">
+    /// The winning exit's grid cell in the interstitial maze. Its along-edge coordinate (row for
+    /// Left/Right, column for Top/Bottom) carries over to the entry point on the mirrored edge of
+    /// the new maze, so exiting bottom-right lands you bottom-left, not at a random spot on the
+    /// left edge.
+    /// </param>
+    public IEnumerator StartChosenMotifOrPhase(int? motifIndex, int? phaseIndex, BoundaryWrap.BoundarySide entryEdge, Vector2Int exitAnchorCell)
+    {
+        if (_gameFlow.dustGenerator != null)
+            _gameFlow.dustGenerator.ResumeRegrowthAfterBridge();
+
+        _bridge.StampMotifStartTime();
+        _gameFlow.controller?.BeginNewMotif("MotifBridge");
+
+        if (_gameFlow.phaseTransitionManager == null)
+        {
+            Debug.LogWarning("[GFM] No PhaseTransitionManager; cannot start chosen motif/phase.");
+            yield break;
+        }
+
+        if (phaseIndex.HasValue)
+            _gameFlow.phaseTransitionManager.StartChapter(phaseIndex.Value, "GFM/PathChoice");
+        else if (motifIndex.HasValue)
+            _gameFlow.phaseTransitionManager.JumpToMotifIndex(motifIndex.Value, "GFM/PathChoice");
+
+        var lockedOwners = new List<LocalPlayer>();
+        var entryCells = StageVehiclesOffscreenAtEdge(entryEdge, exitAnchorCell, lockedOwners);
+
+        yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false, vehicleCellOverrides: entryCells));
+
+        yield return _gameFlow.StartCoroutine(DriveVehiclesInFromOffscreen(entryCells));
+
+        foreach (var lp in lockedOwners)
+            lp?.SetInputLocked(false);
+
+        _gameFlow.PlayVehiclePhaseInFx();
+        if (_gameFlow.GetVehiclePhaseInDelaySeconds() > 0f)
+            yield return new WaitForSeconds(_gameFlow.GetVehiclePhaseInDelaySeconds());
+    }
+
+    // Mirror of the boundary side a vehicle exited from: right<->left, top<->bottom.
+    public static BoundaryWrap.BoundarySide MirrorSide(BoundaryWrap.BoundarySide side) => side switch
+    {
+        BoundaryWrap.BoundarySide.Left  => BoundaryWrap.BoundarySide.Right,
+        BoundaryWrap.BoundarySide.Right => BoundaryWrap.BoundarySide.Left,
+        BoundaryWrap.BoundarySide.Top   => BoundaryWrap.BoundarySide.Bottom,
+        _                                => BoundaryWrap.BoundarySide.Top,
+    };
+
+    // Disables/enables a vehicle's own collider so it can be pulled straight through a solid
+    // boundary wall during the scripted exit/entry transition. Move()-driven physics otherwise
+    // collides with the wall like any other obstacle and bounces the vehicle back onto the
+    // screen instead of carrying it through — this is what actually lets the "grab and pull
+    // off-screen" / "sucked into the new maze" motion cross the boundary at all.
+    public static void SetVehicleSolid(Vehicle v, bool solid)
+    {
+        if (v == null) return;
+        var col = v.GetComponent<Collider2D>();
+        if (col != null) col.enabled = solid;
+    }
+
+    // World-space direction pointing away from the maze through `side` — the negation of
+    // ConfigureExitParticleFlow's "inward" vector (PathChoiceCoordinator.cs), shared here so
+    // exit-carry and entry-staging agree on which way is "out."
+    public static Vector2 OutwardDirection(BoundaryWrap.BoundarySide side) => side switch
+    {
+        BoundaryWrap.BoundarySide.Left  => Vector2.left,
+        BoundaryWrap.BoundarySide.Right => Vector2.right,
+        BoundaryWrap.BoundarySide.Top   => Vector2.up,
+        _ /* Bottom */                   => Vector2.down,
+    };
+
+    // The true screen-edge coordinate on the boundary-normal axis for `side`. Left/Right pull
+    // from the real wall collider bounds (Boundaries.cs derives those straight from
+    // orthographicSize*aspect with no UI adjustment, so they already equal the true edge);
+    // Top/Bottom pull from the camera's orthographic size instead, since those walls are
+    // deliberately pulled in below/above the UI bars (see PathChoiceCoordinator.
+    // SnapToPhysicalBoundary). Null if no camera/Boundaries instance exists yet.
+    private static float? TrueEdgeCoordinate(BoundaryWrap.BoundarySide side)
+    {
+        var cam = Camera.main;
+        var boundaries = Boundaries.Instance;
+        switch (side)
+        {
+            case BoundaryWrap.BoundarySide.Left:
+                if (boundaries != null && boundaries.leftBoundary != null) return boundaries.leftBoundary.bounds.max.x;
+                return cam != null ? -cam.orthographicSize * cam.aspect : (float?)null;
+            case BoundaryWrap.BoundarySide.Right:
+                if (boundaries != null && boundaries.rightBoundary != null) return boundaries.rightBoundary.bounds.min.x;
+                return cam != null ? cam.orthographicSize * cam.aspect : (float?)null;
+            case BoundaryWrap.BoundarySide.Top:
+                return cam != null ? cam.orthographicSize : (float?)null;
+            default: // Bottom
+                return cam != null ? -cam.orthographicSize : (float?)null;
+        }
+    }
+
+    // Pushes `worldPos` past `side`'s true edge by `margin` along the boundary-normal axis,
+    // keeping the along-edge coordinate unchanged — the off-screen staging point for an entry,
+    // and (by construction) exactly the threshold IsPastOffscreenThreshold checks against for
+    // an exit, so both stages agree on what "off-screen" means.
+    public static Vector2 OffscreenPointAlong(Vector2 worldPos, BoundaryWrap.BoundarySide side, float margin)
+    {
+        float? edge = TrueEdgeCoordinate(side);
+        // Fail toward "definitely off-screen," never toward the caller's original (on-screen)
+        // position — silently returning worldPos unchanged here would stage/carry a vehicle at
+        // its visible target instead of hiding it, the exact "reappeared where I shouldn't have"
+        // symptom this method exists to prevent.
+        if (edge == null) return FallbackOffscreenPoint(worldPos, side, margin);
+
+        float signedMargin = (side == BoundaryWrap.BoundarySide.Left || side == BoundaryWrap.BoundarySide.Bottom) ? -margin : margin;
+        if (side == BoundaryWrap.BoundarySide.Left || side == BoundaryWrap.BoundarySide.Right)
+            worldPos.x = edge.Value + signedMargin;
+        else
+            worldPos.y = edge.Value + signedMargin;
+        return worldPos;
+    }
+
+    // Used only when TrueEdgeCoordinate can't determine the real screen edge (no Camera.main /
+    // no Boundaries.Instance yet) — pushes far enough in the outward direction to guarantee
+    // "off screen" for any reasonable camera setup, rather than silently handing back the
+    // caller's original (on-screen) position.
+    private static Vector2 FallbackOffscreenPoint(Vector2 worldPos, BoundaryWrap.BoundarySide side, float margin)
+    {
+        const float safeFallbackDistance = 100f;
+        return worldPos + OutwardDirection(side) * Mathf.Max(margin, safeFallbackDistance);
+    }
+
+    // True once `worldPos` has cleared `side`'s true edge by at least `margin`.
+    public static bool IsPastOffscreenThreshold(Vector2 worldPos, BoundaryWrap.BoundarySide side, float margin)
+    {
+        float? edge = TrueEdgeCoordinate(side);
+        // Fail toward "keep driving it outward," not "already off-screen" — the latter would
+        // let the exit-carry loop stop immediately while the vehicle is still fully visible.
+        if (edge == null) return false;
+
+        return side switch
+        {
+            BoundaryWrap.BoundarySide.Left  => worldPos.x <= edge.Value - margin,
+            BoundaryWrap.BoundarySide.Right => worldPos.x >= edge.Value + margin,
+            BoundaryWrap.BoundarySide.Top   => worldPos.y >= edge.Value + margin,
+            _ /* Bottom */                   => worldPos.y <= edge.Value - margin,
+        };
+    }
+
+    // Generalizes the bottom-row-only spawn placement LocalPlayer.SelectionLaunch.cs uses at
+    // initial launch to an arbitrary edge, so a vehicle can enter a new maze from wherever the
+    // mirrored exit of the interstitial it just left puts it. Rather than teleporting straight to
+    // that entry cell, stages each vehicle off-screen along the same row/column and locks its
+    // input; StartChosenMotifOrPhase drives it in from there once the maze — generated against
+    // these same returned cells, not live position — is ready, so entry reads as a slide-in
+    // instead of an instant pop. Deliberately does NOT carve a keep-clear pocket here:
+    // StartNextPhaseMazeAndStar's own ClearMaze()+GenerateMazeForPhaseWithPaths call carves each
+    // vehicle's landing disk itself (CarvePermanentDisk) using the cells returned here, and
+    // Vehicle's own per-frame RefreshVehicleKeepClearIfNeeded() is intentionally a no-op for the
+    // whole bridge sequence (gfm.BridgePending), so there's no window where dust could bury one.
+    private Dictionary<Vehicle, Vector2Int> StageVehiclesOffscreenAtEdge(
+        BoundaryWrap.BoundarySide edge, Vector2Int exitAnchorCell, List<LocalPlayer> lockedOwners)
+    {
+        var entryCells = new Dictionary<Vehicle, Vector2Int>();
+
+        var drums = _gameFlow.activeDrumTrack;
+        if (drums == null) return entryCells;
+
+        int w = drums.GetSpawnGridWidth();
+        int h = drums.GetSpawnGridHeight();
+        if (w <= 0 || h <= 0) return entryCells;
+
+        // Carry the exit's along-edge position over to the entry point instead of picking a
+        // random spot on the mirrored edge: exiting bottom-right should land bottom-left, not
+        // wherever chance puts it on the left edge.
+        int row = Mathf.Clamp(exitAnchorCell.y, 1, Mathf.Max(1, h - 2));
+        int col = Mathf.Clamp(exitAnchorCell.x, 0, Mathf.Max(0, w - 1));
+        float margin = _gameFlow.PathTransitionOffscreenMargin;
+
+        foreach (var v in _gameFlow.GetVehicles())
+        {
+            if (v == null) continue;
+
+            var cell = edge switch
+            {
+                BoundaryWrap.BoundarySide.Left  => new Vector2Int(0, row),
+                BoundaryWrap.BoundarySide.Right => new Vector2Int(w - 1, row),
+                BoundaryWrap.BoundarySide.Top   => new Vector2Int(col, h - 1),
+                _ /* Bottom */                  => new Vector2Int(col, 1),
+            };
+            entryCells[v] = cell;
+
+            // Already false from PathChoiceCoordinator's exit-carry, but stay defensive here
+            // too — this is the method actually responsible for a vehicle sitting off-screen,
+            // and it must not collide with the boundary wall while staged there.
+            SetVehicleSolid(v, false);
+
+            Vector2 stagingPos = OffscreenPointAlong(drums.GridToWorldPosition(cell), edge, margin);
+            if (v.rb != null)
+            {
+                v.rb.position = stagingPos;
+                v.rb.linearVelocity = Vector2.zero;
+            }
+            else
+            {
+                v.transform.position = stagingPos;
+            }
+
+            foreach (var lp in _session.Players)
+            {
+                if (lp != null && lp.plane == v)
+                {
+                    lp.SetInputLocked(true);
+                    lockedOwners.Add(lp);
+                    break;
+                }
+            }
+        }
+
+        return entryCells;
+    }
+
+    // Drives each staged vehicle from its off-screen point (set by StageVehiclesOffscreenAtEdge)
+    // in to its real entry cell, mirroring PathChoiceCoordinator's exit-carry loop so entry and
+    // exit read as the same kind of scripted travel rather than two different mechanisms.
+    private IEnumerator DriveVehiclesInFromOffscreen(Dictionary<Vehicle, Vector2Int> entryCells)
+    {
+        var drums = _gameFlow.activeDrumTrack;
+        if (drums == null || entryCells.Count == 0) yield break;
+
+        const float arriveDistanceSq = 0.75f * 0.75f;
+        float timeout = _gameFlow.PathTransitionTravelTimeout;
+        var pending = new List<Vehicle>(entryCells.Keys);
+        float elapsed = 0f;
+
+        while (elapsed < timeout && pending.Count > 0)
+        {
+            for (int i = pending.Count - 1; i >= 0; i--)
+            {
+                var v = pending[i];
+                if (v == null) { pending.RemoveAt(i); continue; }
+
+                Vector2 targetWorld = drums.GridToWorldPosition(entryCells[v]);
+                Vector2 toTarget = targetWorld - (Vector2)v.transform.position;
+                if (toTarget.sqrMagnitude <= arriveDistanceSq)
+                {
+                    SnapVehicleTo(v, targetWorld);
+                    SetVehicleSolid(v, true);
+                    pending.RemoveAt(i);
+                    continue;
+                }
+                v.Move(toTarget.normalized);
+            }
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        // Timeout safety net: don't leave anyone stranded just outside the maze.
+        foreach (var v in pending)
+        {
+            if (v == null) continue;
+            SnapVehicleTo(v, drums.GridToWorldPosition(entryCells[v]));
+            SetVehicleSolid(v, true);
+        }
+    }
+
+    private static void SnapVehicleTo(Vehicle v, Vector2 worldPos)
+    {
+        if (v.rb != null)
+        {
+            v.rb.position = worldPos;
+            v.rb.linearVelocity = Vector2.zero;
+        }
+        else
+        {
+            v.transform.position = worldPos;
+        }
+    }
+
+    public IEnumerator StartNextPhaseMazeAndStar(
+        bool doHardReset = true, IReadOnlyDictionary<Vehicle, Vector2Int> vehicleCellOverrides = null)
     {
         var drums = _gameFlow.activeDrumTrack;
         var dust = _gameFlow.dustGenerator;
@@ -412,10 +694,18 @@ public sealed class SceneFlowCoordinator
         var starCell = drums.GetRandomAvailableCell();
         if (starCell.x < 0) yield break;
 
+        // When called from the path-choice entry sequence, vehicles are deliberately staged
+        // off-screen at this point (see StageVehiclesOffscreenAtEdge) — their live transform
+        // position would carve/reserve the wrong cells, so prefer the intended entry cell.
+        Vector2Int CellFor(Vehicle v) =>
+            vehicleCellOverrides != null && vehicleCellOverrides.TryGetValue(v, out var overrideCell)
+                ? overrideCell
+                : drums.WorldToGridPosition(v.transform.position);
+
         _vehicleCellsScratch.Clear();
         foreach (var v in _gameFlow.GetVehicles())
             if (v != null && v.isActiveAndEnabled)
-                _vehicleCellsScratch.Add(drums.WorldToGridPosition(v.transform.position));
+                _vehicleCellsScratch.Add(CellFor(v));
 
         dust.SetReservedVehicleCells(_vehicleCellsScratch);
 
@@ -437,7 +727,7 @@ public sealed class SceneFlowCoordinator
                 foreach (var v in vehicleList)
                 {
                     if (v == null || !v.isActiveAndEnabled) continue;
-                    Vector2Int center = drums.WorldToGridPosition(v.transform.position);
+                    Vector2Int center = CellFor(v);
                     if (trapMotif.trapShape == TrapShape.Circle)
                     {
                         int inner = Mathf.Max(0, trapMotif.trapRadius - 1);
@@ -467,10 +757,18 @@ public sealed class SceneFlowCoordinator
 
         yield return _gameFlow.StartCoroutine(dust.GenerateMazeForPhaseWithPaths(starCell, _vehicleCellsScratch, 1.0f, onBeforeGrowth: trapCallback));
 
-        _gameFlow.PlayVehiclePhaseInFx();
+        dust.SetTravelCorridors(_vehicleCellsScratch, starCell, radiusCells: 1);
 
-        if (_gameFlow.GetVehiclePhaseInDelaySeconds() > 0f)
-            yield return new WaitForSeconds(_gameFlow.GetVehiclePhaseInDelaySeconds());
+        // When vehicleCellOverrides is set, vehicles are still staged off-screen (path-choice
+        // entry) — StartChosenMotifOrPhase plays the phase-in FX itself once they've actually
+        // slid into position, so firing it here would burst at the wrong (off-screen) spot.
+        if (vehicleCellOverrides == null)
+        {
+            _gameFlow.PlayVehiclePhaseInFx();
+
+            if (_gameFlow.GetVehiclePhaseInDelaySeconds() > 0f)
+                yield return new WaitForSeconds(_gameFlow.GetVehiclePhaseInDelaySeconds());
+        }
 
         drums.RequestPhaseStar(starCell);
         dust.ResetMazeGenerationFlag();

@@ -106,6 +106,14 @@ public partial class CosmicDustGenerator : MonoBehaviour
         cell => { TryGetCellGo(cell, out var go); return go; },
         (cell, mode, fade, scheduleRegrow) => ClearCell(cell, mode, fade, scheduleRegrow));
 
+    private CosmicDustCorridorReservationController _corridorReservationBacking;
+    private CosmicDustCorridorReservationController _corridorReservation => _corridorReservationBacking ??= new CosmicDustCorridorReservationController(
+        () => drums != null ? drums.GetSpawnGridWidth() : 0,
+        () => drums != null ? drums.GetSpawnGridHeight() : 0,
+        () => dustClaims,
+        cell => _permanentClearCells.Contains(cell),
+        cell => RequestRegrowCellAt(cell, -1f, true, false));
+
     private CosmicDustColliderSuppressionController _colliderSuppressionBacking;
     private CosmicDustColliderSuppressionController _colliderSuppression => _colliderSuppressionBacking ??= new CosmicDustColliderSuppressionController(
         _gridState,
@@ -443,6 +451,16 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
             regrowRole = ClearCellFlag(gp, CellFlags.ZapForceGray) ? MusicalRole.None : _roleDensity.ResolveRegrowRole(gp);
             ClearCellFlag(gp, CellFlags.ForceGrayRegrow);
+            // TEMP DIAGNOSTIC: pin down the dust-color-drift-on-regrow report.
+            if (GameFlowManager.VerboseLogging)
+            {
+                DustImprint diagImp = default;
+                bool hadImprint = _imprints != null && _imprints.TryGetValue(gp, out diagImp);
+                Debug.Log($"[CommitRegrowCell] gp={gp} hadImprint={hadImprint} " +
+                    $"existingRole={(hadImprint ? diagImp.role.ToString() : "n/a")} " +
+                    $"existingHiddenRole={(hadImprint ? diagImp.hiddenRole.ToString() : "n/a")} " +
+                    $"resolvedRegrowRole={regrowRole}");
+            }
 
             // --- Color from role profile (authoritative source) ---
             var roleProfile = _roleDensity.GetResolvedRoleProfile(regrowRole);
@@ -656,6 +674,33 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
     public float GetLiveCarveResistance01(Vector2Int cell) => _resistance.GetLiveCarveResistance01(cell);
 
+    // Fraction of the grid currently Solid, for callers that want to pace/throttle spawning
+    // (e.g. GravityVoidController) as a motif's dust accumulates.
+    public float GetSolidFraction()
+    {
+        int w = _gridState.Width;
+        int h = _gridState.Height;
+        if (w <= 0 || h <= 0) return 0f;
+        return Mathf.Clamp01(_roleDensity.TotalSolidCount() / (float)(w * h));
+    }
+
+    // Claims a persistent, guaranteed-open lane between each vehicle's current cell and the
+    // phase's objective cell (the PhaseStar). Call once per phase/motif start after the maze has
+    // been (re)generated; recomputing releases any cells that fell out of the new corridor.
+    public void SetTravelCorridors(IReadOnlyList<Vector2Int> fromCells, Vector2Int toCell, int radiusCells = 1) =>
+        _corridorReservation.SetCorridors(fromCells, toCell, radiusCells);
+
+    // Same as above, but keeps a simultaneous guaranteed lane open to every destination cell
+    // (used by the path-choice interstitial, where each exit must stay reachable at once).
+    public void SetTravelCorridors(IReadOnlyList<Vector2Int> fromCells, IReadOnlyList<Vector2Int> toCells, int radiusCells = 1) =>
+        _corridorReservation.SetCorridors(fromCells, toCells, radiusCells);
+
+    public void ClaimVehicleTrailCell(int ownerId, Vector2Int cell, float ttlSeconds) =>
+        _vehicleReservation.ClaimTrailCell(ownerId, cell, ttlSeconds);
+
+    public void ReleaseVehicleTrailCell(int ownerId, Vector2Int cell) =>
+        _vehicleReservation.ReleaseTrailCell(ownerId, cell);
+
     public bool TryGetDustAt(Vector2Int cell, out CosmicDust dust) {
         dust = null;
         if (!TryGetCellGo(cell, out var go) || go == null) return false;
@@ -665,6 +710,11 @@ public partial class CosmicDustGenerator : MonoBehaviour
     public Color MazeColor()
     {
         return config.mazeTint;
+    }
+
+    public Color SolidDustColor()
+    {
+        return config.solidDustTint;
     }
     public void ApplyActiveRoles(MotifProfile motif)
     {

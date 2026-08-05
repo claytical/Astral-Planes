@@ -1,0 +1,104 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &100000
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 400000}
+  - component: {fileID: 114000}
+  - component: {fileID: 114002}
+  - component: {fileID: 114004}
+  m_Layer: 0
+  m_Name: InstrumentTrack
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &400000
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &114000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ba22e9cc420e3e429d85dafbbecc80b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  trackColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  collectablePrefab: {fileID: 1316711709889716, guid: c828453352ebb154b89a3d30668886a5,
+    type: 3}
+  collectableParent: {fileID: 0}
+  assignedRole: 0
+  controller: {fileID: 0}
+  midiStreamPlayer: {fileID: 0}
+  drumTrack: {fileID: 0}
+  authoredRootMidi: 0
+  loopMultiplier: 1
+  config: {fileID: 11400000, guid: f57bdfba3f0e0440d9329728a5e2f6ef, type: 2}
+  spawnedCollectables: []
+  currentBurstId: 0
+  _binFilled: 
+  _binFillOrder: 
+  _binChordIndex: 
+  _nextFillOrdinal: 1
+  compositionSpawnEffectPrefab: {fileID: -3568776027110564007, guid: dc5ddd287a18c4c1a89ccf315973f73a,
+    type: 3}
+  binAllocated: 
+  _binCursor: 0
+  midiVoice: {fileID: 114004}
+  loopPattern: {fileID: 114002}
+  trackShadowColor: {r: 0.08, g: 0.08, b: 0.08, a: 1}
+  _loopCacheDirtyPending: 0
+  spawnBlockedMask:
+    serializedVersion: 2
+    m_Bits: 0
+--- !u!114 &114002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd0eca0389ef4d998136c071db692965, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LoopPattern
+--- !u!114 &114004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11ce2ca362e448e6abebcc17c72aa1e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MidiVoice
+  midiStreamPlayer: {fileID: 0}
+  drumTrack: {fileID: 0}
+  channel: 0
+  bank: 0

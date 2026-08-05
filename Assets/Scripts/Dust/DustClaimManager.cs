@@ -4,10 +4,11 @@ using UnityEngine;
 
 public enum DustClaimType
 {
-    KeepClear = 10,       // PhaseStar / vehicle pockets
-    Occupancy = 20,       // Collectable is sitting here
-    TemporaryCarve = 30,  // DiscoveryTrackNode erosion / corridor
-    PeekHole = 40,        // micro-hole for visibility
+    KeepClear = 10,        // PhaseStar / vehicle pockets
+    Occupancy = 20,        // Collectable is sitting here
+    TemporaryCarve = 30,   // DiscoveryTrackNode erosion / corridor
+    PeekHole = 40,         // micro-hole for visibility
+    CorridorReserved = 50, // Persistent guaranteed route between vehicle spawn and objective
 }
 
 public sealed class DustClaimManager : MonoBehaviour

@@ -21,6 +21,7 @@ public partial class InstrumentTrack
 
     void Awake()
     {
+        if (!collectableParent) collectableParent = transform;
         if (!midiVoice) midiVoice = GetComponent<MidiVoice>();
         if (!loopPattern) loopPattern = GetComponent<LoopPattern>() ?? gameObject.AddComponent<LoopPattern>();
         _expansionCtrl = new TrackExpansionController(this);

@@ -95,7 +95,7 @@ public sealed class GravityVoidController
         _gravityVoidCenterGP = centerGP;
         _gravityVoidHasCenterGP = true;
 
-        var c = MusicalRoleProfileLibrary.GetProfile(ownerTrack.assignedRole)?.GetBaseColor() ?? ownerTrack.DisplayColor;
+        var c = (ownerTrack.ActiveProfile ?? MusicalRoleProfileLibrary.GetProfile(ownerTrack.assignedRole))?.GetBaseColor() ?? ownerTrack.DisplayColor;
         _gravityVoidDustImprintTint = c;
         _gravityVoidParticleTint    = new Color(c.r, c.g, c.b, 1f);
 
@@ -190,6 +190,7 @@ public sealed class GravityVoidController
             {
                 lastBurstBin   = playheadBin;
                 int ringsThisBin = (playheadBin == 0) ? N : ringsPerSubseq;
+                ringsThisBin = ApplyDensityThrottle(ringsThisBin);
                 float growIn     = Mathf.Max(0.05f, GetSecondsRemainingInCurrentBin());
 
                 CollectVehicleGridCells();
@@ -203,6 +204,26 @@ public sealed class GravityVoidController
         }
 
         _gravityVoidRoutine = null;
+    }
+
+    // Nothing thins dust back down within a motif — only the full ClearMaze() reset at the next
+    // motif/phase transition does. As staged expansions repeatedly fire ring bursts, scale the
+    // ring count down once the grid is already dense so clutter can't climb unbounded within a
+    // single motif's void-growth window.
+    private const float kDensityThrottleHalfAt = 0.5f;
+    private const float kDensityThrottleSkipAt = 0.8f;
+
+    private int ApplyDensityThrottle(int ringsThisBin)
+    {
+        if (ringsThisBin <= 0) return ringsThisBin;
+
+        var dustGen = _getGfm()?.dustGenerator;
+        if (dustGen == null) return ringsThisBin;
+
+        float solidFraction = dustGen.GetSolidFraction();
+        if (solidFraction >= kDensityThrottleSkipAt) return 0;
+        if (solidFraction >= kDensityThrottleHalfAt) return Mathf.Max(1, ringsThisBin / 2);
+        return ringsThisBin;
     }
 
     private void CollectVehicleGridCells()
@@ -231,7 +252,9 @@ public sealed class GravityVoidController
             int innerR        = globalRingIdx * W;
             int outerR        = innerR + W;
             var ringRole      = activeRoles[globalRingIdx % N];
-            var roleProfile   = MusicalRoleProfileLibrary.GetProfile(ringRole);
+            var motif         = _getGfm()?.phaseTransitionManager?.currentMotif;
+            var roleProfile   = motif?.GetConfigForRoleAtBin(ringRole, 0, 1, 0)?.roleProfile
+                ?? MusicalRoleProfileLibrary.GetProfile(ringRole);
 
             dustGen.GrowVoidDustDiskFromGrid(
                 centerGP:                  _gravityVoidCenterGP,

@@ -411,13 +411,21 @@ public static class CosmicDustMazePatterns
         int mw   = Mathf.Max(1, width  / step);
         int mh   = Mathf.Max(1, height / step);
 
+        // Anchor room 0 at the grid's min edge and stretch the last room so its block's far
+        // edge lands on width-1/height-1. A fixed rx*step spacing leaves a leftover strip
+        // (whenever width/height aren't an exact multiple of step) that no room or corridor
+        // ever reaches — a disconnected dead-solid band along the top/right edges that
+        // BuildPorousBorderCells' top/right border gaps would open into a dead end.
+        int[] roomX = BuildRoomAnchors(mw, width, corridorWidth);
+        int[] roomY = BuildRoomAnchors(mh, height, corridorWidth);
+
         var openCells = new HashSet<Vector2Int>(mw * mh * step * 4);
 
         // Open a corridorWidth × corridorWidth block at each logical room centre
         for (int rx = 0; rx < mw; rx++)
         for (int ry = 0; ry < mh; ry++)
         {
-            int bx = rx * step, by = ry * step;
+            int bx = roomX[rx], by = roomY[ry];
             for (int dx = 0; dx < corridorWidth; dx++)
             for (int dy = 0; dy < corridorWidth; dy++)
                 openCells.Add(new Vector2Int(bx + dx, by + dy));
@@ -457,8 +465,8 @@ public static class CosmicDustMazePatterns
 
             // Carve a corridorWidth-wide passage between the two room blocks.
             // The passage spans the gap between room edges (not including the room blocks themselves).
-            int px0 = cur.x    * step, py0 = cur.y    * step;
-            int px1 = chosen.x * step, py1 = chosen.y * step;
+            int px0 = roomX[cur.x],    py0 = roomY[cur.y];
+            int px1 = roomX[chosen.x], py1 = roomY[chosen.y];
 
             if (px0 != px1) // horizontal passage
             {
@@ -497,6 +505,18 @@ public static class CosmicDustMazePatterns
         return growth;
     }
 
+    // Evenly spaces room anchors across [0, extent-1] so room 0 sits at 0 and the last room's
+    // corridorWidth-wide block reaches extent-1, instead of a fixed rx*step spacing that can
+    // leave a leftover unreachable strip when extent isn't an exact multiple of step.
+    private static int[] BuildRoomAnchors(int roomCount, int extent, int corridorWidth)
+    {
+        var anchors = new int[roomCount];
+        int maxAnchor = Mathf.Max(0, extent - corridorWidth);
+        for (int i = 0; i < roomCount; i++)
+            anchors[i] = roomCount <= 1 ? 0 : Mathf.RoundToInt(i * (float)maxAnchor / (roomCount - 1));
+        return anchors;
+    }
+
     /// <summary>
     /// Assigns a MusicalRole to every cell in <paramref name="cells"/> using a Voronoi
     /// partition driven by the motif's active roles.
@@ -526,6 +546,23 @@ public static class CosmicDustMazePatterns
         int exitCount,
         Func<int, int, bool> isCellAvailable)
     {
+        return BuildPorousBorderCells(width, height, exitCount, isCellAvailable, out _);
+    }
+
+    /// <summary>
+    /// Same as the 4-arg overload, but also returns the gap cell groups (one list of
+    /// (usually) 2 adjacent cells per exit, in generation order) via <paramref name="gapGroupsOut"/>
+    /// so callers can place something (a trigger, a marker) at each opening.
+    /// </summary>
+    public static HashSet<Vector2Int> BuildPorousBorderCells(
+        int width,
+        int height,
+        int exitCount,
+        Func<int, int, bool> isCellAvailable,
+        out List<List<Vector2Int>> gapGroupsOut)
+    {
+        gapGroupsOut = new List<List<Vector2Int>>();
+
         var result = new HashSet<Vector2Int>();
         if (width <= 0 || height <= 0 || isCellAvailable == null) return result;
 
@@ -562,27 +599,33 @@ public static class CosmicDustMazePatterns
                 if (segEnd <= segStart) segEnd = Mathf.Min(segStart + 1, n);
 
                 int firstIndex = Random.Range(segStart, segEnd);
-                gapCells.Add(perimeter[firstIndex]);
+                var group = new List<Vector2Int>(2);
+                if (gapCells.Add(perimeter[firstIndex]))
+                    group.Add(perimeter[firstIndex]);
 
-                if (n < minGapLength) continue;
+                if (n >= minGapLength)
+                {
+                    int secondIndex;
+                    if (firstIndex + 1 < segEnd)
+                    {
+                        secondIndex = firstIndex + 1;
+                    }
+                    else if (firstIndex - 1 >= segStart)
+                    {
+                        secondIndex = firstIndex - 1;
+                    }
+                    else
+                    {
+                        // Extremely short segment (length 1): spill to adjacent perimeter cell
+                        // so each porous opening is still visibly at least two cells long.
+                        secondIndex = (firstIndex + 1) % n;
+                    }
 
-                int secondIndex;
-                if (firstIndex + 1 < segEnd)
-                {
-                    secondIndex = firstIndex + 1;
-                }
-                else if (firstIndex - 1 >= segStart)
-                {
-                    secondIndex = firstIndex - 1;
-                }
-                else
-                {
-                    // Extremely short segment (length 1): spill to adjacent perimeter cell
-                    // so each porous opening is still visibly at least two cells long.
-                    secondIndex = (firstIndex + 1) % n;
+                    if (gapCells.Add(perimeter[secondIndex]))
+                        group.Add(perimeter[secondIndex]);
                 }
 
-                gapCells.Add(perimeter[secondIndex]);
+                if (group.Count > 0) gapGroupsOut.Add(group);
             }
         }
 

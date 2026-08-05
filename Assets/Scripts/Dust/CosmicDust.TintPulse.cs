@@ -17,6 +17,10 @@ public partial class CosmicDust
     private Color _hiddenHintColor; // Color.clear = no hint stored
     private bool _hasFeedbackColors = false;
     public bool regrowAlphaCapped = false;
+    // True for CellFlags.Solid path-choice maze walls: SpriteRenderer must stay off for this
+    // cell's whole lifecycle (particle-only look). Only set at the two Solid-flag creation
+    // sites in CosmicDustGenerator (BulkSpawn, VoidGrowth). Reset in PrepareForReuse.
+    public bool suppressSpriteRenderer = false;
     private const float kRegrowAlphaCap = 0.20f;
     [SerializeField] private float colliderDisabledAlpha = 0.08f;
     [SerializeField] private bool useWorkShaderParams = true;
