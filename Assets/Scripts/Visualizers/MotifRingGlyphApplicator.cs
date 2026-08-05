@@ -78,6 +78,10 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
     private int     _pendingDeformationCount;
     private Coroutine _gameplayHideCoroutine;
 
+    // Physical collision for gameplay bin rings only — never added for library-card
+    // (RecordRings) instances, since only SpawnBinRing lazily creates it.
+    private CircleCollider2D _ringCollider;
+
     private struct NoteAnimInfo
     {
         public InstrumentTrack         Track;
@@ -113,6 +117,29 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
 
     private float RingInnerRadius(int idx) =>
         config.innerRadius + idx * (config.ringThickness + config.ringSpacing);
+
+    // ── Gameplay collision ──────────────────────────────────────────────────
+    // Solid while the ring stack is flat (spawn, deformation, idle hide); disabled
+    // once the tilt-exit phase begins (RunSpinRollScale) so the vehicle can phase
+    // through. Static, non-trigger — Unity's physics solver pushes the vehicle out
+    // for free, same as CosmicDust.
+
+    private void EnsureRingCollider()
+    {
+        if (_ringCollider != null) return;
+        _ringCollider = GetComponent<CircleCollider2D>();
+        if (_ringCollider == null) _ringCollider = gameObject.AddComponent<CircleCollider2D>();
+        _ringCollider.isTrigger = false;
+        _ringCollider.enabled   = false;
+        int ringLayer = LayerMask.NameToLayer("RingGlyph");
+        if (ringLayer >= 0) gameObject.layer = ringLayer;
+    }
+
+    private void UpdateRingColliderRadius(int ringCount)
+    {
+        if (_ringCollider == null || config == null || ringCount <= 0) return;
+        _ringCollider.radius = RingInnerRadius(ringCount - 1) + config.ringThickness;
+    }
 
     private void RefreshPlayAreaFit(int ringCount)
     {
