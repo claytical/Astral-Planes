@@ -77,7 +77,7 @@ public partial class Vehicle
             }
             flickerPulseRoutine = StartCoroutine(ThudRoutine(collisionPoint));
         }
-    private void TriggerFlickerAndPulse(float scaleMultiplier, Color? baseColor = null, bool cycleHue = false)
+    private void TriggerFlickerAndPulse(float scaleMultiplier, Color? baseColor = null, bool cycleHue = false, float duration = 0.2f)
         {
             if (baseSprite == null || isFlickering) return;
 
@@ -86,8 +86,18 @@ public partial class Vehicle
                 StopCoroutine(flickerPulseRoutine); // Prevent stacking
             }
 
-            flickerPulseRoutine = StartCoroutine(FlickerAndPulseRoutine(scaleMultiplier, baseColor, cycleHue));
+            flickerPulseRoutine = StartCoroutine(FlickerAndPulseRoutine(scaleMultiplier, baseColor, cycleHue, duration));
         }
+
+    /// <summary>
+    /// Momentary "hit" reaction for an energy-draining blast (e.g. a discarded-note bomb):
+    /// flashes to the color that hit it, shrinks, then springs back to normal size/color.
+    /// SpectrumFlickerWithPulse's pulse curve is symmetric around 1, so a sub-1 scaleMultiplier
+    /// (drainFeedbackShrinkScale) produces a shrink-and-recover for free — same routine the
+    /// DiscoveryTrackNode bump reaction above uses with a >1 (grow) value.
+    /// </summary>
+    public void TriggerDrainFeedback(Color hitColor) =>
+        TriggerFlickerAndPulse(vehicleConfig.drainFeedbackShrinkScale, hitColor, false, vehicleConfig.drainFeedbackDuration);
     private IEnumerator ThudRoutine(Vector2 coll)
         {
             isFlickering = true;
@@ -95,14 +105,14 @@ public partial class Vehicle
             isFlickering = false;
             flickerPulseRoutine = null;
         }
-    private IEnumerator FlickerAndPulseRoutine(float scaleMultiplier, Color? baseColor, bool cycleHue)
+    private IEnumerator FlickerAndPulseRoutine(float scaleMultiplier, Color? baseColor, bool cycleHue, float duration = 0.2f)
         {
             isFlickering = true;
 
             yield return VisualFeedbackUtility.SpectrumFlickerWithPulse(
                 baseSprite,
                 transform,
-                0.2f,
+                duration,
                 scaleMultiplier,
                 cycleHue ? null : baseColor,
                 cycleHue

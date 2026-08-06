@@ -31,6 +31,7 @@ Coral and the 2D glyph path have both been fully removed — noted briefly rathe
        │    [SuperNode] ─── alternate ejection: multi-track chase bonus round
        │         │
        │    [Collectable] ─── autonomous drifter → Vehicle pickup → DSP deposit
+       │                       (or Vehicle discard → time bomb → blast → Vehicle drain)
        │
        ├─► [Vehicle] ─── player physics, energy, manual release queue
        │
@@ -281,7 +282,7 @@ DiscoveryTrackNode's alternate ejection outcome — a multi-track "bonus round" 
 ### Collectable
 `Assets/Scripts/Gameplay/Mining/Collectable.cs`
 
-A note-carrying orb spawned in bursts by `DiscoveryTrackNode` (or instant-filled by `SuperNode`). Has two lifecycle paths:
+A note-carrying orb spawned in bursts by `DiscoveryTrackNode` (or instant-filled by `SuperNode`). Has three lifecycle paths:
 
 **Path 1 — Auto-deposit:**
 ```
@@ -300,7 +301,29 @@ Vehicle trigger pickup → OnCollectablePickedUpForManualRelease()
   → Collectable.CommitManualReleaseAtStep() → InstrumentTrack.CommitManualReleasedNote()
 ```
 
-**Owns:** assigned note + step + bin, carry state, grid occupancy cell (`_currentCell`), tether line.
+**Path 3 — Discard → Time Bomb** (`Collectable.Bomb.cs`):
+```
+Vehicle discards a carried note (missed release window, sacrificed outside window,
+manual-release queue overflow, or Vehicle death) → OnManualReleaseDiscarded(step)
+  → ArmAsTimeBomb(step)
+      Rigidbody2D → Kinematic (pinned exactly in place — immune to the physics
+        engine's own collision depenetration as its collider grows, which a
+        Dynamic body is not; still generates collisions against the Dynamic
+        Vehicle for bump-detonation)
+      fuse = InstrumentTrack.ComputeDepositDsp(step) − now, floored at minFuseSeconds
+        (same DSP step-clock math that schedules normal note deposits — a note
+        discarded right after its own step passed gets nearly a full loop to
+        clear the area; discarded right before its step gets a short fuse)
+      swells + tints toward warningColor every frame until fuse-out
+  → Detonate() — on fuse-out OR immediately on Vehicle collision (TriggerEarlyDetonation)
+      for every Vehicle within blastRadius: Vehicle.DrainEnergy() + Vehicle.TriggerDrainFeedback()
+  → FlashThenImplode() — flashes to a size matching blastRadius, then collapses → Destroy()
+```
+An armed bomb still counts toward `GameFlowManager.AnyCollectablesInFlightGlobal()` until
+this sequence fully destroys it — `StarPool`/`PhaseStar` bridge gates wait on a ticking
+bomb exactly like an uncollected note.
+
+**Owns:** assigned note + step + bin, carry state, grid occupancy cell (`_currentCell`), tether line, bomb-armed state once discarded (fuse timing, swell/detonation/implosion scale, Kinematic pin — `Collectable.Bomb.cs`).
 
 **Autonomous movement:** the timeline ghost pulse (`DrumTrack.OnStepChanged` crossing the note's step) sounds the note and arms a movement intent for the note's duration; role-specific patterns (Bass charges, Lead headings, Groove darts, Harmony orbits) run under a home tether with vehicle-flee. **While an intent is armed the note plows through dust** (`CarveCellPreserveGray`, source `CollectablePlow` — gray regrow, temporary corridors); between intents it bounces off dust. The arrival flight also carves its path gray (source `CollectableArrival`).
 
@@ -331,6 +354,15 @@ Collectable trigger → EnqueuePendingCollectedNote()
   → CommitManualReleaseAtStep() → track.CommitManualReleasedNote()
   → NoteVisualizer ghost cue cleared
 ```
+
+**External energy drain:** `DrainEnergy(amount, source)` (`Vehicle.Energy.cs`) is the shared
+entry point any system uses to damage a vehicle from outside its own boost loop — dust
+boost-collision resistance (`CosmicDust.Collision.cs`) and a detonating bomb Collectable
+within blast radius (`Collectable.Bomb.cs`, Path 3 above) both call it. A bomb hit also
+calls `TriggerDrainFeedback(color)` (`Vehicle.Damage.cs`) — a momentary flash-to-hit-color,
+shrink, and spring-back reaction reusing the same flicker/pulse machinery as the
+`DiscoveryTrackNode`-bump reaction, so the hit reads on the vehicle itself rather than only
+the fuel UI ticking down.
 
 **Listens to:** `DrumTrack.OnStepChanged` (release cue beat countdown).
 
@@ -492,3 +524,22 @@ Vehicle plow-carves dust → cell regrows in its true role color + charge
 ```
 Collectable dust removal (arrival flight + intent-window plowing) and SuperNodeTrackNode dust-seeking always regrow gray —
 they open temporary corridors but never feed the star.
+
+### Flow F — Discard → Time Bomb → Blast
+```
+Vehicle discards a carried note (miss window / sacrifice / queue overflow / vehicle death)
+  → Collectable.ArmAsTimeBomb(authoredAbsStep)
+      Rigidbody2D → Kinematic (pinned, immune to physics-engine depenetration)
+      fuse = InstrumentTrack.ComputeDepositDsp(step) − now, floored at minFuseSeconds
+      swells + tints toward warningColor each frame until fuse-out
+  → Detonate() — fuse-out OR Vehicle bump (TriggerEarlyDetonation)
+      for each Vehicle within blastRadius:
+        Vehicle.DrainEnergy(amount, "TimeBombCollectable")
+        Vehicle.TriggerDrainFeedback(warningColor)
+  → FlashThenImplode() — flash to blastRadius-matched size, then collapse → Destroy()
+```
+The note's own energy was already processed at pickup (a partial refund is granted on most
+discard paths via `CollectEnergy(amount * .25f)`, `Vehicle.NoteRelease.cs`) — leaving it out
+of the loop is what makes it unstable. Drain amount scales by the collectable's own
+`MusicalRoleProfile.drainResistance01` (the same field/formula dust boost-collision drain
+uses) and falls off with distance to `edgeDamageFraction` at the blast edge.

@@ -60,6 +60,11 @@ public partial class Collectable
                 continue;
             }
 
+            // Note: an armed bomb never reaches this point — ArmAsTimeBomb (Collectable.Bomb.cs)
+            // switches it to a Kinematic Rigidbody2D to hold it perfectly in place (immune to
+            // physics-engine collision response), and the Dynamic-only gate above already
+            // continues past it. Its own BombFuseRoutine owns velocity-zeroing directly.
+
             // The intent window is armed by HandleTimelineStep when the playhead crosses
             // this note's step; between pulses the note rests near home.
             _intentTimer = Mathf.Max(0f, _intentTimer - fdt);
@@ -411,6 +416,16 @@ public partial class Collectable
     private void OnCollisionEnter2D(Collision2D coll)
     {
         if (_rb == null && !TryGetComponent(out _rb)) return;
+
+        if (_isBomb)
+        {
+            var bumpedVehicle = coll.collider != null ? coll.collider.GetComponent<Vehicle>() : null;
+            if (bumpedVehicle != null)
+            {
+                TriggerEarlyDetonation();
+                return;
+            }
+        }
 
         var dust = coll.collider != null ? coll.collider.GetComponent<CosmicDust>() : null;
         if (dust != null)

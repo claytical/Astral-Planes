@@ -115,7 +115,10 @@ public partial class LocalPlayer
         _launched = false;
         _launchStarted = false;
 
-        int playerCount = GameFlowManager.Instance?.SessionState.Players.Count ?? 1;
+        // Fully chained ?. — SessionState/Players being null (not just Instance) must not throw
+        // here: this runs synchronously on whatever call stack killed the vehicle, which can be
+        // a bomb's Detonate() drain loop, and an unguarded NRE there would abort cleanup.
+        int playerCount = GameFlowManager.Instance?.SessionState?.Players?.Count ?? 1;
         bool isMultiplayer = playerCount >= 2;
         bool vehiclesAvailable = Hangar.Instance?.HasAvailableVehicles() ?? false;
 

@@ -95,4 +95,11 @@ public class VehicleConfig : ScriptableObject
     public float trailFirstSlotOffset = 0.7f;
     [Tooltip("Number of historical positions stored for trail direction sampling.")]
     public int trailHistoryCapacity = 48;
+
+    [Header("Drain Feedback")]
+    [Range(0.1f, 1f)]
+    [Tooltip("Scale the vehicle shrinks to at the bottom of the flicker/pulse when hit by an energy-draining blast (e.g. a discarded-note bomb). 1 = no shrink.")]
+    public float drainFeedbackShrinkScale = 0.7f;
+    [Tooltip("Duration of the shrink-and-recover flicker/pulse triggered by a drain hit.")]
+    public float drainFeedbackDuration = 0.25f;
 }

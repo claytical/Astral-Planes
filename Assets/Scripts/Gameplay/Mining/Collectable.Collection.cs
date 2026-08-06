@@ -53,6 +53,8 @@ public partial class Collectable
     {
         // Protected flight: the note is untouchable until it lands on its cell.
         if (_inSpawnArrival || _handled) return;
+        // Armed time bomb: no longer collectable, only drifts toward detonation.
+        if (_isBomb) return;
 
         var vehicle = coll.GetComponent<Vehicle>();
         if (vehicle == null) return;

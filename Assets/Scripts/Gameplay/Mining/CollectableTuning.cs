@@ -22,6 +22,9 @@ public class CollectableTuning : ScriptableObject
     [Header("Dust Collision")]
     public DustCollisionParams dustCollision = new();
 
+    [Header("Discard → Time Bomb")]
+    public BombParams bomb = new();
+
     public void Validate()
     {
         depositTiming ??= new DepositTimingParams();
@@ -30,10 +33,12 @@ public class CollectableTuning : ScriptableObject
         noteTrail ??= new NoteTrailParams();
         dustCollision ??= new DustCollisionParams();
         baseMotion ??= new BaseMotionParams();
+        bomb ??= new BombParams();
 
         depositTiming.Validate();
         absorbVfx.Validate();
         dustCollision.Validate();
+        bomb.Validate();
     }
 
     private void OnValidate() => Validate();
@@ -141,5 +146,51 @@ public sealed class DustCollisionParams
         dustCollisionEnterImpulse = Mathf.Max(0f, dustCollisionEnterImpulse);
         dustCollisionStayForce = Mathf.Max(0f, dustCollisionStayForce);
         arrivalCarveFadeSeconds = Mathf.Max(0f, arrivalCarveFadeSeconds);
+    }
+}
+
+[Serializable]
+public sealed class BombParams
+{
+    [Tooltip("World-unit radius scanned for vehicles at detonation.")]
+    public float blastRadius = 5f;
+
+    [Tooltip("Base drain, as a multiplier of the note's own processed energy value (Collectable.amount).")]
+    public float drainMultiplier = 2f;
+
+    [Tooltip("Fraction of full drain dealt at the edge of the blast radius (1 = no falloff, full damage everywhere in range).")]
+    [Range(0f, 1f)] public float edgeDamageFraction = 0.25f;
+
+    [Tooltip("Minimum seconds between discard and detonation, regardless of how close the encoded step already was.")]
+    public float minFuseSeconds = 0.75f;
+
+    [Tooltip("Pulse frequency (Hz) at the start of the fuse.")]
+    public float minPulseHz = 0.6f;
+
+    [Tooltip("Pulse frequency (Hz) right before detonation.")]
+    public float maxPulseHz = 4f;
+
+    [Tooltip("Peak scale multiplier the collectable (and its particle systems, kept in lockstep) swells to right before detonation. 2 = about twice its normal size.")]
+    public float maxPulseScale = 2f;
+
+    [Tooltip("Color the collectable and its core particle system tint toward as the fuse burns down, and flash to at the moment of detonation.")]
+    public Color warningColor = new Color(1f, 0.2f, 0.2f, 0.85f);
+
+    [Tooltip("Seconds the detonation flash takes: right after damage is dealt, the collectable (and its particle systems) scale up from wherever the countdown swell left them to a size matching the real blastRadius, before the implosion collapse begins.")]
+    public float detonationFlashSeconds = 0.15f;
+
+    [Tooltip("Seconds the post-detonation collapse takes: the flashed-out collectable (and its particle systems) shrink back to nothing together before being destroyed.")]
+    public float implosionSeconds = 0.25f;
+
+    public void Validate()
+    {
+        blastRadius = Mathf.Max(0f, blastRadius);
+        drainMultiplier = Mathf.Max(0f, drainMultiplier);
+        minFuseSeconds = Mathf.Max(0.05f, minFuseSeconds);
+        minPulseHz = Mathf.Max(0.01f, minPulseHz);
+        maxPulseHz = Mathf.Max(minPulseHz, maxPulseHz);
+        maxPulseScale = Mathf.Max(1f, maxPulseScale);
+        detonationFlashSeconds = Mathf.Max(0.01f, detonationFlashSeconds);
+        implosionSeconds = Mathf.Max(0.01f, implosionSeconds);
     }
 }
