@@ -413,7 +413,9 @@ public partial class InstrumentTrack
     // Computes the DSP time at which a collectable should deposit its note.
     // Anchors to the next occurrence of finalTargetStep in leader-step space so that
     // bin expansion does not shift the confirm timing relative to persistentLoopNotes.
-    private double ComputeDepositDsp(int finalTargetStep)
+    // Internal: also used by Collectable.Bomb.cs to schedule a discarded note's detonation
+    // at the next occurrence of its encoded step.
+    internal double ComputeDepositDsp(int finalTargetStep)
     {
         if (drumTrack == null)
             return AudioSettings.dspTime + 0.05;

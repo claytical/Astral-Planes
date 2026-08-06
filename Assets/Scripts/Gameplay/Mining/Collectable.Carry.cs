@@ -290,7 +290,7 @@ public partial class Collectable
         }
     }
 
-    public void OnManualReleaseDiscarded()
+    public void OnManualReleaseDiscarded(int authoredAbsStep)
     {
         ReportedCollected = true;
 
@@ -299,19 +299,7 @@ public partial class Collectable
 
         if (_carryRoutine != null) { StopCoroutine(_carryRoutine); _carryRoutine = null; }
 
-        var ex = GetComponent<Explode>();
-        if (ex != null)
-        {
-            ex.SetTint(new Color(1f, 0.2f, 0.2f), multiply: false);
-            ex.Permanent(false);
-        }
-
-        if (energySprite != null)
-            energySprite.color = new Color(1f, 0.2f, 0.2f, 0.85f);
-
-        assignedInstrumentTrack?.spawnedCollectables?.Remove(gameObject);
-
-        Destroy(gameObject);
+        ArmAsTimeBomb(authoredAbsStep);
     }
 
     public void OnManualReleaseConsumed()

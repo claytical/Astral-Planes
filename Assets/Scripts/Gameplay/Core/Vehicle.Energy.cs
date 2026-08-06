@@ -64,7 +64,11 @@ public partial class Vehicle
             energyLevel -= amount;
             energyLevel = Mathf.Max(0, energyLevel);
             _cumulativeEnergySpent += Mathf.Max(0f, amount);
-            if (energyLevel <= 0)
+            // !_isDead guards against re-entering the death cascade if this vehicle is drained
+            // again after already dying (e.g. overlapping bomb blast radii in the same frame) —
+            // without it, Explode/DiscardCarriedCollectables/OnVehicleDied/CheckAllPlayersOutOfEnergy
+            // would all fire a second time before the delayed Destroy(gameObject, 1) catches up.
+            if (energyLevel <= 0 && !_isDead)
             {
                 _isDead = true;
                 rb.linearVelocity = Vector2.zero;

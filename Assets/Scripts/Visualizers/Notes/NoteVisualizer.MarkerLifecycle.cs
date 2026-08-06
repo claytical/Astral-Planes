@@ -44,20 +44,6 @@ public partial class NoteVisualizer
         ClearManualReleaseCue(vehicle);
     }
 
-    public void BlastManualReleaseCueFailure(Transform vehicle, Vector3 blastPos, Color roleColor)
-    {
-        ClearManualReleaseCue(vehicle);
-
-        if (failureExplosionPrefab != null)
-        {
-            var ps = Instantiate(failureExplosionPrefab, blastPos, Quaternion.identity);
-            var main = ps.main;
-            main.startColor = roleColor * 0.45f;
-            ps.Play();
-            Destroy(ps.gameObject, main.duration + main.startLifetime.constantMax);
-        }
-    }
-
     public void PulseMarkerSpecial(InstrumentTrack track, int stepAbs)
     {
         if (track == null) return;

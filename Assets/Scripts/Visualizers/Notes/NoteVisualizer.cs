@@ -26,8 +26,6 @@ public partial class NoteVisualizer : MonoBehaviour
     [Header("Manual Release Cue")]
     [Tooltip("Prefab for the ghost/cue that travels between the vehicle and the next unlit placeholder marker.")]
     public GameObject releaseCuePrefab;
-    [Tooltip("Particle prefab instantiated at the release cue position when a manual release fails.")]
-    [SerializeField] private ParticleSystem failureExplosionPrefab;
     [SerializeField] private Color failureColor = new Color(1f, 0.12f, 0.05f, 1f);
     [Header("Track Rows (one per InstrumentTrack in controller order)")]
     public List<RectTransform> trackRows;

@@ -42,11 +42,11 @@ public partial class Vehicle
     private void DiscardCarriedCollectables()
     {
         foreach (var armed in _armedReleases)
-            armed.note.collectable?.OnManualReleaseDiscarded();
+            armed.note.collectable?.OnManualReleaseDiscarded(armed.note.authoredAbsStep);
         _armedReleases.Clear();
 
         foreach (var pending in _pendingNotes)
-            pending.collectable?.OnManualReleaseDiscarded();
+            pending.collectable?.OnManualReleaseDiscarded(pending.authoredAbsStep);
         _pendingNotes.Clear();
 
         _releaseButtonHeld = false;
@@ -79,7 +79,7 @@ public partial class Vehicle
     private void DiscardPendingNote(PendingCollectedNote p)
     {
         _pendingNotes.Dequeue();
-        if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
+        if (p.collectable != null) p.collectable.OnManualReleaseDiscarded(p.authoredAbsStep);
         p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
     }
 
@@ -93,7 +93,7 @@ public partial class Vehicle
         {
             var dropped = _pendingNotes.Dequeue();
             if (dropped.collectable != null)
-                dropped.collectable.OnManualReleaseDiscarded();
+                dropped.collectable.OnManualReleaseDiscarded(dropped.authoredAbsStep);
             dropped.track?.NotifyNoteDiscarded(dropped.burstId, dropped.authoredAbsStep);
         }
 
@@ -132,7 +132,7 @@ public partial class Vehicle
     if (!p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbs, out int floorAbs, out int totalSteps))
     {
         _pendingNotes.Dequeue();
-        if (p.collectable != null) p.collectable.OnManualReleaseDiscarded();
+        if (p.collectable != null) p.collectable.OnManualReleaseDiscarded(p.authoredAbsStep);
         p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
         CollectEnergy(p.collectable.amount * .25f);
 //sacrifice note to gain small amount of energy instead of specific failure
@@ -205,8 +205,7 @@ public partial class Vehicle
         ResolvePlaybackNote(p, targetAbsStep, out int midiToPlay, out int durToPlay);
         p.track.PlayOneShotMidi(midiToPlay, p.velocity127, durToPlay);
         DiscardPendingNote(p);
-        Vector3 blastPos = p.collectable != null ? p.collectable.transform.position : transform.position;
-        viz?.BlastManualReleaseCueFailure(transform, blastPos, p.track.DisplayColor);
+        viz?.ClearManualReleaseCue(transform);
         if (p.collectable != null) CollectEnergy(p.collectable.amount * .25f);
         return false;
     }
