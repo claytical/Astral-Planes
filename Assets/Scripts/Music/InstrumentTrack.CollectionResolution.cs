@@ -3,7 +3,7 @@ using UnityEngine;
 
 public partial class InstrumentTrack
 {
-    public void OnCollectableCollected(Collectable collectable, int reportedStep, int durationTicks, float force)
+    public void OnCollectableCollected(Vehicle vehicle, Collectable collectable, int reportedStep, int durationTicks, float force)
     {
         if (collectable == null || collectable.assignedInstrumentTrack != this) return;
         controller.NotifyCollected(this);
@@ -25,7 +25,7 @@ public partial class InstrumentTrack
         SnapshotBurstLeaderBins(collectable.burstId, finalTargetStep);
 
         int note = collectable.GetNote();
-        CollectNote(finalTargetStep, note, durationTicks, force, ResolveAuthoredRootMidi(finalTargetStep, note));
+        CollectNote(vehicle, finalTargetStep, note, durationTicks, force, ResolveAuthoredRootMidi(finalTargetStep, note));
 
         int targetBin = BinIndexForStep(finalTargetStep);
         if (GameFlowManager.VerboseLogging) Debug.Log($"[CURSOR] Target Bin={targetBin} binCursor: {_binCursor} allocated: {binAllocated} filled: {_binFilled}");

@@ -806,21 +806,20 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         spawnedCollectables.RemoveAll(go => go == null || !go.activeInHierarchy);
     }
 
-    private int CollectNote(int stepIndex, int note, int durationTicks, float force, int authoredRootMidi = int.MinValue)
+    private int CollectNote(Vehicle vehicle, int stepIndex, int note, int durationTicks, float force, int authoredRootMidi = int.MinValue)
     {
         int qNote = QuantizeNoteToBinChord(stepIndex, note, authoredRootMidi);
         if (GameFlowManager.VerboseLogging) Debug.Log($"[COLLECT:PITCH] track={name} step={stepIndex} raw={note} quantized={qNote} diff={qNote - note} authoredRoot={authoredRootMidi}");
         // Commit immediately (the loop evolves as notes are collected).
         AddNoteToLoop(stepIndex, note, durationTicks, force, false, authoredRootMidi);
 
-        // Immediate tactile feedback (short), then audition on-grid (full voice).
-        PlayCollectionConfirm(note, force);
-        //QuantizedAuditionToStep(stepIndex, note, durationTicks, force);
+        // Tactile confirmation, quantized + throttled per vehicle so clustered pickups don't stack.
+        controller?.PlayQuantizedCollectConfirm(vehicle, this, note, force);
 
         return stepIndex;
     }
-    
-    private void PlayCollectionConfirm(int note, float velocity)
+
+    public void PlayCollectionConfirm(int note, float velocity)
     {
         if (midiVoice == null) return;
         midiVoice.PlayCollectionConfirm(note, velocity);
