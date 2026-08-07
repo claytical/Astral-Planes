@@ -66,10 +66,10 @@ public partial class CosmicDust
         }
 
         if (Role == MusicalRole.None || Time.time < _nextDustPluckTime) return;
-        PlayNonBoostDustPluck();
+        PlayNonBoostDustPluck(vehicle);
     }
 
-    private void PlayNonBoostDustPluck()
+    private void PlayNonBoostDustPluck(Vehicle vehicle)
     {
         float hold01 = Mathf.Clamp01(_nonBoostClearSeconds / Mathf.Max(0.01f, pluck.swellSeconds));
         float bloom01 = hold01 * hold01;
@@ -78,7 +78,9 @@ public partial class CosmicDust
         float cooldown = Mathf.Lerp(pluck.maxCooldownSeconds, pluck.minCooldownSeconds, bloom01);
 
         if (_gfm == null) _gfm = GameFlowManager.Instance;
-        _gfm?.controller?.PlayDustChordPluck(Role, bloom01, 4, durTicks, vel127);
+        _gfm?.controller?.PlayDustChordPluck(vehicle, Role, bloom01, 4, durTicks, vel127);
+        // minCooldownSeconds must exceed the max single quantization step, or a cell could
+        // re-arm and fire again before its first (now-delayed) pluck actually sounds.
         _nextDustPluckTime = Time.time + cooldown;
     }
 

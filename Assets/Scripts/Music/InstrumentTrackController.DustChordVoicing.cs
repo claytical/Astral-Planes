@@ -22,7 +22,7 @@ public partial class InstrumentTrackController
         return null;
     }
 
-    public void PlayDustChordPluck(
+    private void ResolveAndPlayDustChordPluckNow(
         MusicalRole role,
         float phrase01 = 0f,
         int chordSize = 4,

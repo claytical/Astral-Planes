@@ -149,7 +149,8 @@ public partial class Collectable
             (matchedStep >= 0) ? matchedStep :
             (intendedStep >= 0) ? (((intendedStep % baseSteps) + baseSteps) % baseSteps) :
             0;
-        assignedInstrumentTrack.PlayQuantizedNoteForStep(stepToReportBase, assignedNote, noteDurationTicks, force);
+        assignedInstrumentTrack.controller?.PlayQuantizedCollectNote(
+            vehicle, assignedInstrumentTrack, stepToReportBase, assignedNote, noteDurationTicks, force);
         float velocity127 = ComputeHitVelocity127(vehicle);
 
         if (vehicle.ManualNoteReleaseEnabled)
@@ -158,7 +159,7 @@ public partial class Collectable
             return;
         }
 
-        HandleAutoDeposit(stepToReportBase, velocity127, force, baseSteps, drumTrack);
+        HandleAutoDeposit(vehicle, stepToReportBase, velocity127, force, baseSteps, drumTrack);
     }
 
     private void HandleManualPickup(Vehicle vehicle, int stepToReportBase, float velocity127)
@@ -182,9 +183,9 @@ public partial class Collectable
         _trailFollowRoutine = StartCoroutine(AbsorbThenTrailFollowRoutine(vehicle));
     }
 
-    private void HandleAutoDeposit(int stepToReportBase, float velocity127, float force, int baseSteps, DrumTrack drumTrack)
+    private void HandleAutoDeposit(Vehicle vehicle, int stepToReportBase, float velocity127, float force, int baseSteps, DrumTrack drumTrack)
     {
-        assignedInstrumentTrack.OnCollectableCollected(this, stepToReportBase, noteDurationTicks, velocity127);
+        assignedInstrumentTrack.OnCollectableCollected(vehicle, this, stepToReportBase, noteDurationTicks, velocity127);
 
         if (_rb == null) TryGetComponent(out _rb);
         if (_rb != null) _rb.simulated = false;
