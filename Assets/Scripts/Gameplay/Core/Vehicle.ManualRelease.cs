@@ -148,7 +148,7 @@ public partial class Vehicle
         {
             var targetNs = p.track.GetNoteSetForBin(targetBin);
             if (targetNs?.chordRegion != null && targetNs.chordRegion.Count > 0)
-                commitAuthoredRoot = targetNs.chordRegion[targetBin % targetNs.chordRegion.Count].rootNote;
+                commitAuthoredRoot = targetNs.chordRegion[p.track.ResolveChordRegionIndex(targetBin, targetNs.chordRegion.Count)].rootNote;
         }
 
         p.track.CommitManualReleasedNote(

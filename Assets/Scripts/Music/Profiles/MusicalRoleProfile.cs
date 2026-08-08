@@ -105,6 +105,8 @@ public class MusicalRoleProfile : ScriptableObject
     public RoleConfigSelectionMode configSelectionMode = RoleConfigSelectionMode.ByBin;
     [Tooltip("Override colors for chord voices 1, 2, … (voice 0 uses dustColors.baseColor). Only relevant when configSelectionMode = ByVoice.")]
     public Color[] chordVoiceColors;
+    [Tooltip("If true, every bin's riff for this role anchors to the motif's first/tonic chord root (chordRegion[0]) instead of walking the chord progression bin-by-bin. Lets a role hold one harmonic center across bins — e.g. a solo/lead pieced together from distinct per-bin riffs, or an arpeggio that shouldn't re-root each bin. Authored per-bin chord overrides still take priority. Only the bin-0-resolved profile governs this for the whole motif — same rule as configSelectionMode.")]
+    public bool sameRootAcrossBins = false;
 
     [Header("Presets")] public int midiPreset;
 

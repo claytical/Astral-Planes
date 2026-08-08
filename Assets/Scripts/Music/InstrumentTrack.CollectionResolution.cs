@@ -51,7 +51,7 @@ public partial class InstrumentTrack
         int resolveBin = BinIndexForStep(finalTargetStep);
         var resolveNs  = GetNoteSetForBin(resolveBin);
         if (resolveNs?.chordRegion != null && resolveNs.chordRegion.Count > 0)
-            return resolveNs.chordRegion[resolveBin % resolveNs.chordRegion.Count].rootNote;
+            return resolveNs.chordRegion[ResolveChordRegionIndex(resolveBin, resolveNs.chordRegion.Count)].rootNote;
 
         if (_gfm == null) _gfm = GameFlowManager.Instance;
         int chordIdx = Harmony_GetChordIndexForBin(resolveBin);

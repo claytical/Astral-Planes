@@ -145,7 +145,16 @@ public class NoteSetFactory : MonoBehaviour
     int ticksPerStep = ticksPerQuarter / (stepsPerBar / beatsPerBar);
 
     int authoredAnchor = riff.authoredRootMidi > 0 ? riff.authoredRootMidi : chordSeq[0].rootNote;
-    int targetRoot = chordSeq[binIndex % chordSeq.Count].rootNote;
+    // track.ActiveProfile is the bin-0-resolved profile (set by PhaseTransitionManager
+    // before this per-bin loop runs), so this agrees with what runtime quantization
+    // later reads via _activeProfile — falls back to this bin's own cfg.roleProfile
+    // only if ActiveProfile hasn't been resolved yet.
+    bool sameRootAcrossBins = track.ActiveProfile != null
+        ? track.ActiveProfile.sameRootAcrossBins
+        : (cfg.roleProfile != null && cfg.roleProfile.sameRootAcrossBins);
+    int targetRoot = sameRootAcrossBins
+        ? chordSeq[0].rootNote
+        : chordSeq[binIndex % chordSeq.Count].rootNote;
     // Exact-register transposition: the chord root's octave is authoritative.
     // No nearest-register normalization — a ♭III authored an octave below I
     // must pull the riff down with it.

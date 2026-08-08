@@ -86,8 +86,22 @@ public partial class InstrumentTrack
             if (authored >= 0) return authored;
         }
 
-        // Deterministic: absolute bin -> progression slot
-        return ((binIndex % progLen) + progLen) % progLen;
+        // Deterministic: absolute bin -> progression slot (or a fixed anchor when
+        // the active role profile wants every bin on the same root).
+        return ResolveChordRegionIndex(binIndex, progLen);
+    }
+
+    /// <summary>
+    /// Resolves which entry of a chord list (chordRegion or the live HarmonyDirector
+    /// progression) a given bin should use. Normally walks the progression
+    /// (bin % regionCount); when the active role profile has sameRootAcrossBins set,
+    /// every bin anchors to index 0 instead.
+    /// </summary>
+    public int ResolveChordRegionIndex(int bin, int regionCount)
+    {
+        regionCount = Mathf.Max(1, regionCount);
+        if (_activeProfile != null && _activeProfile.sameRootAcrossBins) return 0;
+        return ((bin % regionCount) + regionCount) % regionCount;
     }
 
     private static List<int> BuildChordTones(Chord chord, int lowestNote, int highestNote)
@@ -130,7 +144,7 @@ public partial class InstrumentTrack
     Chord chord, baseChord;
     if (region != null && region.Count > 0)
     {
-        int chordIdx = bin % region.Count;
+        int chordIdx = ResolveChordRegionIndex(bin, region.Count);
         chord     = region[chordIdx];
         baseChord = region[0];
     }
@@ -227,11 +241,15 @@ public partial class InstrumentTrack
             Chord baseChord = default;
             if (region != null && region.Count > 0)
             {
-                chord    = region[bin % region.Count];
+                chord    = region[ResolveChordRegionIndex(bin, region.Count)];
                 baseChord = region[0];
             }
             else
             {
+                // sameRootAcrossBins is honored inside Harmony_GetChordIndexForBin too, so a
+                // mid-motif progression swap (forceHarmonyDirector=true) re-roots this track to
+                // the NEW progression's chord-0 rather than staying frozen to the old root —
+                // intentional: "same root across bins", not "same root forever".
                 int chordIdx = Harmony_GetChordIndexForBin(bin);
                 if (_gfm == null) _gfm = GameFlowManager.Instance;
                 var hd = _gfm?.harmony;
