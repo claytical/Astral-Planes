@@ -41,6 +41,11 @@ public partial class GameFlowManager : MonoBehaviour
     [SerializeField, Min(0f)] private float pathExitParticleSpeed = 3f;
     public float PathExitParticleSpeed => pathExitParticleSpeed;
 
+    [Tooltip("Seconds to fade a losing exit's particle visual after it's sealed, before " +
+             "deactivating it. Keeps the tunnel closing from reading as an instant pop.")]
+    [SerializeField, Min(0f)] private float pathExitSealFadeSeconds = 0.35f;
+    public float PathExitSealFadeSeconds => pathExitSealFadeSeconds;
+
     [Tooltip("World units past the true screen edge a vehicle must clear before it counts as " +
              "off-screen — used both when carrying vehicles out through a chosen exit and when " +
              "staging them for their off-screen entry into the next maze.")]

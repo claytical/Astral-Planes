@@ -53,6 +53,12 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     [Tooltip("When enabled, the dust grid wraps toroidally — cells at one edge connect to the opposite edge.")]
     public bool toroidal = false;
 
+    [Header("Motif Density Normalization")]
+    [Tooltip("Average notes-per-bin per active voice at/below which a motif reads as fully sparse (busyness01=0). Reference scale, not per-motif authoring.")]
+    public float minNotesPerBinPerVoice = 2f;
+    [Tooltip("Average notes-per-bin per active voice at/above which a motif's busyness01 saturates to 1.")]
+    public float maxNotesPerBinPerVoice = 16f;
+
     [Header("Tint Diffusion")]
     [Tooltip("If enabled, recently modified cells gradually blend toward their neighbours.")]
     public bool enableTintDiffusion = true;

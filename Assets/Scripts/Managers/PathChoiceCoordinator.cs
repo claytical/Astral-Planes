@@ -149,10 +149,16 @@ public sealed class PathChoiceCoordinator
             // burst-style particle effect fires reliably no matter how the prefab is authored.
             foreach (var ps in visualInstance.GetComponentsInChildren<ParticleSystem>())
                 ps.Play();
+            // This coordinator already owns the visual's whole lifecycle (destroyed alongside
+            // the rest of the exit once a winner is chosen), so the prefab's own "destroy self
+            // once not playing" behavior is never needed here — and calling Stop() on the
+            // ParticleSystem for the seal-fade must not let it self-destroy mid-fade.
+            foreach (var explosion in visualInstance.GetComponentsInChildren<Explosion>(true))
+                explosion.enabled = false;
         }
 
         var exit = go.AddComponent<MazePathExit>();
-        exit.Configure(this, info.AnchorCell, new List<Vector2Int>(info.GapCells), info.Side, motifIdx, phaseIdx, visualInstance);
+        exit.Configure(this, info.AnchorCell, new List<Vector2Int>(info.GapCells), info.Side, motifIdx, phaseIdx, visualInstance, _gameFlow.PathExitSealFadeSeconds);
         return exit;
     }
 
@@ -336,6 +342,15 @@ public sealed class PathChoiceCoordinator
 
         foreach (var lp in lockedOwners)
             lp?.SetInputLocked(false);
+
+        // Losing exits' particle visuals are still fading (SetSealed kicked off a coroutine on
+        // each MazePathExit) — top up to the fade's full duration before hard-destroying the exit
+        // GameObjects below, so a fast carry-out (e.g. no losers, or one already close to the
+        // winner) can't cut a losing exit's dissolve short.
+        float remainingFade = _gameFlow.PathExitSealFadeSeconds - elapsed;
+        Debug.Log($"[PathExitFade] RedirectLosersAndAdvance: carry-out took {elapsed:F2}s, topping up {Mathf.Max(0f, remainingFade):F2}s before destroying {_allExits.Count} exit(s)");
+        if (remainingFade > 0f)
+            yield return new WaitForSeconds(remainingFade);
 
         int? chosenMotif = winnerExit.TargetMotifIndex;
         int? chosenPhase = winnerExit.TargetPhaseIndex;

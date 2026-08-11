@@ -712,7 +712,7 @@ public sealed class SceneFlowCoordinator
         var profileForPhase = _gameFlow.phaseTransitionManager?.currentMotif?.starBehavior;
         if (profileForPhase != null) dust.ApplyProfile(profileForPhase);
         dust.ApplyActiveRoles(_gameFlow.phaseTransitionManager?.currentMotif);
-        dust.ApplyMotifGeoConfig(_gameFlow.phaseTransitionManager?.currentMotif);
+        dust.ApplyMotifGeoConfig(_gameFlow.phaseTransitionManager?.currentMotif, _gameFlow.controller?.tracks);
 
         var trapMotif = _gameFlow.phaseTransitionManager?.currentMotif;
         System.Action<List<(Vector2Int, Vector3)>> trapCallback = null;

@@ -42,7 +42,7 @@ MonoBehaviour:
     dustCollisionStayForce: 2.25
     arrivalCarveFadeSeconds: 0.15
   bomb:
-    blastRadius: 10
+    blastRadius: 2
     drainMultiplier: 5
     edgeDamageFraction: 0.25
     minFuseSeconds: 0.75
@@ -50,4 +50,5 @@ MonoBehaviour:
     maxPulseHz: 4
     maxPulseScale: 1.6
     warningColor: {r: 1, g: 0.22521083, b: 0.07800001, a: 0.85}
+    detonationFlashSeconds: 0.15
     implosionSeconds: 0.25

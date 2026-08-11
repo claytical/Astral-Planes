@@ -85,7 +85,7 @@ public partial class CosmicDustGenerator
             }
         }
 
-        var mazeResult = BuildMazeGrowthFromConfig(interstitialPattern, contextAnchor, reserved, out var gapGroups);
+        var mazeResult = BuildMazeGrowthFromConfig(interstitialPattern, contextAnchor, reserved, out var gapGroups, busyness01Override: 0.5f);
 
         _mazePatternCells = new HashSet<Vector2Int>(mazeResult.Count);
         foreach (var (cell, _) in mazeResult)

@@ -13,6 +13,12 @@ public sealed class MazeTopologyService
         public Func<int, int, bool> IsCellAvailable;
         public Func<Vector2Int, bool> IsBlocked;
         public Func<Vector2Int, Vector2Int> NormalizeCell;
+
+        // 0=motif at/below CosmicDustGeneratorConfig.minNotesPerBinPerVoice, 1=at/above max.
+        // Default 0.5 is the neutral midpoint of every MazeDensityModulation formula, so a
+        // caller that never sets this gets byte-identical behavior to before density modulation
+        // existed (see CosmicDustGenerator.BuildMazeGrowthFromConfig's busyness01Override).
+        public float Busyness01 = 0.5f;
     }
 
     public HashSet<Vector2Int> BuildSolidCells(
@@ -42,16 +48,16 @@ public sealed class MazeTopologyService
         {
             MazePatternType.ClearBoxes => CosmicDustMazePatterns.BuildClearBoxes(
                 width, height,
-                config.clearBoxes.clearBoxCount,
-                config.clearBoxes.clearBoxWidth,
-                config.clearBoxes.clearBoxHeight,
+                MazeDensityModulation.ClearBoxesCount(config.clearBoxes.clearBoxCount, context.Busyness01),
+                MazeDensityModulation.ClearBoxesWidth(config.clearBoxes.clearBoxWidth, context.Busyness01),
+                MazeDensityModulation.ClearBoxesHeight(config.clearBoxes.clearBoxHeight, context.Busyness01),
                 _ => Vector3.zero,
                 context.IsCellAvailable,
                 _ => true),
             MazePatternType.CellularAutomata => CosmicDustMazePatterns.BuildCA(
                 width, height,
-                config.cellularAutomata.fillChance,
-                config.cellularAutomata.iterations,
+                MazeDensityModulation.CellularAutomataFillChance(config.cellularAutomata.fillChance, context.Busyness01),
+                MazeDensityModulation.CellularAutomataIterations(config.cellularAutomata.iterations, context.Busyness01),
                 context.GetHexDirectionsByRow,
                 _ => Vector3.zero,
                 context.IsCellAvailable,
@@ -59,8 +65,8 @@ public sealed class MazeTopologyService
             MazePatternType.RingChokepoints => CosmicDustMazePatterns.BuildRingChokepoints(
                 context.StarCell,
                 width, height,
-                config.ring.spacing,
-                config.ring.thickness,
+                MazeDensityModulation.RingSpacing(config.ring.spacing, context.Busyness01),
+                MazeDensityModulation.RingThickness(MazeDensityModulation.RingSpacing(config.ring.spacing, context.Busyness01), config.ring.thickness, context.Busyness01),
                 config.ring.jitter,
                 context.GetHexDirectionsByRow,
                 _ => Vector3.zero,
@@ -70,25 +76,25 @@ public sealed class MazeTopologyService
                 context.NormalizeCell),
             MazePatternType.DrunkenStrokes => CosmicDustMazePatterns.BuildDrunkenStrokes(
                 width, height,
-                config.drunkenStrokes.strokes,
+                MazeDensityModulation.DrunkenStrokesCount(config.drunkenStrokes.strokes, context.Busyness01),
                 config.drunkenStrokes.maxLen,
                 config.drunkenStrokes.jitter,
-                config.drunkenStrokes.dilate,
+                MazeDensityModulation.DrunkenStrokesDilate(config.drunkenStrokes.dilate, context.Busyness01),
                 context.GetHexDirectionsByRow,
                 _ => Vector3.zero,
                 context.IsCellAvailable,
                 _ => true),
             MazePatternType.DiagonalLanes => CosmicDustMazePatterns.BuildPopDots(
                 width, height,
-                config.diagonalLanes.step,
+                MazeDensityModulation.DiagonalLanesStep(config.diagonalLanes.step, context.Busyness01),
                 UnityEngine.Random.Range(0, config.diagonalLanes.step),
                 _ => Vector3.zero,
                 context.IsCellAvailable,
                 _ => true),
             MazePatternType.Tunnels => CosmicDustMazePatterns.BuildPacManTunnels(
                 width, height,
-                config.tunnels.corridorStep,
-                config.tunnels.corridorWidth,
+                MazeDensityModulation.TunnelsCorridorStep(config.tunnels.corridorStep, MazeDensityModulation.TunnelsCorridorWidth(config.tunnels.corridorWidth, context.Busyness01)),
+                MazeDensityModulation.TunnelsCorridorWidth(config.tunnels.corridorWidth, context.Busyness01),
                 _ => Vector3.zero,
                 context.IsCellAvailable,
                 _ => true),

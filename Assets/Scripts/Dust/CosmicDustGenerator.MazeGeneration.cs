@@ -9,14 +9,26 @@ public partial class CosmicDustGenerator
 {
     private List<MazeRoleGeoConfig> _roleGeoConfigs;
     private MazePatternType _activePatternType = MazePatternType.FullFill;
+    private DustMotifDensitySnapshot _densitySnapshot;
 
-    public void ApplyMotifGeoConfig(MotifProfile motif)
+    public void ApplyMotifGeoConfig(MotifProfile motif, IReadOnlyList<InstrumentTrack> tracks = null)
     {
         _roleGeoConfigs = motif?.roleGeoConfigs != null && motif.roleGeoConfigs.Count > 0
             ? new List<MazeRoleGeoConfig>(motif.roleGeoConfigs)
             : null;
         _activePatternType = motif?.mazePattern?.patternType ?? MazePatternType.FullFill;
+        _densitySnapshot = MotifNoteDensityAnalyzer.Analyze(
+            motif,
+            tracks,
+            config != null ? config.minNotesPerBinPerVoice : 2f,
+            config != null ? config.maxNotesPerBinPerVoice : 16f);
     }
+
+    private float GetWeightNorm01ByVoice(RoleVoiceKey voice) =>
+        _densitySnapshot?.GetWeightNorm01ByVoice(voice) ?? 0.5f;
+
+    private float GetWeightNorm01ByRole(MusicalRole role) =>
+        _densitySnapshot?.GetWeightNorm01ByRole(role) ?? 0.5f;
 
     private bool TryGetGeoConfig(MusicalRole role, out MazeRoleGeoConfig config)
     {
@@ -36,10 +48,24 @@ public partial class CosmicDustGenerator
             MazePatternType.RingChokepoints => MazeGeoFeature.Rings,
             MazePatternType.DrunkenStrokes  => MazeGeoFeature.Archipelago,
             MazePatternType.DiagonalLanes   => MazeGeoFeature.Archipelago,
-            MazePatternType.ClearBoxes      => roleIndex == 0 ? MazeGeoFeature.Glade : MazeGeoFeature.Continent,
-            MazePatternType.Tunnels         => roleIndex == 0 ? MazeGeoFeature.Ridge : MazeGeoFeature.Continent,
-            _                               => MazeGeoFeature.Continent,
+            MazePatternType.ClearBoxes      => roleIndex == 0 ? MazeGeoFeature.Glade : DensityRankFeature(role),
+            MazePatternType.Tunnels         => roleIndex == 0 ? MazeGeoFeature.Ridge : DensityRankFeature(role),
+            _                               => DensityRankFeature(role),
         };
+    }
+
+    private const float DensityFeatureBandHigh = 0.66f;
+    private const float DensityFeatureBandLow  = 0.33f;
+
+    // Replaces the old flat "always Continent" catch-all: a role's relative note density (see
+    // MotifNoteDensityAnalyzer) picks between a sprawling single territory (busy), a few
+    // scattered footholds (typical), or one compact cluster (sparse).
+    private MazeGeoFeature DensityRankFeature(MusicalRole role)
+    {
+        float w = GetWeightNorm01ByRole(role);
+        if (w >= DensityFeatureBandHigh) return MazeGeoFeature.Continent;
+        if (w <= DensityFeatureBandLow) return MazeGeoFeature.Island;
+        return MazeGeoFeature.Archipelago;
     }
 
     private MazeRoleGeoConfig ResolveGeoConfig(MusicalRole role)
@@ -94,18 +120,23 @@ public partial class CosmicDustGenerator
     private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthFromConfig(
         MazePatternConfig config,
         Vector2Int starCell,
-        HashSet<Vector2Int> reservedCells)
+        HashSet<Vector2Int> reservedCells,
+        float? busyness01Override = null)
     {
-        return BuildMazeGrowthFromConfig(config, starCell, reservedCells, out _);
+        return BuildMazeGrowthFromConfig(config, starCell, reservedCells, out _, busyness01Override);
     }
 
     // Same as above, but also returns the porous-border gap cell groups computed in this same
     // pass (see MazeTopologyService.BuildSolidCells's out-param overload).
+    // busyness01Override forces a specific Context.Busyness01 instead of reading the current
+    // motif's density snapshot — used by GenerateInterstitialMaze (CosmicDustGenerator.Interstitial.cs)
+    // so its blind, role-less path-choice tunnels never inherit stale cross-motif density state.
     private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthFromConfig(
         MazePatternConfig config,
         Vector2Int starCell,
         HashSet<Vector2Int> reservedCells,
-        out List<List<Vector2Int>> gapGroupsOut)
+        out List<List<Vector2Int>> gapGroupsOut,
+        float? busyness01Override = null)
     {
         config?.Validate();
         if (drums == null) { gapGroupsOut = new List<List<Vector2Int>>(); return new List<(Vector2Int, Vector3)>(); }
@@ -133,7 +164,8 @@ public partial class CosmicDustGenerator
                 if (IsKeepClearCell(cell)) return true;
                 return false;
             },
-            NormalizeCell = toroidal ? WrapCell : null
+            NormalizeCell = toroidal ? WrapCell : null,
+            Busyness01 = busyness01Override ?? _densitySnapshot?.MotifBusyness01 ?? 0.5f
         };
 
         var solidCells = _mazeTopologyService.BuildSolidCells(config, context, out gapGroupsOut);
@@ -307,7 +339,9 @@ public partial class CosmicDustGenerator
             MazeRoleGeoConfig cfg = ResolveGeoConfig(voice.role);
             desiredCounts[vi] = feature switch
             {
-                MazeGeoFeature.Archipelago => cfg != null ? Mathf.Clamp(cfg.seedCount, 2, 8) : 3,
+                MazeGeoFeature.Archipelago => cfg != null
+                    ? Mathf.Clamp(cfg.seedCount, 2, 8)
+                    : Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(2, 8, GetWeightNorm01ByVoice(voice))), 2, 8),
                 MazeGeoFeature.Ridge => 2,
                 _ => 1,
             };
@@ -453,7 +487,7 @@ public partial class CosmicDustGenerator
 
             if (feature == MazeGeoFeature.Island || feature == MazeGeoFeature.Archipelago)
             {
-                float radius = cfg != null ? cfg.radiusCells : 6f;
+                float radius = cfg != null ? cfg.radiusCells : Mathf.Lerp(4f, 9f, GetWeightNorm01ByVoice(voice));
                 float radiusSq = radius * radius;
 
                 for (int i = 0; i < occupied.Count; i++)
@@ -505,8 +539,12 @@ public partial class CosmicDustGenerator
 
                 if (territory.Count == 0) continue;
 
-                int gladeCount2 = cfg != null ? cfg.gladeCount : 2;
-                float gladeRadius2 = cfg != null ? cfg.gladeRadius : 3f;
+                // Glade means yielding territory to another role, so — inverted vs. Island/
+                // Archipelago's radius growth — a busy/dominant voice yields LESS (fewer, smaller
+                // clearings) while a sparse voice yields more.
+                float gladeWeight = GetWeightNorm01ByVoice(voice);
+                int gladeCount2 = cfg != null ? cfg.gladeCount : Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(4, 1, gladeWeight)), 1, 4);
+                float gladeRadius2 = cfg != null ? cfg.gladeRadius : Mathf.Lerp(4f, 2f, gladeWeight);
                 float gladeRadiusSq = gladeRadius2 * gladeRadius2;
 
                 for (int g = 0; g < gladeCount2; g++)
