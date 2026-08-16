@@ -66,7 +66,7 @@ public class SuperNode : MonoBehaviour
             }
 
             _pendingChaseCount++;
-            node.Setup(tracks[i], _difficulty01, drumTrack);
+            node.Setup(tracks[i], _difficulty01, drumTrack, count);
             node.OnResolved = OnTrackNodeResolved;
         }
     }

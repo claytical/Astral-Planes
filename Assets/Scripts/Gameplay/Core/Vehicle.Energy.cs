@@ -54,16 +54,10 @@ public partial class Vehicle
 
         }
 
-    public float GetCumulativeSpentTanks() {
-        if (capacity <= 0f) return 0f;
-        return _cumulativeEnergySpent / capacity;
-    }
-
     private void ConsumeEnergy(float amount)
         {
             energyLevel -= amount;
             energyLevel = Mathf.Max(0, energyLevel);
-            _cumulativeEnergySpent += Mathf.Max(0f, amount);
             // !_isDead guards against re-entering the death cascade if this vehicle is drained
             // again after already dying (e.g. overlapping bomb blast radii in the same frame) —
             // without it, Explode/DiscardCarriedCollectables/OnVehicleDied/CheckAllPlayersOutOfEnergy

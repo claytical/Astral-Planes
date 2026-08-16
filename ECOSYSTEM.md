@@ -31,7 +31,8 @@ Coral and the 2D glyph path have both been fully removed — noted briefly rathe
        │    [SuperNode] ─── alternate ejection: multi-track chase bonus round
        │         │
        │    [Collectable] ─── autonomous drifter → Vehicle pickup → DSP deposit
-       │                       (or Vehicle discard → time bomb → blast → Vehicle drain)
+       │                       (or Vehicle discard → time bomb → blast →
+       │                        Vehicle drain + CosmicDustGenerator dust clear)
        │
        ├─► [Vehicle] ─── player physics, energy, manual release queue
        │
@@ -316,12 +317,23 @@ manual-release queue overflow, or Vehicle death) → OnManualReleaseDiscarded(st
         clear the area; discarded right before its step gets a short fuse)
       swells + tints toward warningColor every frame until fuse-out
   → Detonate() — on fuse-out OR immediately on Vehicle collision (TriggerEarlyDetonation)
-      for every Vehicle within blastRadius: Vehicle.DrainEnergy() + Vehicle.TriggerDrainFeedback()
-  → FlashThenImplode() — flashes to a size matching blastRadius, then collapses → Destroy()
+      radius = MusicalRoleProfile.discardBlastRadiusCells (grid cells; 0 = fall back to
+        CollectableTuning.bomb.blastRadius ÷ cell size) — one radius drives everything below
+      for every Vehicle within radius: Vehicle.DrainEnergy() + Vehicle.TriggerDrainFeedback()
+      CosmicDustGenerator.TriggerDiscardBlast(centerCell, radius) — carves every solid dust
+        cell in the disk (source CollectableDiscard); each regrows respecting its own identity
+        (hidden Voronoi role if still gray, its already-revealed role otherwise) — no role
+        is forced or biased, this is the same carve/regrow pipeline every other clear source uses
+  → FlashThenImplode() — flashes to a size matching the resolved radius, then collapses → Destroy()
 ```
 An armed bomb still counts toward `GameFlowManager.AnyCollectablesInFlightGlobal()` until
 this sequence fully destroys it — `StarPool`/`PhaseStar` bridge gates wait on a ticking
 bomb exactly like an uncollected note.
+
+Radius is authored per role (`MusicalRoleProfile.discardBlastRadiusCells`) so a heavier role
+(Bass) can be tuned to a bigger blast than a lighter one (Lead) — the same number is used for
+the visual flash size, the vehicle-damage falloff, and the dust-clear disk, so what the player
+sees blasted is exactly what gets cleared.
 
 **Owns:** assigned note + step + bin, carry state, grid occupancy cell (`_currentCell`), tether line, bomb-armed state once discarded (fuse timing, swell/detonation/implosion scale, Kinematic pin — `Collectable.Bomb.cs`).
 
@@ -390,6 +402,7 @@ Authoritative 2D grid. All spatial state lives here — cell solid/empty status,
 | `PaintDustExhaust()` | `DiscoveryTrackNodeDustInteractor` — role tint only, never clears |
 | `GrowVoidDustDiskFromGrid()` | `InstrumentTrackController` (expansion pending), `GameFlowManager.SpawnVehicleTraps` |
 | `CreateJailCenterForCollectable()` | `Collectable` spawn pocket |
+| `TriggerDiscardBlast()` | `Collectable.Bomb.cs Detonate()` — discard-detonation dust clear, source `CollectableDiscard` |
 | `HardStopRegrowthForBridge()` | `BridgeCoordinator` bridge start (also flushes held cells) |
 | `BeginSlowFadeAllDust()` | `BridgeCoordinator` bridge fade |
 | `ResumeRegrowthAfterBridge()` | `SceneFlowCoordinator` next motif start |
@@ -533,13 +546,25 @@ Vehicle discards a carried note (miss window / sacrifice / queue overflow / vehi
       fuse = InstrumentTrack.ComputeDepositDsp(step) − now, floored at minFuseSeconds
       swells + tints toward warningColor each frame until fuse-out
   → Detonate() — fuse-out OR Vehicle bump (TriggerEarlyDetonation)
-      for each Vehicle within blastRadius:
+      radius = MusicalRoleProfile.discardBlastRadiusCells × cell size
+               (0 → falls back to CollectableTuning.bomb.blastRadius, today's fixed value)
+      for each Vehicle within radius:
         Vehicle.DrainEnergy(amount, "TimeBombCollectable")
         Vehicle.TriggerDrainFeedback(warningColor)
-  → FlashThenImplode() — flash to blastRadius-matched size, then collapse → Destroy()
+      CosmicDustGenerator.TriggerDiscardBlast(centerCell, radiusCells)
+        → CarveCell() per solid cell in the disk, source CollectableDiscard
+        → each cell regrows via the normal resolver: revealed role stays the same role,
+          still-gray cells fall back to their permanent hidden Voronoi role — never biased
+          toward a different role, and the regrow delay is tunable independently via
+          MazePatternConfig.dustTiming.collectableDiscardRegrowDelay
+  → FlashThenImplode() — flash to the same resolved radius, then collapse → Destroy()
 ```
 The note's own energy was already processed at pickup (a partial refund is granted on most
 discard paths via `CollectEnergy(amount * .25f)`, `Vehicle.NoteRelease.cs`) — leaving it out
-of the loop is what makes it unstable. Drain amount scales by the collectable's own
+of the loop is what makes it unstable. Vehicle drain amount scales by the collectable's own
 `MusicalRoleProfile.drainResistance01` (the same field/formula dust boost-collision drain
-uses) and falls off with distance to `edgeDamageFraction` at the blast edge.
+uses) and falls off with distance to `edgeDamageFraction` at the blast edge. Blast **radius**
+is a separate per-role knob (`discardBlastRadiusCells`) — heavier roles (Bass) are meant to be
+tuned to a bigger radius than lighter ones (Lead), and that one radius drives the vehicle
+falloff, the dust-clear disk, and the flash-visual size together, so the visible blast is
+exactly the area that gets cleared.

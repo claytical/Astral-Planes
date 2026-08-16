@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -21,6 +22,7 @@ public partial class Vehicle
 
     private void RecoverIfNeeded()
 {
+    if (_movementLocked) return; // already animating a return — don't re-trigger mid-glide
     if (Time.time - _lastRecoverAt < vehicleConfig.minSecondsBetweenRecoveries) return;
     if (rb == null || drumTrack == null || gfm == null || gfm.dustGenerator == null) return;
 
@@ -44,15 +46,10 @@ public partial class Vehicle
         if (_timeStuckInVoid >= vehicleConfig.stuckSecondsInVoid)
         {
             // Prefer local eject (feels physical), but fall back to snap if we can’t find a clean spot.
+            // TryEjectFromVoid/DoSnapRespawn both go through BeginAnimatedRecovery, which already
+            // sets _lastRecoverAt/_timeStuckInVoid — no need to duplicate that here.
             if (!TryEjectFromVoid(voidCenter, voidRadius))
-            {
                 DoSnapRespawn("void_trap_snap");
-            }
-            else
-            {
-                _lastRecoverAt = Time.time;
-                _timeStuckInVoid = 0f;
-            }
         }
     }
     else
@@ -129,13 +126,9 @@ public partial class Vehicle
     {
         Vector2 world = (Vector2)drumTrack.GridToWorldPosition(emptyCell);
 
-        // Teleport + impulse outward so we don’t immediately re-stick
-        rb.position = world;
-        rb.linearVelocity = away * Mathf.Max(2.5f, arcadeMaxSpeed * 0.35f);
-        rb.angularVelocity = 0f;
-
-        _lastRecoverAt = Time.time;
-        _timeStuckInVoid = 0f;
+        // Glide to the rim, then apply the outward exit impulse once arrived so we don't
+        // immediately re-stick — impulse now lands after the animated return, not before it.
+        BeginAnimatedRecovery(world, away * Mathf.Max(2.5f, arcadeMaxSpeed * vehicleConfig.voidEjectExitSpeedMultiplier), "void_trap_eject");
         return true;
     }
 
@@ -150,26 +143,66 @@ public partial class Vehicle
     if (!TryFindNearbyEmptyCell(_lastSafeCell, vehicleConfig.respawnSearchRadiusCells, out var respawnCell))
     {
         // Absolute fallback: last safe world position.
-        rb.position = _lastSafeWorld;
-        rb.linearVelocity = Vector2.zero;
-        rb.angularVelocity = 0f;
-
-        _lastRecoverAt = Time.time;
-        _timeStuckInVoid = 0f;
+        BeginAnimatedRecovery(_lastSafeWorld, Vector2.zero, reason);
         Debug.LogWarning($"[VEHICLE:RECOVER] {name} fallback to lastSafeWorld (reason={reason})", this);
         return;
     }
 
     Vector2 respawnWorld = (Vector2)drumTrack.GridToWorldPosition(respawnCell);
 
-    rb.position = respawnWorld;
-    rb.linearVelocity = Vector2.zero;
-    rb.angularVelocity = 0f;
-
-    _lastRecoverAt = Time.time;
-    _timeStuckInVoid = 0f;
+    BeginAnimatedRecovery(respawnWorld, Vector2.zero, reason);
 
     Debug.LogWarning($"[VEHICLE:RECOVER] {name} respawn to cell {respawnCell} (reason={reason})", this);
+}
+
+    /// <summary>
+    /// Replaces the old instant, silent rb.position teleport: locks movement input (Vehicle.Move /
+    /// UpdateMovementAndFuel both check _movementLocked) and glides the vehicle to targetWorld over
+    /// vehicleConfig.recoveryReturnSeconds, so the player gets a legible beat instead of an
+    /// unannounced pop. Falls back to the old instant behavior if lockMovementDuringRecovery is off.
+    /// </summary>
+    private void BeginAnimatedRecovery(Vector2 targetWorld, Vector2 exitVelocity, string reason)
+{
+    if (!vehicleConfig.lockMovementDuringRecovery)
+    {
+        rb.position = targetWorld;
+        rb.linearVelocity = exitVelocity;
+        rb.angularVelocity = 0f;
+        _lastRecoverAt = Time.time;
+        _timeStuckInVoid = 0f;
+        return;
+    }
+
+    if (_recoveryRoutine != null) StopCoroutine(_recoveryRoutine);
+    _movementLocked = true;
+    _lastRecoverAt = Time.time;
+    _timeStuckInVoid = 0f;
+    _recoveryRoutine = StartCoroutine(AnimatedRecoveryRoutine(targetWorld, exitVelocity, reason));
+}
+
+    private IEnumerator AnimatedRecoveryRoutine(Vector2 targetWorld, Vector2 exitVelocity, string reason)
+{
+    Vector2 start = rb.position;
+    float duration = Mathf.Max(0.01f, vehicleConfig.recoveryReturnSeconds);
+    float elapsed = 0f;
+    while (elapsed < duration)
+    {
+        elapsed += Time.fixedDeltaTime;
+        float u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
+        rb.position = Vector2.Lerp(start, targetWorld, u);
+        // Re-zero every tick — same reasoning as the bomb's Kinematic-immunity comment: prevents
+        // dust/void contact forces from fighting the scripted glide.
+        rb.linearVelocity = Vector2.zero;
+        rb.angularVelocity = 0f;
+        yield return new WaitForFixedUpdate();
+    }
+
+    rb.position = targetWorld;
+    rb.linearVelocity = exitVelocity;
+
+    _movementLocked = false;
+    _recoveryRoutine = null;
+    Debug.LogWarning($"[VEHICLE:RECOVER] {name} animated return complete (reason={reason})", this);
 }
 
     private bool TryFindNearbyEmptyCell(Vector2Int around, int maxRadius, out Vector2Int found) {

@@ -16,8 +16,12 @@ public class DrumTrackConfig : ScriptableObject
     public float timingWindowSteps = 0.25f;
 
     [Header("Intensity Tuning")]
-    [Tooltip("Intensity ceiling when exactly 1 instrument track has notes in the upcoming bin (0=low clip only, 1=uncapped). 2+ tracks always uncap.")]
-    public float singleTrackIntensityCeiling = 0.45f;
-    [Tooltip("Minimum change in intensity01 required before allowing a new target profile.")]
+    [Tooltip("Minimum change in density01 required before allowing a new target profile.")]
     public float intensityHysteresis = 0.08f;
+    [Tooltip("CosmicDust solid fraction (0-1) at/below which the density nudge is 0.")]
+    public float minDensityForIntensity = 0.15f;
+    [Tooltip("CosmicDust solid fraction (0-1) at/above which the density nudge saturates to 1.")]
+    public float maxDensityForIntensity = 0.65f;
+    [Tooltip("Total swing that maze density can nudge intensity01 around the track-fullness tier (density01 is centered at 0.5, so the max nudge in either direction is half this value).")]
+    public float densityNudgeRange = 0.3f;
 }

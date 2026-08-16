@@ -25,7 +25,7 @@ MonoBehaviour:
   stepsPerLoop: 16
   nodesPerStar: 4
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
-  mazePattern: {fileID: 11400000, guid: e33ec23797f8442308d50f9624f2d657, type: 2}
+  mazePattern: {fileID: 11400000, guid: c90fade64b1a04f608cacc42c162a9a6, type: 2}
   roleGeoConfigs: []
   chordProgression: {fileID: 11400000, guid: b956b0bff50d748d88897368376e5eeb, type: 2}
   alternateChordProgressionProfile: {fileID: 11400000, guid: 04a688fc570cd408bb4261ed5647fa97,
@@ -34,7 +34,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 4ec45572f751b490bb622b7f3ec15e63, type: 2}
   selectionWeight: 1
   beatIntroCount: 0
-  driveBeatsFromEnergy: 1
+  driveBeatsFromDensity: 1
   spawnVehicleTrap: 1
   trapShape: 0
   trapRadius: 3

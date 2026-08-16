@@ -66,7 +66,7 @@ public partial class DrumTrack
         _motif               = motif;
         _entryLoops          = _motif?.entryDrumLoops;
         _intensityLoops      = _motif?.intensityDrumLoops;
-        _driveFromEnergy     = _motif != null && _motif.driveBeatsFromEnergy;
+        _driveFromDensity    = _motif != null && _motif.driveBeatsFromDensity;
 
         // Carry latch is one-way for the session: survives motif changes unless the incoming
         // motif opts into re-arming the intro hold. A hard transport restart always re-arms.
@@ -78,17 +78,15 @@ public partial class DrumTrack
         if (motifChanged || restartTransport)
         {
             _entryLoopsRemaining  = _motif != null ? Mathf.Max(0, _motif.entryLoopCount) : 0;
-            _lastTotalSpentSample = -1f;
-            _burnTier             = 0f;
             // Preserve intensity when timing is identical — same BPM/steps means no perceptual
             // discontinuity and resetting would cause a spurious intensity dip.
             if (stepsChanged || bpmChanged)
-                _lastIntensity01 = 0f;
+                _lastDensity01 = 0f;
         }
 
         if (_motif == null) return;
-        if (!_motif.driveBeatsFromEnergy)
-            Debug.LogWarning($"[DRUM][MOTIF] Motif {_motif.motifId} has driveBeatsFromEnergy=FALSE. Beat intensity will never run.");
+        if (!_motif.driveBeatsFromDensity)
+            Debug.LogWarning($"[DRUM][MOTIF] Motif {_motif.motifId} has driveBeatsFromDensity=FALSE. Beat intensity will never run.");
         int entryCt = _motif.entryDrumLoops?.Count ?? 0;
         int intCt   = _motif.intensityDrumLoops?.Count ?? 0;
         if (entryCt == 0) Debug.LogWarning($"[DRUM][MOTIF] Motif {_motif.motifId} has 0 entryDrumLoops.");
@@ -138,7 +136,7 @@ public partial class DrumTrack
             if (GameFlowManager.VerboseLogging) Debug.Log(
                 $"[DRUM][MOTIF] ApplyMotif by {who}: motif={(_motif ? _motif.motifId : "null")} " +
                 $"entryLoops={_entryLoops?.Count ?? 0} intensityLoops={_intensityLoops?.Count ?? 0} " +
-                $"entryLoopRemaining={_entryLoopsRemaining} drive={_driveFromEnergy} " +
+                $"entryLoopRemaining={_entryLoopsRemaining} drive={_driveFromDensity} " +
                 $"bpm={drumLoopBPM} steps={totalSteps} clip={(clip ? clip.name : "null")} " +
                 $"armAtNextBoundary={armAtNextBoundary} restart={restartTransport} motifChanged={motifChanged}"
             );

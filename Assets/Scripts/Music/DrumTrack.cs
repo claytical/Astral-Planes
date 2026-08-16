@@ -18,7 +18,6 @@ public partial class DrumTrack : MonoBehaviour
     private int _motifSetSerial = 0;
     private float _lateBindMotifTimer = 0f;
     private const float kLateBindMotifInterval = 1.0f;
-    private float _lastTotalSpentSample = -1f; // baseline sample of TOTAL spent tanks (cumulative)
     private double _lastApplyMotifDsp = -1.0;
     private string _lastApplyMotifId = "";
     [HideInInspector]
@@ -82,10 +81,9 @@ public partial class DrumTrack : MonoBehaviour
     public event System.Action<int, int> OnStepChanged; // (stepIndex, leaderSteps)
 
     private int _lastStepIdx = -1;
-    private bool _driveFromEnergy;
+    private bool _driveFromDensity;
 
-    private float _lastIntensity01 = 0f; // for hysteresis
-    private float _burnTier = 0f;        // ramp counter: steps up while burning, down when idle
+    private float _lastDensity01 = 0f; // for hysteresis, density sub-component of intensity01
 
     public float EffectiveLoopLengthSec => (_trackController != null) ? _trackController.GetEffectiveLoopLengthInSeconds() : _clipLengthSec;
     public float GetLoopLengthInSeconds() => EffectiveLoopLengthSec;

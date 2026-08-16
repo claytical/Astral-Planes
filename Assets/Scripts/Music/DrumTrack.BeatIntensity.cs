@@ -5,9 +5,9 @@ public partial class DrumTrack
     private void HandleBeatSequencingAtLoopBoundary(float loopSeconds)
     {
         // --- hard gates (log on exit) ---
-        if (!_driveFromEnergy)
+        if (!_driveFromDensity)
         {
-            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: driveFromEnergy=false motif={(_motif ? _motif.motifId : "null")}");
+            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: driveFromDensity=false motif={(_motif ? _motif.motifId : "null")}");
             return;
         }
         if (_gfm == null)
@@ -44,19 +44,19 @@ public partial class DrumTrack
             return;
         }
 
-        // 3) Compute burn-tier intensity from aggregate energy spent
-        float totalSpent = _gfm.GetTotalSpentEnergyTanks();
-        if (!ComputeBurnIntensity(totalSpent, loopsCt, out float intensity01))
+        // 3) Compute intensity: track fullness picks the tier, live CosmicDust density nudges within it
+        if (_dust == null)
         {
-            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] baseline acquired motif={_motif.motifId}");
+            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: _dust==null motif={_motif.motifId}");
             return;
         }
+        float fullness01 = ComputeTrackFullness01();
+        ComputeDensityIntensity(_dust.GetSolidFraction(), out float density01);
+        float intensity01 = Mathf.Clamp01(fullness01 + (density01 - 0.5f) * config.densityNudgeRange);
 
         if (logBeatSeqGates) Debug.Log(
-            $"[DRUM][BeatSeq] motif={_motif.motifId} tier={_burnTier:F0} intensity={intensity01:F3} loops={loopsCt}"
+            $"[DRUM][BeatSeq] motif={_motif.motifId} fullness={fullness01:F3} density={density01:F3} intensity={intensity01:F3} loops={loopsCt}"
         );
-
-        ApplyPerBinIntensityCeiling(ref intensity01);
 
         // 4) Select target clip
         var targetClip = ResolveIntensityClip(intensity01);
@@ -90,65 +90,41 @@ public partial class DrumTrack
         if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] scheduled clip={targetClip.name}");
     }
 
-    // Returns false if the baseline sample hasn't been acquired yet (caller should return early).
-    // Updates _lastTotalSpentSample, _burnTier, _lastIntensity01; outputs smoothed intensity01.
-    private bool ComputeBurnIntensity(float totalSpent, int clipCount, out float intensity01)
+    // Updates _lastDensity01; outputs smoothed density01 from live CosmicDust density.
+    private void ComputeDensityIntensity(float solidFraction, out float density01)
     {
-        intensity01 = _lastIntensity01;
-
-        if (_lastTotalSpentSample < 0f)
-        {
-            _lastTotalSpentSample = totalSpent;
-            return false;
-        }
-
-        float delta = Mathf.Max(0f, totalSpent - _lastTotalSpentSample);
-        _lastTotalSpentSample = totalSpent;
-
-        float maxTier = clipCount - 1;
-        if (delta > 0f)
-            _burnTier = Mathf.Min(_burnTier + 1f, maxTier);
-        else
-            _burnTier = Mathf.Max(_burnTier - 1f, 0f);
-
-        float rawIntensity = (clipCount > 1) ? _burnTier / maxTier : 0f;
+        float rawDensity = Mathf.InverseLerp(config.minDensityForIntensity, config.maxDensityForIntensity, solidFraction);
 
         const float kIntensitySmooth = 0.35f;
-        intensity01 = Mathf.Lerp(_lastIntensity01, rawIntensity, kIntensitySmooth);
-        if (Mathf.Abs(intensity01 - _lastIntensity01) < config.intensityHysteresis)
-            intensity01 = _lastIntensity01;
-        _lastIntensity01 = intensity01;
-
-        return true;
+        density01 = Mathf.Lerp(_lastDensity01, rawDensity, kIntensitySmooth);
+        if (Mathf.Abs(density01 - _lastDensity01) < config.intensityHysteresis)
+            density01 = _lastDensity01;
+        _lastDensity01 = density01;
     }
 
-    // Per-bin ceiling: clamps intensity based on how many tracks have filled bins.
-    // Does NOT update _lastIntensity01 so energy-burn history is preserved across empty bins.
-    // 0 filled tracks → ceiling 0, 1 → config.singleTrackIntensityCeiling, 2+ → uncapped.
-    private void ApplyPerBinIntensityCeiling(ref float intensity01)
+    // Primary intensity tier driver: average how built-out each instrument track's loop is
+    // (loopMultiplier vs its own ceiling) across all currently-spawned tracks.
+    private float ComputeTrackFullness01()
     {
         var ctrl = _gfm?.controller;
-        if (ctrl?.tracks == null) return;
+        if (ctrl?.tracks == null || ctrl.tracks.Length == 0) return 0f;
 
-        int filledCount = 0;
+        float sum = 0f;
+        int counted = 0;
         foreach (var track in ctrl.tracks)
         {
             if (track == null) continue;
-            int upcomingBin = completedLoops % Mathf.Max(1, track.loopMultiplier);
-            if (track.HasAnyNoteInBin(upcomingBin)) filledCount++;
+            int maxMul = Mathf.Max(1, track.maxLoopMultiplier);
+            sum += Mathf.Clamp01(track.loopMultiplier / (float)maxMul);
+            counted++;
         }
-        float ceiling = filledCount == 0 ? 0f
-                      : filledCount == 1 ? config.singleTrackIntensityCeiling
-                      : 1f;
-        intensity01 = Mathf.Min(intensity01, ceiling);
+        return counted > 0 ? sum / counted : 0f;
     }
 
     public void ResetBeatSequencingState(string who)
     {
         // Do NOT clear _motif or loop lists. This is a state reset, not a motif reset.
-        _lastTotalSpentSample = -1f;
-        _burnTier = 0f;
-        _lastIntensity01 = 0f;
+        _lastDensity01 = 0f;
 
         if (GameFlowManager.VerboseLogging) Debug.Log($"[DRUM][BeatSeq] Soft reset by {who} motif={(_motif ? _motif.motifId : "null")}");
     }

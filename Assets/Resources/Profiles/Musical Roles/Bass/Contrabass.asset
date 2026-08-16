@@ -41,7 +41,9 @@ MonoBehaviour:
   collectableFleeSpeedMul: 1.3
   configSelectionMode: 0
   chordVoiceColors: []
+  sameRootAcrossBins: 0
   midiPreset: 2
   lowestNote: 12
   highestNote: 64
-  regrowthDelay: 0.8
+  regrowthDelay: 3
+  discardBlastRadiusCells: 0

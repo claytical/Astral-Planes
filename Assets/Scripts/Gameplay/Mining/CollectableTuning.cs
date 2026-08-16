@@ -164,6 +164,9 @@ public sealed class BombParams
     [Tooltip("Minimum seconds between discard and detonation, regardless of how close the encoded step already was.")]
     public float minFuseSeconds = 0.75f;
 
+    [Tooltip("Seconds after arming during which a vehicle bump is ignored instead of triggering early detonation. While carried, the note's Rigidbody2D is not simulated, so it can end up positioned overlapping the discarding vehicle with no collision detected; ArmAsTimeBomb re-enables simulation immediately, and without this grace window that overlap reads as a brand-new bump the instant the bomb is armed. Physics still naturally separates the (Kinematic bomb, Dynamic vehicle) pair during this window.")]
+    public float earlyDetonationGraceSeconds = 0.25f;
+
     [Tooltip("Pulse frequency (Hz) at the start of the fuse.")]
     public float minPulseHz = 0.6f;
 
@@ -182,15 +185,36 @@ public sealed class BombParams
     [Tooltip("Seconds the post-detonation collapse takes: the flashed-out collectable (and its particle systems) shrink back to nothing together before being destroyed.")]
     public float implosionSeconds = 0.25f;
 
+    [Tooltip("Peak alpha the blast-radius telegraph ring reaches at fuse end. The ring is sized to the true blast radius throughout the fuse (unlike the body/particle swell, which is a fixed cosmetic multiplier), so this is the player's actual read on the danger zone.")]
+    [Range(0f, 1f)] public float telegraphMaxAlpha = 0.35f;
+
+    [Tooltip("Pulse frequency (Hz) of the telegraph ring — independent of the body's ramping pulse.")]
+    public float telegraphPulseHz = 1.5f;
+
+    [Tooltip("Minimum scale multiplier of the ring's pulse. Max is always exactly 1.0 (true radius), so the ring never overstates the real danger zone.")]
+    [Range(0.5f, 1f)] public float telegraphPulseMin = 0.9f;
+
+    [Tooltip("Impulse magnitude (Rigidbody2D.AddForce, ForceMode2D.Impulse) applied to each vehicle in the blast radius at detonation, directed away from the blast center. Mass-respecting.")]
+    public float knockbackImpulse = 6f;
+
+    [Tooltip("Fraction of full knockback dealt at the edge of the blast radius (same linear falloff shape as edgeDamageFraction).")]
+    [Range(0f, 1f)] public float knockbackEdgeFraction = 0.2f;
+
     public void Validate()
     {
         blastRadius = Mathf.Max(0f, blastRadius);
         drainMultiplier = Mathf.Max(0f, drainMultiplier);
         minFuseSeconds = Mathf.Max(0.05f, minFuseSeconds);
+        earlyDetonationGraceSeconds = Mathf.Max(0f, earlyDetonationGraceSeconds);
         minPulseHz = Mathf.Max(0.01f, minPulseHz);
         maxPulseHz = Mathf.Max(minPulseHz, maxPulseHz);
         maxPulseScale = Mathf.Max(1f, maxPulseScale);
         detonationFlashSeconds = Mathf.Max(0.01f, detonationFlashSeconds);
         implosionSeconds = Mathf.Max(0.01f, implosionSeconds);
+        telegraphMaxAlpha = Mathf.Clamp01(telegraphMaxAlpha);
+        telegraphPulseHz = Mathf.Max(0.01f, telegraphPulseHz);
+        telegraphPulseMin = Mathf.Clamp(telegraphPulseMin, 0.5f, 1f);
+        knockbackImpulse = Mathf.Max(0f, knockbackImpulse);
+        knockbackEdgeFraction = Mathf.Clamp01(knockbackEdgeFraction);
     }
 }

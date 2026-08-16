@@ -4,19 +4,27 @@ using UnityEngine;
 
 public partial class Collectable
 {
+    [Tooltip("Child transform carrying the bomb's cosmetic sprite/particle visuals. During the fuse and detonation, only this transform's scale swells/collapses — the root (and the solid dust-collision collider that lives on it) stays a fixed size the whole time, so the countdown swell no longer physically shoves overlapping vehicles. Falls back to the root transform if unassigned.")]
+    [SerializeField] private Transform bombVisualRoot;
+
     // ---- Time bomb (discard) state ----
     private bool _isBomb;
     private bool _bombDetonated;
     private Coroutine _bombRoutine;
     private double _bombDetonateDsp;
     private double _bombFuseTotalSeconds;
+    private double _bombArmedDsp;
     private Vector3 _bombBaseScale;
     private Color _bombBaseColor;
     private float _bombBaseVisualRadius;
+    private float _bombEffectiveBlastRadius;
+    private float _bombBlastRadiusCells;
     private ParticleSystem _bombCoreParticles;
     private Color _bombCoreBaseColor;
     private ParticleSystem[] _bombParticleSystems;
     private Vector3[] _bombParticleBaseScales;
+
+    private Transform BombVisualRoot => bombVisualRoot != null ? bombVisualRoot : transform;
 
     /// <summary>
     /// Called when a carried note is discarded instead of committed to the loop. The note's
@@ -55,13 +63,19 @@ public partial class Collectable
         // setup) so the bomb physically sits in the world like a live collectable.
         SetSpawnArrivalProtection(false);
 
-        _bombBaseScale = transform.localScale;
+        _bombBaseScale = BombVisualRoot.localScale;
         _bombBaseColor = energySprite != null ? energySprite.color : Color.white;
         // World-space visual radius at the current (base, pre-swell) scale, so Detonate() can
         // compute exactly what scale multiplier makes the rendered size equal blastRadius.
         _bombBaseVisualRadius = energySprite != null
             ? Mathf.Max(energySprite.bounds.extents.x, energySprite.bounds.extents.y)
             : 0.1f;
+
+        // Resolved once here (not in Detonate()) so the radius-ring telegraph can show the true
+        // blast radius from the moment the bomb is armed, not just once damage is about to land.
+        ResolveAndCacheBombBlastRadius();
+        EnsureBombTelegraphRing();
+        UpdateBombTelegraphRing(0f);
 
         _bombCoreParticles = TryGetComponent(out CollectableParticles cp) ? cp.coreParticleSystem : null;
         _bombCoreBaseColor = _bombCoreParticles != null ? (Color)_bombCoreParticles.main.startColor.color : Color.white;
@@ -84,9 +98,27 @@ public partial class Collectable
         double fuseSeconds = Math.Max(tuning.bomb.minFuseSeconds, detonateDsp - dspNow);
         _bombDetonateDsp = dspNow + fuseSeconds;
         _bombFuseTotalSeconds = fuseSeconds;
+        _bombArmedDsp = dspNow;
 
         if (_bombRoutine != null) StopCoroutine(_bombRoutine);
         _bombRoutine = StartCoroutine(BombFuseRoutine());
+    }
+
+    /// <summary>
+    /// Resolves and caches the blast radius (both cell-count and world-space) once at arm time,
+    /// off the bomb's own role profile — uniform across the whole blast, same as the radius
+    /// already worked before this change, just moved earlier so the telegraph ring (which needs
+    /// the true radius from the moment the bomb is armed) and Detonate() share one computation
+    /// instead of Detonate() re-deriving it after the fact.
+    /// </summary>
+    private void ResolveAndCacheBombBlastRadius()
+    {
+        var drums = assignedInstrumentTrack != null ? assignedInstrumentTrack.drumTrack : null;
+        float cellSize = drums != null ? Mathf.Max(0.001f, drums.GetCellWorldSize()) : 1f;
+        _bombBlastRadiusCells = (_roleProfile != null && _roleProfile.discardBlastRadiusCells > 0f)
+            ? _roleProfile.discardBlastRadiusCells
+            : tuning.bomb.blastRadius / cellSize;
+        _bombEffectiveBlastRadius = _bombBlastRadiusCells * cellSize;
     }
 
     private void ApplyParticleScaleLockstep(float ratio)
@@ -104,6 +136,14 @@ public partial class Collectable
     private void TriggerEarlyDetonation()
     {
         if (!_isBomb || _bombDetonated) return;
+
+        // While carried, Rigidbody2D.simulated is false (Collectable.Carry.cs), so the note can
+        // end up positioned overlapping/adjacent to the discarding vehicle with no collision ever
+        // detected. ArmAsTimeBomb re-enables simulation immediately, which reads as a brand-new
+        // bump against that same vehicle the instant the bomb is armed. Ignore bumps for a short
+        // grace window so physics has a moment to separate them before bump-detonation goes live.
+        if (AudioSettings.dspTime - _bombArmedDsp < tuning.bomb.earlyDetonationGraceSeconds) return;
+
         if (_bombRoutine != null) { StopCoroutine(_bombRoutine); _bombRoutine = null; }
         Detonate();
     }
@@ -128,8 +168,9 @@ public partial class Collectable
             // ambient particles visibly swell as one connected object, not two disconnected
             // effects.
             float scaleMul = Mathf.Lerp(1f, tuning.bomb.maxPulseScale, t * pulse);
-            transform.localScale = _bombBaseScale * scaleMul;
+            BombVisualRoot.localScale = _bombBaseScale * scaleMul;
             ApplyParticleScaleLockstep(scaleMul);
+            UpdateBombTelegraphRing(t);
 
             if (energySprite != null)
                 energySprite.color = Color.Lerp(_bombBaseColor, tuning.bomb.warningColor, t);
@@ -158,6 +199,10 @@ public partial class Collectable
             for (int i = 0; i < _solidColliders.Length; i++)
                 if (_solidColliders[i] != null) _solidColliders[i].enabled = false;
 
+        // The telegraph's job (showing danger before impact) is done now that damage/knockback
+        // are about to land.
+        HideBombTelegraphRing();
+
         // Dealing damage must never be able to skip cleanup: DrainEnergy can cascade into a
         // vehicle dying (Explode, OnVehicleDied, discarding ITS carried notes, ...), and if any
         // of that throws, an unguarded call here would abort before StartCoroutine(ImplodeAndDestroy())
@@ -168,13 +213,17 @@ public partial class Collectable
         {
             if (_gfm == null) _gfm = GameFlowManager.Instance;
             var vehicles = _gfm != null ? _gfm.GetVehicles() : null;
+
+            // Radius was already resolved and cached at arm time (ResolveAndCacheBombBlastRadius,
+            // called from ArmAsTimeBomb) so the telegraph ring and this call agree on one number.
+            float radius = _bombEffectiveBlastRadius;
+
             if (vehicles != null)
             {
                 float baseDrain = amount * tuning.bomb.drainMultiplier;
                 float roleScale = _roleProfile != null
                     ? Mathf.Lerp(1f, 0.1f, Mathf.Clamp01(_roleProfile.drainResistance01))
                     : 1f;
-                float radius = tuning.bomb.blastRadius;
 
                 for (int i = 0; i < vehicles.Count; i++)
                 {
@@ -188,7 +237,25 @@ public partial class Collectable
                         : 1f;
                     v.DrainEnergy(baseDrain * roleScale * falloff, "TimeBombCollectable");
                     v.TriggerDrainFeedback(tuning.bomb.warningColor);
+
+                    Vector2 away = (Vector2)v.transform.position - (Vector2)transform.position;
+                    away = away.sqrMagnitude > 0.0001f ? away.normalized : UnityEngine.Random.insideUnitCircle.normalized;
+                    float knockbackFalloff = radius > 0f
+                        ? Mathf.Lerp(1f, tuning.bomb.knockbackEdgeFraction, Mathf.Clamp01(dist / radius))
+                        : 1f;
+                    v.ApplyKnockback(away * tuning.bomb.knockbackImpulse * knockbackFalloff);
                 }
+            }
+
+            var drums = assignedInstrumentTrack != null ? assignedInstrumentTrack.drumTrack : null;
+            if (drums != null)
+            {
+                var centerGP = drums.CellOf(transform.position);
+                int radiusCellsInt = Mathf.Max(1, Mathf.RoundToInt(_bombBlastRadiusCells));
+                float discardRegrowDelay = (_roleProfile != null && _roleProfile.discardBlastRegrowDelay >= 0f)
+                    ? _roleProfile.discardBlastRegrowDelay
+                    : -1f;
+                _gfm?.dustGenerator?.TriggerDiscardBlast(centerGP, radiusCellsInt, regrowDelaySeconds: discardRegrowDelay);
             }
         }
         catch (Exception ex)
@@ -233,13 +300,13 @@ public partial class Collectable
             Debug.LogException(ex, this);
         }
 
-        Vector3 flashStartRootScale = transform.localScale;
+        Vector3 flashStartRootScale = BombVisualRoot.localScale;
         var flashStartParticleScales = new Vector3[_bombParticleSystems.Length];
         for (int i = 0; i < _bombParticleSystems.Length; i++)
             flashStartParticleScales[i] = _bombParticleSystems[i] != null ? _bombParticleSystems[i].transform.localScale : Vector3.zero;
 
         float blastRatio = _bombBaseVisualRadius > 0.0001f
-            ? tuning.bomb.blastRadius / _bombBaseVisualRadius
+            ? _bombEffectiveBlastRadius / _bombBaseVisualRadius
             : tuning.bomb.maxPulseScale;
         Vector3 flashTargetRootScale = _bombBaseScale * blastRatio;
 
@@ -250,7 +317,7 @@ public partial class Collectable
             flashElapsed += Time.deltaTime;
             float u = Mathf.Clamp01(flashElapsed / flashDuration);
 
-            transform.localScale = Vector3.Lerp(flashStartRootScale, flashTargetRootScale, u);
+            BombVisualRoot.localScale = Vector3.Lerp(flashStartRootScale, flashTargetRootScale, u);
             for (int i = 0; i < _bombParticleSystems.Length; i++)
                 if (_bombParticleSystems[i] != null)
                     _bombParticleSystems[i].transform.localScale =
@@ -259,7 +326,7 @@ public partial class Collectable
             yield return null;
         }
 
-        Vector3 peakRootScale = transform.localScale;
+        Vector3 peakRootScale = BombVisualRoot.localScale;
         var peakParticleScales = new Vector3[_bombParticleSystems.Length];
         for (int i = 0; i < _bombParticleSystems.Length; i++)
             peakParticleScales[i] = _bombParticleSystems[i] != null ? _bombParticleSystems[i].transform.localScale : Vector3.zero;
@@ -272,7 +339,7 @@ public partial class Collectable
             float u = Mathf.Clamp01(elapsed / duration);
             float remainingFrac = 1f - (u * u); // accelerating collapse, not linear
 
-            transform.localScale = peakRootScale * remainingFrac;
+            BombVisualRoot.localScale = peakRootScale * remainingFrac;
             for (int i = 0; i < _bombParticleSystems.Length; i++)
                 if (_bombParticleSystems[i] != null)
                     _bombParticleSystems[i].transform.localScale = peakParticleScales[i] * remainingFrac;

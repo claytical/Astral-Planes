@@ -98,6 +98,19 @@ public partial class Vehicle
     /// </summary>
     public void TriggerDrainFeedback(Color hitColor) =>
         TriggerFlickerAndPulse(vehicleConfig.drainFeedbackShrinkScale, hitColor, false, vehicleConfig.drainFeedbackDuration);
+
+    /// <summary>
+    /// Instantaneous knockback impulse (e.g. a discarded-note bomb). ForceMode2D.Impulse (not a
+    /// direct linearVelocity write) so heavier ships resist more via rb.mass, matching the
+    /// Vehicle→DiscoveryTrackNode knockback above. UpdateMovementAndFuel only ever steers
+    /// linearVelocity toward desiredVel at a clamped accel rate — it never overwrites it outright —
+    /// so the impulse bleeds off naturally over several ticks instead of vanishing next frame.
+    /// </summary>
+    public void ApplyKnockback(Vector2 impulseWorld)
+    {
+        if (rb == null) return;
+        rb.AddForce(impulseWorld, ForceMode2D.Impulse);
+    }
     private IEnumerator ThudRoutine(Vector2 coll)
         {
             isFlickering = true;

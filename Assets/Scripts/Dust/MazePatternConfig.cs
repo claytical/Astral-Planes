@@ -28,6 +28,8 @@ public sealed class DustTimingParams
     public float zapRegrowDelay = -1f;
     [Tooltip("Delay applied when a DiscoveryTrackNode dies and releases the star-drained cells it was holding.")]
     public float starDrainReleaseDelay = -1f;
+    [Tooltip("Delay applied to cells cleared by a discarded carried note's detonation blast.")]
+    public float collectableDiscardRegrowDelay = -1f;
 
     /// <summary>Per-source delay, or -1 to fall back to the base regrowDelay.</summary>
     public float GetDelayFor(DustClearSource source) => source switch
@@ -39,6 +41,7 @@ public sealed class DustTimingParams
         DustClearSource.CollectablePlow    => collectablePlowRegrowDelay,
         DustClearSource.Jail               => jailRegrowDelay,
         DustClearSource.SuperNode          => superNodeRegrowDelay,
+        DustClearSource.CollectableDiscard => collectableDiscardRegrowDelay,
         _                                  => -1f,
     };
 
@@ -52,6 +55,7 @@ public sealed class DustTimingParams
         superNodeRegrowDelay          = Mathf.Max(-1f, superNodeRegrowDelay);
         zapRegrowDelay                = Mathf.Max(-1f, zapRegrowDelay);
         starDrainReleaseDelay         = Mathf.Max(-1f, starDrainReleaseDelay);
+        collectableDiscardRegrowDelay = Mathf.Max(-1f, collectableDiscardRegrowDelay);
     }
 }
 

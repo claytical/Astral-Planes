@@ -46,7 +46,12 @@ public sealed class PathChoiceCoordinator
         bool crossPhase = remainingMotifs.Count == 0;
         IReadOnlyList<int> targets = crossPhase ? ptm.GetRemainingPhaseIndices() : remainingMotifs;
 
-        if (targets.Count <= 1)
+        // Intra-phase remaining motifs are a fixed linear sequence, so 0 or 1 of them is not a
+        // real choice. Cross-phase targets already encode the real choice set themselves —
+        // including a single wrap-to-phase-0 target once loopChapters wraps past the last phase
+        // (see GetRemainingPhaseIndices) — so a lone cross-phase target still deserves a maze.
+        bool nothingToOffer = crossPhase ? targets.Count == 0 : targets.Count <= 1;
+        if (nothingToOffer)
         {
             yield return _gameFlow.StartCoroutine(_sceneFlow.StartNextMotifInPhase());
             yield break;
@@ -133,11 +138,16 @@ public sealed class PathChoiceCoordinator
         Vector2 triggerCenter = SnapToPhysicalBoundary((min + max) * 0.5f, info.Side);
         go.transform.position = triggerCenter;
 
+        // Only the boundary-normal axis gets the extra cellSize of depth (so a vehicle passing
+        // straight through registers reliably). Padding the tangential axis too would reach past
+        // the actual gap cells into the solid wall on either side of the opening, where the
+        // particle visual isn't shown — letting a vehicle sliding along the wall trip the trigger.
+        bool horizontalWall = info.Side == BoundaryWrap.BoundarySide.Top || info.Side == BoundaryWrap.BoundarySide.Bottom;
         var col = go.AddComponent<BoxCollider2D>();
         col.isTrigger = true;
         col.size = new Vector2(
-            Mathf.Max(cellSize, (max.x - min.x) + cellSize),
-            Mathf.Max(cellSize, (max.y - min.y) + cellSize));
+            horizontalWall ? Mathf.Max(cellSize, max.x - min.x) : cellSize,
+            horizontalWall ? cellSize : Mathf.Max(cellSize, max.y - min.y));
 
         GameObject visualInstance = null;
         if (_gameFlow.PathExitVisualPrefab != null)

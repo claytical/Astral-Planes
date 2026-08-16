@@ -25,7 +25,6 @@ public partial class Vehicle : MonoBehaviour
     private float _burnRateMultiplier = 1f; // Multiplier for the burn rate based on trigger pressure
     private bool _boostCostFree;           // When true, boost ignores energy requirement and skips burn
     [HideInInspector] public float arcadeMaxSpeed = 14f;
-    private float _cumulativeEnergySpent = 0f;
     [HideInInspector] [SerializeField] private int vehicleKeepClearRadiusCells = 0;
     private float _nextVehicleKeepClearRefreshAt = 0f;
 
@@ -44,6 +43,8 @@ public partial class Vehicle : MonoBehaviour
 
     private float _lastRecoverAt = -999f;
     private float _timeStuckInVoid = 0f;
+    private bool _movementLocked = false;
+    private Coroutine _recoveryRoutine;
 
     private GameFlowManager gfm;
     float   _lastMoveStamp;
@@ -288,6 +289,11 @@ public partial class Vehicle : MonoBehaviour
 
     private void UpdateMovementAndFuel(float dt)
     {
+        // A recovery glide (Vehicle.Recovery.cs) has sole authority over rb.position/linearVelocity
+        // while it runs — suspending accel/steering/coast-brake/boost here prevents it fighting
+        // the scripted return.
+        if (_movementLocked) return;
+
         bool hasInput = _moveInput.sqrMagnitude > 0.0001f;
 
         if (hasInput || boosting)
@@ -360,6 +366,11 @@ public partial class Vehicle : MonoBehaviour
 
     public void Move(Vector2 direction)
     {
+        // Locked during an animated recovery glide (Vehicle.Recovery.cs) — works regardless of
+        // input driver (local player, AI, ...) since the lock lives here rather than on any one
+        // input source.
+        if (_movementLocked) return;
+
         if (direction.magnitude < profile.inputDeadzone) direction = Vector2.zero;
 
         _moveInput     = direction;

@@ -12,4 +12,5 @@ public enum DustClearSource
     CollectablePlow,
     Jail,
     SuperNode,
+    CollectableDiscard,  // detonation blast of a discarded carried note
 }

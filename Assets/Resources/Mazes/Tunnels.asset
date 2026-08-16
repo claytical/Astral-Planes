@@ -22,6 +22,7 @@ MonoBehaviour:
     superNodeRegrowDelay: -1
     zapRegrowDelay: -1
     starDrainReleaseDelay: -1
+    collectableDiscardRegrowDelay: -1
   clearBoxes:
     clearBoxCount: 4
     clearBoxWidth: 5
@@ -41,7 +42,7 @@ MonoBehaviour:
   diagonalLanes:
     step: 12
   tunnels:
-    corridorStep: 2
-    corridorWidth: 2
+    corridorStep: 4
+    corridorWidth: 4
   porousBorder:
-    exitCount: 3
+    exitCount: 6

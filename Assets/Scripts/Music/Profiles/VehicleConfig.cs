@@ -42,6 +42,12 @@ public class VehicleConfig : ScriptableObject
     public float stuckSpeedThreshold = 0.35f;
     [Tooltip("Seconds inside void while not moving before ejection.")]
     public float stuckSecondsInVoid = 0.60f;
+    [Tooltip("If true, recovery locks player movement input and glides the vehicle back to safety over recoveryReturnSeconds instead of an instant, silent teleport.")]
+    public bool lockMovementDuringRecovery = true;
+    [Tooltip("Seconds the animated return-to-safety glide takes.")]
+    public float recoveryReturnSeconds = 0.6f;
+    [Tooltip("Multiplier of arcadeMaxSpeed for the outward exit velocity applied once a void-trap eject reaches its target rim position.")]
+    public float voidEjectExitSpeedMultiplier = 0.35f;
 
     [Header("Gravity Void Detection")]
     public float voidProbeRadiusWorld = 0.6f;

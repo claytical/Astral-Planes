@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public enum TrapShape { Circle, Box }
 
@@ -68,8 +69,9 @@ public class MotifProfile : ScriptableObject
     [Tooltip("How many entries at the front of beatProfileSequence play once per motif, then are skipped on wrap.")]
     public int beatIntroCount = 0;
 
-    [Tooltip("If true, drums are driven by player energy expenditure through beatProfileSequence.")]
-    public bool driveBeatsFromEnergy = true;
+    [FormerlySerializedAs("driveBeatsFromEnergy")]
+    [Tooltip("If true, drums are driven by live CosmicDust density through beatProfileSequence.")]
+    public bool driveBeatsFromDensity = true;
 
     [Header("Vehicle Trap")]
     [Tooltip("If true, a ring or box of CosmicDust spawns around each vehicle when this motif begins.")]

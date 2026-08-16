@@ -13,10 +13,6 @@ public partial class InstrumentTrack
         int binSz = BinSize();
         int bins  = toMaxCapacity ? Mathf.Max(1, maxLoopMultiplier) : Mathf.Max(1, loopMultiplier);
 
-        // When expanding to max capacity, only fill bins above the current count so that the
-        // player's already-collected notes in existing bins survive the fill.
-        int fillFrom = toMaxCapacity ? loopMultiplier : 0;
-
         if (bins > loopMultiplier)
         {
             loopMultiplier = bins;
@@ -26,13 +22,16 @@ public partial class InstrumentTrack
                 SetBinAllocated(b, true);
         }
 
-        // Clear only the bins we are about to fill (preserves existing bins when toMaxCapacity).
-        for (int b = fillFrom; b < bins; b++)
+        // Fill every bin across the whole track that isn't already filled — including bins
+        // behind the playhead that were allocated but never collected during normal play —
+        // instead of only the newly-expanded bins above the old loopMultiplier. Already-filled
+        // bins are left untouched so the player's collected notes in them survive the fill.
+        for (int b = 0; b < bins; b++)
+        {
+            if (toMaxCapacity && IsBinFilled(b)) continue;
+
             ClearBinNotesKeepAllocated(b);
 
-        // Write authored notes bin-by-bin (new bins only when toMaxCapacity).
-        for (int b = fillFrom; b < bins; b++)
-        {
             var ns = GetNoteSetForBin(b);
             if (ns == null) continue;
 

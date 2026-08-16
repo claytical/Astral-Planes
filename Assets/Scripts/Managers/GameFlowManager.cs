@@ -204,18 +204,6 @@ public partial class GameFlowManager : MonoBehaviour
     {
         SceneFlow.UnregisterPlayerStatsGrid(grid);
     }
-    public float GetTotalSpentEnergyTanks()
-    {
-        float total = 0f;
-        if (vehicles == null) return total;
-        for (int i = 0; i < vehicles.Count; i++)
-        {
-            var v = vehicles[i];
-            if (v == null || !v.isActiveAndEnabled) continue;
-            total += v.GetCumulativeSpentTanks();
-        }
-        return total;
-    }
     public void RegisterVehicle(Vehicle v)
     {
         if (v == null) return;

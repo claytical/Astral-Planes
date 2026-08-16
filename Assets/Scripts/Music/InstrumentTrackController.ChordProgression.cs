@@ -6,6 +6,14 @@ using Object = UnityEngine.Object;
 // per-cohort ascension completion, both of which end in HarmonyDirector advancing the chord.
 public partial class InstrumentTrackController
 {
+    // Counts SuperNodeCompletionCoroutine instances currently mid-flight. While any are
+    // pending, CheckAndTriggerAllTracksMaxed must not fire — otherwise a synchronous caller
+    // (e.g. the SuperNode.OnResolved targetTrack mirror in PhaseStar.EjectionLogic.cs, which
+    // fires the instant a track is already maxed) can race ahead of the coroutine's own
+    // staged two-loop-boundary cleanup/ascend visual and trigger the motif bridge before that
+    // choreography has had a chance to run.
+    private int _pendingSuperNodeCompletions;
+
     // Shared precondition for both AllTracksMaxed paths below: resolves GameFlowManager
     // and the motif's alternate chord profile, and confirms every track whose role is
     // active in the current motif has reached its max loopMultiplier.
@@ -39,6 +47,7 @@ public partial class InstrumentTrackController
 
     public void CheckAndTriggerAllTracksMaxed()
     {
+        if (_pendingSuperNodeCompletions > 0) return;
         if (!TryGetAllTracksMaxedAltProfile(out var gfm, out var alt)) return;
         if (gfm.GhostCycleInProgress || gfm.BridgePending) return;
 
@@ -56,6 +65,7 @@ public partial class InstrumentTrackController
                                                    int ascendLoopsOverride, int binSz, DrumTrack drum)
     {
         if (track == null || fromBin >= toBin) return;
+        _pendingSuperNodeCompletions++;
         StartCoroutine(SuperNodeCompletionCoroutine(track, fromBin, toBin, ascendLoopsOverride, binSz, drum));
     }
 
@@ -86,6 +96,7 @@ public partial class InstrumentTrackController
         yield return WaitForNextLoopBoundary(drum);
 
         // N+2 boundary: record appears with alt chord.
+        _pendingSuperNodeCompletions = Mathf.Max(0, _pendingSuperNodeCompletions - 1);
         CheckAndTriggerAllTracksMaxed();
     }
 

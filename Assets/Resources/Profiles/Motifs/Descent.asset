@@ -22,13 +22,13 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 8068d0b2d74874427a91f238a413496f, type: 3}
   - {fileID: 8300000, guid: 9d56afa31ad8e405794a38c66ab5f302, type: 3}
   - {fileID: 8300000, guid: 0fb896d4a09a64a01a6d2feb8945acf5, type: 3}
-  intensityThresholds: []
   entryLoopCount: 1
+  resetFirstCarryOnStart: 0
   bpm: 161
   stepsPerLoop: 32
   nodesPerStar: 7
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
-  mazePattern: {fileID: 11400000, guid: a6ec550cd7f5743ea8637890719fdde7, type: 2}
+  mazePattern: {fileID: 11400000, guid: 801fa6791dfb34c298cea3d865cdf526, type: 2}
   roleGeoConfigs: []
   chordProgression: {fileID: 11400000, guid: e7e83b9a382cd456a99566c339aaadc1, type: 2}
   alternateChordProgressionProfile: {fileID: 11400000, guid: ca3447ad7edd345dd80f3239695c1c8f,
@@ -48,4 +48,3 @@ MonoBehaviour:
   trapRadius: 3
   trapGrowSeconds: 0.4
   trapRole: 4
-  trapHardness01: 0.5

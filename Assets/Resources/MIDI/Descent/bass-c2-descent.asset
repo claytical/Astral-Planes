@@ -29,13 +29,5 @@ MonoBehaviour:
       midiNote: 51
       durSteps: 2
       velocity01: 0.9448819
-    - step: 26
-      midiNote: 53
-      durSteps: 2
-      velocity01: 0.9448819
-    - step: 28
-      midiNote: 51
-      durSteps: 4
-      velocity01: 0.9448819
     overlapPolicy: 1
     octaveShift: -1

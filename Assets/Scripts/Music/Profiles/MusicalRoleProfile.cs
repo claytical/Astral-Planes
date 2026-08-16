@@ -120,6 +120,12 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("Seconds before this cell regrows after being carved. −1 = use the active maze pattern's default.")]
     public float regrowthDelay = -1f;
 
+    [Header("Discard Blast")]
+    [Tooltip("Grid-cell radius of the detonation when a carried note of this role is discarded. Drives the visual blast, vehicle damage falloff, and how much CosmicDust is cleared — all three use this same radius. 0 = fall back to CollectableTuning.bomb.blastRadius (current fixed behavior).")]
+    [Min(0f)] public float discardBlastRadiusCells = 0f;
+    [Tooltip("Seconds before dust cleared by this role's discard-blast detonation regrows. −1 = fall back to the maze pattern's collectableDiscardRegrowDelay (or base regrowDelay if that's also −1). Short delay = fast reuse/re-harvest; long delay = a lasting carved path.")]
+    public float discardBlastRegrowDelay = -1f;
+
     // ---------- Color helpers (authority) ----------
 
     public Color GetBaseColor()

@@ -65,6 +65,7 @@ public class SuperNodeTrackNode : TrackNode
     private float _spawnTime;
     private bool  _collected;
     private float _speed;
+    private int   _totalShardCount;
 
     private Rigidbody2D         _rb;
     private DrumTrack           _drum;
@@ -110,12 +111,13 @@ public class SuperNodeTrackNode : TrackNode
         }
     }
 
-    public void Setup(InstrumentTrack track, float difficulty01, DrumTrack drum)
+    public void Setup(InstrumentTrack track, float difficulty01, DrumTrack drum, int totalShardCount)
     {
         AssignedTrack     = track;
         _drum             = drum;
         _spawnTime        = Time.time;
         _loopsSinceSpawn  = 0;
+        _totalShardCount  = totalShardCount;
 
         _speed            = Mathf.Lerp(minSpeed, maxSpeed, difficulty01);
         _expireAfterLoops = Mathf.RoundToInt(Mathf.Lerp(maxLifetimeLoops, minLifetimeLoops, difficulty01));
@@ -359,8 +361,9 @@ public class SuperNodeTrackNode : TrackNode
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (_collected || Time.time - _spawnTime < spawnGraceSeconds) return;
-        if (other.GetComponentInParent<Vehicle>() != null)
-            Collect();
+        var vehicle = other.GetComponentInParent<Vehicle>();
+        if (vehicle != null)
+            Collect(vehicle);
     }
 
     private void OnCollisionEnter2D(Collision2D col)
@@ -373,9 +376,12 @@ public class SuperNodeTrackNode : TrackNode
         _dustGen.CarveCellPreserveGray(cell, dustFadeSeconds, DustClearSource.SuperNode, dustRegrowDelay);
     }
 
-    private void Collect()
+    private void Collect(Vehicle vehicle)
     {
         _collected = true;
+
+        if (vehicle != null && _totalShardCount > 0)
+            vehicle.CollectEnergy(vehicle.capacity / _totalShardCount);
 
         if (AssignedTrack != null)
         {

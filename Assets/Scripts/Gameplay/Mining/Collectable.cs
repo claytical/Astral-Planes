@@ -51,7 +51,9 @@ public partial class Collectable : MonoBehaviour
 
         if (_solidColliders == null)
         {
-            var all = GetComponents<Collider2D>();
+            // InChildren: the real solid, non-trigger dust-collision collider lives on the
+            // "Cube" child, not the root — the root only carries the pickup trigger collider.
+            var all = GetComponentsInChildren<Collider2D>(true);
             int solid = 0;
             for (int i = 0; i < all.Length; i++) if (!all[i].isTrigger) solid++;
             _solidColliders = new Collider2D[solid];
