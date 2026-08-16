@@ -11,6 +11,12 @@ public class PhaseTransitionManager : MonoBehaviour
     // Phase index replaces MazeArchetype. Stub property kept for BridgeOrchestration compat.
     private int currentPhaseIndex  { get; set; } = -1;
     public int CurrentPhaseIndex => currentPhaseIndex;
+
+    public string CurrentPhaseId =>
+        (chapterLibrary != null && chapterLibrary.phases != null
+         && currentPhaseIndex >= 0 && currentPhaseIndex < chapterLibrary.phases.Count)
+            ? chapterLibrary.phases[currentPhaseIndex].phaseId
+            : null;
     public int previousPhaseIndex { get; private set; } = -1;
     public MazeArchetype currentPhase => MazeArchetype.Windows; // compat stub — remove when MazeArchetype is fully gone
 
@@ -108,6 +114,28 @@ public class PhaseTransitionManager : MonoBehaviour
     // ---------------------------
     // CHAPTER START (PHASE)
     // ---------------------------
+
+    /// <summary>
+    /// Like StartChapter, but resolves the target by stable phaseId first (if the
+    /// PhaseLibrary asset's phase order has been reordered since phaseId/fallbackIndex
+    /// were recorded, e.g. an edit that inserted/removed/reordered phases). Falls back
+    /// to the raw fallbackIndex when phaseId is null/empty or isn't found.
+    /// </summary>
+    public void StartChapterById(string phaseId, int fallbackIndex, string who)
+    {
+        int resolvedIndex = fallbackIndex;
+
+        if (!string.IsNullOrEmpty(phaseId) && chapterLibrary?.phases != null)
+        {
+            int idx = chapterLibrary.phases.FindIndex(p => p != null && p.phaseId == phaseId);
+            if (idx >= 0)
+                resolvedIndex = idx;
+            else
+                Debug.LogWarning($"[CHAPTER] StartChapterById: phaseId '{phaseId}' not found; falling back to stored index {fallbackIndex} by {who}");
+        }
+
+        StartChapter(resolvedIndex, who);
+    }
 
     public void StartChapter(int phaseIndex, string who)
     {
@@ -274,19 +302,23 @@ public class PhaseTransitionManager : MonoBehaviour
             return;
         }
 
-        int idx = Mathf.Clamp(phaseIndex, 0, chapterLibrary.phases.Count - 1);
-        var phase = chapterLibrary.phases[idx];
+        if (phaseIndex < 0 || phaseIndex >= chapterLibrary.phases.Count)
+        {
+            Debug.LogError($"[CHAPTER] LoadChapterForPhase: index {phaseIndex} out of range (count={chapterLibrary.phases.Count}); no chapter loaded.");
+            return;
+        }
+        var phase = chapterLibrary.phases[phaseIndex];
 
         if (phase == null || phase.motifs == null || phase.motifs.Count == 0)
         {
-            Debug.LogError($"[CHAPTER] Phase {idx} ('{phase?.phaseName}') has no motifs.");
+            Debug.LogError($"[CHAPTER] Phase {phaseIndex} ('{phase?.phaseName}') has no motifs.");
             return;
         }
 
         _chapterMotifs = phase.motifs;
         _chapterLoops  = phase.loopMotifs;
 
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[CHAPTER] Loaded phase {idx} '{phase.phaseName}' with {_chapterMotifs.Count} motif(s), loop={_chapterLoops}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[CHAPTER] Loaded phase {phaseIndex} '{phase.phaseName}' with {_chapterMotifs.Count} motif(s), loop={_chapterLoops}");
     }
 
     private void ApplyMotifToAudioAndTracks(

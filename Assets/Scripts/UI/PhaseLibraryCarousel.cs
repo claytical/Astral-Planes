@@ -58,6 +58,13 @@ public class PhaseLibraryCarousel : MonoBehaviour
     [Tooltip("Authoritative motif list, used to find the next not-yet-completed motif to offer as a locked preview.")]
     [SerializeField] private PhaseLibrary phaseLibrary;
 
+#if UNITY_EDITOR
+    [Header("Debug (Editor Only)")]
+    [Tooltip("Design-time only: shows and allows navigating to every phase/motif in " +
+             "PhaseLibrary regardless of completion state. Never available in player builds.")]
+    [SerializeField] private bool showAllPhasesForDesign = false;
+#endif
+
     /// <summary>Fired when the player confirms a motif, before the scene loads.</summary>
     public UnityEvent onMotifConfirmed;
 
@@ -66,6 +73,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
     {
         public MotifSnapshot Snapshot;   // non-null for a played/recorded motif
         public MotifProfile  Profile;    // non-null only for the locked-preview entry
+        public string PhaseId;
         public int    PhaseIndex;
         public int    MotifIndex;
         public string MotifId;
@@ -89,17 +97,28 @@ public class PhaseLibraryCarousel : MonoBehaviour
     private void Start()
     {
         var rings = RingSessionStore.LoadAllRingsFromDisk();
+        List<CarouselEntry> entries;
 
-        var entries = rings.Select(r => new CarouselEntry
+#if UNITY_EDITOR
+        if (showAllPhasesForDesign)
         {
-            Snapshot   = r,
-            PhaseIndex = r.PhaseIndex,
-            MotifIndex = r.MotifIndex,
-            MotifId    = r.MotifId,
-        }).ToList();
+            entries = BuildAllLibraryEntries(rings);
+        }
+        else
+#endif
+        {
+            entries = rings.Select(r => new CarouselEntry
+            {
+                Snapshot   = r,
+                PhaseId    = r.PhaseId,
+                PhaseIndex = r.PhaseIndex,
+                MotifIndex = r.MotifIndex,
+                MotifId    = r.MotifId,
+            }).ToList();
 
-        if (entries.Count > 0 && TryFindNextUnplayedMotif(rings, out var lockedEntry))
-            entries.Add(lockedEntry);
+            if (entries.Count > 0 && TryFindNextUnplayedMotif(rings, out var lockedEntry))
+                entries.Add(lockedEntry);
+        }
 
         entries.Sort((a, b) => a.PhaseIndex != b.PhaseIndex
             ? a.PhaseIndex.CompareTo(b.PhaseIndex)
@@ -152,6 +171,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
                 {
                     Snapshot   = null,
                     Profile    = motif,
+                    PhaseId    = phase.phaseId,
                     PhaseIndex = p,
                     MotifIndex = m,
                     MotifId    = motif.motifId,
@@ -161,6 +181,51 @@ public class PhaseLibraryCarousel : MonoBehaviour
         }
         return false;
     }
+
+#if UNITY_EDITOR
+    // Design-time only: one entry per phase×motif in the full authored PhaseLibrary,
+    // regardless of completion. Played motifs use their recorded snapshot (full audio/
+    // visual preview); everything else renders as a locked preview, same treatment as
+    // the single "next up" entry already used in normal play.
+    private List<CarouselEntry> BuildAllLibraryEntries(List<MotifSnapshot> rings)
+    {
+        var result = new List<CarouselEntry>();
+        if (phaseLibrary == null || phaseLibrary.phases == null) return result;
+
+        for (int p = 0; p < phaseLibrary.phases.Count; p++)
+        {
+            var phase = phaseLibrary.phases[p];
+            if (phase?.motifs == null) continue;
+
+            for (int m = 0; m < phase.motifs.Count; m++)
+            {
+                var motif = phase.motifs[m];
+                if (motif == null) continue;
+
+                var snap = rings.Find(r => r.PhaseIndex == p && r.MotifIndex == m);
+                result.Add(snap != null
+                    ? new CarouselEntry
+                      {
+                          Snapshot   = snap,
+                          PhaseId    = phase.phaseId,
+                          PhaseIndex = p,
+                          MotifIndex = m,
+                          MotifId    = snap.MotifId,
+                      }
+                    : new CarouselEntry
+                      {
+                          Snapshot   = null,
+                          Profile    = motif,
+                          PhaseId    = phase.phaseId,
+                          PhaseIndex = p,
+                          MotifIndex = m,
+                          MotifId    = motif.motifId,
+                      });
+            }
+        }
+        return result;
+    }
+#endif
 
     // ── Setup ──────────────────────────────────────────────────────────────────
 
@@ -339,7 +404,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
         }
 
         var entry = CurrentRow[_currentCol];
-        PhaseLibraryStartConfig.RequestStart(entry.PhaseIndex, entry.MotifIndex, entry.MotifId);
+        PhaseLibraryStartConfig.RequestStart(entry.PhaseId, entry.PhaseIndex, entry.MotifIndex, entry.MotifId);
         onMotifConfirmed.Invoke();
         SceneManager.LoadScene(trackSelectionScene);
     }

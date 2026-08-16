@@ -94,6 +94,13 @@ public class MotifSnapshot
     /// Used to group records by phase in PhaseLibraryBrowser.</summary>
     public int PhaseIndex;
 
+    /// <summary>Stable identifier of the phase at save time (PhaseLibrary.Phase.phaseId).
+    /// Used to re-resolve the correct phase if the PhaseLibrary asset's phase order
+    /// changes after this ring was saved. Null/empty on legacy rings saved before this
+    /// field existed ⇒ resolution falls back to the raw PhaseIndex (RingSessionStore
+    /// backfills this on load).</summary>
+    public string PhaseId;
+
     /// <summary>Zero-based index of this motif within its phase's motif list.
     /// Used to map a saved record back to a specific MotifProfile in PhaseLibrary.</summary>
     public int MotifIndex;

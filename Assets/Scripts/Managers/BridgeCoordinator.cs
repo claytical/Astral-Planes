@@ -101,6 +101,7 @@ public sealed class BridgeCoordinator
         snapshot.MotifKeyRootMidi = (_gameFlow.phaseTransitionManager != null && _gameFlow.phaseTransitionManager.currentMotif != null)
             ? _gameFlow.phaseTransitionManager.currentMotif.keyRootMidi
             : 60;
+        snapshot.PhaseId     = _gameFlow.phaseTransitionManager?.CurrentPhaseId;
         snapshot.PhaseIndex  = _gameFlow.phaseTransitionManager?.CurrentPhaseIndex ?? 0;
         snapshot.MotifIndex  = _gameFlow.phaseTransitionManager?.currentMotifIndex ?? 0;
         snapshot.MotifId     = _gameFlow.phaseTransitionManager?.currentMotif?.motifId;

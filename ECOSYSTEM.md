@@ -289,7 +289,7 @@ A note-carrying orb spawned in bursts by `DiscoveryTrackNode` (or instant-filled
 ```
 Spawned → BeginSpawnArrival() → MovementRoutine() (autonomous drift)
   → Vehicle trigger pickup → OnCollectableCollected()
-  → BeginCarryAndDepositAtDsp() → CarryAndDepositRoutine()
+  → BeginCarryThenDepositAtDsp() → CarryAndDepositRoutine()
   → arrives at NoteVisualizer marker → InstrumentTrack.OnCollectableCollected()
 ```
 
@@ -299,7 +299,8 @@ Vehicle trigger pickup → OnCollectablePickedUpForManualRelease()
   → Vehicle.EnqueuePendingCollectedNote()
   → DrumTrack.OnStepChanged → Vehicle.TryReleaseQueuedNote()
   → Vehicle.CommitManualReleaseAtStep()
-  → Collectable.CommitManualReleaseAtStep() → InstrumentTrack.CommitManualReleasedNote()
+      → Collectable.MarkAsReportedCollected() / OnManualReleaseConsumed()
+      → InstrumentTrack.CommitManualReleasedNote()
 ```
 
 **Path 3 — Discard → Time Bomb** (`Collectable.Bomb.cs`):
@@ -315,15 +316,23 @@ manual-release queue overflow, or Vehicle death) → OnManualReleaseDiscarded(st
         (same DSP step-clock math that schedules normal note deposits — a note
         discarded right after its own step passed gets nearly a full loop to
         clear the area; discarded right before its step gets a short fuse)
+      radius resolved once here, not in Detonate() (ResolveAndCacheBombBlastRadius,
+        Collectable.Bomb.cs:114-122), so a telegraph ring (Collectable.BombTelegraph.cs)
+        can show the true blast radius for the whole fuse — pulsing via
+        tuning.bomb.telegraphPulseHz/telegraphPulseMin, alpha ramping to telegraphMaxAlpha
       swells + tints toward warningColor every frame until fuse-out
   → Detonate() — on fuse-out OR immediately on Vehicle collision (TriggerEarlyDetonation)
       radius = MusicalRoleProfile.discardBlastRadiusCells (grid cells; 0 = fall back to
         CollectableTuning.bomb.blastRadius ÷ cell size) — one radius drives everything below
       for every Vehicle within radius: Vehicle.DrainEnergy() + Vehicle.TriggerDrainFeedback()
-      CosmicDustGenerator.TriggerDiscardBlast(centerCell, radius) — carves every solid dust
-        cell in the disk (source CollectableDiscard); each regrows respecting its own identity
-        (hidden Voronoi role if still gray, its already-revealed role otherwise) — no role
-        is forced or biased, this is the same carve/regrow pipeline every other clear source uses
+        + Vehicle.ApplyKnockback() (tuning.bomb.knockbackImpulse, falls off toward
+        knockbackEdgeFraction at the blast edge — same distance falloff shape as the drain)
+      CosmicDustGenerator.TriggerDiscardBlast(centerCell, radius, regrowDelaySeconds) — carves
+        every solid dust cell in the disk (source CollectableDiscard); regrow delay comes from
+        MusicalRoleProfile.discardBlastRegrowDelay when set, else the normal resolver default;
+        each cell regrows respecting its own identity (hidden Voronoi role if still gray, its
+        already-revealed role otherwise) — no role is forced or biased, this is the same
+        carve/regrow pipeline every other clear source uses
   → FlashThenImplode() — flashes to a size matching the resolved radius, then collapses → Destroy()
 ```
 An armed bomb still counts toward `GameFlowManager.AnyCollectablesInFlightGlobal()` until
@@ -335,13 +344,15 @@ Radius is authored per role (`MusicalRoleProfile.discardBlastRadiusCells`) so a 
 the visual flash size, the vehicle-damage falloff, and the dust-clear disk, so what the player
 sees blasted is exactly what gets cleared.
 
-**Owns:** assigned note + step + bin, carry state, grid occupancy cell (`_currentCell`), tether line, bomb-armed state once discarded (fuse timing, swell/detonation/implosion scale, Kinematic pin — `Collectable.Bomb.cs`).
+**Owns:** assigned note + step + bin, carry state, grid occupancy cell (`_currentCell`), home-pull anchor state (`_homeWorld`/`_homeFreeRadius` — a numeric elastic pull, not a rendered tether line), bomb-armed state once discarded (fuse timing, swell/detonation/implosion scale, Kinematic pin — `Collectable.Bomb.cs`).
 
-**Autonomous movement:** the timeline ghost pulse (`DrumTrack.OnStepChanged` crossing the note's step) sounds the note and arms a movement intent for the note's duration; role-specific patterns (Bass charges, Lead headings, Groove darts, Harmony orbits) run under a home tether with vehicle-flee. **While an intent is armed the note plows through dust** (`CarveCellPreserveGray`, source `CollectablePlow` — gray regrow, temporary corridors); between intents it bounces off dust. The arrival flight also carves its path gray (source `CollectableArrival`).
+**Autonomous movement:** the timeline ghost pulse (`DrumTrack.OnStepChanged` crossing the note's step) sounds the note and arms a movement intent for the note's duration; role-specific patterns (Bass charges, Lead headings, Groove darts, Harmony orbits) run under a home pull with vehicle-flee. **While an intent is armed the note plows through dust** (`CarveCellPreserveGray`, source `CollectablePlow` — gray regrow, temporary corridors); between intents it bounces off dust. A collectable only fully stops plowing/bouncing when its own cell *and* all 8 neighbor cells are solid (`IsFullyTrapped`, `Collectable.Movement.cs`) — anything less and it keeps moving. The arrival flight also carves its path gray (source `CollectableArrival`); during that flight solid colliders are disabled and pickup is refused, so vehicles pass through a still-arriving collectable rather than colliding with or collecting it (`BeginSpawnArrival` protected-flight window, `Collectable.cs`).
 
 **Listens to:** `DrumTrack.OnStepChanged` (ghost pulse → intent arming, trail follow timing).
 
-**Emits:** `OnCollected` (pickup), `OnDestroyed` (cleanup accounting).
+**Emits:** `OnDestroyed` (cleanup accounting) — pickup itself is a direct call (`InstrumentTrack.OnCollectableCollected()` / `.OnCollectablePickedUpForManualRelease()`), not an emitted event.
+
+**Tuning:** `Assets/Scripts/Gameplay/Mining/CollectableTuning.cs` is a `ScriptableObject` centralizing the non-role-varying numeric knobs referenced above (base motion, deposit timing, absorb VFX, idle pulse, note trail, dust-collision, bomb params) — role-varying values (blast radius, regrow delay, drain resistance) stay on `MusicalRoleProfile` instead.
 
 ---
 
@@ -473,7 +484,7 @@ StarPool spawns PhaseStar for role → tentacles drain role-carved dust cells (1
                           → InstrumentTrack.SpawnCollectableBurst(noteSet)
       [SuperNode path] → target track InstantFillAllBins(); shard tracks chased via SuperNodeTrackNode
   → Vehicle trigger collides Collectable
-      [auto] → BeginCarryAndDepositAtDsp() → InstrumentTrack.OnCollectableCollected()
+      [auto] → BeginCarryThenDepositAtDsp() → InstrumentTrack.OnCollectableCollected()
       [manual] → Vehicle.EnqueuePendingCollectedNote()
                    → DrumTrack.OnStepChanged → TryReleaseQueuedNote()
                    → InstrumentTrack.CommitManualReleasedNote()
@@ -515,13 +526,21 @@ StarPool.CheckBridgeGate() passes (budget spent, no live stars) + no collectable
   → new StarPool spins up, PhaseStars re-arm for the new phase
 ```
 
-### Flow D — Energy / Drum Intensity
+### Flow D — Track Fullness / Dust Density → Drum Intensity
+Energy-burn-driven intensity is gone — `MotifProfile.driveBeatsFromDensity` (`[FormerlySerializedAs("driveBeatsFromEnergy")]`) marks that the old burn-rate tracking plumbing was removed outright, not just renamed.
 ```
-Vehicle.TurnOnBoost() → ConsumeEnergy() per frame
-  → GameFlowManager accumulates burn rate → intensity level (0–4)
-  → DrumTrack.ApplyMotif(intensityLevel) → swaps to intensity drum clip
-  → Vehicle energy = 0 → respawn + SessionStateCoordinator.CheckAllPlayersOutOfEnergy()
+DrumTrack.Update() → TickLoopBoundaries() (once per leader-loop boundary)
+  → HandleBeatSequencingAtLoopBoundary()
+      gates: driveBeatsFromDensity=true, entry-loop window elapsed, _carryLatched
+             (a vehicle has carried at least one collectable), intensityDrumLoops non-empty
+      → ComputeTrackFullness01() — avg loopMultiplier/maxLoopMultiplier across all InstrumentTracks (tier driver)
+      → ComputeDensityIntensity(CosmicDustGenerator.GetSolidFraction()) — smoothed/hysteresis dust density (nudge)
+      → intensity01 = fullness01 + (density01 − 0.5) × densityNudgeRange
+      → ResolveIntensityClip(intensity01) — linear index into MotifProfile.intensityDrumLoops
+      → ScheduleDrumLoopChange() → ArmPendingDrumLoopForNextLeaderBoundary() → TickDeckSwap()
+          (dual A/B AudioSource decks, bar-aligned swap)
 ```
+`DrumTrack.ApplyMotif()` is a separate path — phase/motif changes only. It commits the new `MotifProfile` refs, resets entry-loop/carry-latch state, and picks an entry clip via `ChooseEntryClip()` (random from `entryDrumLoops`). It takes no intensity parameter and never touches `ResolveIntensityClip`/`_intensityLoops`; within-motif intensity swaps run entirely separately, once per loop boundary, as above.
 
 ### Flow E — Dust Energy Economy
 ```
@@ -544,6 +563,8 @@ Vehicle discards a carried note (miss window / sacrifice / queue overflow / vehi
   → Collectable.ArmAsTimeBomb(authoredAbsStep)
       Rigidbody2D → Kinematic (pinned, immune to physics-engine depenetration)
       fuse = InstrumentTrack.ComputeDepositDsp(step) − now, floored at minFuseSeconds
+      radius resolved once here (ResolveAndCacheBombBlastRadius) so a telegraph ring
+        (Collectable.BombTelegraph.cs) can show the true blast radius for the whole fuse
       swells + tints toward warningColor each frame until fuse-out
   → Detonate() — fuse-out OR Vehicle bump (TriggerEarlyDetonation)
       radius = MusicalRoleProfile.discardBlastRadiusCells × cell size
@@ -551,12 +572,14 @@ Vehicle discards a carried note (miss window / sacrifice / queue overflow / vehi
       for each Vehicle within radius:
         Vehicle.DrainEnergy(amount, "TimeBombCollectable")
         Vehicle.TriggerDrainFeedback(warningColor)
-      CosmicDustGenerator.TriggerDiscardBlast(centerCell, radiusCells)
+        Vehicle.ApplyKnockback(tuning.bomb.knockbackImpulse, falls off toward knockbackEdgeFraction)
+      CosmicDustGenerator.TriggerDiscardBlast(centerCell, radiusCells, regrowDelaySeconds)
         → CarveCell() per solid cell in the disk, source CollectableDiscard
         → each cell regrows via the normal resolver: revealed role stays the same role,
           still-gray cells fall back to their permanent hidden Voronoi role — never biased
-          toward a different role, and the regrow delay is tunable independently via
-          MazePatternConfig.dustTiming.collectableDiscardRegrowDelay
+          toward a different role; regrow delay is MusicalRoleProfile.discardBlastRegrowDelay
+          when set, else falls back to the normal resolver (MazePatternConfig.dustTiming
+          .collectableDiscardRegrowDelay)
   → FlashThenImplode() — flash to the same resolved radius, then collapse → Destroy()
 ```
 The note's own energy was already processed at pickup (a partial refund is granted on most

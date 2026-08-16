@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PhaseChapterLibrary
   phases:
   - phaseName: Steam Demo
+    phaseId: 2cfde5cf3d2048b8910ab984b7267338
     motifs:
     - {fileID: 11400000, guid: 39d204e098aac450aaa74bc66d2708b4, type: 2}
     - {fileID: 11400000, guid: f8216e90d53ac4365b251f482390aba7, type: 2}
@@ -22,6 +23,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 3a813a514b2474c8ca82c09409defe85, type: 2}
     loopMotifs: 0
   - phaseName: EP
+    phaseId: e80b2c210dcf4b40ba9f3f3542b20d69
     motifs:
     - {fileID: 11400000, guid: 71d8771ade7c04484bf40e07a09dcb53, type: 2}
     - {fileID: 11400000, guid: d128ad57d4e11486bba9dd57cd935bbc, type: 2}

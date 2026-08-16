@@ -36,14 +36,42 @@ public static class RingSessionStore
         return LoadFromDirectory(SaveDirectory);
     }
 
+    private static PhaseLibrary _migrationLibrary;
+    private static PhaseLibrary MigrationLibrary =>
+        _migrationLibrary != null ? _migrationLibrary
+            : (_migrationLibrary = Resources.Load<PhaseLibrary>("Phase Library"));
+
     private static List<MotifSnapshot> LoadFromDirectory(string dir)
     {
         var result = new List<MotifSnapshot>();
         if (!Directory.Exists(dir)) return result;
 
+        var library = MigrationLibrary;
+
         foreach (var file in Directory.GetFiles(dir, "ring_*.json"))
         {
-            try { result.Add(JsonUtility.FromJson<MotifSnapshot>(File.ReadAllText(file))); }
+            try
+            {
+                var snap = JsonUtility.FromJson<MotifSnapshot>(File.ReadAllText(file));
+
+                // One-time migration: legacy rings predate PhaseId. Backfill it from the
+                // *current* PhaseLibrary while PhaseIndex is still trustworthy (i.e. before
+                // any reorder happens relative to when this ring was saved).
+                if (string.IsNullOrEmpty(snap.PhaseId) && library?.phases != null
+                    && snap.PhaseIndex >= 0 && snap.PhaseIndex < library.phases.Count)
+                {
+                    var resolvedId = library.phases[snap.PhaseIndex]?.phaseId;
+                    if (!string.IsNullOrEmpty(resolvedId))
+                    {
+                        snap.PhaseId = resolvedId;
+                        File.WriteAllText(file, JsonUtility.ToJson(snap, true));
+                        if (GameFlowManager.VerboseLogging)
+                            Debug.Log($"[RingSessionStore] Migrated {file}: backfilled PhaseId={resolvedId}");
+                    }
+                }
+
+                result.Add(snap);
+            }
             catch (Exception e) { Debug.LogWarning($"[RingSessionStore] Failed to load {file}: {e.Message}"); }
         }
         if (GameFlowManager.VerboseLogging) Debug.Log($"[RingSessionStore] Loaded {result.Count} rings from {dir}");

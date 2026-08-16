@@ -1311,6 +1311,9 @@ MonoBehaviour:
   pathExitVisualPrefab: {fileID: 2567590292593330884, guid: dcf1116fb59d94ad6b7c608af44d1053,
     type: 3}
   pathExitParticleSpeed: 3
+  pathExitSealFadeSeconds: 0.35
+  pathTransitionOffscreenMargin: 2
+  pathTransitionTravelTimeout: 3
   demoMode: 0
   verboseLogging: 1
   harmony: {fileID: 1151719980}
@@ -1943,6 +1946,11 @@ PrefabInstance:
       propertyPath: pressToStartCue
       value: 
       objectReference: {fileID: 1057326950}
+    - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: showAllPhasesForDesign
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 3751250523553378462, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
       propertyPath: midiStreamPlayer

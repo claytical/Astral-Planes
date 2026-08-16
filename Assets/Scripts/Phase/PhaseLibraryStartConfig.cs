@@ -6,12 +6,14 @@
 public static class PhaseLibraryStartConfig
 {
     public static bool   HasPendingStart { get; private set; }
+    public static string PhaseId         { get; private set; }
     public static int    PhaseIndex      { get; private set; }
     public static int    MotifIndex      { get; private set; }
     public static string MotifId         { get; private set; }
 
-    public static void RequestStart(int phaseIndex, int motifIndex, string motifId)
+    public static void RequestStart(string phaseId, int phaseIndex, int motifIndex, string motifId)
     {
+        PhaseId         = phaseId;
         PhaseIndex      = phaseIndex;
         MotifIndex      = motifIndex;
         MotifId         = motifId;

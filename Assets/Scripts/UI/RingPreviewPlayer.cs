@@ -49,13 +49,22 @@ public class RingPreviewPlayer : MonoBehaviour
             return;
         }
 
-        if (snap.PhaseIndex < 0 || snap.PhaseIndex >= phaseLibrary.phases.Count)
-        {
-            Debug.LogWarning($"[RingPreviewPlayer] PhaseIndex {snap.PhaseIndex} out of range.");
-            return;
-        }
+        PhaseLibrary.Phase phase = null;
+        if (!string.IsNullOrEmpty(snap.PhaseId))
+            phase = phaseLibrary.phases.Find(p => p != null && p.phaseId == snap.PhaseId);
 
-        var phase = phaseLibrary.phases[snap.PhaseIndex];
+        if (phase == null)
+        {
+            if (snap.PhaseIndex < 0 || snap.PhaseIndex >= phaseLibrary.phases.Count)
+            {
+                Debug.LogWarning($"[RingPreviewPlayer] PhaseIndex {snap.PhaseIndex} out of range and PhaseId '{snap.PhaseId}' not found.");
+                return;
+            }
+
+            phase = phaseLibrary.phases[snap.PhaseIndex];
+            if (!string.IsNullOrEmpty(snap.PhaseId))
+                Debug.LogWarning($"[RingPreviewPlayer] PhaseId '{snap.PhaseId}' not found; falling back to index {snap.PhaseIndex}.");
+        }
         if (snap.MotifIndex < 0 || snap.MotifIndex >= phase.motifs.Count)
         {
             Debug.LogWarning($"[RingPreviewPlayer] MotifIndex {snap.MotifIndex} out of range.");
