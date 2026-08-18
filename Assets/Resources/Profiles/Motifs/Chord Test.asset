@@ -22,8 +22,25 @@ MonoBehaviour:
   - {fileID: 8300000, guid: a366fd566c0a240228fd4be1d54f4349, type: 3}
   - {fileID: 8300000, guid: 799839257d1494e2395ef91bccc352b4, type: 3}
   - {fileID: 8300000, guid: 618ce53fddcb9408886349de7d098cc6, type: 3}
-  intensityThresholds: []
+  intensityClipTags:
+  - clip: {fileID: 8300000, guid: 02810767ddbe8457a9c7d7dc247f2e13, type: 3}
+    depth01: 0
+    breadth01: 0
+    pressure01: 0
+  - clip: {fileID: 8300000, guid: a366fd566c0a240228fd4be1d54f4349, type: 3}
+    depth01: 0.33333334
+    breadth01: 0.33333334
+    pressure01: 0.33333334
+  - clip: {fileID: 8300000, guid: 799839257d1494e2395ef91bccc352b4, type: 3}
+    depth01: 0.6666667
+    breadth01: 0.6666667
+    pressure01: 0.6666667
+  - clip: {fileID: 8300000, guid: 618ce53fddcb9408886349de7d098cc6, type: 3}
+    depth01: 1
+    breadth01: 1
+    pressure01: 1
   entryLoopCount: 1
+  resetFirstCarryOnStart: 0
   bpm: 107
   stepsPerLoop: 16
   nodesPerStar: 3
@@ -39,10 +56,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 0fe32380cf7be402195dcb189e560a5c, type: 2}
   selectionWeight: 1
   beatIntroCount: 0
-  driveBeatsFromEnergy: 1
+  driveBeatsFromDensity: 1
   spawnVehicleTrap: 0
   trapShape: 0
   trapRadius: 3
   trapGrowSeconds: 0.4
   trapRole: 5
-  trapHardness01: 0.5

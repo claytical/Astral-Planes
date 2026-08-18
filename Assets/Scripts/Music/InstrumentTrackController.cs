@@ -70,7 +70,8 @@ public partial class InstrumentTrackController : MonoBehaviour
             getGravityVoidScale: () => config.gravityVoidScale,
             getVoidRingWidthCells: () => config.voidRingWidthCells,
             getGravityVoidImprintTickSeconds: () => config.gravityVoidImprintTickSeconds,
-            getPlayheadBin: () => GetTransportFrame().playheadBin);
+            getPlayheadBin: () => GetTransportFrame().playheadBin,
+            getFilledBinCountForRole: role => GetTrackForRole(role)?.GetFilledBinCount() ?? 0);
     }
 
     private void EnsureBinAllocator()

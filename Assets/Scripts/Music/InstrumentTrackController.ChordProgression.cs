@@ -45,6 +45,10 @@ public partial class InstrumentTrackController
         return true;
     }
 
+    // Applies the alternate chord progression once every active-role track is maxed. Does NOT
+    // end the motif — SuperNode capture always shifts the chord, but the motif only ends when
+    // StarPool's nodesPerStar harvest budget is satisfied, either through normal play or a full
+    // completionist shard sweep (see NotifySuperNodeResolved / TryCompleteFullSweepHarvestIfReady).
     public void CheckAndTriggerAllTracksMaxed()
     {
         if (_pendingSuperNodeCompletions > 0) return;
@@ -52,7 +56,27 @@ public partial class InstrumentTrackController
         if (gfm.GhostCycleInProgress || gfm.BridgePending) return;
 
         gfm.harmony?.SetActiveProfile(alt, applyImmediately: true);
-        gfm.BeginMotifBridge("AllTracksMaxed");
+    }
+
+    // Sticky flag set when a SuperNode resolves with every shard caught. Consumed once
+    // TryCompleteFullSweepHarvestIfReady finds no pending ascend-visual coroutines and all
+    // active-role tracks maxed — i.e. a true completionist sweep, not just a partial catch.
+    private bool _pendingFullSweepHarvestCompletion;
+
+    public void NotifySuperNodeResolved(bool allShardsCaught)
+    {
+        if (allShardsCaught) _pendingFullSweepHarvestCompletion = true;
+        TryCompleteFullSweepHarvestIfReady();
+    }
+
+    private void TryCompleteFullSweepHarvestIfReady()
+    {
+        if (!_pendingFullSweepHarvestCompletion) return;
+        if (_pendingSuperNodeCompletions > 0) return;
+        if (!TryGetAllTracksMaxedAltProfile(out var gfm, out _)) return;
+
+        _pendingFullSweepHarvestCompletion = false;
+        gfm?.activeDrumTrack?._starPool?.CompleteMotifHarvestBudget("SuperNodeFullSweep");
     }
 
     public void StageAltChordIfAllTracksMaxed()
@@ -98,6 +122,7 @@ public partial class InstrumentTrackController
         // N+2 boundary: record appears with alt chord.
         _pendingSuperNodeCompletions = Mathf.Max(0, _pendingSuperNodeCompletions - 1);
         CheckAndTriggerAllTracksMaxed();
+        TryCompleteFullSweepHarvestIfReady();
     }
 
     private IEnumerator WaitForNextLoopBoundary(DrumTrack drum)

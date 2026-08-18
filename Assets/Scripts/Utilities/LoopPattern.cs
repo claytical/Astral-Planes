@@ -82,6 +82,8 @@ public class LoopPattern : MonoBehaviour
         int bin,
         int localStep,
         float gain,
+        int minVel127,
+        int maxVel127,
         List<(int note, int duration, float velocity)> outNotes)
     {
         outNotes.Clear();
@@ -97,7 +99,7 @@ public class LoopPattern : MonoBehaviour
             if (n.localStep != localStep) continue;
 
             // n.velocity is 0..127
-            float vel127 = Mathf.Clamp(n.velocity, 60f, 127f) * Mathf.Clamp01(gain);
+            float vel127 = Mathf.Clamp(n.velocity, minVel127, maxVel127) * Mathf.Clamp01(gain);
 
             outNotes.Add((n.note, n.duration, vel127));
         }

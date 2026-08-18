@@ -139,7 +139,11 @@ public class NoteSetFactory : MonoBehaviour
         $"totalSteps={totalSteps} debugKey={debugKey} binIndex={binIndex}"
     );
 
-    const int stepsPerBar = 16;
+    if (riff.stepsPerBar <= 0)
+        Debug.LogWarning(
+            $"[NoteSetFactory] Riff '{cfg.riff.name}' has no recorded stepsPerBar (imported before this field existed) — " +
+            $"assuming 16. Re-import via MIDI→Riff Importer to record the real value and avoid duration drift.");
+    int stepsPerBar = riff.stepsPerBar > 0 ? riff.stepsPerBar : 16;
     const int beatsPerBar = 4;
     const int ticksPerQuarter = 480;
     int ticksPerStep = ticksPerQuarter / (stepsPerBar / beatsPerBar);
@@ -152,17 +156,27 @@ public class NoteSetFactory : MonoBehaviour
     bool sameRootAcrossBins = track.ActiveProfile != null
         ? track.ActiveProfile.sameRootAcrossBins
         : (cfg.roleProfile != null && cfg.roleProfile.sameRootAcrossBins);
-    int targetRoot = sameRootAcrossBins
-        ? chordSeq[0].rootNote
-        : chordSeq[binIndex % chordSeq.Count].rootNote;
+    Chord targetChord = sameRootAcrossBins ? chordSeq[0] : chordSeq[binIndex % chordSeq.Count];
+
+    // ByVoice roles (voiceIndex > 0): anchor this voice to its own chord tone — root for voice 0,
+    // the chord's next interval for voice 1, etc. — instead of every voice converging on the bare
+    // root. Without this, voices authored on different chord tones (e.g. root/third/fifth) all
+    // transpose onto the exact same pitch, since delta only ever preserves pitch class relative to
+    // the chord's rootNote. voiceIndex 0 (every currently-shipped ByBin/RandomPerBin motif) is
+    // unaffected: chordToneOffset stays 0, matching prior behavior exactly.
+    int chordToneOffset = 0;
+    if (track.voiceIndex > 0 && targetChord.intervals != null && targetChord.intervals.Count > 0)
+        chordToneOffset = targetChord.intervals[track.voiceIndex % targetChord.intervals.Count];
+    int targetRoot = targetChord.rootNote + chordToneOffset;
+
     // Exact-register transposition: the chord root's octave is authoritative.
     // No nearest-register normalization — a ♭III authored an octave below I
     // must pull the riff down with it.
     int delta = targetRoot - authoredAnchor + riff.octaveShift * 12;
 
     if (GameFlowManager.VerboseLogging) Debug.Log(
-        $"[NoteSetFactory] RIFF TRANSPOSE bin={binIndex} authoredAnchor={authoredAnchor} " +
-        $"targetRoot={targetRoot} delta={delta} (riff.authoredRootMidi was {riff.authoredRootMidi})"
+        $"[NoteSetFactory] RIFF TRANSPOSE bin={binIndex} voiceIndex={track.voiceIndex} authoredAnchor={authoredAnchor} " +
+        $"chordRoot={targetChord.rootNote} chordToneOffset={chordToneOffset} targetRoot={targetRoot} delta={delta} (riff.authoredRootMidi was {riff.authoredRootMidi})"
     );
 
     var ordered = riff.events.OrderBy(e => e.step).ToList();

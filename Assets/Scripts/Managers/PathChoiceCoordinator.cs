@@ -46,11 +46,12 @@ public sealed class PathChoiceCoordinator
         bool crossPhase = remainingMotifs.Count == 0;
         IReadOnlyList<int> targets = crossPhase ? ptm.GetRemainingPhaseIndices() : remainingMotifs;
 
-        // Intra-phase remaining motifs are a fixed linear sequence, so 0 or 1 of them is not a
-        // real choice. Cross-phase targets already encode the real choice set themselves —
-        // including a single wrap-to-phase-0 target once loopChapters wraps past the last phase
-        // (see GetRemainingPhaseIndices) — so a lone cross-phase target still deserves a maze.
-        bool nothingToOffer = crossPhase ? targets.Count == 0 : targets.Count <= 1;
+        // Every motif/phase transition gets the interstitial-maze treatment, even a lone
+        // target with no real branching (the phase's final motif, or a single wrap-to-phase-0
+        // target once loopChapters wraps past the last phase — see GetRemainingPhaseIndices) —
+        // porousBorder.exitCount below just becomes 1, a single-exit corridor instead of a
+        // real choice. Only truly nothing to transition to (0 targets) skips the maze.
+        bool nothingToOffer = targets.Count == 0;
         if (nothingToOffer)
         {
             yield return _gameFlow.StartCoroutine(_sceneFlow.StartNextMotifInPhase());
@@ -98,6 +99,8 @@ public sealed class PathChoiceCoordinator
             _allExits.Add(CreateExitTrigger(drums, info, motifIdx, phaseIdx));
         }
 
+        SpawnWisp(drums, vehicleCells, ptm);
+
         var exitAnchors = new List<Vector2Int>(_allExits.Count);
         foreach (var e in _allExits) exitAnchors.Add(e.AnchorCell);
         dust.SetTravelCorridors(vehicleCells, exitAnchors, radiusCells: 1);
@@ -119,6 +122,32 @@ public sealed class PathChoiceCoordinator
 
         foreach (var e in _allExits)
             if (e != exit) e.SetSealed(true);
+    }
+
+    // Spawns one wisp (not one per exit) targeting a randomly chosen exit among those just
+    // created. Purely additive/decorative to the path-choice mechanic: touching the wisp
+    // never resolves the choice itself, only OnVehicleReachedExit does that — see Wisp.cs.
+    private void SpawnWisp(DrumTrack drums, List<Vector2Int> vehicleCells, PhaseTransitionManager ptm)
+    {
+        var prefab = _gameFlow.WispPrefab;
+        if (prefab == null || _allExits.Count == 0 || vehicleCells.Count == 0) return;
+
+        var targetExit = _allExits[UnityEngine.Random.Range(0, _allExits.Count)];
+
+        // Same peek pattern as CreateExitTrigger's role-color preview: resolve the wisp's
+        // bridging sample from the motif its assigned exit actually leads into, not the
+        // outgoing motif. crossPhase exits (TargetPhaseIndex set, TargetMotifIndex null) have
+        // no same-phase motif to peek at — mirroring CreateExitTrigger's own limitation — so
+        // fall back to the current outgoing motif rather than leaving the bridge sample null.
+        MotifProfile targetMotif = targetExit.TargetMotifIndex.HasValue
+            ? ptm.PeekMotifInCurrentPhase(targetExit.TargetMotifIndex.Value)
+            : ptm.currentMotif;
+
+        var go = Object.Instantiate(prefab, Vector3.zero, Quaternion.identity);
+        bool placed = go.TryGetComponent<Wisp>(out var wisp) &&
+                      wisp.Initialize(drums, vehicleCells[0], targetExit.AnchorCell, targetMotif);
+        if (!placed)
+            Object.Destroy(go);
     }
 
     private MazePathExit CreateExitTrigger(DrumTrack drums, CosmicDustGenerator.PathExitInfo info, int? motifIdx, int? phaseIdx)
@@ -155,6 +184,12 @@ public sealed class PathChoiceCoordinator
             Vector2 visualCenter = OffsetVisualToScreenEdge(triggerCenter, info.Side);
             visualInstance = Object.Instantiate(_gameFlow.PathExitVisualPrefab, visualCenter, Quaternion.identity, go.transform);
             ConfigureExitParticleFlow(visualInstance, info.Side);
+            if (motifIdx.HasValue)
+            {
+                var targetMotif = _gameFlow.phaseTransitionManager.PeekMotifInCurrentPhase(motifIdx.Value);
+                var roleColors = targetMotif?.GetActiveRoleColors();
+                ConfigureExitParticleRoleColors(visualInstance, roleColors);
+            }
             // Play explicitly rather than relying on the prefab's "Play On Awake" setting, so a
             // burst-style particle effect fires reliably no matter how the prefab is authored.
             foreach (var ps in visualInstance.GetComponentsInChildren<ParticleSystem>())
@@ -258,6 +293,60 @@ public sealed class PathChoiceCoordinator
             var shape = ps.shape;
             shape.rotation = new Vector3(0f, 0f, shapeZ);
         }
+    }
+
+    // Replaces the prefab's authored rainbow with a gradient built from the target motif's
+    // active role colors, so a path-choice exit hints at what's behind it. Falls back to the
+    // prefab's own rainbow (no-op) when roleColors is null/empty — a peek miss or a motif with
+    // no active roles shouldn't leave the exit visually blank. Alpha keys are read off the
+    // existing gradient first and kept as-is, so only hue/color content changes — the authored
+    // fade-in/fade-out timing survives untouched.
+    private static void ConfigureExitParticleRoleColors(GameObject visualInstance, List<Color> roleColors)
+    {
+        if (visualInstance == null || roleColors == null || roleColors.Count == 0) return;
+
+        var colorKeys = BuildEvenlySpacedColorKeys(roleColors);
+
+        foreach (var ps in visualInstance.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var col = ps.colorOverLifetime;
+            if (col.enabled)
+            {
+                var grad = new Gradient();
+                grad.SetKeys(colorKeys, ExtractAlphaKeys(col.color));
+                col.color = new ParticleSystem.MinMaxGradient(grad);
+            }
+
+            var trails = ps.trails;
+            if (trails.enabled)
+            {
+                var tGrad = new Gradient();
+                tGrad.SetKeys(colorKeys, ExtractAlphaKeys(trails.colorOverLifetime));
+                trails.colorOverLifetime = new ParticleSystem.MinMaxGradient(tGrad);
+            }
+        }
+    }
+
+    private static GradientAlphaKey[] ExtractAlphaKeys(ParticleSystem.MinMaxGradient g)
+    {
+        switch (g.mode)
+        {
+            case ParticleSystemGradientMode.TwoGradients: return g.gradientMax.alphaKeys;
+            case ParticleSystemGradientMode.Gradient:
+            case ParticleSystemGradientMode.RandomColor:  return g.gradient.alphaKeys;
+            default: return new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 1f) };
+        }
+    }
+
+    private static GradientColorKey[] BuildEvenlySpacedColorKeys(List<Color> colors)
+    {
+        if (colors.Count == 1)
+            return new[] { new GradientColorKey(colors[0], 0f), new GradientColorKey(colors[0], 1f) };
+
+        var keys = new GradientColorKey[colors.Count];
+        for (int i = 0; i < colors.Count; i++)
+            keys[i] = new GradientColorKey(colors[i], i / (float)(colors.Count - 1));
+        return keys;
     }
 
     private IEnumerator RedirectLosersAndAdvance(List<Vector2Int> vehicleCells, CosmicDustGenerator dust, DrumTrack drums)

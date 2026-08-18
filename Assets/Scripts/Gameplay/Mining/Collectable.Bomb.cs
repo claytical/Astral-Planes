@@ -115,9 +115,7 @@ public partial class Collectable
     {
         var drums = assignedInstrumentTrack != null ? assignedInstrumentTrack.drumTrack : null;
         float cellSize = drums != null ? Mathf.Max(0.001f, drums.GetCellWorldSize()) : 1f;
-        _bombBlastRadiusCells = (_roleProfile != null && _roleProfile.discardBlastRadiusCells > 0f)
-            ? _roleProfile.discardBlastRadiusCells
-            : tuning.bomb.blastRadius / cellSize;
+        _bombBlastRadiusCells = tuning.bomb.blastRadius / cellSize;
         _bombEffectiveBlastRadius = _bombBlastRadiusCells * cellSize;
     }
 
@@ -252,10 +250,7 @@ public partial class Collectable
             {
                 var centerGP = drums.CellOf(transform.position);
                 int radiusCellsInt = Mathf.Max(1, Mathf.RoundToInt(_bombBlastRadiusCells));
-                float discardRegrowDelay = (_roleProfile != null && _roleProfile.discardBlastRegrowDelay >= 0f)
-                    ? _roleProfile.discardBlastRegrowDelay
-                    : -1f;
-                _gfm?.dustGenerator?.TriggerDiscardBlast(centerGP, radiusCellsInt, regrowDelaySeconds: discardRegrowDelay);
+                _gfm?.dustGenerator?.TriggerDiscardBlast(centerGP, radiusCellsInt);
             }
         }
         catch (Exception ex)

@@ -7,8 +7,10 @@ public partial class DiscoveryTrackNode
         var profile = _activeLocomotionProfile;
         if (profile == null)
         {
-            float fallback = Mathf.Max(Mathf.Lerp(0.5f, 2.5f, _speed) * speedScale, kMinSpeedFloor);
-            Vector2 fallbackForce = (_carveDir * fallback - _rb.linearVelocity) * Mathf.Lerp(3f, 20f, _speed) * _rb.mass;
+            // No DiscoveryTrackNodeLocomotionProfile resolved (e.g. MusicalRole.None) — degenerate path, uses a fixed mid-speed feel.
+            const float kNoProfileSpeed = 0.5f;
+            float fallback = Mathf.Max(Mathf.Lerp(0.5f, 2.5f, kNoProfileSpeed) * speedScale, kMinSpeedFloor);
+            Vector2 fallbackForce = (_carveDir * fallback - _rb.linearVelocity) * Mathf.Lerp(3f, 20f, kNoProfileSpeed) * _rb.mass;
             _rb.AddForce(fallbackForce, ForceMode2D.Force);
             _currentDesiredSpeed = fallback;
             return;
@@ -138,7 +140,7 @@ public partial class DiscoveryTrackNode
         // Orbital bias (Harmony): 2.0 base + profile fine-tune; competes meaningfully with clearance scores
         if (_behaviorCategory == DiscoveryTrackNodeBehaviorCategory.Orbital)
         {
-            float orbitalBias = 2.0f + (_roleProfile?.orbitalTurnBias ?? 0.6f);
+            float orbitalBias = 2.0f + (_roleProfile?.movementArchetype?.orbitalTurnBias ?? 0.6f);
             var perp = new Vector2(-_carveDir.y * _orbitSign, _carveDir.x * _orbitSign).normalized;
             score += orbitalBias * Mathf.Max(0f, Vector2.Dot(dir.normalized, perp));
         }

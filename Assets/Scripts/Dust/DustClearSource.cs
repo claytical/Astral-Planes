@@ -13,4 +13,5 @@ public enum DustClearSource
     Jail,
     SuperNode,
     CollectableDiscard,  // detonation blast of a discarded carried note
+    TrackFilled,         // role-wide sweep held until that InstrumentTrack's notes ascend
 }

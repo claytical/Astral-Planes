@@ -6,19 +6,525 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/UI/Note Ping Visualizer.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/UI/Note Ping Visualizer.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Audio/ProceduralMixer.mixer" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Audio/ProceduralMixer.mixer" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Editor/MidiToRiffImporterWindow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Editor/MidiToRiffImporterWindow.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MidiPlayer/Prefab/MidiStreamPlayer.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MidiPlayer/Prefab/MidiStreamPlayer.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/FloTilla.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/FloTilla.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/CosmicDustGeneratorConfig.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Config/CosmicDustGeneratorConfig.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/DrumTrackConfig.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/DrumTrackConfig.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Beats/coralkit-75bpm-1.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/Beats/coralkit-75bpm-1.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Beats/coralkit-75bpm-2.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/Beats/coralkit-75bpm-2.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Beats/coralkit-75bpm-3.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/Beats/coralkit-75bpm-3.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Beats/coralkit-75bpm-4.wav" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/Beats/coralkit-75bpm-4.wav" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/0_Intro.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/0_Intro.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/1_Two.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/1_Two.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/2_Waiting.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/2_Waiting.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/3_Here We Go.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/3_Here We Go.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/4_Circus.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/4_Circus.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Harmony-NoteSetConfig-0.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Harmony-NoteSetConfig-0.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Harmony-NoteSetConfig-1.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Harmony-NoteSetConfig-1.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Harmony-NoteSetConfig-2.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Harmony-NoteSetConfig-2.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Lead-NoteSetConfig-0.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Lead-NoteSetConfig-0.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Lead-NoteSetConfig-1.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Lead-NoteSetConfig-1.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Lead-NoteSetConfig-2.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Lead-NoteSetConfig-2.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Resources/Phase Library.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Phase Library.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Playtest Demo/Demo Motif.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Playtest Demo/Demo Motif.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/4 Bars - Shift.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/4 Bars - Shift.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/4 Bars.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/4 Bars.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Bounce - Bass and Groove.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Bounce - Bass and Groove.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Bounce - Harmony.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Bounce - Harmony.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Bounce - Together.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Bounce - Together.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Chord Test.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Chord Test.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Descent.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Descent.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Folding.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Folding.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Lights.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Lights.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/New Groove.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/New Groove.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Contrabass.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Contrabass.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Dope.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Dope.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Finger.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Finger.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Floor.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Floor.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Hip Hop Sub.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Hip Hop Sub.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Muted.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Muted.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Street.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Street.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Subwoofer.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass/Subwoofer.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Groove/Mood String.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Groove/Mood String.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Groove/Rob Otto.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Groove/Rob Otto.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Groove/Soft Guitar.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Groove/Soft Guitar.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Groove/Whistler.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Groove/Whistler.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Detroit Keys.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Detroit Keys.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Light Keys.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Light Keys.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Soul Oohs.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Soul Oohs.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Still Sky.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Still Sky.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Under Pad.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony/Under Pad.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Contact.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Contact.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Guitar Wah.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Guitar Wah.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Les Paul.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Les Paul.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Palm Guitar.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Palm Guitar.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Steel Jazz.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Steel Jazz.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Theramin.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead/Theramin.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Rhythm/Rhythm Guitar.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Rhythm/Rhythm Guitar.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scenes/Main.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/Main.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/BridgeCoordinator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/BridgeCoordinator.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/SceneFlowCoordinator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/SceneFlowCoordinator.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/PhaseLibrary.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/PhaseLibrary.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/PhaseLibraryStartConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/PhaseLibraryStartConfig.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.Lifecycle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.Lifecycle.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.TintPulse.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.TintPulse.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustCellRegistry.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustCellRegistry.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.CellLifecycle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.CellLifecycle.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.Clearing.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.Clearing.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/DustClearSource.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/DustClearSource.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.Energy.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.Energy.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.Bomb.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.Bomb.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.Movement.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.Movement.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.Drifting.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.Drifting.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.Locomotion.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.Locomotion.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNode.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeDustInteractor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeDustInteractor.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/SuperNode.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/SuperNode.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/SuperNodeTrackNode.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/SuperNodeTrackNode.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/PathChoiceCoordinator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/PathChoiceCoordinator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Config/DrumTrackConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Config/DrumTrackConfig.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.BeatIntensity.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.BeatIntensity.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.MotifApplication.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.MotifApplication.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.Transport.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.Transport.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/GravityVoidController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/GravityVoidController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.BinState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.BinState.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.Lifecycle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.Lifecycle.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.SuperNodeInstant.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.SuperNodeInstant.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.ChordProgression.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.ChordProgression.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrackController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Motif/MotifProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Motif/MotifProfile.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Motif/RiffTypes.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Motif/RiffTypes.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Profiles/MusicalRoleProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Profiles/MusicalRoleProfile.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Theory/NoteSetFactory.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Theory/NoteSetFactory.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/PhaseTransitionManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/PhaseTransitionManager.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/PhaseLibraryCarousel.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/PhaseLibraryCarousel.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.EjectionLogic.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.EjectionLogic.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/StarPool.BridgeGate.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/StarPool.BridgeGate.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/RingPreviewPlayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/RingPreviewPlayer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MotifSnapshot.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MotifSnapshot.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/RingSessionStore.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/RingSessionStore.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ECOSYSTEM.md" beforeDir="false" afterPath="$PROJECT_DIR$/ECOSYSTEM.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/LoopPattern.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/LoopPattern.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MidiVoice.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MidiVoice.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Fills.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Fills/Drums-Fill-Breakbeat.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Fills/Drums-Fill-Breakbeat.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Fills/Drums-Fill-Snare.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Fills/Drums-Fill-Snare.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Fills/Drums-Fill-Tom.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Fills/Drums-Fill-Tom.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp1.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp1.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp1.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp1.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp2.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp2.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp2.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp2.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp3.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp3.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp3.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp3.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp4a.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp4a.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp4a.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp4a.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp4b.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp4b.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp4b.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp4b.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp4c.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp4c.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp4c.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp4c.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp4d.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp4d.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp4d.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp4d.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp5M.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp5M.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp5M.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Comp5M.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/DarkStar Bug.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/DarkStar Bug.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/DarkStar.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/DarkStar.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Establish Solo.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Establish Solo.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Establish Solo.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Establish Solo.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve Solo.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve Solo.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve Solo.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve Solo.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-D.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-D.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-E.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-E.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-F.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-F.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-G.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-G.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-H.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-H.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-I.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-I.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-J.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-J.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-K.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Evolve-K.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-D.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-D.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-E.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-E.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-F.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-F.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-G.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-G.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-H.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-H.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-I.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-I.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-J.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-J.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-K.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Foundation-K.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify Solo.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify Solo.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify Solo.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify Solo.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-D.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-D.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-E.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-E.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-F.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-F.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-G.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-G.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-H.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-H.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-I.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Intensify-I.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop Solo.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop Solo.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop Solo.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop Solo.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop-D.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop-D.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop-E.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop-E.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop-F.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop-F.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop-G.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop-G.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop-H.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Pop-H.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release Solo.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release Solo.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release Solo.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release Solo.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release-D.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release-D.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release-E.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release-E.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release-F.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release-F.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release-G.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release-G.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release-H.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Release-H.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Weird-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Weird-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Weird-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Weird-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Weird-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Weird-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Weird-D.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Weird-D.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Weird-E.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Weird-E.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Weird-F.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Weird-F.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Weird-G.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Weird-G.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Weird-H.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Weird-H.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Wild Solo.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Wild Solo.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Wild Solo.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/4am/Wild Solo.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/606-Steady.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/606-Steady.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-D.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-D.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-E.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-E.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-F.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-F.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-G.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-G.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-H.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-H.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-I.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-I.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-J.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-J.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-K.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Evolve/Evolve-K.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-D.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-D.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-E.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-E.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-F.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-F.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-G.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-G.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-H.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-H.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-I.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-I.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-J.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-J.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-K.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Foundation/Foundation-K.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-D.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-D.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-E.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-E.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-F.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-F.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-G.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-G.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-H.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-H.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-I.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Intensify/Intensify-I.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Evolve-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Evolve-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Evolve-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Evolve-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Evolve-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Evolve-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Evolve-D.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Evolve-D.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Evolve-E.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Evolve-E.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Foundation-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Foundation-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Foundation-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Foundation-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Foundation-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Foundation-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Foundation-D.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Foundation-D.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Intensify-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Intensify-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Intensify-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Intensify-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Pop-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Pop-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Release-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Release-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Release-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Release-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Weird-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Weird-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Weird-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Phases/Weird-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop/Pop-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop/Pop-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop/Pop-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop/Pop-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop/Pop-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop/Pop-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop/Pop-D.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop/Pop-D.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop/Pop-E.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop/Pop-E.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop/Pop-F.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop/Pop-F.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop/Pop-G.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop/Pop-G.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop/Pop-H.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Pop/Pop-H.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release/Release-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release/Release-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release/Release-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release/Release-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release/Release-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release/Release-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release/Release-D.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release/Release-D.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release/Release-E.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release/Release-E.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release/Release-F.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release/Release-F.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release/Release-G.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release/Release-G.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release/Release-H.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Release/Release-H.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard/Weird-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard/Weird-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard/Weird-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard/Weird-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard/Weird-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard/Weird-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard/Weird-D.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard/Weird-D.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard/Weird-E.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard/Weird-E.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard/Weird-F.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard/Weird-F.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard/Weird-G.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard/Weird-G.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard/Weird-H.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Datai/Wildcard/Weird-H.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Perc-Ambient-E.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Perc-Ambient-E.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Establish-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Establish-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Establish-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Establish-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Establish-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Establish-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Establish-D.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Establish-D.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Establish-E.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Establish-E.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Establish-F.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Establish-F.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Establish-G.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Establish-G.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Evolve-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Evolve-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Evolve-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Evolve-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Evolve-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Evolve-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Intensify-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Intensify-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Intensify-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Intensify-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Release-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Release-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Release-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Release-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Wildcard-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Wildcard-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Wildcard-AA.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Squashed/Wildcard-AA.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/606-Ambient.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/606-Ambient.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/606-Ambient.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/606-Ambient.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/606-Building.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/606-Building.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/606-Building.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/606-Building.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/606-Intense.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/606-Intense.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/606-Intense.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/606-Intense.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/606-Steady.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/606-Steady.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-1.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-1.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-1.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-1.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-2.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-2.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-2.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-2.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-3.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-3.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-3.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-3.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-4.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-4.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-4.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-4.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-5.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-5.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-5.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-5.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-6.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-6.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-6.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-6.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-A.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-A.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-A.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-A.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-B.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-B.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-B.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-B.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-C.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-C.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-C.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-C.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-D.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-D.wav.asd" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-D.wav.asd.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-D.wav.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-E.wav" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sounds/Drums/Loops/Temp/Perc-Ambient-E.wav.meta" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -313,7 +819,7 @@
       <workItem from="1784689139456" duration="50731000" />
       <workItem from="1784849120685" duration="140649000" />
       <workItem from="1785872502007" duration="79110000" />
-      <workItem from="1786725716236" duration="24779000" />
+      <workItem from="1786725716236" duration="94083000" />
     </task>
     <servers />
   </component>

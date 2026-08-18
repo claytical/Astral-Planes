@@ -197,7 +197,7 @@ public partial class Collectable
             case MusicalRole.Groove:
                 _intentDir = (_rng.Next(2) == 0) ? Vector2.left : Vector2.right;
                 _grooveBurstActive = true;
-                _groovePhaseTimer = _roleProfile != null ? _roleProfile.burstDuration : 0.4f;
+                _groovePhaseTimer = _roleProfile?.movementArchetype != null ? _roleProfile.movementArchetype.burstDuration : 0.4f;
                 break;
 
             case MusicalRole.Harmony:
@@ -228,8 +228,8 @@ public partial class Collectable
 
             case MusicalRole.Groove:
             {
-                float burst = _roleProfile != null ? _roleProfile.burstDuration : 0.4f;
-                float pause = _roleProfile != null ? _roleProfile.pauseDuration : 0.35f;
+                float burst = _roleProfile?.movementArchetype != null ? _roleProfile.movementArchetype.burstDuration : 0.4f;
+                float pause = _roleProfile?.movementArchetype != null ? _roleProfile.movementArchetype.pauseDuration : 0.35f;
                 _groovePhaseTimer -= fdt;
                 if (_groovePhaseTimer <= 0f)
                 {
@@ -254,8 +254,8 @@ public partial class Collectable
 
                 // Pulse: sweep the configured arc in exactly one note duration, so long
                 // chords glide slowly and short notes dart. Rest: slow crawl.
-                float arcDeg = _roleProfile != null ? _roleProfile.collectableOrbitArcDegreesPerNote : 240f;
-                float restMul = _roleProfile != null ? _roleProfile.collectableOrbitRestSpeedMul : 0.35f;
+                float arcDeg = _roleProfile?.movementArchetype != null ? _roleProfile.movementArchetype.collectableOrbitArcDegreesPerNote : 240f;
+                float restMul = _roleProfile?.movementArchetype != null ? _roleProfile.movementArchetype.collectableOrbitRestSpeedMul : 0.35f;
                 float surgeSpeed = _profileSpeedMul * (arcDeg * Mathf.Deg2Rad * ringRadius) / _intentInterval;
                 float restSpeed = _speed * restMul;
                 float speedNow = resting ? restSpeed : Mathf.Max(surgeSpeed, restSpeed);
@@ -272,9 +272,9 @@ public partial class Collectable
                 // paced so one note duration spans a fixed number of S-cycles. The pulse
                 // speed is derived from the cage so each pulse sweeps a real excursion
                 // (travelRadii × radius per note) instead of speed × duration crumbs.
-                float swerveDeg = _roleProfile != null ? _roleProfile.collectableSwerveDegrees : 65f;
-                float cycles = _roleProfile != null ? _roleProfile.collectableSwerveCyclesPerNote : 1.5f;
-                float travelRadii = _roleProfile != null ? _roleProfile.collectableTravelRadiiPerNote : 1.5f;
+                float swerveDeg = _roleProfile?.movementArchetype != null ? _roleProfile.movementArchetype.collectableSwerveDegrees : 65f;
+                float cycles = _roleProfile?.movementArchetype != null ? _roleProfile.movementArchetype.collectableSwerveCyclesPerNote : 1.5f;
+                float travelRadii = _roleProfile?.movementArchetype != null ? _roleProfile.movementArchetype.collectableTravelRadiiPerNote : 1.5f;
                 float period = _intentInterval / Mathf.Max(0.25f, cycles);
                 _leadSwervePhase += (2f * Mathf.PI / period) * fdt;
                 float ang = (_leadHeadingDeg + swerveDeg * Mathf.Sin(_leadSwervePhase)) * Mathf.Deg2Rad;

@@ -46,6 +46,13 @@ public class PhaseTransitionManager : MonoBehaviour
 
     public int RemainingMotifCount => Mathf.Max(0, (_chapterMotifs?.Count ?? 0) - (currentMotifIndex + 1));
 
+    /// <summary>Motif at motifIndex within the current phase's motif list, without changing state. Null if out of range.</summary>
+    public MotifProfile PeekMotifInCurrentPhase(int motifIndex)
+    {
+        if (_chapterMotifs == null || motifIndex < 0 || motifIndex >= _chapterMotifs.Count) return null;
+        return _chapterMotifs[motifIndex];
+    }
+
     /// <summary>
     /// Phase indices after currentPhaseIndex. Mirrors AdvancePhase's wrap semantics: if
     /// loopChapters is true and we're on the last phase, "remaining" is every phase except
@@ -165,7 +172,7 @@ public class PhaseTransitionManager : MonoBehaviour
         ApplyMotifToAudioAndTracks(
             oldMotif,
             currentMotif,
-            armAtNextBoundary: false,
+            armAtNextBoundary: true,
             restartTransport: false,
             who: $"PTM/StartChapter:{who}"
         );
@@ -275,7 +282,7 @@ public class PhaseTransitionManager : MonoBehaviour
         ApplyMotifToAudioAndTracks(
             prev,
             currentMotif,
-            armAtNextBoundary: false,
+            armAtNextBoundary: true,
             restartTransport: false,
             who: $"PTM/JumpToMotif:{who}"
         );

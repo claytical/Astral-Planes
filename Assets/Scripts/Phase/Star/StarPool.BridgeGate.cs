@@ -53,6 +53,22 @@ public sealed partial class StarPool
 
     // ── Bridge gate ───────────────────────────────────────────────────────────
 
+    // Called when a SuperNode resolves with every shard caught and every active-role track
+    // maxed (a full completionist sweep) — treats that as satisfying the harvest budget in
+    // place of normal DiscoveryTrackNode captures. This fires up to two drum-loop-boundaries
+    // after shard capture (via SuperNodeCompletionCoroutine), long after OnStarMineNodeResolved's
+    // own synchronous CheckBridgeGate call has already run and found the budget still nonzero —
+    // so that call can't be relied on to pick this up. Defer to the same _pendingGateCheck poll
+    // Update() already uses for the manual-release race, so CheckBridgeGate reruns once any
+    // in-flight collectables actually clear.
+    public void CompleteMotifHarvestBudget(string reason)
+    {
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] CompleteMotifHarvestBudget({reason}) — SuperNode full sweep satisfies remaining harvest budget.");
+        _remainingEjectionsTotal = 0;
+        DespawnLeftoverStars();
+        _pendingGateCheck = true;
+    }
+
     private void CheckBridgeGate()
     {
         if (_remainingEjectionsTotal > 0)

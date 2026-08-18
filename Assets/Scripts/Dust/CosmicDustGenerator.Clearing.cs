@@ -143,18 +143,46 @@ public partial class CosmicDustGenerator
     }
 
     /// <summary>
-    /// Release cells previously held by <see cref="ZapClearCellHeld"/> and schedule their
-    /// regrow (StarDrain delay unless delayOverride >= 0). Cells not currently held are skipped.
+    /// Release cells previously held by <see cref="ZapClearCellHeld"/> or
+    /// <see cref="ClearAndHoldRoleCells"/> and schedule their regrow (per-source delay unless
+    /// delayOverride >= 0). Cells not currently held are skipped.
     /// </summary>
-    public void ReleaseHeldCells(IReadOnlyList<Vector2Int> cells, float delayOverride = -1f)
+    public void ReleaseHeldCells(IReadOnlyList<Vector2Int> cells, DustClearSource source = DustClearSource.StarDrain, float delayOverride = -1f)
     {
         if (cells == null) return;
         for (int i = 0; i < cells.Count; i++)
         {
             var c = cells[i];
             if (!_heldRegrowCells.Remove(c)) continue;
-            RequestRegrowCellAt(c, ResolveRegrowDelay(c, DustClearSource.StarDrain, delayOverride), refreshIfPending: true);
+            RequestRegrowCellAt(c, ResolveRegrowDelay(c, source, delayOverride), refreshIfPending: true);
         }
+    }
+
+    private static readonly List<Vector2Int> _roleSweepScratch = new List<Vector2Int>();
+
+    /// <summary>
+    /// Clears and holds every solid cell whose CosmicDust role matches <paramref name="role"/>,
+    /// mirroring <see cref="ZapClearCellHeld"/> for a whole-role sweep instead of a single cell.
+    /// Returns the cells cleared, for the caller to hand back to <see cref="ReleaseHeldCells"/>
+    /// once the corresponding InstrumentTrack's notes start ascending again. Already-held or
+    /// non-solid cells are naturally skipped by ClearCellByInteraction's Solid-state guard.
+    /// </summary>
+    public List<Vector2Int> ClearAndHoldRoleCells(MusicalRole role)
+    {
+        var held = new List<Vector2Int>();
+        if (role == MusicalRole.None) return held;
+
+        _registry.GetCellsForRole(role, _roleSweepScratch);
+        for (int i = 0; i < _roleSweepScratch.Count; i++)
+        {
+            var cell = _roleSweepScratch[i];
+            SetCellFlag(cell, CellFlags.ZapForceGray);
+            var req = new DustClearRequest(DustInteractionMode.Zap, DustClearMode.FadeAndHide, config.zapFadeSeconds, false, DustClearSource.TrackFilled, -1f, true);
+            ClearCellByInteraction(cell, req);
+            _heldRegrowCells.Add(cell);
+            held.Add(cell);
+        }
+        return held;
     }
 
     private void DespawnDustAtAndMarkPermanent(Vector2Int gridPos)

@@ -231,6 +231,11 @@ public partial class InstrumentTrack
                && binIndex < _binFilled.Count
                && _binFilled[binIndex];
     }
+    public int GetFilledBinCount()
+    {
+        EnsureBinList();
+        return _binFilled?.Count(b => b) ?? 0;
+    }
     /// <summary>
     /// Returns the Time.time value at which the given bin was marked filled,
     /// or -1 if the bin has not been filled yet.

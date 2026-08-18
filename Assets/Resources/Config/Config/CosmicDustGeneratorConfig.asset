@@ -22,11 +22,15 @@ MonoBehaviour:
   regrowVetoBoxMul: 0.85
   regrowVetoMaxHits: 8
   voidDustGrowInSeconds: 0.4
+  voidRingRippleFraction: 0.35
   zapFadeSeconds: 1.5
   zapRegrowDelaySeconds: -1
-  mineNodeErodePerTick: 10
-  mazeTint: {r: 0.7, g: 0.7, b: 0.7, a: 0.25}
+  zapScaleOutSeconds: 0.12
+  mazeTint: {r: 0.461, g: 0.461, b: 0.461, a: 0.25}
+  solidDustTint: {r: 0.05, g: 0.05, b: 0.08, a: 1}
   toroidal: 0
+  minNotesPerBinPerVoice: 2
+  maxNotesPerBinPerVoice: 16
   enableTintDiffusion: 1
   tintDiffusionInterval: 0.12
   tintDiffusionMaxCellsPerTick: 256

@@ -108,8 +108,8 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
 
             float fraction = config.exhaustEnergyFraction * Mathf.Clamp01(speed / 3f) * skim;
             if (fraction < 0.02f) continue;
-
-            gen.PaintDustExhaust(neighbor, role, fraction);
+            //NOTE: Removed to see affect on design with other features. Probably not needed anymore.
+//            gen.PaintDustExhaust(neighbor, role, fraction);
         }
     }
 
@@ -136,7 +136,7 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
         dust.ApplyRoleAndCharge(role, roleColor, 1f, prof.maxEnergyUnits);
         dust.clearing.drainResistance01 = prof.drainResistance01;
 
-        gen.PaintDustExhaust(cell, role, 1f);
+//        gen.PaintDustExhaust(cell, role, 1f);
     }
 
     private Vector2 SumNeighborDirections(Vector2Int center, bool requireDust)

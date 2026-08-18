@@ -28,6 +28,26 @@ public partial class Vehicle
     public void ReportCollisionResistance(float resistance01) =>
         _collisionResistance01 = Mathf.Max(_collisionResistance01, Mathf.Clamp01(resistance01));
 
+    // Average fuel ratio (energyLevel/capacity) across all active local players' vehicles.
+    // Defaults to 1 (full fuel -> low pressure) when no vehicles are present, so a boot/
+    // transition window doesn't read as a spurious fuel-scarcity spike.
+    public static float GetFleetFuelRatio01()
+    {
+        var gfm = GameFlowManager.Instance;
+        if (gfm == null || gfm.localPlayers == null || gfm.localPlayers.Count == 0) return 1f;
+
+        float sum = 0f;
+        int counted = 0;
+        foreach (var lp in gfm.localPlayers)
+        {
+            var v = lp?.plane;
+            if (v == null || v.capacity <= 0f) continue;
+            sum += Mathf.Clamp01(v.energyLevel / v.capacity);
+            counted++;
+        }
+        return counted > 0 ? sum / counted : 1f;
+    }
+
     private void ApplyShipProfile(ShipMusicalProfile p, bool refillEnergy = true)
     {
         profile = p;

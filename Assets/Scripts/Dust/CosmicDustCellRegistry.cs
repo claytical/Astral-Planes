@@ -117,6 +117,25 @@ public sealed class CosmicDustCellRegistry
         }
     }
 
+    /// <summary>
+    /// Populates <paramref name="results"/> with every Solid cell whose CosmicDust role
+    /// matches <paramref name="role"/>. Clears the list before filling.
+    /// </summary>
+    public void GetCellsForRole(MusicalRole role, List<Vector2Int> results)
+    {
+        results.Clear();
+        if (role == MusicalRole.None) return;
+        if (_gridState.CellState == null || _gridState.CellDust == null) return;
+        for (int y = 0; y < _gridState.Height; y++)
+        for (int x = 0; x < _gridState.Width; x++)
+        {
+            if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
+            var dust = _gridState.CellDust[x, y];
+            if (dust != null && dust.Role == role)
+                results.Add(new Vector2Int(x, y));
+        }
+    }
+
     public MusicalRole GetZoneRole(Vector2Int cell) => _hiddenRoleLookup(cell);
 
     public bool HasCellFlag(Vector2Int cell, CellFlags flag) =>

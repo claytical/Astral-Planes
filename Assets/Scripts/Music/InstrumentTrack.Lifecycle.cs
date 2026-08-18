@@ -17,6 +17,8 @@ public partial class InstrumentTrack
         trackShadowColor = prof.GetShadowColor();
         preset           = prof.midiPreset;
         midiVoice?.SetPreset(prof.midiPreset);
+        midiVoice?.SetVolume(prof.volumeMultiplier);
+        midiVoice?.SetMixerGroup(prof.outputMixerGroup);
     }
 
     void Awake()
@@ -239,6 +241,7 @@ public partial class InstrumentTrack
         _expansionCtrl?.UnhookExpandBoundary();
         if (controller != null)
             controller.EndGravityVoidForPendingExpand(this);
+        UnsubscribeFromDustReleaseAscension();
     }
     private void OnEnable()
     {
@@ -260,7 +263,9 @@ public partial class InstrumentTrack
     {
         _expansionCtrl?.UnhookExpandBoundary();
         if (controller != null)
-            controller.EndGravityVoidForPendingExpand(this);    }
+            controller.EndGravityVoidForPendingExpand(this);
+        UnsubscribeFromDustReleaseAscension();
+    }
 
     private readonly List<Action> _nextFrameQueue = new();
     private void EnqueueNextFrame(Action a) => _nextFrameQueue.Add(a);

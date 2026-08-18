@@ -87,8 +87,8 @@ public class RingPreviewPlayer : MonoBehaviour
         {
             // Legacy ring (saved before timing capture): re-derive from the MotifProfile.
             AudioClip drumClip = null;
-            if (motif.intensityDrumLoops != null)
-                foreach (var c in motif.intensityDrumLoops) { if (c != null) { drumClip = c; break; } }
+            if (motif.intensityClipTags != null)
+                foreach (var t in motif.intensityClipTags) { if (t.clip != null) { drumClip = t.clip; break; } }
             if (drumClip == null && motif.entryDrumLoops != null)
                 foreach (var c in motif.entryDrumLoops) { if (c != null) { drumClip = c; break; } }
 

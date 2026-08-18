@@ -20,30 +20,26 @@ MonoBehaviour:
   maxEnergyUnits: 5
   carveResistance01: 0.777
   drainResistance01: 0.25
-  mineNodeSpeed: 0.35
   mineNodeLocomotionProfile: {fileID: 11400000, guid: e36f28096af234af1ba66f20d16b8c64,
     type: 2}
-  orbitalTurnBias: 0.6
-  burstDuration: 0.4
-  pauseDuration: 0.35
+  movementArchetype: {fileID: 11400000, guid: 44298f52e37cc40919dbcece3ca47722, type: 2}
   evasionCells: 1.5
   collectableSpeed: 1
   collectableAccelSeconds: 0.75
   collectableBounceRecoverSeconds: 0.45
-  collectableTravelRadiiPerNote: 1.5
   collectableHomeRadiusCells: 4
   collectableHomePullPerUnit: 0.5
-  collectableSwerveDegrees: 65
-  collectableSwerveCyclesPerNote: 1.5
-  collectableOrbitArcDegreesPerNote: 240
-  collectableOrbitRestSpeedMul: 0.35
   collectableFleeRadiusCells: 2
   collectableFleeSpeedMul: 1.3
-  configSelectionMode: 0
-  chordVoiceColors: []
-  sameRootAcrossBins: 0
   midiPreset: 6
   lowestNote: 50
   highestNote: 77
+  outputMixerGroup: {fileID: 8757496109221892152, guid: 07985bf4f6d469340930e958ef313c14,
+    type: 2}
+  volumeMultiplier: 1
+  minVelocity: 60
+  maxVelocity: 127
   regrowthDelay: 2.5
-  discardBlastRadiusCells: 0
+  configSelectionMode: 2
+  chordVoiceColors: []
+  sameRootAcrossBins: 0

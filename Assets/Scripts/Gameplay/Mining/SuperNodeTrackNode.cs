@@ -387,15 +387,13 @@ public class SuperNodeTrackNode : TrackNode
         {
             var rings = GameFlowManager.Instance?.GetMotifRingGlyphApplicator();
             rings?.SetSuperNodeMode(true);
-            int pre = AssignedTrack.loopMultiplier;
-            AssignedTrack.InstantFillAllBins(toMaxCapacity: true);
-            int post = AssignedTrack.loopMultiplier;
+            var (fromBin, toBin) = AssignedTrack.InstantFillAllBins(toMaxCapacity: true);
 
-            if (post > pre)
+            if (toBin > fromBin)
             {
                 int binSz = AssignedTrack.BinSize();
                 AssignedTrack.controller?.StartSuperNodeCompletionSequence(
-                    AssignedTrack, pre, post, ascendLoopsOverride, binSz, _drum);
+                    AssignedTrack, fromBin, toBin, ascendLoopsOverride, binSz, _drum);
             }
             else
             {

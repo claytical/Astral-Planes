@@ -1314,6 +1314,8 @@ MonoBehaviour:
   pathExitSealFadeSeconds: 0.35
   pathTransitionOffscreenMargin: 2
   pathTransitionTravelTimeout: 3
+  wispPrefab: {fileID: 2567590292593330884, guid: 6120d0fb3b6a8405abb162fc41452f69,
+    type: 3}
   demoMode: 0
   verboseLogging: 1
   harmony: {fileID: 1151719980}

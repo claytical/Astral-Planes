@@ -112,6 +112,12 @@ public partial class CosmicDust
     public void PrepareForReuse()
     {
         StopAllVisualCoroutines();
+        // StopAllVisualCoroutines cancels any tint pulse with restoreToBase: false (this
+        // method sets its own dormant tint below instead), which skips the particle
+        // cleanup RestoreDisplayToBaseTint would normally do — a cell pooled mid-rainbow-
+        // pulse (e.g. the interstitial maze tearing down before the ~1s pulse finished)
+        // would otherwise carry a stray hue into its next reuse in the following motif.
+        ClearRainbowParticleDirtyIfNeeded();
         _isBreaking = false;
         regrowAlphaCapped = false;
         suppressSpriteRenderer = false;

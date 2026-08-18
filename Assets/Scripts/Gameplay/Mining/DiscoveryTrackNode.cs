@@ -46,7 +46,6 @@ public partial class DiscoveryTrackNode : TrackNode
     private NoteSet _noteSet;
     private InstrumentTrack _track;
     private MusicalRole _role;
-    private float _speed    = 0.5f;
     private DiscoveryTrackNodeLocomotionProfile _activeLocomotionProfile;
     private int _lastProcessedStep = -1;
     private float _rescanTimer = 0f;
@@ -120,7 +119,6 @@ public partial class DiscoveryTrackNode : TrackNode
         var prof = (_track != null && _track.ActiveProfile != null)
             ? _track.ActiveProfile
             : MusicalRoleProfileLibrary.GetProfile(_role);
-        if (prof != null) _speed = prof.mineNodeSpeed;  // category speed is applied in FixedUpdateDrifting
         _activeLocomotionProfile = ResolveLocomotionProfile(prof);
         // Strength and expiration resolve through the same locomotion profile that drives speed.
         // NoteSet value wins for expiration only when authored (>0); otherwise the role/archetype
@@ -134,7 +132,7 @@ public partial class DiscoveryTrackNode : TrackNode
         _orbitSign = UnityEngine.Random.value < 0.5f ? 1 : -1;
         _orbitSignLocked = false;
         _isInBurst = true;
-        _burstPauseTimer = prof?.burstDuration ?? 0.4f;
+        _burstPauseTimer = prof?.movementArchetype?.burstDuration ?? 0.4f;
         _burstPauseSnapPending = false;
         var explode = GetComponent<Explode>();
         if (explode != null) explode.SetTint(_lockedColor, multiply: true);

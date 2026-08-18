@@ -7,8 +7,12 @@ public partial class InstrumentTrack
     /// <summary>
     /// Instantly overwrites the entire track with perfect authored notes for every bin,
     /// following each bin's chord progression. Called by SuperNode on collision.
+    /// Returns the [fromBin, toBin) range of bins that actually received new notes this call
+    /// (toBin &lt;= fromBin means nothing new was committed) — callers must use this, not a
+    /// loopMultiplier before/after comparison, to decide whether to register an ascend sequence:
+    /// a track already at maxLoopMultiplier can still have previously-unfilled bins filled here.
     /// </summary>
-    public void InstantFillAllBins(bool toMaxCapacity = false)
+    public (int fromBin, int toBin) InstantFillAllBins(bool toMaxCapacity = false)
     {
         int binSz = BinSize();
         int bins  = toMaxCapacity ? Mathf.Max(1, maxLoopMultiplier) : Mathf.Max(1, loopMultiplier);
@@ -26,6 +30,8 @@ public partial class InstrumentTrack
         // behind the playhead that were allocated but never collected during normal play —
         // instead of only the newly-expanded bins above the old loopMultiplier. Already-filled
         // bins are left untouched so the player's collected notes in them survive the fill.
+        int fromBin = -1;
+        int toBin   = -1;
         for (int b = 0; b < bins; b++)
         {
             if (toMaxCapacity && IsBinFilled(b)) continue;
@@ -36,6 +42,7 @@ public partial class InstrumentTrack
             if (ns == null) continue;
 
             int binStart = b * binSz;
+            bool addedAnyNote = false;
 
             if (ns.persistentTemplate != null && ns.persistentTemplate.Count > 0)
             {
@@ -44,6 +51,7 @@ public partial class InstrumentTrack
                 {
                     int absStep = binStart + step;
                     AddNoteToLoop(absStep, note, dur, vel, lightMarkerNow: true, authoredRoot);
+                    addedAnyNote = true;
                 }
             }
             else
@@ -55,10 +63,17 @@ public partial class InstrumentTrack
                     int absStep = binStart + localStep;
                     int note    = ns.GetNoteForPhaseAndRole(this, localStep);
                     AddNoteToLoop(absStep, note, 120, 1.0f, lightMarkerNow: true, authoredRootMidi);
+                    addedAnyNote = true;
                 }
             }
 
             SetBinFilled(b, true);
+
+            if (addedAnyNote)
+            {
+                if (fromBin < 0) fromBin = b;
+                toBin = b + 1;
+            }
         }
 
         _loopCacheDirtyPending = true;
@@ -69,6 +84,13 @@ public partial class InstrumentTrack
         // to one full leader loop, causing barIndex >= committedLeaderBins to fire on the extra
         // bars and silence all tracks for half the extended loop.
         if (toMaxCapacity) controller?.ResyncLeaderBinsNow();
+
+        // This role's dust has no further use while the track is fully filled — clear it out
+        // and hold it until this track's notes start ascending, freeing grid capacity for
+        // other roles in the meantime.
+        if (toMaxCapacity) ClearRoleDustUntilAscension();
+
+        return fromBin < 0 ? (0, 0) : (fromBin, toBin);
     }
 
     public void ClearBinNotesKeepAllocated(int binIdx)

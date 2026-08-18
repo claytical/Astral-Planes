@@ -15,12 +15,17 @@ MonoBehaviour:
   referenceWidthPx: 1920
   referenceColumns: 40
   uiBottomPaddingPx: 160
+  uiTopPaddingPx: 52
   gridPadding: 0.2
   autoSizeSpawnGridToScreen: 1
   lockPlayAreaAfterInit: 1
   timingWindowSteps: 4
-  sessionBurnEmaAlpha: 0.25
-  burnMultipleAtFullIntensity: 2.5
-  singleTrackIntensityCeiling: 0.45
-  tanksPerLoopAtFullIntensity: 0.35
-  intensityHysteresis: 0.08
+  pressureDustWeight: 0.5
+  pressureFuelWeight: 0.5
+  axisSmoothFactor: 0.35
+  axisHysteresis: 0.08
+  minClipDwellSeconds: 4
+  clipPollMode: 0
+  binFillPollDebounceSeconds: 0.15
+  defaultTransitionPhraseLengthLoops: 1
+  deckCrossfadeSeconds: 0.15

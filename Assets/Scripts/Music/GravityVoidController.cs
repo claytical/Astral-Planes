@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 // Owns the "Gravity Void" particle VFX + dust-ring imprint lifecycle that plays while a
@@ -17,6 +18,7 @@ public sealed class GravityVoidController
     private readonly Func<int> _getVoidRingWidthCells;
     private readonly Func<float> _getGravityVoidImprintTickSeconds;
     private readonly Func<int> _getPlayheadBin;
+    private readonly Func<MusicalRole, int> _getFilledBinCountForRole;
 
     private Vector2Int _gravityVoidCenterGP;
     private bool _gravityVoidHasCenterGP;
@@ -33,6 +35,12 @@ public sealed class GravityVoidController
     private Color _gravityVoidParticleTint;
     private Color _gravityVoidDustImprintTint;
     private int _gravityVoidMaxRadiusRuntime = -1;
+    // Non-owner active roles ranked most-filled-bins first (innermost ring) down to
+    // least-filled last (outer rim). Recomputed on every Begin call (see
+    // BeginGravityVoidForPendingExpand); re-read per new-bin tick by the growth
+    // routine rather than snapshotted once, so mid-flight fill changes affect
+    // rings not yet imprinted.
+    private IReadOnlyList<MusicalRole> _gravityVoidRankedRoles;
     // Last duration actually applied to the particle systems; avoids re-touching
     // main.duration/startLifetime (illegal while playing) when nothing has changed.
     private float _gravityVoidAppliedDurationSeconds = -1f;
@@ -45,7 +53,8 @@ public sealed class GravityVoidController
         Func<float> getGravityVoidScale,
         Func<int> getVoidRingWidthCells,
         Func<float> getGravityVoidImprintTickSeconds,
-        Func<int> getPlayheadBin)
+        Func<int> getPlayheadBin,
+        Func<MusicalRole, int> getFilledBinCountForRole)
     {
         _host = host;
         _getGfm = getGfm;
@@ -55,6 +64,29 @@ public sealed class GravityVoidController
         _getVoidRingWidthCells = getVoidRingWidthCells;
         _getGravityVoidImprintTickSeconds = getGravityVoidImprintTickSeconds;
         _getPlayheadBin = getPlayheadBin;
+        _getFilledBinCountForRole = getFilledBinCountForRole;
+    }
+
+    // Ranks non-owner active roles by fill level, most-filled first (innermost ring) down to
+    // least-filled last (outer rim). Ties keep original activeRoles order (stable sort).
+    // Falls back to the full activeRoles list (including owner) if filtering empties the set
+    // (e.g. a single-active-role motif where the owner is the only active role) so callers
+    // never divide by zero / index an empty list.
+    private IReadOnlyList<MusicalRole> BuildRankedRoles(IReadOnlyList<MusicalRole> activeRoles)
+    {
+        if (activeRoles == null || activeRoles.Count == 0) return activeRoles;
+
+        var ownerRole = _gravityVoidOwner != null ? _gravityVoidOwner.assignedRole : MusicalRole.None;
+
+        var candidates = new List<MusicalRole>(activeRoles.Count);
+        foreach (var r in activeRoles)
+            if (r != ownerRole) candidates.Add(r);
+
+        if (candidates.Count == 0) return activeRoles;
+
+        return candidates
+            .OrderByDescending(r => _getFilledBinCountForRole?.Invoke(r) ?? 0)
+            .ToList();
     }
 
     private float GetSecondsRemainingInCurrentBin()
@@ -102,14 +134,27 @@ public sealed class GravityVoidController
         // Spawn if needed, otherwise update visuals/position (must not destroy/recreate).
         SpawnOrUpdateGravityVoid(_gravityVoidCenterWorld, _gravityVoidParticleTint);
 
-        // Recompute runtime parameters; these can change while pending.
+        // Recompute runtime parameters; these can change while pending. Runs unconditionally
+        // (even on same-owner refresh calls that skip the coroutine restart below) so the
+        // ranked-role list — and the max radius derived from its count — stay current with
+        // live fill counts for as long as the void is pending.
         _gravityVoidMaxRadiusRuntime = -1;
 
-        if (_gravityVoidOwner != null)
         {
-            // Radius mapping: 1 bin = 1 radius cell (visualize incoming bin => current + 1).
-            int targetRadius = Mathf.Max(1, _gravityVoidOwner.loopMultiplier + 1);
-            _gravityVoidMaxRadiusRuntime = targetRadius;
+            var gfm = _getGfm();
+            var pool = gfm?.activeDrumTrack?._starPool;
+            var motifRoles = pool?.GetAnyActiveStarMotifRoles();
+            IReadOnlyList<MusicalRole> activeRolesForRanking =
+                (motifRoles != null && motifRoles.Count > 0)
+                    ? motifRoles
+                    : new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove, MusicalRole.Rhythm };
+
+            _gravityVoidRankedRoles = BuildRankedRoles(activeRolesForRanking);
+
+            int m = _gravityVoidRankedRoles.Count;
+            int ringsPerSubseqCalc = Mathf.Max(1, m / 2);
+            int totalRings = m + (Mathf.Max(1, _gravityVoidOwner.loopMultiplier) - 1) * ringsPerSubseqCalc;
+            _gravityVoidMaxRadiusRuntime = totalRings * _getVoidRingWidthCells();
         }
 
         // --- CRITICAL: don't restart the coroutine if it's already running for this owner. ---
@@ -124,19 +169,6 @@ public sealed class GravityVoidController
         {
             _host.StopCoroutine(_gravityVoidRoutine);
             _gravityVoidRoutine = null;
-        }
-
-        // Safety bubble: activate at the DiscoveryTrackNode capture position while the void is expanding.
-        {
-            var gfm = _getGfm();
-            var pool = gfm?.activeDrumTrack?._starPool;
-
-            // Compute max outer radius from ring formula so VFX sizes correctly.
-            var motifRoles = pool?.GetAnyActiveStarMotifRoles();
-            int roleCount = (motifRoles != null && motifRoles.Count > 0) ? motifRoles.Count : 4;
-            int ringsPerSubseq = Mathf.Max(1, roleCount / 2);
-            int totalRings = roleCount + (Mathf.Max(1, _gravityVoidOwner.loopMultiplier) - 1) * ringsPerSubseq;
-            _gravityVoidMaxRadiusRuntime = totalRings * _getVoidRingWidthCells();
         }
 
         _gravityVoidRoutine = _host.StartCoroutine(GravityVoidGrowAndImprintRoutine());
@@ -169,17 +201,10 @@ public sealed class GravityVoidController
         var gfm = _getGfm();
         if (gfm?.dustGenerator == null) yield break;
 
-        var pool = gfm?.activeDrumTrack?._starPool;
-        IReadOnlyList<MusicalRole> activeRoles = pool?.GetAnyActiveStarMotifRoles();
-        if (activeRoles == null || activeRoles.Count == 0)
-            activeRoles = new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove, MusicalRole.Rhythm };
-
-        int N            = activeRoles.Count;
-        int W            = _getVoidRingWidthCells();
-        int ringsPerSubseq = Mathf.Max(1, N / 2);
-        int completedRings = 0;
-        int lastBurstBin   = -1;
-        float tick         = Mathf.Max(0.01f, _getGravityVoidImprintTickSeconds());
+        int W               = _getVoidRingWidthCells();
+        int completedRings  = 0;
+        int lastBurstBin    = -1;
+        float tick          = Mathf.Max(0.01f, _getGravityVoidImprintTickSeconds());
 
         while (_gravityVoidOwner != null)
         {
@@ -188,13 +213,23 @@ public sealed class GravityVoidController
             int playheadBin = _getPlayheadBin();
             if (playheadBin != lastBurstBin && _gravityVoidHasCenterGP)
             {
-                lastBurstBin   = playheadBin;
-                int ringsThisBin = (playheadBin == 0) ? N : ringsPerSubseq;
+                lastBurstBin = playheadBin;
+
+                // Re-read the controller-cached ranked list here (not snapshotted at
+                // coroutine start) so a same-owner Begin refresh mid-flight can affect
+                // rings not yet imprinted. Already-imprinted rings are never recolored.
+                var rankedRoles = _gravityVoidRankedRoles;
+                if (rankedRoles == null || rankedRoles.Count == 0)
+                    rankedRoles = new[] { MusicalRole.Bass, MusicalRole.Harmony, MusicalRole.Lead, MusicalRole.Groove, MusicalRole.Rhythm };
+                int m = rankedRoles.Count;
+                int ringsPerSubseq = Mathf.Max(1, m / 2);
+
+                int ringsThisBin = (playheadBin == 0) ? m : ringsPerSubseq;
                 ringsThisBin = ApplyDensityThrottle(ringsThisBin);
-                float growIn     = Mathf.Max(0.05f, GetSecondsRemainingInCurrentBin());
+                float growIn = Mathf.Max(0.05f, GetSecondsRemainingInCurrentBin());
 
                 CollectVehicleGridCells();
-                ImprintVoidRings(activeRoles, N, W, ringsThisBin, completedRings, growIn);
+                ImprintVoidRings(rankedRoles, m, W, ringsThisBin, completedRings, growIn);
 
                 completedRings           += ringsThisBin;
                 _gravityVoidCurrentOuterR = completedRings * W;

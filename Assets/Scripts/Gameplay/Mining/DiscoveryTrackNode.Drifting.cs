@@ -63,8 +63,8 @@ public partial class DiscoveryTrackNode
                 _isInBurst = !_isInBurst;
                 _burstPauseSnapPending = false;
                 _burstPauseTimer = _isInBurst
-                    ? (_roleProfile?.burstDuration  ?? 0.4f)
-                    : (_roleProfile?.pauseDuration  ?? 0.35f);
+                    ? (_roleProfile?.movementArchetype?.burstDuration  ?? 0.4f)
+                    : (_roleProfile?.movementArchetype?.pauseDuration  ?? 0.35f);
             }
             return;
         }

@@ -21,13 +21,27 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 9bc37986ec4c0483b96d6c2d68654b44, type: 3}
   - {fileID: 8300000, guid: 2360740bfa34e487b85ed58ee031042c, type: 3}
   - {fileID: 8300000, guid: 0fe576a594c974a5bb2de5289a636806, type: 3}
-  intensityThresholds: []
+  intensityClipTags:
+  - clip: {fileID: 8300000, guid: 9bc37986ec4c0483b96d6c2d68654b44, type: 3}
+    depth01: 0
+    breadth01: 0
+    pressure01: 0
+  - clip: {fileID: 8300000, guid: 2360740bfa34e487b85ed58ee031042c, type: 3}
+    depth01: 0.5
+    breadth01: 0.5
+    pressure01: 0.5
+  - clip: {fileID: 8300000, guid: 0fe576a594c974a5bb2de5289a636806, type: 3}
+    depth01: 1
+    breadth01: 1
+    pressure01: 1
   entryLoopCount: 1
+  resetFirstCarryOnStart: 0
   bpm: 168
   stepsPerLoop: 32
   nodesPerStar: 12
   starBehavior: {fileID: 11400000, guid: 9dd08ed983d384107aaff4f28fa8803d, type: 2}
   mazePattern: {fileID: 11400000, guid: dc7bcb920eadd40139a254499c81741c, type: 2}
+  roleGeoConfigs: []
   chordProgression: {fileID: 11400000, guid: 72948641f168645a3ab969303689bac7, type: 2}
   alternateChordProgressionProfile: {fileID: 11400000, guid: 04a688fc570cd408bb4261ed5647fa97,
     type: 2}
@@ -40,10 +54,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 18f4a309bf1b54f6691a97ed4b32463c, type: 2}
   selectionWeight: 1
   beatIntroCount: 0
-  driveBeatsFromEnergy: 1
+  driveBeatsFromDensity: 1
   spawnVehicleTrap: 0
   trapShape: 0
   trapRadius: 3
   trapGrowSeconds: 0.4
   trapRole: 4
-  trapHardness01: 0.5

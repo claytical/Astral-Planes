@@ -30,3 +30,8 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 01d5a06a93dbc4649989f03be242f088, type: 2}
     - {fileID: 11400000, guid: 471683db0fd1148bdb3ab5ba73459190, type: 2}
     loopMotifs: 0
+  - phaseName: Next
+    phaseId: 7372954664d149969c3d8cf05cef0823
+    motifs:
+    - {fileID: 11400000, guid: 0dfacc5b336a449a68b1538328875e4f, type: 2}
+    loopMotifs: 0

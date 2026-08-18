@@ -2,6 +2,7 @@ using System.Collections;
 using System.Reflection;
 using MidiPlayerTK;
 using UnityEngine;
+using UnityEngine.Audio;
 
 /// <summary>
 /// Pure "voice" component: plays MIDI notes (loop voice, confirms, special FX).
@@ -20,6 +21,10 @@ public class MidiVoice : MonoBehaviour
     [SerializeField] private int bank = 0;
     
     private static bool _forcedProgramPropsCached;
+
+    // Cached per-role volume trim; re-applied on every note-on so it self-heals
+    // once MPTK_Channels exists, the same way preset/bank already do.
+    private float _volume = 1f;
 
     // Optional callback so trimming logic can use track’s windowing model.
     private System.Func<float> _remainingActiveWindowSec;
@@ -68,7 +73,56 @@ public class MidiVoice : MonoBehaviour
 
         midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = preset;
     }
-    
+
+    /// <summary>
+    /// Per-role gain trim: pure MPTK channel volume multiply (doesn't affect note velocity/timbre).
+    /// </summary>
+    public void SetVolume(float volume)
+    {
+        _volume = volume;
+
+        if (midiStreamPlayer == null)
+            return;
+
+        if (midiStreamPlayer.MPTK_Channels == null)
+        {
+            Debug.LogWarning(
+                $"[MidiVoice] MPTK_Channels not ready yet on {name}; " +
+                $"volume {volume} not applied.");
+            return;
+        }
+
+        if (channel < 0 || channel >= midiStreamPlayer.MPTK_Channels.Length)
+        {
+            Debug.LogWarning(
+                $"[MidiVoice] Channel out of range on {name}: channel={channel}, " +
+                $"channelsLength={midiStreamPlayer.MPTK_Channels.Length}. " +
+                $"Volume {volume} not applied.");
+            return;
+        }
+
+        if (midiStreamPlayer.MPTK_Channels[channel] == null)
+        {
+            Debug.LogWarning(
+                $"[MidiVoice] Channel slot {channel} is null on {name}; " +
+                $"volume {volume} not applied.");
+            return;
+        }
+
+        midiStreamPlayer.MPTK_Channels[channel].Volume = volume;
+    }
+
+    /// <summary>
+    /// Routes this voice's AudioSource to the given mixer group (per-role bus). No-op if group is null.
+    /// </summary>
+    public void SetMixerGroup(AudioMixerGroup group)
+    {
+        if (group == null || midiStreamPlayer == null || midiStreamPlayer.CoreAudioSource == null)
+            return;
+
+        midiStreamPlayer.CoreAudioSource.outputAudioMixerGroup = group;
+    }
+
     public void Bind(
         MidiStreamPlayer player,
         DrumTrack drums,
@@ -117,6 +171,7 @@ public class MidiVoice : MonoBehaviour
         }
         midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = preset;
         midiStreamPlayer.MPTK_Channels[channel].ForcedBank = bank;
+        midiStreamPlayer.MPTK_Channels[channel].Volume = _volume;
 
         float v127 = (velocity <= 1.01f) ? (velocity * 127f) : velocity;
 
@@ -155,6 +210,7 @@ public class MidiVoice : MonoBehaviour
         // override before the note is actually rendered.
         midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = overridePreset;
         midiStreamPlayer.MPTK_Channels[channel].ForcedBank   = overrideBank;
+        midiStreamPlayer.MPTK_Channels[channel].Volume       = _volume;
 
         var ev = new MPTKEvent
         {
@@ -179,6 +235,7 @@ public class MidiVoice : MonoBehaviour
 
         midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = preset;
         midiStreamPlayer.MPTK_Channels[channel].ForcedBank = bank;
+        midiStreamPlayer.MPTK_Channels[channel].Volume = _volume;
 
         int v = Mathf.Clamp(Mathf.RoundToInt(velocity01 * 0.45f), 1, 80);
 

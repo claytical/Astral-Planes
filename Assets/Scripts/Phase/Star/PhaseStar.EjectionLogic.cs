@@ -324,15 +324,13 @@ public partial class PhaseStar
                 var rings = GameFlowManager.Instance?.GetMotifRingGlyphApplicator();
                 rings?.SetSuperNodeMode(true);
 
-                int pre = targetTrack.loopMultiplier;
-                targetTrack.InstantFillAllBins(toMaxCapacity: true);
-                int post = targetTrack.loopMultiplier;
+                var (fromBin, toBin) = targetTrack.InstantFillAllBins(toMaxCapacity: true);
 
-                if (post > pre)
+                if (toBin > fromBin)
                 {
                     int binSz = targetTrack.BinSize();
                     targetTrack.controller?.StartSuperNodeCompletionSequence(
-                        targetTrack, pre, post, /*ascendLoopsOverride*/ 3, binSz, _drum);
+                        targetTrack, fromBin, toBin, /*ascendLoopsOverride*/ 3, binSz, _drum);
                 }
                 else
                 {
@@ -340,6 +338,7 @@ public partial class PhaseStar
                 }
 
                 targetTrack.controller?.StageAltChordIfAllTracksMaxed();
+                targetTrack.controller?.NotifySuperNodeResolved(sn.AllShardsCaught);
             }
 
             OnMineNodeResolved?.Invoke(this, _attunedRole);

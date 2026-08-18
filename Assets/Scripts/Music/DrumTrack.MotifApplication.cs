@@ -10,20 +10,31 @@ public partial class DrumTrack
         return _entryLoops[i];
     }
 
-    private AudioClip ResolveIntensityClip(float intensity01)
+    // Nearest-match selection: picks whichever tagged clip's (depth,breadth,pressure) target
+    // is closest to the live-computed axis point. Squared distance avoids a sqrt per
+    // candidate since only comparisons are needed. Ties resolve to the first-in-list entry,
+    // matching the determinism guarantee this pool needs (same as GetConfigForRoleAtBin).
+    private AudioClip ResolveNearestIntensityClip(float depth01, float breadth01, float pressure01)
     {
-        if (_intensityLoops == null || _intensityLoops.Count == 0) return null;
+        if (_intensityTags == null || _intensityTags.Count == 0) return null;
 
-        int n = _intensityLoops.Count;
-        if (n == 1) return _intensityLoops[0];
-
-        intensity01 = Mathf.Clamp01(intensity01);
-
-        // Even mapping: 0 -> 0, 1 -> n-1
-        int idx = Mathf.RoundToInt(intensity01 * (n - 1));
-        idx = Mathf.Clamp(idx, 0, n - 1);
-
-        return _intensityLoops[idx];
+        float bestDist = float.MaxValue;
+        AudioClip best = null;
+        for (int i = 0; i < _intensityTags.Count; i++)
+        {
+            var t = _intensityTags[i];
+            if (t.clip == null) continue;
+            float dd = depth01 - t.depth01;
+            float db = breadth01 - t.breadth01;
+            float dp = pressure01 - t.pressure01;
+            float dist = dd * dd + db * db + dp * dp;
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                best = t.clip;
+            }
+        }
+        return best;
     }
 
     private void ApplyMotif(MotifProfile motif, bool armAtNextBoundary, string who, bool restartTransport = false)
@@ -65,7 +76,7 @@ public partial class DrumTrack
     {
         _motif               = motif;
         _entryLoops          = _motif?.entryDrumLoops;
-        _intensityLoops      = _motif?.intensityDrumLoops;
+        _intensityTags       = _motif?.intensityClipTags;
         _driveFromDensity    = _motif != null && _motif.driveBeatsFromDensity;
 
         // Carry latch is one-way for the session: survives motif changes unless the incoming
@@ -81,16 +92,20 @@ public partial class DrumTrack
             // Preserve intensity when timing is identical — same BPM/steps means no perceptual
             // discontinuity and resetting would cause a spurious intensity dip.
             if (stepsChanged || bpmChanged)
-                _lastDensity01 = 0f;
+            {
+                _lastDepth01 = 0f;
+                _lastBreadth01 = 0f;
+                _lastPressure01 = 0f;
+            }
         }
 
         if (_motif == null) return;
         if (!_motif.driveBeatsFromDensity)
             Debug.LogWarning($"[DRUM][MOTIF] Motif {_motif.motifId} has driveBeatsFromDensity=FALSE. Beat intensity will never run.");
         int entryCt = _motif.entryDrumLoops?.Count ?? 0;
-        int intCt   = _motif.intensityDrumLoops?.Count ?? 0;
+        int tagCt   = _motif.intensityClipTags?.Count ?? 0;
         if (entryCt == 0) Debug.LogWarning($"[DRUM][MOTIF] Motif {_motif.motifId} has 0 entryDrumLoops.");
-        if (intCt   == 0) Debug.LogWarning($"[DRUM][MOTIF] Motif {_motif.motifId} has 0 intensityDrumLoops. Intensity changes cannot occur.");
+        if (tagCt   == 0) Debug.LogWarning($"[DRUM][MOTIF] Motif {_motif.motifId} has 0 intensityClipTags. Intensity changes cannot occur.");
     }
 
     // Applies deferred or immediate timing depending on transport state.
@@ -135,7 +150,7 @@ public partial class DrumTrack
 
             if (GameFlowManager.VerboseLogging) Debug.Log(
                 $"[DRUM][MOTIF] ApplyMotif by {who}: motif={(_motif ? _motif.motifId : "null")} " +
-                $"entryLoops={_entryLoops?.Count ?? 0} intensityLoops={_intensityLoops?.Count ?? 0} " +
+                $"entryLoops={_entryLoops?.Count ?? 0} intensityTags={_intensityTags?.Count ?? 0} " +
                 $"entryLoopRemaining={_entryLoopsRemaining} drive={_driveFromDensity} " +
                 $"bpm={drumLoopBPM} steps={totalSteps} clip={(clip ? clip.name : "null")} " +
                 $"armAtNextBoundary={armAtNextBoundary} restart={restartTransport} motifChanged={motifChanged}"
@@ -153,6 +168,8 @@ public partial class DrumTrack
             Debug.LogWarning($"[DRUM][MOTIF] No entry clip available for motif '{(_motif ? _motif.motifId : "null")}' (by {who}).");
             return;
         }
+
+        WarnIfClipTimingMismatch(_motif, clip);
 
         if (!_started)
             return;
@@ -187,8 +204,46 @@ public partial class DrumTrack
             return;
         }
 
+        if (_pendingDrumLoopDspStart > 0.0)
+        {
+            // A swap is already physically scheduled (inactive deck has a PlayScheduled call
+            // pending). Remember the latest target but don't touch the decks again until that
+            // swap finishes — stomping it here would desync the in-flight PlayScheduled/
+            // SetScheduledEndTime pair.
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[DRUM] ScheduleClipChange: swap already in-flight for dsp={_pendingDrumLoopDspStart:F3}; deferring new target clip={clip.name}");
+            _pendingDrumLoop = clip;
+            _pendingDrumLoopArmed = armAtNextBoundary;
+            _pendingSwapPhraseTarget = ResolvePhraseLengthLoops(_motif);
+            return;
+        }
+
         _pendingDrumLoop = clip;
         _pendingDrumLoopArmed = armAtNextBoundary;
+        _pendingSwapPhraseTarget = ResolvePhraseLengthLoops(_motif);
+        _pendingSwapLoopsElapsed = 0;
+    }
+
+    // Resolves how many completed leader-loop boundaries to wait before an armed swap is
+    // allowed to fire, so a transition gets a full musical phrase of runway instead of
+    // arming after just one bar. Per-motif override wins; falls back to the config default.
+    private int ResolvePhraseLengthLoops(MotifProfile motif)
+    {
+        int overrideVal = motif != null ? motif.phraseLengthLoopsOverride : 0;
+        if (overrideVal > 0) return overrideVal;
+        return config != null ? Mathf.Max(1, config.defaultTransitionPhraseLengthLoops) : 1;
+    }
+
+    // Warns when a chosen clip's real length doesn't match motif.bpm/stepsPerLoop. Runtime
+    // counterpart to MotifProfile.ValidateTimingAgainstClips — needed because intensityClipTags
+    // are chosen dynamically (ResolveNearestIntensityClip) and won't re-trigger OnValidate.
+    private void WarnIfClipTimingMismatch(MotifProfile motif, AudioClip clip)
+    {
+        if (motif == null || clip == null || clip.length <= 0f || motif.bpm <= 0f || motif.stepsPerLoop <= 0) return;
+        float impliedLoopSec = motif.stepsPerLoop * (60f / motif.bpm) / 4f;
+        float delta = Mathf.Abs(clip.length - impliedLoopSec);
+        float tol = Mathf.Max(0.02f, impliedLoopSec * 0.02f);
+        if (delta > tol)
+            Debug.LogWarning($"[DRUM][MOTIF][TIMING] motif={motif.motifId} bpm={motif.bpm} stepsPerLoop={motif.stepsPerLoop} implies loop={impliedLoopSec:F3}s but clip '{clip.name}' is {clip.length:F3}s (Δ={delta:F3}s).");
     }
 
     public void SetMotifBeatSequence(MotifProfile motif, bool armAtNextBoundary, string who, bool restartTransport = false) {
@@ -223,21 +278,56 @@ public partial class DrumTrack
             swapDsp = leaderStartDspTime + bars * barLen;
         }
 
-        // Safety: must schedule in the future
+        // Safety: must schedule in the future. Reaching this branch means the bar-aligned swapDsp
+        // computed above landed at/before dspNow (stale leaderStartDspTime after a frame hitch, or
+        // FP drift between this method's barLen and EffectiveLoopLengthSec's independently-computed
+        // step duration) — the near-instant fallback below can collapse the crossfade window to ~0
+        // and race Unity's PlayScheduled/SetScheduledEndTime DSP-buffer latency, which is a
+        // suspected cause of an audible dropout at the swap. Always logged (not gated behind
+        // logBeatSeqGates) since this should be rare and is the thing to look for if drums cut out.
         if (swapDsp <= dspNow + 0.01)
+        {
+            Debug.LogWarning($"[DRUM] ArmPendingDrumLoopForNextLeaderBoundary: bar-aligned swapDsp={swapDsp:F3} was <= dspNow={dspNow:F3}+0.01 — falling back to near-instant schedule. clip={_pendingDrumLoop?.name} leaderStartDspTime={leaderStartDspTime:F3}");
             swapDsp = dspNow + 0.05;
+        }
 
         var newClip = _pendingDrumLoop;
         if (newClip == null)
         {
             _pendingDrumLoopArmed = false;
+            _pendingSwapLoopsElapsed = 0;
             return;
         }
 
+        // Crossfade window straddling the swap: the incoming deck pre-rolls silently and ramps
+        // up while the outgoing deck ramps down, both converging exactly at swapDsp — the
+        // bar-aligned instant everything else (SetScheduledEndTime, TickDeckSwap's pointer/
+        // timing commit) still keys off unchanged. Only the audio pre-roll start moves earlier.
+        float fadeWin = config != null ? Mathf.Max(0f, config.deckCrossfadeSeconds) : 0f;
+        fadeWin = Mathf.Min(fadeWin, newClip.length * 0.5f);
+        double crossStart = swapDsp - fadeWin;
+        if (crossStart <= dspNow + 0.01)
+        {
+            double collapsed = System.Math.Max(dspNow + 0.01, swapDsp - 0.001);
+            Debug.LogWarning($"[DRUM] ArmPendingDrumLoopForNextLeaderBoundary: crossfade window collapsed (wanted crossStart={crossStart:F3}, using {collapsed:F3}, swapDsp={swapDsp:F3}) — incoming/outgoing decks converge in under 1ms instead of {fadeWin:F3}s.");
+            crossStart = collapsed;
+            fadeWin = (float)System.Math.Max(0.0, swapDsp - crossStart);
+        }
 
         _inactiveDrum.clip = newClip;
         _inactiveDrum.loop = true;
         _inactiveDrum.playOnAwake = false;
+        _inactiveDrum.volume = 0f;
+
+        // Start the incoming deck fadeWin seconds INTO its own bar rather than at sample 0, so its
+        // native loop-wrap — i.e. its own downbeat — lands exactly at swapDsp instead of at
+        // crossStart. Starting from sample 0 at crossStart would play the new pattern's opening hits
+        // fadeWin seconds before the bar-aligned instant every other system (leaderStartDspTime
+        // advancement, InstrumentTrack's note grid, SetScheduledEndTime below) treats as the true
+        // downbeat — audible as the drums coming in early, ahead of the instrument note timing.
+        // The audible content during the fade-in becomes the tail of the new clip's own bar instead,
+        // which is rhythmically continuous since every clip for a motif shares the same bar length.
+        _inactiveDrum.time = Mathf.Clamp(newClip.length - fadeWin, 0f, Mathf.Max(0f, newClip.length - 0.0001f));
 
         // Try to end active at the swap boundary (avoids overlaps)
         try
@@ -252,15 +342,28 @@ public partial class DrumTrack
         // The currently-audible deck must remain authoritative until swapDsp arrives.
         // Note: assigning .clip above already stopped any prior playback on _inactiveDrum,
         // so there is no need to check isPlaying before calling PlayScheduled.
-        _inactiveDrum.PlayScheduled(swapDsp);
+        _inactiveDrum.PlayScheduled(crossStart);
+
+        _crossfadeBaseVolume = _activeDrum.volume;
+        _crossfadeStartDsp = crossStart;
+        _crossfadeEndDsp = swapDsp;
 
         _pendingDrumLoopDspStart = swapDsp;
 
         // Keep flags so Update() can finalize the deck swap when DSP reaches swapDsp.
         _pendingDrumLoopArmed = false;
         _pendingDrumLoop = null;
+        _pendingSwapLoopsElapsed = 0;
 
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[DRUM] Armed drum loop swap for dsp={swapDsp:F3} clip={newClip.name}");
+        // Temporary full-lifecycle trace (unconditional, not gated behind logBeatSeqGates) while
+        // chasing an audible-dropout report where the arm itself logged a correct clip but nothing
+        // was heard — captures the volume baseline this whole ramp is keyed off, since a wrong
+        // _crossfadeBaseVolume here would silently produce a silent ramp with no warning anywhere.
+        Debug.LogWarning($"[DRUM][TRACE] Armed swap: newClip={newClip.name} swapDsp={swapDsp:F3} crossStart={crossStart:F3} " +
+            $"_crossfadeBaseVolume={_crossfadeBaseVolume:F3} activeDrum={_activeDrum.name}(vol={_activeDrum.volume:F3},mute={_activeDrum.mute},clip={(_activeDrum.clip?_activeDrum.clip.name:"null")}) " +
+            $"inactiveDrum={_inactiveDrum.name}(vol={_inactiveDrum.volume:F3},mute={_inactiveDrum.mute},clip={(_inactiveDrum.clip?_inactiveDrum.clip.name:"null")},isPlaying={_inactiveDrum.isPlaying})");
+
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DRUM] Armed drum loop swap for dsp={swapDsp:F3} clip={newClip.name} crossStart={crossStart:F3}");
     }
 
     private void ScheduleDrumLoopChange(AudioClip newLoop)
@@ -270,6 +373,13 @@ public partial class DrumTrack
             Debug.LogWarning("[DrumTrack] ScheduleDrumLoopChange called with null clip.");
             return;
         }
+
+        // Unlike the entry-clip path (ScheduleClipChange), intensity-tag clips picked here by
+        // EvaluateAndScheduleClip never went through this check — a mismatched clip silently
+        // redefines EffectiveLoopLengthSec (derived from the clip's real length, not from
+        // bpm/stepsPerLoop) the moment it becomes active, which reads as the whole motif's
+        // tempo drifting mid-playback instead of a one-off warning at the actual cause.
+        WarnIfClipTimingMismatch(_motif, newLoop);
 
         // If a swap is already scheduled (inactive already has PlayScheduled),
         // DO NOT clear _pendingDrumLoopDspStart, or we will never finalize the swap.
@@ -285,6 +395,15 @@ public partial class DrumTrack
 
         // Only clear this when we are truly arming a not-yet-scheduled swap.
         _pendingDrumLoopDspStart = -1.0;
+
+        // Unlike ScheduleClipChange's pending-path, this was never setting these — meaning every
+        // intensity-tag swap ran the phrase-length gate (TickLoopBoundaries) off whatever stale
+        // _pendingSwapPhraseTarget/_pendingSwapLoopsElapsed a PRIOR motif/entry-clip change left
+        // behind (or, on a fresh session, the raw field initializers), instead of freshly resolving
+        // this motif's actual phraseLengthLoopsOverride. Set them here too so every swap path is
+        // consistent and phraseLengthLoopsOverride actually takes effect for intensity swaps.
+        _pendingSwapPhraseTarget = ResolvePhraseLengthLoops(_motif);
+        _pendingSwapLoopsElapsed = 0;
     }
 
     private void EnsureDualDrumSources()

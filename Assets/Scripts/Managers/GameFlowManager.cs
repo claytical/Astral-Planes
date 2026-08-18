@@ -57,6 +57,12 @@ public partial class GameFlowManager : MonoBehaviour
     [SerializeField, Min(0f)] private float pathTransitionTravelTimeout = 3f;
     public float PathTransitionTravelTimeout => pathTransitionTravelTimeout;
 
+    [Tooltip("Wisp prefab spawned once per multi-exit path-choice interstitial maze — leads " +
+             "the vehicle toward a randomly chosen exit and plays a one-shot bridging sample " +
+             "on contact. Leave unassigned to disable the feature.")]
+    [SerializeField] private GameObject wispPrefab;
+    public GameObject WispPrefab => wispPrefab;
+
     public static GameFlowManager Instance { get; private set; }
     public bool demoMode = true;
 

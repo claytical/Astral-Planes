@@ -33,6 +33,25 @@ private Coroutine _tintPulseRoutine;
 private int _tintPulseToken = 0;
 private bool _tintPulseActive = false;
 
+// Reused scratch buffer for SetDustColorAllParticles' live-particle rewrite — avoids a
+// per-call allocation since a maze-wide pulse calls this on every solid cell every frame.
+private ParticleSystem.Particle[] _colorParticleBuffer;
+
+// True whenever this cell's particle color is currently controlled by an in-flight or
+// abandoned rainbow pulse (the only caller of SetRainbowParticleColor). Checked by both
+// RestoreDisplayToBaseTint and PrepareForReuse so a pulse interrupted mid-flight (e.g. the
+// interstitial maze tears down and this cell gets pooled into the next motif before its
+// ~1s pulse would have finished naturally) can't leave a stray hue stuck on particles that
+// nothing else ever resets.
+private bool _rainbowParticleDirty;
+
+private void ClearRainbowParticleDirtyIfNeeded()
+{
+    if (!_rainbowParticleDirty) return;
+    SetRainbowParticleColor(_baseCaptured ? _baseColor : _currentTint);
+    _rainbowParticleDirty = false;
+}
+
 // Canonical/rest tint.
     private Color _currentTint = Color.white;
 
@@ -81,6 +100,7 @@ private bool _tintPulseActive = false;
     {
         _tintPulseActive = false;
         ApplyDisplayedTint(_currentTint);
+        ClearRainbowParticleDirtyIfNeeded();
     }
     private void CancelTintPulse(bool restoreToBase)
     {
@@ -105,15 +125,48 @@ private bool _tintPulseActive = false;
         // Particles: leave authored color/gradient/material alone.
         // (If you later want particle tinting, do it as an explicit opt-in path.)
     }
+    // Deliberately a no-op: SetDustColorAllParticles is reached not just from pulses but
+    // from ordinary cell spawn/reuse (ApplyWorkShaderParamsParticlesOnly <- SyncParticleColor
+    // / ResetVisualToBase). SyncParticleColor's own doc says particles are meant to "keep
+    // their birth color until explicitly refreshed" — the whole particle-tint call graph
+    // was built around this being inert. Making it actually apply color (tried once)
+    // pushed every dust cell's near-black role tint (e.g. path-choice maze walls'
+    // solidDustTint) onto particles that read as invisible under their blend mode,
+    // breaking every interstitial maze, not just pulsed cells. BeginRainbowPulse uses its
+    // own isolated SetRainbowParticleColor instead, so it doesn't reactivate this for
+    // every other caller.
     private void SetDustColorAllParticles(Color target)
     {
         if (visual.particleSystem == null) return;
 
         var ps   = visual.particleSystem;
-        var main = ps.main;
         var col  = ps.colorOverLifetime;
 
         col.enabled = true;
+    }
+
+    // Isolated particle recolor used only by the rainbow pulse — never routed through by
+    // any other caller (see SetDustColorAllParticles above), so it can't affect ordinary
+    // cell spawn/reuse or other pulses. Sets startColor for future emissions and rewrites
+    // every currently-live particle so the change reads immediately.
+    private void SetRainbowParticleColor(Color target)
+    {
+        if (visual.particleSystem == null) return;
+
+        var ps = visual.particleSystem;
+        var main = ps.main;
+        main.startColor = target;
+
+        int count = ps.particleCount;
+        if (count <= 0) return;
+
+        if (_colorParticleBuffer == null || _colorParticleBuffer.Length < count)
+            _colorParticleBuffer = new ParticleSystem.Particle[Mathf.Max(count, 32)];
+
+        int actual = ps.GetParticles(_colorParticleBuffer);
+        for (int i = 0; i < actual; i++)
+            _colorParticleBuffer[i].startColor = target;
+        ps.SetParticles(_colorParticleBuffer, actual);
     }
     internal void ApplyTintVisual(Color tint)
     {
@@ -236,6 +289,100 @@ private bool _tintPulseActive = false;
     _tintPulseToken++;
     int token = _tintPulseToken;
     _tintPulseRoutine = StartCoroutine(TintPulseRoutine(token, _hiddenHintColor, 0.5f));
+}
+
+    // Triggered maze-wide by CosmicDustGenerator.BeginRainbowPulseAllDust on wisp consume.
+    // Same fade-in/hold/fade-out shape as TintPulseRoutine, except "hold" continuously
+    // advances an HSV hue cycle instead of holding one constant color.
+    public void BeginRainbowPulse(float seconds, float hueCyclesPerSecond, float saturation, float value)
+{
+    if (seconds <= 0f) return;
+    CancelTintPulse(restoreToBase: false);
+    _tintPulseToken++;
+    int token = _tintPulseToken;
+    _tintPulseRoutine = StartCoroutine(RainbowPulseRoutine(token, seconds, hueCyclesPerSecond, saturation, value));
+}
+
+    private Color RainbowColorAt(float elapsedSeconds, float hueCyclesPerSecond, float saturation, float value)
+{
+    float hue = Mathf.Repeat(elapsedSeconds * hueCyclesPerSecond, 1f);
+    Color c = Color.HSVToRGB(hue, saturation, value);
+    c.a = _currentTint.a;
+    return c;
+}
+
+    private IEnumerator RainbowPulseRoutine(int token, float seconds, float hueCyclesPerSecond, float saturation, float value)
+{
+    _tintPulseActive = true;
+
+    // Particles rest at their authored base color (_baseColor), not _currentTint — a
+    // role's near-black tint (e.g. path-choice maze walls' solidDustTint) is fine for the
+    // opaque sprite but reads as invisible once pushed onto particles under an additive
+    // blend, which is exactly the regression this isolates against (see
+    // SetDustColorAllParticles' comment). The bright rainbow hues themselves are safe
+    // either way — only the rest color needs to avoid _currentTint.
+    if (!_baseCaptured) CaptureBaseVisual();
+    Color particleRestColor = _baseCaptured ? _baseColor : _currentTint;
+    _rainbowParticleDirty = true;
+
+    float fadeIn  = Mathf.Clamp(seconds * 0.15f, 0.05f, 0.3f);
+    float fadeOut = Mathf.Clamp(seconds * 0.25f, 0.1f, 0.5f);
+    float hold    = Mathf.Max(0f, seconds - fadeIn - fadeOut);
+
+    Color startTint = _displayTint;
+    float t = 0f;
+
+    while (t < fadeIn)
+    {
+        if (token != _tintPulseToken) yield break;
+
+        t += Time.deltaTime;
+        float a = (fadeIn <= 0f) ? 1f : Mathf.Clamp01(t / fadeIn);
+        Color rc = RainbowColorAt(t, hueCyclesPerSecond, saturation, value);
+
+        ApplyDisplayedTint(Color.Lerp(startTint, rc, a));
+        SetRainbowParticleColor(Color.Lerp(particleRestColor, rc, a));
+        yield return null;
+    }
+
+    float holdElapsed = 0f;
+    while (holdElapsed < hold)
+    {
+        if (token != _tintPulseToken) yield break;
+
+        holdElapsed += Time.deltaTime;
+        Color rc = RainbowColorAt(fadeIn + holdElapsed, hueCyclesPerSecond, saturation, value);
+        ApplyDisplayedTint(rc);
+        SetRainbowParticleColor(rc);
+        yield return null;
+    }
+
+    // Sprite and particles were driven identically through fade-in/hold, so _displayTint
+    // is a valid shared starting point for both fade-out lerps below even though they
+    // diverge to different end targets.
+    startTint = _displayTint;
+    t = 0f;
+
+    while (t < fadeOut)
+    {
+        if (token != _tintPulseToken) yield break;
+
+        t += Time.deltaTime;
+        float a = (fadeOut <= 0f) ? 1f : Mathf.Clamp01(t / fadeOut);
+
+        ApplyDisplayedTint(Color.Lerp(startTint, _currentTint, a));
+        SetRainbowParticleColor(Color.Lerp(startTint, particleRestColor, a));
+        yield return null;
+    }
+
+    if (token == _tintPulseToken)
+    {
+        // RestoreDisplayToBaseTint checks _rainbowParticleDirty and cleans up particles
+        // itself — same path a forced cancel (OnDisable) uses, so there's one place that
+        // decides how to reset particles after a rainbow pulse touched them.
+        RestoreDisplayToBaseTint();
+        _tintPulseRoutine = null;
+    }
 }
 
     private IEnumerator TintPulseRoutine(int token, Color pulseColor, float seconds)

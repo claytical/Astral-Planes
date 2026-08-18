@@ -70,7 +70,7 @@ public partial class DrumTrack : MonoBehaviour
 
     private MotifProfile _motif;
     private List<AudioClip> _entryLoops;
-    private List<AudioClip> _intensityLoops;
+    private List<IntensityClipTag> _intensityTags;
 
     private int _entryLoopsRemaining;
     private bool _carryLatched; // one-way: set once any vehicle carries a collectable
@@ -83,7 +83,13 @@ public partial class DrumTrack : MonoBehaviour
     private int _lastStepIdx = -1;
     private bool _driveFromDensity;
 
-    private float _lastDensity01 = 0f; // for hysteresis, density sub-component of intensity01
+    // Smoothed depth/breadth/pressure axis values, for hysteresis between evaluations.
+    private float _lastDepth01 = 0f;
+    private float _lastBreadth01 = 0f;
+    private float _lastPressure01 = 0f;
+
+    // Min-dwell gate: last dsp time an intensity clip swap actually finalized (audible).
+    private double _lastClipSwapFinalizedDsp = -1.0;
 
     public float EffectiveLoopLengthSec => (_trackController != null) ? _trackController.GetEffectiveLoopLengthInSeconds() : _clipLengthSec;
     public float GetLoopLengthInSeconds() => EffectiveLoopLengthSec;
@@ -101,6 +107,13 @@ public partial class DrumTrack : MonoBehaviour
 
     private bool _pendingDrumLoopArmed;
     private double _pendingDrumLoopDspStart;
+    private int _pendingSwapPhraseTarget = 1;
+    private int _pendingSwapLoopsElapsed = 0;
+
+    private double _crossfadeStartDsp = -1.0;
+    private double _crossfadeEndDsp = -1.0;
+    private float _crossfadeBaseVolume = 1f;
+    private bool _traceCrossfadeStarted; // temporary: gates the one-shot "ramp starting" trace log
 
     // Owns world↔grid coordinate mapping and spawn-grid delegation; fully decoupled from
     // DSP/motif state, mirroring how CosmicDustGenerator owns CosmicDustCellRegistry.

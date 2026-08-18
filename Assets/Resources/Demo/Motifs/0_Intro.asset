@@ -17,13 +17,36 @@ MonoBehaviour:
   keyRootMidi: 46
   entryDrumLoops:
   - {fileID: 8300000, guid: a6b537cd91fc44bc2a4357aa1a154bea, type: 3}
-  intensityDrumLoops:
-  - {fileID: 8300000, guid: 4999a62c67b26451cb5ebf6ca5f3582e, type: 3}
+  intensityClipTags:
+  - clip: {fileID: 8300000, guid: 4999a62c67b26451cb5ebf6ca5f3582e, type: 3}
+    depth01: 0
+    breadth01: 0
+    pressure01: 0
+  - clip: {fileID: 8300000, guid: e095cc2787fa74168ab460cb92fb1259, type: 3}
+    depth01: 0.3
+    breadth01: 0.2
+    pressure01: 0
+  - clip: {fileID: 8300000, guid: c0d471632abfa453a919a93eeef1406a, type: 3}
+    depth01: 0.2
+    breadth01: 0.3
+    pressure01: 0
+  - clip: {fileID: 8300000, guid: c6203f9021ee148bbadff648d3e20ffe, type: 3}
+    depth01: 0.5
+    breadth01: 0.4
+    pressure01: 0.1
+  - clip: {fileID: 8300000, guid: 29918de9d949044b8bc0299e58bc63e7, type: 3}
+    depth01: 0.4
+    breadth01: 0.5
+    pressure01: 0.5
   entryLoopCount: 16
   resetFirstCarryOnStart: 0
+  bridgeSamples: []
+  bridgeSampleVolume: 0.027
+  quantizeBridgeSampleToBeat: 1
   bpm: 75
   stepsPerLoop: 16
-  nodesPerStar: 4
+  phraseLengthLoopsOverride: 0
+  nodesPerStar: 2
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
   mazePattern: {fileID: 11400000, guid: c90fade64b1a04f608cacc42c162a9a6, type: 2}
   roleGeoConfigs: []

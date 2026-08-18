@@ -16,6 +16,9 @@ public class SuperNode : MonoBehaviour
     private bool            _resolvedFired;
     private float           _difficulty01;
     private int             _pendingChaseCount;
+    // True unless any shard resolves uncaught (expired). Vacuously true with zero shards.
+    private bool            _allShardsCaught = true;
+    public  bool            AllShardsCaught => _allShardsCaught;
 
     private void Awake()
     {
@@ -73,6 +76,7 @@ public class SuperNode : MonoBehaviour
 
     private void OnTrackNodeResolved(bool wasCaught)
     {
+        if (!wasCaught) _allShardsCaught = false;
         _pendingChaseCount--;
         if (_pendingChaseCount <= 0)
         {

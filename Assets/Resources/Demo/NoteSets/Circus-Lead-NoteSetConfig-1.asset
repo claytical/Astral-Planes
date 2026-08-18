@@ -15,6 +15,5 @@ MonoBehaviour:
   id: circus-lead-1
   roleProfile: {fileID: 11400000, guid: aa4a3255c51e74fe5ae31274a4564cfd, type: 2}
   riff: {fileID: 11400000, guid: 570cea6fa1a754e8b9791a1b38cd7d91, type: 2}
-  mineNodeTintBudget: 20
   mineNodeExpireAfterLoops: 8
-  ascendLoops: 4
+  ascendLoops: 2

@@ -33,4 +33,8 @@ public struct Riff
 
     public RiffOverlapPolicy overlapPolicy;
     public int octaveShift;        // applied post-transpose
+
+    // Quantization grid the importer used to produce `events` (e.g. 16 = 16th notes).
+    // 0 on older assets imported before this field existed — NoteSetFactory assumes 16 and warns.
+    public int stepsPerBar;
 }

@@ -223,6 +223,29 @@ public partial class CosmicDustGenerator
         ClearCell(gp, DustClearMode.FadeAndHide, fadeSeconds: 0.5f, scheduleRegrow: false);
     }
 
+    // Sibling of BeginSlowFadeAllDust, but pulses every currently-solid cell's displayed
+    // tint through a rainbow hue-cycle instead of fading it out — used by Wisp.Consume()
+    // so the whole maze reacts visually, not just the wisp itself. Deliberately no
+    // per-cell stagger (unlike the fade above): the maze should read as pulsing in
+    // unison. Iterates the raw grid rather than GetColoredDustCells, since that helper
+    // filters to Role != MusicalRole.None and would skip every wall in a blind
+    // path-choice maze (built with role = MusicalRole.None) — exactly the cells that
+    // need to pulse here.
+    public void BeginRainbowPulseAllDust(float durationSeconds, float hueCyclesPerSecond, float saturation, float value)
+    {
+        if (_gridState.CellState == null || _gridState.CellGo == null || _gridState.Width <= 0 || _gridState.Height <= 0) return;
+
+        for (int x = 0; x < _gridState.Width; x++)
+        for (int y = 0; y < _gridState.Height; y++)
+        {
+            if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
+            var go = _gridState.CellGo[x, y];
+            if (go == null) continue;
+            var dust = go.GetComponent<CosmicDust>();
+            dust?.BeginRainbowPulse(durationSeconds, hueCyclesPerSecond, saturation, value);
+        }
+    }
+
     private void RequestRegrowCellAt(Vector2Int gridPos, float delaySeconds = -1f, bool refreshIfPending = false, bool clearImprintOnRefresh = false)
     {
         if (_regrowthSuppressed)
