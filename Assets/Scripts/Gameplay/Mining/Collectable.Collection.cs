@@ -102,6 +102,7 @@ public partial class Collectable
 
         _handled = true;
         UnbindTimelineStep(); // carried notes go silent until committed
+        CollectionSoundManager.Instance?.PlayCaptureLock(_role);
 
         if (_spawnArrivalRoutine != null)
         {

@@ -41,44 +41,50 @@ public partial class CosmicDust
         // Maintain legacy field behavior too.
         if (terrainCollider != null) terrainCollider.enabled = enabled;
 
-        // Mirror collider state onto sprite alpha so non-interactive cells read as ghost/faint.
-        if (visual.sprite != null)
+        // Mirror collider state onto displayed alpha so non-interactive cells read as ghost/faint.
+        Color mirroredTint = _displayTint;
+        if (enabled)
         {
-            Color c = _displayTint;
-            if (enabled)
-            {
-                // Restore authoritative tint alpha — do not cap at kRegrowAlphaCap here,
-                // which would cause a visible brightness drop on cells that are already at
-                // proper alpha when their collider is re-enabled after spawn or regrowth.
-                c.a = _currentTint.a;
-            }
-            else
-            {
-                c.a = colliderDisabledAlpha;
-            }
-            ApplyDisplayedTint(c);
+            // Restore authoritative tint alpha — do not cap at kRegrowAlphaCap here,
+            // which would cause a visible brightness drop on cells that are already at
+            // proper alpha when their collider is re-enabled after spawn or regrowth.
+            mirroredTint.a = _currentTint.a;
         }
+        else
+        {
+            mirroredTint.a = colliderDisabledAlpha;
+        }
+        ApplyDisplayedTint(mirroredTint);
 
-        // When enabling collision, ensure CircleCollider2D radius matches the current sprite footprint.
+        // When enabling collision, ensure the box collider matches the current visual footprint.
         if (enabled)
         {
             RebuildColliderForCurrentScale();
-            SyncColliderRadiusToSprite();
         }
 
         OnCollisionStateChanged?.Invoke(enabled);
     }
     public bool IsVisuallyPresentForTargeting(float minEffectiveAlpha = 0.05f, float minAbsScale = 0.01f)
     {
-        if (visual.sprite == null || !visual.sprite.enabled)
+        // Tentacles may only target cells the player has personally carved and are now
+        // regrowing (vehicle-carve tell) — see CosmicDust.Flower.cs.
+        if (!HasBloomedFlower)
             return false;
 
-        var srColor = visual.sprite.color;
-        float effectiveAlpha = srColor.a;
-        if (effectiveAlpha <= minEffectiveAlpha)
+        if (visual.particleSystem == null)
             return false;
 
-        Vector3 lossy = visual.sprite.transform.lossyScale;
+        var pr = visual.particleSystem.GetComponent<ParticleSystemRenderer>();
+        if (pr == null || !pr.enabled)
+            return false;
+
+        // _currentTint.a is the authoritative charge/energy-driven alpha — this check has
+        // always meant "is there enough charge left to be a legal target," not a render-timing
+        // detail, so it keys off the same value ApplyDisplayedTint/particle color derive from.
+        if (_currentTint.a <= minEffectiveAlpha)
+            return false;
+
+        Vector3 lossy = visual.particleSystem.transform.lossyScale;
         if (Mathf.Abs(lossy.x) <= minAbsScale || Mathf.Abs(lossy.y) <= minAbsScale)
             return false;
 
@@ -86,49 +92,31 @@ public partial class CosmicDust
     }
     private void EnsureVisibleWhenCollidable()
     {
-        // Invariant: active collider → visible sprite + particle renderers.
+        // Invariant: active collider → visible particle renderers.
         // HideVisualsInstant() can disable these; re-enable them so the cell is never
         // an invisible wall with an active collider.
         SetVisualsEnabled(true);
 
-        if (visual.particleSystem != null)
+        // Defensive sanity: if a solid cell somehow has a zeroed visual scale, restore expected target.
+        if (visual.particleSystem != null && _spriteScaleTarget > 0f)
         {
-            var systems = _particles.GetAllParticleSystems();
-            if (systems != null)
-                for (int i = 0; i < systems.Length; i++)
-                {
-                    if (systems[i] == null) continue;
-                    var pr = systems[i].GetComponent<ParticleSystemRenderer>();
-                    if (pr != null) pr.enabled = true;
-                }
-        }
-
-        // Defensive sanity: if a solid cell somehow has a zeroed sprite scale, restore expected target.
-        if (visual.sprite != null && _spriteScaleTarget > 0f)
-        {
-            var ls = visual.sprite.transform.localScale;
+            var ls = visual.particleSystem.transform.localScale;
             if (Mathf.Abs(ls.x) <= 0.0001f || Mathf.Abs(ls.y) <= 0.0001f)
                 ResetSpriteScaleTo(_spriteScaleTarget);
         }
-
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        if (visual.sprite != null && !visual.sprite.enabled && !suppressSpriteRenderer)
-            Debug.LogWarning($"[{nameof(CosmicDust)}] Collider enabled while sprite renderer is disabled on '{name}'. Re-enabling visuals.", this);
-#endif
     }
     private void SetVisualsEnabled(bool enabled)
 {
-    // In the simplified model, we only toggle sprite visibility.
-    // Particles stay enabled; their "presence" is driven by emission rate (SetEmissionMultiplier).
-    if (visual.sprite != null)
-        visual.sprite.enabled = enabled && !suppressSpriteRenderer;
-}
-    // Called for CellFlags.Solid path-choice maze walls, whose particle-only look must survive
-    // the normal spawn/collider lifecycle (which otherwise force the sprite back on).
-    public void SetSpriteSuppressed(bool suppressed)
+    // Presence is driven by the particle renderer(s) directly; emission rate separately
+    // drives density (SetEmissionMultiplier).
+    if (visual.particleSystem == null) return;
+    var systems = _particles.GetAllParticleSystems();
+    if (systems == null) return;
+    for (int i = 0; i < systems.Length; i++)
     {
-        suppressSpriteRenderer = suppressed;
-        if (suppressed && visual.sprite != null)
-            visual.sprite.enabled = false;
+        if (systems[i] == null) continue;
+        var pr = systems[i].GetComponent<ParticleSystemRenderer>();
+        if (pr != null) pr.enabled = enabled;
     }
+}
 }

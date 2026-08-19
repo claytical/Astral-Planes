@@ -34,7 +34,7 @@ MonoBehaviour:
   midiPreset: 4
   lowestNote: 55
   highestNote: 72
-  outputMixerGroup: {fileID: 8757496109221892152, guid: 07985bf4f6d469340930e958ef313c14,
+  outputMixerGroup: {fileID: -8632850657534393594, guid: 07985bf4f6d469340930e958ef313c14,
     type: 2}
   volumeMultiplier: 0.75
   minVelocity: 60

@@ -150,6 +150,10 @@ public partial class CosmicDustGenerator : MonoBehaviour
     // until ReleaseHeldCells (node death) or a maze flush supersedes them.
     private readonly HashSet<Vector2Int> _heldRegrowCells = new HashSet<Vector2Int>();
     private Dictionary<Vector2Int, float> _carveAccumulator = new();
+    // Persists the DustClearSource that triggered a cell's pending regrow, from clear-time
+    // (ClearCell) through to regrow-time (CommitRegrowCell), so the flower bloom can be gated
+    // on VehiclePlow specifically. Written whenever a regrow is scheduled; read-and-removed once.
+    private readonly Dictionary<Vector2Int, DustClearSource> _pendingRegrowSource = new();
     private Coroutine _spawnRoutine;
     private DrumTrack drums;
     private PhaseTransitionManager phaseTransitionManager;
@@ -175,12 +179,15 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
     // Back-compat hooks (no-op now that composite rebuilds are removed).
 
-    public void HardStopRegrowthForBridge(bool hideTransientDust = true)
+    /// <summary>
+    /// Stops every coroutine that could still be animating dust in or out: maze-growth
+    /// stagger, pending per-cell regrow-delay timers, in-flight void-grow, and in-flight
+    /// commit-regrow. Shared by HardStopRegrowthForBridge (bridge transitions) and ClearMaze
+    /// (any full-grid reset) so a stray coroutine can never survive a "the grid is now empty"
+    /// moment regardless of which call path reached it.
+    /// </summary>
+    private void CancelAllInFlightDustCoroutines()
     {
-        _regrowthSuppressed = true;
-        // The regenerated maze supersedes any node-held drain batches.
-        _heldRegrowCells.Clear();
-
         // Stop maze-growth/stagger routines tied to the outgoing motif.
         if (_spawnRoutine != null)
         {
@@ -212,6 +219,15 @@ public partial class CosmicDustGenerator : MonoBehaviour
             }
             _regrowthScheduler.CommitRegrowCoroutines.Clear();
         }
+    }
+
+    public void HardStopRegrowthForBridge(bool hideTransientDust = true)
+    {
+        _regrowthSuppressed = true;
+        // The regenerated maze supersedes any node-held drain batches.
+        _heldRegrowCells.Clear();
+
+        CancelAllInFlightDustCoroutines();
 
         // Dismiss transient cells from the outgoing motif using the same dissipation visual as
         // vehicle carving — no abrupt pop/cut.
@@ -466,6 +482,11 @@ public partial class CosmicDustGenerator : MonoBehaviour
             var roleProfile = _roleDensity.GetResolvedRoleProfile(regrowRole);
             Color regrowTint = (roleProfile != null) ? roleProfile.GetRandomVoiceColor() : config.mazeTint;
 
+            // Which DustClearSource triggered this regrow cycle — determines whether the
+            // flower bloom tell is allowed to show (VehiclePlow only).
+            _pendingRegrowSource.TryGetValue(gp, out var regrowSource);
+            _pendingRegrowSource.Remove(gp);
+
             // Write / update the imprint so future regrows of this cell remember the role.
             // Preserve hiddenRole (permanent Voronoi ground-truth) across the rewrite.
             _imprints.EnsureAllocated();
@@ -486,6 +507,9 @@ public partial class CosmicDustGenerator : MonoBehaviour
             int maxUnits = roleProfile != null ? roleProfile.maxEnergyUnits : 1;
             dust.ApplyRoleAndCharge(regrowRole, regrowTint, regrowTint.a, maxUnits);
 
+            if (regrowSource == DustClearSource.VehiclePlow)
+                dust.BloomFlower(regrowTint);
+
             if (regrowRole == MusicalRole.None)
                 _imprints.ApplyHiddenHintToDust(gp, dust, _roleDensity.GetResolvedRoleProfile);
 
@@ -499,6 +523,12 @@ public partial class CosmicDustGenerator : MonoBehaviour
             dust.regrowAlphaCapped = true;
             dust.Begin();
             SetDustCollision(dust, false);
+
+            if (config.regrowSpeedPreviewEnabled && roleProfile != null && roleProfile.regrowthDelay >= 0f)
+                dust.PreviewRegrowSpeed(roleProfile.regrowthDelay, config.regrowSpeedPreviewFastSeconds,
+                    config.regrowSpeedPreviewSlowSeconds, config.regrowSpeedPreviewFastColor,
+                    config.regrowSpeedPreviewSlowColor, config.regrowSpeedPreviewPulseSeconds,
+                    regrowTint, config.regrowSpeedPreviewGlowBoost01);
         }
 
         // Let the visual settle before collisions are reintroduced.
@@ -758,9 +788,13 @@ public partial class CosmicDustGenerator : MonoBehaviour
                     // Skip cells that carry a role imprint — their color is authoritative
                     // (set by BuildMazeRoleImprints / DiscoveryTrackNode carve). Overwriting them with
                     // config.mazeTint (a flat gray) would erase the 4-color Voronoi layout.
+                    // Also skip cells still hidden (role == None) but carrying a hiddenRole — those
+                    // show ApplyHiddenColorPreview's darkened preview, not a flat-gray placeholder;
+                    // erasing it here was silently reverting every not-yet-carved cell to gray
+                    // shortly after spawn, since this guard only used to check the revealed role.
                     var gp = new Vector2Int(x, y);
                     if (_imprints != null && _imprints.TryGetValue(gp, out var imp)
-                        && imp.role != MusicalRole.None)
+                        && (imp.role != MusicalRole.None || imp.hiddenRole != MusicalRole.None))
                         continue;
 
                     StartCoroutine(d.RetintOver(seconds, config.mazeTint));
@@ -780,8 +814,17 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 if (d == null) continue;
                 if (!d.isActiveAndEnabled) continue;
 
-                // In the fallback path we don't have grid coords, but we can check dust.Role.
                 if (d.Role != MusicalRole.None) continue;
+
+                // Same hiddenRole-preview check as the primary path above — d.Role alone can't
+                // distinguish a darkened-preview cell from plain gray filler, so resolve grid
+                // coords to consult the imprint.
+                if (drums != null && _imprints != null)
+                {
+                    var gp = drums.WorldToGridPosition(d.transform.position);
+                    if (_imprints.TryGetValue(gp, out var imp) && imp.hiddenRole != MusicalRole.None)
+                        continue;
+                }
 
                 StartCoroutine(d.RetintOver(seconds, config.mazeTint));
             }

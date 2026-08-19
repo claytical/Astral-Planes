@@ -249,15 +249,22 @@ public partial class Vehicle
             armedSlot++;
         }
 
-        // Pending notes: trail behind vehicle.
+        // Pending notes: mounted at a fixed vehicle-relative slot instead of a point sampled
+        // from the vehicle's position-history wake. Wake-sampling read as "drifting behind the
+        // vehicle's path" (incidental) rather than "captured and held" — a rigid, live-tracked
+        // local-space slot reads as mounted instead, stacking further back per queued note.
         int slot = armedSlot;
+        int pendingIndex = 0;
         foreach (var p in _pendingNotes)
         {
-            if (p.collectable == null) { slot++; continue; }
+            if (p.collectable == null) { slot++; pendingIndex++; continue; }
 
-            p.collectable.SetTrailTarget(SampleTrailPosition(bunchDist));
+            float pendingOffset = vehicleConfig.trailFirstSlotOffset + pendingIndex * vehicleConfig.trailSlotSpacing;
+            Vector3 pendingSlotWorld = transform.TransformPoint(new Vector3(0f, -pendingOffset, 0f));
+            p.collectable.SetTrailTarget(pendingSlotWorld);
             p.collectable.SetReleasePulse(slot == 0 && _armedReleases.Count == 0 ? pulse01 : 0f);
             slot++;
+            pendingIndex++;
         }
 
         // Single Vehicle-owned tether: create, update, or destroy.

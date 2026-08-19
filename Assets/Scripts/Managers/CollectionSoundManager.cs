@@ -79,6 +79,23 @@ public class CollectionSoundManager : MonoBehaviour
         fxVoice.PlayOneShotMs127(note, durationMs: 180, velocity127: vel, overridePreset: track.Preset, overrideBank: track.Bank);
     }
     
+    public void PlayCaptureLock(MusicalRole role)
+    {
+        if (fxVoice == null) return;
+
+        // A short, non-pitched "lock" click distinct from both the note's own musical
+        // confirm tone and the eventual commit tick — fires at the literal pickup instant,
+        // mode-agnostic (manual-release and auto-deposit both trigger it).
+        int keyRoot = 60; // C4 fallback
+        var motif = GameFlowManager.Instance?.phaseTransitionManager?.currentMotif;
+        if (motif != null) keyRoot = motif.keyRootMidi;
+
+        int rootOct5 = (keyRoot % 12) + 72; // bright, high register — a "click" not a "note"
+
+        fxVoice.PlayOneShotMs127(rootOct5, durationMs: 60, velocity127: 100,
+            overridePreset: (int)SoundEffectPreset.Aether, overrideBank: fxBank);
+    }
+
     public void PlayReleaseFailure()
     {
         if (fxVoice == null) return;

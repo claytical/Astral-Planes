@@ -17,16 +17,9 @@ public partial class CosmicDust
     private Color _hiddenHintColor; // Color.clear = no hint stored
     private bool _hasFeedbackColors = false;
     public bool regrowAlphaCapped = false;
-    // True for CellFlags.Solid path-choice maze walls: SpriteRenderer must stay off for this
-    // cell's whole lifecycle (particle-only look). Only set at the two Solid-flag creation
-    // sites in CosmicDustGenerator (BulkSpawn, VoidGrowth). Reset in PrepareForReuse.
-    public bool suppressSpriteRenderer = false;
     private const float kRegrowAlphaCap = 0.20f;
     [SerializeField] private float colliderDisabledAlpha = 0.08f;
     [SerializeField] private bool useWorkShaderParams = true;
-
-[SerializeField, Tooltip("Fallback deny pulse duration when no explicit pulse length is provided.")]
-private float denyPulseDefaultSeconds = 0.25f;
 
 // Single managed tint pulse lane (charge + deny both use this).
 private Coroutine _tintPulseRoutine;
@@ -61,10 +54,9 @@ private void ClearRainbowParticleDirtyIfNeeded()
     private bool _baseCaptured;
 
     /// <summary>
-    /// Syncs both the sprite renderer AND the particle system to _currentTint.
-    /// Call after ApplyRoleAndCharge when the cell is already live (not growing in),
-    /// e.g. after DiscoveryTrackNode tinting. ApplyRoleAndCharge alone only updates the sprite;
-    /// particles keep their birth color until explicitly refreshed.
+    /// Forces the particle system to re-sync with _currentTint. Call after ApplyRoleAndCharge
+    /// when the cell is already live (not growing in), e.g. after DiscoveryTrackNode tinting —
+    /// particles otherwise keep their birth color until explicitly refreshed.
     /// </summary>
     public void SyncParticleColor()
     {
@@ -77,13 +69,10 @@ private void ClearRainbowParticleDirtyIfNeeded()
     {
         _displayTint = tint;
 
-        if (visual.sprite != null)
-        {
-            Color applied = tint;
-            if (regrowAlphaCapped)
-                applied.a = Mathf.Min(applied.a, kRegrowAlphaCap);
-            visual.sprite.color = applied;
-        }
+        Color applied = tint;
+        if (regrowAlphaCapped)
+            applied.a = Mathf.Min(applied.a, kRegrowAlphaCap);
+        SetDustColorAllParticles(applied);
     }
     private void SetBaseTint(Color tint, bool applyImmediatelyIfNoPulse = true)
     {
@@ -121,28 +110,31 @@ private void ClearRainbowParticleDirtyIfNeeded()
     {
         SetBaseTint(tint, applyImmediatelyIfNoPulse: true);
         OnTintStateChanged?.Invoke(_currentTint);
-
-        // Particles: leave authored color/gradient/material alone.
-        // (If you later want particle tinting, do it as an explicit opt-in path.)
     }
-    // Deliberately a no-op: SetDustColorAllParticles is reached not just from pulses but
-    // from ordinary cell spawn/reuse (ApplyWorkShaderParamsParticlesOnly <- SyncParticleColor
-    // / ResetVisualToBase). SyncParticleColor's own doc says particles are meant to "keep
-    // their birth color until explicitly refreshed" — the whole particle-tint call graph
-    // was built around this being inert. Making it actually apply color (tried once)
-    // pushed every dust cell's near-black role tint (e.g. path-choice maze walls'
-    // solidDustTint) onto particles that read as invisible under their blend mode,
-    // breaking every interstitial maze, not just pulsed cells. BeginRainbowPulse uses its
-    // own isolated SetRainbowParticleColor instead, so it doesn't reactivate this for
-    // every other caller.
+    // Now the real particle tint path (dust is going particle-only — see CosmicDust migration
+    // plan). Mirrors SetRainbowParticleColor: sets startColor for future emissions and rewrites
+    // every currently-live particle so the change reads immediately. An earlier attempt at this
+    // pushed near-black role tints onto particles that read as invisible under an additive blend
+    // mode, breaking every interstitial maze — verify in-editor that the particle material
+    // actually alpha-blends (not additive) before relying on this for solid/dim tints.
     private void SetDustColorAllParticles(Color target)
     {
         if (visual.particleSystem == null) return;
 
-        var ps   = visual.particleSystem;
-        var col  = ps.colorOverLifetime;
+        var ps = visual.particleSystem;
+        var main = ps.main;
+        main.startColor = target;
 
-        col.enabled = true;
+        int count = ps.particleCount;
+        if (count <= 0) return;
+
+        if (_colorParticleBuffer == null || _colorParticleBuffer.Length < count)
+            _colorParticleBuffer = new ParticleSystem.Particle[Mathf.Max(count, 32)];
+
+        int actual = ps.GetParticles(_colorParticleBuffer);
+        for (int i = 0; i < actual; i++)
+            _colorParticleBuffer[i].startColor = target;
+        ps.SetParticles(_colorParticleBuffer, actual);
     }
 
     // Isolated particle recolor used only by the rainbow pulse — never routed through by
@@ -271,25 +263,19 @@ private void ClearRainbowParticleDirtyIfNeeded()
     }
 }
 
-    private void TriggerDenyTintPulse(float seconds = -1f)
-{
-    float dur = (seconds > 0f) ? seconds : denyPulseDefaultSeconds;
-    if (dur <= 0f) return;
-    CancelTintPulse(restoreToBase: false);
-    _tintPulseToken++;
-    int token = _tintPulseToken;
-    Color denyTint = _hasFeedbackColors ? _denyColor : Color.black;
-    _tintPulseRoutine = StartCoroutine(TintPulseRoutine(token, denyTint, dur));
-}
-
-    private void TriggerHiddenHintPulse()
-{
-    if (_hiddenHintColor.a <= 0f) return;
-    CancelTintPulse(restoreToBase: false);
-    _tintPulseToken++;
-    int token = _tintPulseToken;
-    _tintPulseRoutine = StartCoroutine(TintPulseRoutine(token, _hiddenHintColor, 0.5f));
-}
+    // Non-boost bump feedback: a brief brighten-and-settle on top of whatever the cell's already
+    // showing (its true role color, always — there's no hidden state to reveal anymore). Purely
+    // transient; RestoreDisplayToBaseTint (end of TintPulseRoutine) snaps back to _currentTint.
+    private void TriggerBumpPulse()
+    {
+        Color.RGBToHSV(_currentTint, out float h, out float s, out float v);
+        Color pulseTint = Color.HSVToRGB(h, s, Mathf.Clamp01(v + 0.4f));
+        pulseTint.a = _currentTint.a;
+        CancelTintPulse(restoreToBase: false);
+        _tintPulseToken++;
+        int token = _tintPulseToken;
+        _tintPulseRoutine = StartCoroutine(TintPulseRoutine(token, pulseTint, 0.4f));
+    }
 
     // Triggered maze-wide by CosmicDustGenerator.BeginRainbowPulseAllDust on wisp consume.
     // Same fade-in/hold/fade-out shape as TintPulseRoutine, except "hold" continuously

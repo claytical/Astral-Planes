@@ -23,7 +23,6 @@ public partial class Vehicle : MonoBehaviour
     [SerializeField] private VehicleConfig vehicleConfig;
     [HideInInspector] public float capacity = 10f;
     private float _burnRateMultiplier = 1f; // Multiplier for the burn rate based on trigger pressure
-    private bool _boostCostFree;           // When true, boost ignores energy requirement and skips burn
     [HideInInspector] public float arcadeMaxSpeed = 14f;
     [HideInInspector] [SerializeField] private int vehicleKeepClearRadiusCells = 0;
     private float _nextVehicleKeepClearRefreshAt = 0f;
@@ -33,9 +32,6 @@ public partial class Vehicle : MonoBehaviour
 
     [Header("Gravity Void Detection")]
     [SerializeField] private LayerMask gravityVoidMask; // set in inspector; 0 disables gravity-void detection
-
-    [Header("Boost Collision")]
-    [SerializeField] private LayerMask dustLayerMask; // assign to dust layer so boost ignores dust colliders
 
     private Vector3 _lastSafeWorld;
     private Vector2Int _lastSafeCell;
@@ -332,7 +328,7 @@ public partial class Vehicle : MonoBehaviour
         if (_plowVelocityDrain > 0f && rb.linearVelocity.sqrMagnitude > 0.01f)
             rb.linearVelocity *= Mathf.Max(0f, 1f - _plowVelocityDrain);
 
-        if (boosting && energyLevel > 0f && !_boostCostFree)
+        if (boosting && energyLevel > 0f)
             ConsumeEnergy(_burnRateMultiplier * profile.burnRate);
 
         if (rb.linearVelocity.sqrMagnitude > 0.0001f)
@@ -395,15 +391,10 @@ public partial class Vehicle : MonoBehaviour
             if (_activeTrailRenderer != null)
                 _activeTrailRenderer.emitting = true;
         }
-    public void SetBoostFree(bool free)
-    {
-        _boostCostFree = free;
-    }
-
     public void TurnOnBoost(float triggerValue)
     {
 
-        if ((energyLevel > 0 || _boostCostFree) && !boosting)        {
+        if (energyLevel > 0 && !boosting)        {
             boosting = true;
 
             if (audioManager != null && thrustClip != null)

@@ -31,6 +31,8 @@ MonoBehaviour:
   collectableHomePullPerUnit: 2
   collectableFleeRadiusCells: 4
   collectableFleeSpeedMul: 1.3
+  collectableCatchRadiusMul: 1.5
+  collectableVisualScaleMul: 1.2
   midiPreset: 13
   lowestNote: 48
   highestNote: 88

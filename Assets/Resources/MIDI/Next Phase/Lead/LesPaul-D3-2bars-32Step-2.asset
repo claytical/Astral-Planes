@@ -22,5 +22,5 @@ MonoBehaviour:
       durSteps: 32
       velocity01: 0.78740156
     overlapPolicy: 1
-    octaveShift: 0
+    octaveShift: -1
     stepsPerBar: 16

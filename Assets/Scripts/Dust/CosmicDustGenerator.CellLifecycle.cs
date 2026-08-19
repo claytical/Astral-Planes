@@ -131,8 +131,13 @@ public partial class CosmicDustGenerator
     /// <summary>
     /// Regrow-delay precedence:
     /// 1. Explicit per-call override (>= 0).
-    /// 2. VehiclePlow only: the carved cell's role profile regrowthDelay (>= 0).
-    /// 3. Active maze pattern's per-source delay (>= 0).
+    /// 2. The cell's prospective role's MusicalRoleProfile.regrowthDelay (>= 0), regardless of
+    ///    DustClearSource — a role's color now consistently predicts its regrow speed whether
+    ///    the cell was vehicle-plowed, star-drained, zapped, jailed, etc. Force-gray cells are
+    ///    excluded: they resolve to MusicalRole.None at commit time (see CommitRegrowCell's
+    ///    ZapForceGray handling), so honoring a hidden role's delay here would desync the delay
+    ///    from the color the player actually ends up seeing.
+    /// 3. Active maze pattern's per-source delay (>= 0) — reached for None-role/force-gray cells.
     /// 4. Active maze pattern's base regrowDelay.
     /// 5. Hard fallback 8s (no active pattern).
     /// </summary>
@@ -141,20 +146,40 @@ public partial class CosmicDustGenerator
         if (explicitOverride >= 0f)
             return explicitOverride;
 
-        if (source == DustClearSource.VehiclePlow &&
-            _imprints != null && _imprints.TryGetValue(cell, out var imp) && imp.hiddenRole != MusicalRole.None)
+        if (!HasCellFlag(cell, CellFlags.ForceGrayRegrow) && !HasCellFlag(cell, CellFlags.ZapForceGray))
         {
-            var roleProfile = _roleDensity.GetResolvedRoleProfile(imp.hiddenRole);
-            if (roleProfile != null && roleProfile.regrowthDelay >= 0f)
-                return roleProfile.regrowthDelay;
+            MusicalRole prospectiveRole = GetProspectiveRegrowRole(cell);
+            if (prospectiveRole != MusicalRole.None)
+            {
+                var roleProfile = _roleDensity.GetResolvedRoleProfile(prospectiveRole);
+                if (roleProfile != null && roleProfile.regrowthDelay >= 0f)
+                    return ApplyDensityRegrowEasing(roleProfile.regrowthDelay);
+            }
         }
 
         var timing = _activeMazePattern != null ? _activeMazePattern.dustTiming : null;
         if (timing == null)
-            return 8f;
+            return ApplyDensityRegrowEasing(8f);
 
         float perSource = timing.GetDelayFor(source);
-        return perSource >= 0f ? perSource : Mathf.Max(0f, timing.regrowDelay);
+        float baseDelay = perSource >= 0f ? perSource : Mathf.Max(0f, timing.regrowDelay);
+        return ApplyDensityRegrowEasing(baseDelay);
+    }
+
+    /// <summary>
+    /// Breathing-room easing: as overall solid fraction rises past densityThrottleHalfAt/SkipAt
+    /// (shared thresholds with GravityVoidController.ApplyDensityThrottle, which throttles new
+    /// void-growth rings at the same points), regrow delay ramps smoothly up to
+    /// regrowDensityEaseMaxMultiplier so already-cleared paths stay open longer as pressure
+    /// builds. A smooth ramp is used rather than a hard step because this value is felt on every
+    /// single cell, not just a discrete ring count. Only eases already-scheduled regrows; nothing
+    /// thins existing solid cells — GetSolidFraction() only drops as the player keeps clearing.
+    /// </summary>
+    private float ApplyDensityRegrowEasing(float baseDelay)
+    {
+        float solidFraction = GetSolidFraction();
+        float t = Mathf.InverseLerp(config.densityThrottleHalfAt, config.densityThrottleSkipAt, solidFraction);
+        return baseDelay * Mathf.Lerp(1f, config.regrowDensityEaseMaxMultiplier, Mathf.Clamp01(t));
     }
 
     /// <summary>

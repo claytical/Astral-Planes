@@ -6,8 +6,6 @@ public struct DustVisualSettings {
     [Header("Sizing (prefab baseline)")]
     public Vector3 prefabReferenceScale; // authored prefab baseline (cell-driven scale overrides at runtime)
     public ParticleSystem particleSystem;
-
-    public SpriteRenderer sprite;
 }
 [System.Serializable]
 public struct DustVisualTimings

@@ -8,14 +8,18 @@ public partial class CosmicDustGenerator
         if (!TryGetCellState(gp, out var st)) return;
         if (st == DustCellState.Empty || st == DustCellState.Clearing || st == DustCellState.PendingRegrow) {
             // Optionally refresh regrow timer even if already empty.
-            if (scheduleRegrow)
+            if (scheduleRegrow) {
+                _pendingRegrowSource[gp] = source;
                 RequestRegrowCellAt(gp, ResolveRegrowDelay(gp, source, regrowDelaySeconds), refreshIfPending: true);
+            }
             return;
         }
         if (!TryGetCellGo(gp, out var go) || go == null) {
             SetCellState(gp, DustCellState.Empty);
-            if (scheduleRegrow)
+            if (scheduleRegrow) {
+                _pendingRegrowSource[gp] = source;
                 RequestRegrowCellAt(gp, ResolveRegrowDelay(gp, source, regrowDelaySeconds), refreshIfPending: true);
+            }
             return;
         }
 
@@ -23,6 +27,7 @@ public partial class CosmicDustGenerator
         SetCellState(gp, DustCellState.Clearing);
         if (go.TryGetComponent<CosmicDust>(out var dust) && dust != null){
            SetDustCollision(dust, false);
+           dust.HideFlower();
         }
 
          // Visual policy
@@ -68,6 +73,7 @@ public partial class CosmicDustGenerator
 
          if (scheduleRegrow)
          {
+             _pendingRegrowSource[gp] = source;
              RequestRegrowCellAt(gp, ResolveRegrowDelay(gp, source, regrowDelaySeconds), refreshIfPending: true);
              // TODO: density conservation — fill a frontier cell when one is eroded so total
              // coverage stays constant. Deferred: TryQueueFrontierCompensation() interfered with

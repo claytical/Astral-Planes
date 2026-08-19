@@ -119,13 +119,29 @@ public partial class Collectable
         ApplyParticleScale(peakRatio);
 
         // Hold at peak (the "shield flash" beat), staying glued to the vehicle if it's still moving.
+        // The sprite snaps to lockFlashColor at the instant of capture, then settles into a
+        // tinted "armed" color (between the role color and the flash color) rather than fully
+        // reverting — this lingering tint is the whole-carry "captured" signature, since the
+        // note is destroyed at commit and nothing else ever touches its RGB again.
+        Color roleColor = energySprite != null ? energySprite.color : Color.white;
+        Color armedColor = Color.Lerp(roleColor, lockFlashColor, capturedTintAmount);
+        if (energySprite != null) energySprite.color = lockFlashColor;
+
         float held = 0f;
         while (held < absorbHoldSeconds)
         {
             held += Time.deltaTime;
             if (vehicleTransform != null) transform.position = vehicleTransform.position;
+
+            if (energySprite != null && lockFlashSeconds > 0f)
+            {
+                float flashT = Mathf.Clamp01(held / lockFlashSeconds);
+                energySprite.color = Color.Lerp(lockFlashColor, armedColor, flashT);
+            }
+
             yield return null;
         }
+        if (energySprite != null) energySprite.color = armedColor;
 
         // Shrink + move on to the (live, moving) final destination.
         Vector3 shrinkStartPos = transform.position;

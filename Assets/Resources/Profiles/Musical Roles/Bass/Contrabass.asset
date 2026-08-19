@@ -36,7 +36,7 @@ MonoBehaviour:
   highestNote: 64
   outputMixerGroup: {fileID: 8757496109221892152, guid: 07985bf4f6d469340930e958ef313c14,
     type: 2}
-  volumeMultiplier: 1
+  volumeMultiplier: 0.8
   minVelocity: 60
   maxVelocity: 127
   regrowthDelay: 3

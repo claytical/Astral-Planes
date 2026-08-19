@@ -35,6 +35,7 @@ public partial class CosmicDust
         OnRoleChanged?.Invoke(Role);
         if (maxUnits > 0) _maxEnergyUnits = maxUnits;
         SetEnergyUnits(Mathf.RoundToInt(Mathf.Clamp01(charge) * _maxEnergyUnits));
+
         float visibleAlpha = Mathf.Lerp(kSolidAlphaFloor, 1f, Charge01);
         roleColorRgb.a = visibleAlpha;
         // Alpha comes from the caller (roleProfile.baseAlpha via GetBaseColor()).

@@ -34,7 +34,6 @@ public partial class CosmicDustGenerator
         if (_gridState.CellState == null || _gridState.CellDust == null || _gridState.CellGo == null) return;
 
         int roleZeroEnergy = 0;
-        int colliderOnSpriteOff = 0;
         int roleNoneVisuallyTinted = 0;
 
         for (int x = 0; x < _gridState.Width; x++)
@@ -53,21 +52,6 @@ public partial class CosmicDustGenerator
                 roleZeroEnergy++;
             }
 
-            // Case 2: Collider enabled but sprite renderer disabled → invisible wall.
-            // (Deliberately suppressed path-choice walls are excluded — that's intended.)
-            if (d.visual.sprite != null && !d.visual.sprite.enabled && !d.suppressSpriteRenderer)
-            {
-                bool colEnabled = false;
-                var cols = go.GetComponentsInChildren<Collider2D>(true);
-                for (int i = 0; i < cols.Length; i++) if (cols[i] != null && cols[i].enabled) { colEnabled = true; break; }
-                if (d.terrainCollider != null && d.terrainCollider.enabled) colEnabled = true;
-                if (colEnabled)
-                {
-                    Debug.LogWarning($"[DUST-AUDIT] ({x},{y}) state={st} collider=ON sprite=OFF → invisible wall", go);
-                    colliderOnSpriteOff++;
-                }
-            }
-
             // Case 3: Gray (None-role) cell that appears tinted (RGB far from mazeTint) → diffusion artifact.
             if (st == DustCellState.Solid && d.Role == MusicalRole.None)
             {
@@ -82,6 +66,37 @@ public partial class CosmicDustGenerator
             }
         }
 
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[DUST-AUDIT] Done. role+zeroEnergy={roleZeroEnergy}  collider+spriteOff={colliderOnSpriteOff}  diffusionBleed={roleNoneVisuallyTinted}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DUST-AUDIT] Done. role+zeroEnergy={roleZeroEnergy}  diffusionBleed={roleNoneVisuallyTinted}");
+    }
+
+    /// <summary>
+    /// Flags cells that are Solid/Regrowing/PendingRegrow but belong to neither the current
+    /// motif's authored maze pattern nor a legitimate VoidGrow ring — the signature of a stray
+    /// coroutine that survived a ClearMaze() reset and materialized a cell at old coordinates.
+    /// Run right after a motif/phase transition settles.
+    /// </summary>
+    [ContextMenu("Debug: Audit Orphan Cells")]
+    public void DebugAuditOrphanCells()
+    {
+        if (_gridState.CellState == null) return;
+
+        int orphans = 0;
+        for (int x = 0; x < _gridState.Width; x++)
+        for (int y = 0; y < _gridState.Height; y++)
+        {
+            var st = _gridState.CellState[x, y];
+            if (st != DustCellState.Solid && st != DustCellState.Regrowing && st != DustCellState.PendingRegrow)
+                continue;
+
+            var gp = new Vector2Int(x, y);
+            if (_mazePatternCells != null && _mazePatternCells.Contains(gp)) continue;
+            if (_registry.HasCellFlag(gp, CellFlags.VoidGrow)) continue;
+            if (_permanentClearCells.Contains(gp)) continue;
+
+            Debug.LogWarning($"[DUST-AUDIT] ({x},{y}) state={st} outside current maze pattern and not VoidGrow — likely orphan cell from a prior motif.");
+            orphans++;
+        }
+
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DUST-AUDIT] Orphan scan complete. Found {orphans} orphan cells.");
     }
 }

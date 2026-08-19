@@ -55,7 +55,6 @@ public partial class CosmicDust
     }
     private void ResetSpriteScaleTo(float s)
     {
-        if (visual.sprite == null) return;
         SetBaseSpriteScale(Vector3.one * s);
     }
     public void SetCellSizeDrivenScale(float cellWorldSize, float footprintMul = 1.15f, float clearanceWorld = 0f)
@@ -91,21 +90,5 @@ public partial class CosmicDust
             desiredWorld / (sy * spriteScale)
         );
         _box.offset = Vector2.zero;
-    }
-    private void SyncColliderRadiusToSprite()
-    {
-        // Rule #3: collider radius should match the size of the visual sprite.
-        if (_circle == null || visual.sprite == null) return;
-
-        // Sprite bounds are in world space and already include current transform scale.
-        float worldRadius = Mathf.Max(0.0001f, Mathf.Max(visual.sprite.bounds.extents.x, visual.sprite.bounds.extents.y));
-
-        // Convert world radius to collider-local radius (CircleCollider2D.radius is in the collider's local space).
-        float sx = Mathf.Max(0.0001f, Mathf.Abs(_circle.transform.lossyScale.x));
-        float sy = Mathf.Max(0.0001f, Mathf.Abs(_circle.transform.lossyScale.y));
-        float lossy = Mathf.Max(sx, sy);
-
-        _circle.radius = worldRadius / lossy;
-        _circle.offset = Vector2.zero;
     }
 }

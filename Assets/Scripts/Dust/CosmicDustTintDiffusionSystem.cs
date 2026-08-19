@@ -78,7 +78,17 @@ public sealed class CosmicDustTintDiffusionSystem
             if (dust == null)
                 continue;
 
-            Color avg = ComputeNeighborAverageColor(cell, radius, out int nCount);
+            // Not-yet-carved cells (Role == None) show a static darkened preview of their secret
+            // role color (or plain gray filler) — neither is a stable "identity" to diffuse, and
+            // letting them blend into neighbors (of either kind) is exactly what was washing a
+            // revealed-looking preview color back toward gray shortly after spawn. Only cells
+            // that have actually been carved (a real Role) participate in diffusion, same as the
+            // original pre-color-model-changes intent: same-role neighbors blend for a
+            // "connectedness" glow, nothing else.
+            if (dust.Role == MusicalRole.None)
+                continue;
+
+            Color avg = ComputeNeighborAverageColor(cell, dust.Role, radius, out int nCount);
             if (nCount <= 0) continue;
 
             Color cur = dust.CurrentTint;
@@ -122,7 +132,13 @@ public sealed class CosmicDustTintDiffusionSystem
         return Mathf.Max(Mathf.Max(dr, dg), Mathf.Max(db, da));
     }
 
-    private Color ComputeNeighborAverageColor(Vector2Int cell, int radius, out int count)
+    // Neighbors whose role differs from the center's are excluded from the average, not just
+    // down-weighted — otherwise a role-color boundary (the exact signal a player needs to read
+    // "safe vs. dense") gets permanently blurred by its opposite-role neighbors every tick.
+    // Tick() only ever calls this with a revealed (non-None) centerRole now, so requiring an
+    // exact role match already excludes not-yet-carved neighbors too — their color is a static
+    // preview or plain gray filler, not a stable identity to blend toward.
+    private Color ComputeNeighborAverageColor(Vector2Int cell, MusicalRole centerRole, int radius, out int count)
     {
         radius = Mathf.Max(0, radius);
         count = 0;
@@ -137,7 +153,13 @@ public sealed class CosmicDustTintDiffusionSystem
         {
             if (dx == 0 && dy == 0) continue;
 
-            Color c = _getCellVisualColor(new Vector2Int(cell.x + dx, cell.y + dy));
+            var neighborCell = new Vector2Int(cell.x + dx, cell.y + dy);
+            var neighborDust = _getDustOrNull(neighborCell);
+            var neighborRole = neighborDust != null ? neighborDust.Role : MusicalRole.None;
+            if (neighborRole != centerRole)
+                continue;
+
+            Color c = _getCellVisualColor(neighborCell);
             r += c.r; g += c.g; b += c.b; a += c.a;
             count++;
         }

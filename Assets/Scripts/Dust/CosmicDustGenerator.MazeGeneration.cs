@@ -92,6 +92,13 @@ public partial class CosmicDustGenerator
 
     private void ClearMaze()
     {
+        // Own the "grid is now truly empty" guarantee here rather than relying on callers to
+        // have run HardStopRegrowthForBridge first — a coroutine left running past this point
+        // (regrow timer, void-grow, commit-regrow) would otherwise materialize a stray cell in
+        // the next motif at old coordinates. Safe to call even if HardStopRegrowthForBridge
+        // already ran (idempotent: dictionaries already empty, StopCoroutine(null) no-ops).
+        CancelAllInFlightDustCoroutines();
+
         try
         {
             for (int x = 0; x < _gridState.Width; x++)
@@ -115,6 +122,11 @@ public partial class CosmicDustGenerator
         _targetSolidCount = -1;
         _gridState.RegrowingCount   = 0;
         _mazePatternCells = null;
+        _carveAccumulator.Clear();
+
+        if (GameFlowManager.VerboseLogging)
+            Debug.Assert(_regrowthScheduler.VoidGrowCoroutines.Count == 0 && _regrowthScheduler.CommitRegrowCoroutines.Count == 0,
+                "[MAZE] ClearMaze: scheduler coroutine dictionaries not empty after cancellation.");
     }
 
     private List<(Vector2Int grid, Vector3 world)> BuildMazeGrowthFromConfig(
@@ -235,6 +247,8 @@ public partial class CosmicDustGenerator
             for (int i = 0; i < occupied.Count; i++)
                 _imprints.SetHiddenRole(occupied[i], onlyVoice.role, onlyVoice.voiceIndex);
 
+            ApplyHiddenColorPreview(occupied);
+
             if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden single voice={onlyVoice}");
             return;
         }
@@ -243,6 +257,7 @@ public partial class CosmicDustGenerator
 
         AssignHiddenImprintsByNearestSeed(occupied, seedCells, seedVoices, actualSeedCount);
         PostProcessGeoImprints(occupied, seedCells, seedVoices, actualSeedCount, voicesList);
+        ApplyHiddenColorPreview(occupied);
 
         var counts = new Dictionary<RoleVoiceKey, int>();
         for (int i = 0; i < actualSeedCount; i++)
@@ -261,6 +276,36 @@ public partial class CosmicDustGenerator
 
         string summary = string.Join(", ", counts.Select(kv => $"{kv.Key}={kv.Value}"));
         if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden Voronoi voices={hiddenCount}, seeds={actualSeedCount}, distribution=({summary})");
+    }
+
+    // Cosmetic only — leaves imprint.role at MusicalRole.None (and therefore Role/targeting/
+    // star-arming) untouched. When config.hideDustColorAtSpawn is false (default), gives each
+    // cell a darkened preview of its secret hiddenRole color instead of flat mazeTint, so a
+    // motif's dust reads as "roughly what it is" before any carving. Carving still promotes the
+    // real Role and full color exactly as today (FinalizeVehicleCarve / PromoteHiddenRole).
+    private void ApplyHiddenColorPreview(List<Vector2Int> cells)
+    {
+        if (config.hideDustColorAtSpawn) return;
+        if (cells == null) return;
+
+        float mazeAlpha = config.mazeTint.a;
+        float darken = Mathf.Clamp01(config.hiddenRoleColorDarken01);
+
+        for (int i = 0; i < cells.Count; i++)
+        {
+            var gp = cells[i];
+            if (!_imprints.TryGetValue(gp, out var imp) || imp.hiddenRole == MusicalRole.None) continue;
+
+            var profile = _roleDensity.GetResolvedRoleProfile(imp.hiddenRole);
+            if (profile == null) continue;
+
+            Color trueColor = profile.GetBaseColor();
+            Color preview = Color.Lerp(trueColor, Color.black, darken);
+            preview.a = mazeAlpha;
+
+            imp.color = preview;
+            _imprints[gp] = imp;
+        }
     }
 
     private static List<Vector2Int> BuildOccupiedCells(List<(Vector2Int cell, Vector3 world)> cells)

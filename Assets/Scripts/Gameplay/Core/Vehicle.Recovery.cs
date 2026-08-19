@@ -244,12 +244,11 @@ public partial class Vehicle
     private bool IsCellEmpty(Vector2Int gp)
 {
     var gen = gfm.dustGenerator;
+    if (gen == null) return false;
 
-    // IMPORTANT:
-    // In your current usage, TryGetDustAt() seems to return false OR dust==null
-    // when there is no dust cell at that position (or out of bounds).
-    // We’re using it as “empty enough to respawn”.
-    if (!gen.TryGetDustAt(gp, out var dust)) return true;
-    return (dust == null);
+    // Cells are pooled forever and never destroyed, so TryGetDustAt() alone can't tell us
+    // whether a cell is currently passable — it only tells us whether dust ever spawned
+    // there. "Empty enough to respawn into" means the cell isn't currently Solid.
+    return !gen.TryGetCellState(gp, out var st) || st != DustCellState.Solid;
 }
 }

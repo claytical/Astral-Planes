@@ -81,23 +81,21 @@ private GameFlowManager _gfm;
             _particles.EnsureParticlesPlaying();
 
             // Establish initial tint BEFORE emission so the first spawned particles aren't black.
-            // Prefer authored sprite color if present.
-            if (visual.sprite != null)
-            {
-                _currentTint = visual.sprite.color;
-                _displayTint = _currentTint;
-                _displayTint.a = kRegrowAlphaCap;
-                _dustSpriteBaseLocalPos = visual.sprite.transform.localPosition;
-            }
+            // Neutral default — matches the hidden/unrevealed look; ApplyRoleAndCharge sets the
+            // real tint once a role is assigned.
+            _currentTint = Color.white;
+            _displayTint = _currentTint;
+            _displayTint.a = kRegrowAlphaCap;
+            _dustSpriteBaseLocalPos = visual.particleSystem.transform.localPosition;
 
-            // Apply tint to sprite + particle material/gradient.
+            // Apply tint to particle material/gradient.
             SetTint(_currentTint);
 
-            // Start at default emission (mul = 1). Carved state will drive this to 0 later.
-            _particles.ApplyEmissionMultiplierImmediate(100f);
+            // Flower must never be visible before a vehicle-triggered regrow has bloomed it.
+            HideFlower();
 
-            // Keep root particle transform stable in pooled scenarios
-            visual.particleSystem.transform.localScale = Vector3.one;
+            // Start at default emission (mul = 1). Carved state will drive this to 0 later.
+            _particles.ApplyEmissionMultiplierImmediate(1f);
         }
         // Terrain collider typically lives on this same prefab (PolygonCollider2D recommended),
         // but some prefab variants place colliders on children.
@@ -119,8 +117,9 @@ private GameFlowManager _gfm;
             transform.localScale = visual.prefabReferenceScale;
         _baseLocalScale = transform.localScale;
         float r = GetWorldRadius();
-        // Belt-and-suspenders: make sure SpriteMask can’t clip us accidentally
-        var psr = GetComponent<ParticleSystemRenderer>();
+        // Belt-and-suspenders: make sure SpriteMask can’t clip us accidentally.
+        // The renderer lives on the particle child, not the root.
+        var psr = visual.particleSystem != null ? visual.particleSystem.GetComponent<ParticleSystemRenderer>() : null;
         if (psr) psr.maskInteraction = SpriteMaskInteraction.None;
         if (psr) psr.sortingFudge = 0f;
         ApplyWorkShaderParamsParticlesOnly(roleColor: _currentTint, workSigned01: 0f);
@@ -129,6 +128,7 @@ private GameFlowManager _gfm;
     void Update()
     {
         TickVehicleCompression();
+        TickFlowerRotation();
     }
     /// <summary>
     /// Called by the generator when a cell becomes Solid. Ensures the sprite alpha

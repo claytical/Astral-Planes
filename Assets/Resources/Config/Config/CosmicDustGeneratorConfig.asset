@@ -27,7 +27,7 @@ MonoBehaviour:
   zapRegrowDelaySeconds: -1
   zapScaleOutSeconds: 0.12
   mazeTint: {r: 0.461, g: 0.461, b: 0.461, a: 0.25}
-  solidDustTint: {r: 0.05, g: 0.05, b: 0.08, a: 1}
+  solidDustTint: {r: 0.28, g: 0.25, b: 0.32, a: 1}
   toroidal: 0
   minNotesPerBinPerVoice: 2
   maxNotesPerBinPerVoice: 16
@@ -35,7 +35,7 @@ MonoBehaviour:
   tintDiffusionInterval: 0.12
   tintDiffusionMaxCellsPerTick: 256
   tintDiffusionRadius: 1
-  tintDiffusionStrength: 0.25
+  tintDiffusionStrength: 0.12
   tintDiffusionPropagateOnChange: 1
   tintDiffusionMinDelta: 0.0025
   tintDirtyMarkRadius: 1

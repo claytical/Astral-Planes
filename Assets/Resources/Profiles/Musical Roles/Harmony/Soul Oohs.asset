@@ -31,12 +31,14 @@ MonoBehaviour:
   collectableHomePullPerUnit: 1.5
   collectableFleeRadiusCells: 2
   collectableFleeSpeedMul: 1.3
+  collectableCatchRadiusMul: 1.5
+  collectableVisualScaleMul: 1.2
   midiPreset: 18
   lowestNote: 48
   highestNote: 96
   outputMixerGroup: {fileID: -7502792225068152454, guid: 07985bf4f6d469340930e958ef313c14,
     type: 2}
-  volumeMultiplier: 0.85
+  volumeMultiplier: 0.75
   minVelocity: 60
   maxVelocity: 127
   regrowthDelay: 1

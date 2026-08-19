@@ -244,20 +244,19 @@ public sealed class GravityVoidController
     // Nothing thins dust back down within a motif — only the full ClearMaze() reset at the next
     // motif/phase transition does. As staged expansions repeatedly fire ring bursts, scale the
     // ring count down once the grid is already dense so clutter can't climb unbounded within a
-    // single motif's void-growth window.
-    private const float kDensityThrottleHalfAt = 0.5f;
-    private const float kDensityThrottleSkipAt = 0.8f;
-
+    // single motif's void-growth window. Thresholds live on CosmicDustGeneratorConfig, shared
+    // with CosmicDustGenerator's regrow-delay easing (ApplyDensityRegrowEasing) so both density
+    // responses kick in at the same solid-fraction points.
     private int ApplyDensityThrottle(int ringsThisBin)
     {
         if (ringsThisBin <= 0) return ringsThisBin;
 
         var dustGen = _getGfm()?.dustGenerator;
-        if (dustGen == null) return ringsThisBin;
+        if (dustGen == null || dustGen.config == null) return ringsThisBin;
 
         float solidFraction = dustGen.GetSolidFraction();
-        if (solidFraction >= kDensityThrottleSkipAt) return 0;
-        if (solidFraction >= kDensityThrottleHalfAt) return Mathf.Max(1, ringsThisBin / 2);
+        if (solidFraction >= dustGen.config.densityThrottleSkipAt) return 0;
+        if (solidFraction >= dustGen.config.densityThrottleHalfAt) return Mathf.Max(1, ringsThisBin / 2);
         return ringsThisBin;
     }
 

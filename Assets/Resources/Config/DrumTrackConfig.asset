@@ -16,7 +16,7 @@ MonoBehaviour:
   referenceColumns: 40
   uiBottomPaddingPx: 160
   uiTopPaddingPx: 52
-  gridPadding: 0.2
+  gridPadding: 0.1
   autoSizeSpawnGridToScreen: 1
   lockPlayAreaAfterInit: 1
   timingWindowSteps: 4

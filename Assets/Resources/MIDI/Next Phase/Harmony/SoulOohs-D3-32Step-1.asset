@@ -19,7 +19,7 @@ MonoBehaviour:
     events:
     - step: 0
       midiNote: 62
-      durSteps: 32
+      durSteps: 16
       velocity01: 0.78740156
     - step: 4
       midiNote: 64

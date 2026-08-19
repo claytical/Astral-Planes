@@ -196,7 +196,7 @@ The per-role drain/eject actor spawned and gated by `StarPool`. Siphons dust fro
 
 Readiness is **zap-count-only** — there is no charge/threshold gate. `_displayedCharge01` (`PhaseStar.cs:149`) is a pure visual lerp of `ZapProgress01` (drives the diamond-fill animation); it does not gate ejection. `IsEjectionReady()` = descriptor valid + `ReadyLatched` (zap quota met), period.
 
-**Tentacle drain (`PhaseStarDustAffect`):** one tentacle grows per available role-carved cell, capped by the node payload — the zap budget is `RemainingZapCount` minus in-flight tentacles, so a 5-note payload with 3 carved cells grows 3 tentacles at once and adds more as cells are carved. Each drained cell goes through `CosmicDustGenerator.ZapClearCellHeld()` (no regrow while held) and is registered on the star; the zap is credited immediately on drain (`CreditZap()`), not deferred to full tentacle retraction. When the payload's zap count is met, acquisition disables and the star latches `ReadyLatched`.
+**Tentacle drain (`PhaseStarDustAffect`):** one tentacle grows per available role-carved cell, capped by the node payload — the zap budget is `RemainingZapCount` minus in-flight tentacles, so a 5-note payload with 3 carved cells grows 3 tentacles at once and adds more as cells are carved. Each drained cell goes through `CosmicDustGenerator.ZapClearCellHeld()` (no regrow while held) and is registered on the star; the zap is credited immediately on drain (`CreditZap()`), not deferred to full tentacle retraction. When the payload's zap count is met, acquisition disables and the star latches `ReadyLatched`. Targeting itself is gated on `CosmicDust.IsVisuallyPresentForTargeting()`, which since the flower-bloom redesign also requires `HasBloomedFlower` — a freshly-generated or non-vehicle-regrown cell is invisible to tentacles even if solid and role-carved, until a vehicle has plow-carved it at least once.
 
 **Emits / calls out:**
 - Spawns `DiscoveryTrackNode` via `SpawnNodeCommon()` or `SuperNode` via `SpawnSuperNodeCommon()` — gated by `ShouldSpawnSuperNodeForTrack()` (target track fully expanded + `MotifProfile.alternateChordProgressionProfile` set)
@@ -391,7 +391,7 @@ the fuel UI ticking down.
 
 **Calls out:**
 - `NoteVisualizer.TryGetNextUnlitStepExcluding()` — finds target for ghost cue
-- `dustGenerator.SetVehicleKeepClear()` / `ChipDustByVehicle(…, profile)` — dust pocket + plow; the ship's `regrowDelayMultipliers` scale the carved cell's regrow delay per role (growth agent — a Bass-accelerator ship regrows Bass dust sooner)
+- `dustGenerator.SetVehicleKeepClear()` / `ChipDustByVehicle(…, profile)` — dust pocket + plow; the ship's `regrowDelayMultipliers` scale the carved cell's regrow delay per role (growth agent — a Bass-accelerator ship regrows Bass dust sooner). A vehicle carve is also the only path that blooms the cell's flower on regrow, making it PhaseStar-targetable (see CosmicDustGenerator / PhaseStar).
 
 ---
 
@@ -422,6 +422,8 @@ Authoritative 2D grid. All spatial state lives here — cell solid/empty status,
 **Regrow delay resolution** (`ResolveRegrowDelay`, precedence high → low): explicit per-call override → carved cell's `MusicalRoleProfile.regrowthDelay` (vehicle carves only) → maze `dustTiming` per-source delay → maze base `regrowDelay` → 8s fallback. Vehicle carves then scale the result by the carving ship's per-role `regrowDelayMultipliers`. Cells flagged `ForceGrayRegrow`/`ZapForceGray` always regrow gray and uncharged — role tint (and drainable charge) is only earned by vehicle plow-carves or DiscoveryTrackNode exhaust painting.
 
 Role imprinting: a vehicle plow-carve promotes the cell's hidden Voronoi role into the active imprint, so it regrows in its true role color with charge. Same-role cells attract nearby `DiscoveryTrackNode`/`SuperNodeTrackNode` and `Collectable` movement.
+
+Flower bloom (`CosmicDust.Flower.cs`): each cell carries a hidden `Flower` child sprite pair, normally inactive. `CommitRegrowCell` persists the `DustClearSource` that triggered a pending regrow (`_pendingRegrowSource`, written in `ClearCell`) and, only when that source was `VehiclePlow`, calls `dust.BloomFlower(regrowTint)` — the flower fades in role-tinted alongside the regrowing dust. Every `ClearCell` call unconditionally calls `dust.HideFlower()` first, so any clear (vehicle re-carve, tentacle drain, any other source) resets the tell; only a vehicle carve can re-bloom it. `HasBloomedFlower` gates `CosmicDust.IsVisuallyPresentForTargeting()` (see PhaseStar below) — dust regrown by any non-vehicle source still regrows and is still solid/collidable, it's just untargetable by tentacles until a vehicle carves it at least once.
 
 ---
 
@@ -544,17 +546,17 @@ DrumTrack.Update() → TickLoopBoundaries() (once per leader-loop boundary)
 
 ### Flow E — Dust Energy Economy
 ```
-Vehicle plow-carves dust → cell regrows in its true role color + charge
+Vehicle plow-carves dust → cell regrows in its true role color + charge, flower blooms (vehicle-carve tell)
     (delay = maze dustTiming table × ship's per-role regrowDelayMultiplier)
-  → PhaseStar grows one tentacle per revealed cell, capped at the node payload
-      → each drained cell: ZapClearCellHeld() — held, no regrow; zap credited immediately
+  → PhaseStar grows one tentacle per bloomed, role-carved cell, capped at the node payload
+      → each drained cell: ZapClearCellHeld() — held, no regrow; zap credited immediately; flower hides
   → payload zap count met → tentacles retract → star ReadyLatched
   → DiscoveryTrackNode (or SuperNode) ejected, holding the drained-cell batch
   → node captured / escaped / expired → ReleaseHeldCells()
-      → cells regrow gray + uncharged (starDrainReleaseDelay)
-  → gray dust must be plow-carved again to re-earn role charge
+      → cells regrow gray + uncharged (starDrainReleaseDelay), flower stays hidden
+  → gray dust must be plow-carved again to re-earn role charge and re-bloom
 ```
-Collectable dust removal (arrival flight + intent-window plowing) and SuperNodeTrackNode dust-seeking always regrow gray —
+Collectable dust removal (arrival flight + intent-window plowing) and SuperNodeTrackNode dust-seeking always regrow gray and never bloom the flower —
 they open temporary corridors but never feed the star.
 
 ### Flow F — Discard → Time Bomb → Blast

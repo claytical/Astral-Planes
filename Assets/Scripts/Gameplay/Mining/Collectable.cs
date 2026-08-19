@@ -93,6 +93,9 @@ public partial class Collectable : MonoBehaviour
     private float absorbHoldSeconds => tuning.absorbVfx.absorbHoldSeconds;
     private float absorbShrinkSeconds => tuning.absorbVfx.absorbShrinkSeconds;
     private float absorbScalePeakMultiplier => tuning.absorbVfx.absorbScalePeakMultiplier;
+    private Color lockFlashColor => tuning.absorbVfx.lockFlashColor;
+    private float lockFlashSeconds => tuning.absorbVfx.lockFlashSeconds;
+    private float capturedTintAmount => tuning.absorbVfx.capturedTintAmount;
 
     private GameFlowManager _gfm;
     private Transform _carryParent;
@@ -205,6 +208,22 @@ public partial class Collectable : MonoBehaviour
 
     public int GetNote() => assignedNote;
 
+    private CircleCollider2D _pickupCollider;
+    private float _baseCatchRadius;
+    private Vector3 _baseVisualScale;
+    private bool _baseSizeCaptured;
+
+    private void CaptureBaseSizeIfNeeded()
+    {
+        if (_baseSizeCaptured) return;
+
+        if (_pickupCollider == null) TryGetComponent(out _pickupCollider);
+        if (_pickupCollider != null) _baseCatchRadius = _pickupCollider.radius;
+        if (energySprite != null) _baseVisualScale = energySprite.transform.localScale;
+
+        _baseSizeCaptured = true;
+    }
+
     public void ApplyTrackVisuals(InstrumentTrack track)
     {
         if (track == null) return;
@@ -224,6 +243,12 @@ public partial class Collectable : MonoBehaviour
         var explode = GetComponent<Explode>();
         if (explode != null)
             explode.SetTint(track.DisplayColor, multiply: true);
+
+        CaptureBaseSizeIfNeeded();
+        if (_pickupCollider != null)
+            _pickupCollider.radius = _baseCatchRadius * (_roleProfile != null ? Mathf.Max(0.01f, _roleProfile.collectableCatchRadiusMul) : 1f);
+        if (energySprite != null)
+            energySprite.transform.localScale = _baseVisualScale * (_roleProfile != null ? Mathf.Max(0.01f, _roleProfile.collectableVisualScaleMul) : 1f);
     }
 
     private void Initialize(int note, int duration, InstrumentTrack track, NoteSet noteSet, List<int> steps)
@@ -242,7 +267,8 @@ public partial class Collectable : MonoBehaviour
 
         _role = assignedInstrumentTrack != null ? assignedInstrumentTrack.assignedRole : MusicalRole.None;
         // Prefer the motif-selected profile installed on the track; the library keeps only
-        // the first-loaded asset per role, so it can't see per-motif tuning.
+        // the first-loaded asset per role, so it can't see per-motif tuning. Resolved before
+        // ApplyTrackVisuals so its catch-radius/visual-scale multipliers are available.
         _roleProfile = (assignedInstrumentTrack != null && assignedInstrumentTrack.ActiveProfile != null)
             ? assignedInstrumentTrack.ActiveProfile
             : MusicalRoleProfileLibrary.GetProfile(_role);

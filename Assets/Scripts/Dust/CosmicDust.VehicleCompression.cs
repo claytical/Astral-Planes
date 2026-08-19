@@ -30,11 +30,11 @@ public partial class CosmicDust
 
     private void DriveVehicleCompression(Vehicle vehicle, Collision2D collision)
     {
-        if (!noseCompression.enabled || vehicle == null || visual.sprite == null) return;
+        if (!noseCompression.enabled || vehicle == null || visual.particleSystem == null) return;
         if (_isDespawned) return;
         if (_dustSpriteBaseVisualScale.sqrMagnitude <= 0.000001f) return;
 
-        Vector2 dustCenter = visual.sprite.bounds.center;
+        Vector2 dustCenter = transform.position;
         Vector2 noseWorld = (Vector2)vehicle.transform.position + (Vector2)vehicle.transform.up * noseCompression.probeWorld;
 
         Vector2 dir = Vector2.zero;
@@ -62,14 +62,14 @@ public partial class CosmicDust
     private void SetBaseSpriteScale(Vector3 scale)
     {
         _dustSpriteBaseVisualScale = scale;
-        if (visual.sprite != null) visual.sprite.transform.localScale = scale;
+        if (visual.particleSystem != null) visual.particleSystem.transform.localScale = scale;
     }
 
     private void TickVehicleCompression()
     {
-        if (!noseCompression.enabled || visual.sprite == null) return;
+        if (!noseCompression.enabled || visual.particleSystem == null) return;
 
-        Transform srt = visual.sprite.transform;
+        Transform srt = visual.particleSystem.transform;
         float now = Time.time;
         bool recentlyTouched = (now - _lastNoseContactTime) <= noseCompression.contactGraceSeconds;
         bool stillVisible = now <= _noseVisibleUntil;

@@ -76,6 +76,13 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("Speed multiplier while fleeing a vehicle (× the note's normal speed).")]
     [Range(1f, 3f)] public float collectableFleeSpeedMul = 1.3f;
 
+    [Header("Collectable Catch Size")]
+    [Tooltip("Multiplier on the pickup trigger's baked-in prefab radius. 1 = unchanged. Independent of the dust-collision collider and of movement/speed tuning.")]
+    [Range(0.5f, 3f)] public float collectableCatchRadiusMul = 1f;
+
+    [Tooltip("Multiplier on the energy sprite's baked-in prefab scale. 1 = unchanged.")]
+    [Range(0.5f, 3f)] public float collectableVisualScaleMul = 1f;
+
     [Header("Presets")] public int midiPreset;
 
     [Header("MIDI Range")]

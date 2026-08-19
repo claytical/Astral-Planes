@@ -79,22 +79,32 @@ public sealed class DepositTimingParams
 public sealed class AbsorbVfxParams
 {
     [Tooltip("Duration of the scale-up/move-toward-vehicle phase (seconds).")]
-    public float absorbGrowSeconds = 0.08f;
+    public float absorbGrowSeconds = 0.05f;
 
     [Tooltip("Pause at peak scale before shrinking back down (seconds).")]
     public float absorbHoldSeconds = 0.5f;
 
     [Tooltip("Duration of the scale-down/move-to-destination phase (seconds).")]
-    public float absorbShrinkSeconds = 0.1f;
+    public float absorbShrinkSeconds = 0.16f;
 
     [Tooltip("Extra multiplier applied on top of the vehicle-matched peak scale (1 = exact match).")]
     public float absorbScalePeakMultiplier = 1.1f;
+
+    [Tooltip("Color the collectable snaps to at the peak-hold instant — the 'locked in' flash. Settles toward a tinted armed color (see capturedTintAmount) over lockFlashSeconds, not fully back to the role color, so 'captured' reads as visibly distinct from 'wild' for the rest of the carry.")]
+    public Color lockFlashColor = Color.white;
+
+    [Tooltip("Seconds over which the lock-flash color settles into the armed carry tint, at the start of the peak hold.")]
+    public float lockFlashSeconds = 0.12f;
+
+    [Tooltip("How far the carried note's persistent color sits between the role color (0) and lockFlashColor (1) once armed. This is the 'captured/armed' state's lingering signature, distinguishing it from the pre-pickup role color — the note is destroyed at commit, so nothing reverts it.")]
+    [Range(0f, 1f)] public float capturedTintAmount = 0.35f;
 
     public void Validate()
     {
         absorbGrowSeconds = Mathf.Max(0.001f, absorbGrowSeconds);
         absorbHoldSeconds = Mathf.Max(0f, absorbHoldSeconds);
         absorbShrinkSeconds = Mathf.Max(0.001f, absorbShrinkSeconds);
+        lockFlashSeconds = Mathf.Clamp(lockFlashSeconds, 0f, absorbHoldSeconds);
     }
 }
 
@@ -111,7 +121,7 @@ public sealed class IdlePulseParams
 public sealed class NoteTrailParams
 {
     [Tooltip("How quickly the note lerps toward its trail slot position (world space).")]
-    public float trailFollowLerp = 12f;
+    public float trailFollowLerp = 16f;
 
     [Tooltip("Scale pulse min when idle in trail.")]
     public float trailIdleScaleMin = 0.85f;
@@ -123,7 +133,7 @@ public sealed class NoteTrailParams
     public float trailReadyPulseSpeed = 6f;
 
     [Tooltip("Max world-space radius of idle drift orbit around the slot position.")]
-    public float trailDriftRadius = 0.18f;
+    public float trailDriftRadius = 0.1f;
 
     [Tooltip("Speed of the drift orbit (radians/sec). Each collectable gets a random phase.")]
     public float trailDriftSpeed = 1.1f;

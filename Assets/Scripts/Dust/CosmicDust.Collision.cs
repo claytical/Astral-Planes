@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using UnityEngine;
 
 public partial class CosmicDust
@@ -11,8 +12,8 @@ public partial class CosmicDust
         maxDurationTicks = 1440,
         minVelocity127 = 40f,
         maxVelocity127 = 70f,
-        minCooldownSeconds = 0.8f,
-        maxCooldownSeconds = 2f
+        minCooldownSeconds = 3f,
+        maxCooldownSeconds = 6f
     };
 
     private void OnCollisionStay2D(Collision2D collision)
@@ -47,6 +48,7 @@ public partial class CosmicDust
 
         if (effectiveResistance >= 1f) return;
 
+        TriggerCarveEmissionSpike();
         gen.CarveDustByVehicle(gp, _timings.clearFadeOutSeconds, vehicle.profile);
         TriggerChargeTintPulse();
     }
@@ -58,10 +60,7 @@ public partial class CosmicDust
         {
             _currentPluckVehicle = vehicle;
             _nextDustPluckTime = Time.time;
-            if (_hiddenHintColor.a > 0f)
-                TriggerHiddenHintPulse();
-            else
-                TriggerDenyTintPulse(1);
+            TriggerBumpPulse();
             TriggerJiggle();
         }
 
@@ -82,6 +81,24 @@ public partial class CosmicDust
         // minCooldownSeconds must exceed the max single quantization step, or a cell could
         // re-arm and fire again before its first (now-delayed) pluck actually sounds.
         _nextDustPluckTime = Time.time + cooldown;
+    }
+
+    // Carve's distinct, non-color cue: a brief emission spike (obviously "more particles" for a
+    // moment) instead of another tint pulse competing with the bump-pulse/regrow-glow/charge-pulse
+    // channel. Uses the same tracked single-slot emission-multiplier lane as the grow-in ramp
+    // (_emissionMulRoutine, CosmicDust.Lifecycle.cs) — safe here since carve only ever fires on an
+    // already-settled, fully-grown cell, never mid grow-in.
+    private void TriggerCarveEmissionSpike()
+    {
+        if (_emissionMulRoutine != null) { StopCoroutine(_emissionMulRoutine); _emissionMulRoutine = null; }
+        _emissionMulRoutine = StartCoroutine(CarveEmissionSpikeRoutine());
+    }
+
+    private IEnumerator CarveEmissionSpikeRoutine()
+    {
+        yield return _particles.LerpEmissionMultiplier(_particles.CurrentMultiplier, 5f, 0.08f);
+        yield return _particles.LerpEmissionMultiplier(5f, 1f, 0.35f);
+        _emissionMulRoutine = null;
     }
 
     private void OnCollisionExit2D(Collision2D collision)

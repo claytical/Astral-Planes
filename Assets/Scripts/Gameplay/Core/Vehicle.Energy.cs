@@ -21,7 +21,6 @@ public partial class Vehicle
     public void DrainEnergy(float amount, string source = "Unknown")
 {
     if (amount <= 0f) return;
-    if (_boostCostFree) return; // free boost phase: skip all external energy drains
     ConsumeEnergy(amount);
 }
 

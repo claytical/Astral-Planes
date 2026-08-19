@@ -9,6 +9,11 @@ public partial class CosmicDust
     private float _growInOverride = -1f;
     private Coroutine _emissionMulRoutine;
 
+    [Tooltip("Steady-state emission multiplier a revealed (Role != None) cell settles into after " +
+             "grow-in, vs. 1x for still-hidden None-role cells — carved dust reads as persistently " +
+             "denser/thicker, not just briefly (see TriggerCarveEmissionSpike, CosmicDust.Collision.cs).")]
+    [SerializeField] private float revealedEmissionMultiplier = 1.35f;
+
     public void SetGrowInDuration(float seconds)
     {
         _growInOverride = Mathf.Max(0.05f, seconds);
@@ -70,7 +75,7 @@ public partial class CosmicDust
         ResetSpriteScaleTo(0f);
         AnimateSpriteScale(0f, _spriteScaleTarget, growSeconds);
         _particles.EnsureParticlesPlaying();
-        SetEmissionMultiplier(1f, seconds: growSeconds);
+        SetEmissionMultiplier(Role != MusicalRole.None ? revealedEmissionMultiplier : 1f, seconds: growSeconds);
         ApplyTintVisual(_currentTint);
     }
     internal void RunClearVisuals(float fadeSeconds)
@@ -120,8 +125,8 @@ public partial class CosmicDust
         ClearRainbowParticleDirtyIfNeeded();
         _isBreaking = false;
         regrowAlphaCapped = false;
-        suppressSpriteRenderer = false;
         _isDespawned = false;
+        HideFlower();
         _nonBoostClearSeconds = 0f;
         _growInOverride = -1f;
         _hiddenHintColor = Color.clear;
@@ -196,17 +201,13 @@ public partial class CosmicDust
         // Disable collisions immediately.
         SetTerrainColliderEnabled(false);
 
-        // Hide sprite (authoritative for "solid" dust).
+        // Zero the visual scale (authoritative for "solid" dust).
         // Use SetBaseSpriteScale(zero) instead of directly writing transform.localScale so that
         // _dustSpriteBaseVisualScale is also zeroed. TickVehicleCompression (Update) reads
         // _dustSpriteBaseVisualScale and writes it to srt.localScale every frame; if only the
         // transform is zeroed here, TickVehicleCompression will immediately restore a non-zero
-        // scale after the bridge completes and the SpriteRenderer is re-enabled.
-        if (visual.sprite != null)
-        {
-            SetBaseSpriteScale(Vector3.zero);
-            visual.sprite.enabled = false;
-        }
+        // scale after the bridge completes and the particle renderer is re-enabled.
+        SetBaseSpriteScale(Vector3.zero);
 
         // For pooling / true hiding, stop particles completely.
         if (visual.particleSystem != null)

@@ -291,7 +291,6 @@ public partial class CosmicDustGenerator
                 _imprints.ApplyHiddenHintToDust(gp, existingDust);
                 var res = ResolveResistanceProfile(gp, role, context: "SpawnDustAtCells:existing");
                 existingDust.clearing.drainResistance01 = solid ? 1f : res.drainResistance01;
-                if (solid) existingDust.SetSpriteSuppressed(true);
                 continue;
             }
 
@@ -391,8 +390,6 @@ public partial class CosmicDustGenerator
         {
             dust.PrepareForReuse();
             dust.InitializeVisuals(DustTimings);
-            if (HasCellFlag(gp, CellFlags.Solid))
-                dust.SetSpriteSuppressed(true);
 
             dust.SetGrowInDuration(config.voidDustGrowInSeconds);
             var resistance = ResolveResistanceProfile(gp, role, context: "VoidGrowCellNow");
@@ -402,7 +399,6 @@ public partial class CosmicDustGenerator
             dust.SetFeedbackColors(Color.white, Color.darkGray);
             dust.regrowAlphaCapped = true;
             dust.Begin();
-            EnsureDustSpriteRendererEnabled(dust);
 
             // Organic grow-in: start at maze gray and fade to role color over the full visual duration.
             Color dormantStart = config.mazeTint;
@@ -415,9 +411,6 @@ public partial class CosmicDustGenerator
         }
         float enableDelay = Mathf.Max(config.regrowColliderEnableDelaySeconds, growInSeconds * 0.85f);
         yield return new WaitForSeconds(enableDelay);
-
-        if (dust != null)
-            EnsureDustSpriteRendererEnabled(dust);
 
         if (!IsInBounds(gp) || _permanentClearCells.Contains(gp))
         {
@@ -457,18 +450,9 @@ public partial class CosmicDustGenerator
         {
             dust.regrowAlphaCapped = false;
             dust.EnsureMinSolidAlpha(0.55f);
-            EnsureDustSpriteRendererEnabled(dust);
             SetDustCollision(dust, true);
         }
 
         _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
-    }
-
-    private static void EnsureDustSpriteRendererEnabled(CosmicDust dust)
-    {
-        if (dust == null || dust.suppressSpriteRenderer) return;
-        var spriteRenderer = dust.GetComponentInChildren<SpriteRenderer>(true);
-        if (spriteRenderer != null)
-            spriteRenderer.enabled = true;
     }
 }
