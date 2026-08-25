@@ -22,7 +22,7 @@ public partial class CosmicDust
         probeWorld = 0.55f,
         speedForFull = 10f,
         boostBonus = 0.20f,
-        contactGraceSeconds = 0.075f,
+        contactGraceSeconds = 0.35f,
         minimumVisibleSeconds = 0.050f,
         attackSharpness = 10f,
         releaseSharpness = 16f
