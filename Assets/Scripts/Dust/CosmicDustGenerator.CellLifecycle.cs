@@ -313,7 +313,7 @@ public partial class CosmicDustGenerator
         int h = drums.GetSpawnGridHeight();
 
         var cells = new HashSet<Vector2Int>();
-        FillDisk(cells, center, radiusCells, w, h);
+        DustGridMath.FillDisk(cells, center, radiusCells, w, h);
         foreach (var gp in cells)
             DespawnDustAtAndMarkPermanent(gp);
     }

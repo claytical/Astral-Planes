@@ -49,18 +49,6 @@ public sealed class CosmicDustVehicleReservationController
         _clearCell = clearCell;
     }
 
-    private static void FillDisk(HashSet<Vector2Int> result, Vector2Int center, int r, int w, int h)
-    {
-        for (int dx = -r; dx <= r; dx++)
-        for (int dy = -r; dy <= r; dy++)
-        {
-            if (dx * dx + dy * dy > r * r) continue;
-            int x = center.x + dx; int y = center.y + dy;
-            if ((uint)x >= (uint)w || (uint)y >= (uint)h) continue;
-            result.Add(new Vector2Int(x, y));
-        }
-    }
-
     public void SetVehicleKeepClear(int ownerId, Vector2Int centerCell, int radiusCells, bool forceRemoveExisting, float forceRemoveFadeSeconds = 0.20f)
     {
         int w = _drumsWidth();
@@ -74,7 +62,7 @@ public sealed class CosmicDustVehicleReservationController
 
         // Build new footprint (disk).
         var next = new HashSet<Vector2Int>();
-        FillDisk(next, centerCell, r, w, h);
+        DustGridMath.FillDisk(next, centerCell, r, w, h);
 
         _tmpReleased.Clear();
         _tmpClaimed.Clear();
@@ -155,7 +143,7 @@ public sealed class CosmicDustVehicleReservationController
         radiusCells = Mathf.Max(0, radiusCells);
 
         var next = new HashSet<Vector2Int>();
-        FillDisk(next, centerCell, radiusCells, w, h);
+        DustGridMath.FillDisk(next, centerCell, radiusCells, w, h);
 
         _exclusions.UpdateStarPocket(next, _tmpReleased, _tmpClaimed);
 

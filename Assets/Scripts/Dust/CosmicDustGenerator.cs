@@ -291,18 +291,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
     private void SetCellFlag(Vector2Int cell, CellFlags flag) => _registry.SetCellFlag(cell, flag);
     private bool ClearCellFlag(Vector2Int cell, CellFlags flag) => _registry.ClearCellFlag(cell, flag);
 
-    private static void FillDisk(HashSet<Vector2Int> result, Vector2Int center, int r, int w, int h)
-    {
-        for (int dx = -r; dx <= r; dx++)
-        for (int dy = -r; dy <= r; dy++)
-        {
-            if (dx * dx + dy * dy > r * r) continue;
-            int x = center.x + dx; int y = center.y + dy;
-            if ((uint)x >= (uint)w || (uint)y >= (uint)h) continue;
-            result.Add(new Vector2Int(x, y));
-        }
-    }
-
     public void SetVehicleKeepClear(int ownerId, Vector2Int centerCell, int radiusCells, bool forceRemoveExisting, float forceRemoveFadeSeconds = 0.20f) =>
         _vehicleReservation.SetVehicleKeepClear(ownerId, centerCell, radiusCells, forceRemoveExisting, forceRemoveFadeSeconds);
 
