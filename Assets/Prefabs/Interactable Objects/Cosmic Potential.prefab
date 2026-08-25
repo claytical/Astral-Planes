@@ -60,7 +60,7 @@ MonoBehaviour:
   flowerDiamondA: {fileID: 6771263445632034394}
   flowerDiamondB: {fileID: 6349677698668529810}
   flowerBloomAlpha: 0.75
-  flowerRotationSpeedDegPerSec: 12
+  flowerRotationSpeedDegPerSec: 50
   revealedEmissionMultiplier: 1.1
   _chargeColor: {r: 1, g: 1, b: 1, a: 0.23529412}
   _denyColor: {r: 0.8156863, g: 0.1254902, b: 0.5647059, a: 1}
@@ -154,7 +154,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 1.1, y: 1.1}
+  m_Size: {x: 2, y: 2}
   m_EdgeRadius: 0
 --- !u!1 &1242142635046489474
 GameObject:
@@ -1033,7 +1033,7 @@ ParticleSystem:
     sphericalDirectionAmount: 0
     randomPositionAmount: 1
     radius:
-      value: 1
+      value: 0.5
       mode: 0
       spread: 0
       speed:
