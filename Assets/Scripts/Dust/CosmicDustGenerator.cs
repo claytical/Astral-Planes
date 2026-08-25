@@ -493,6 +493,10 @@ public partial class CosmicDustGenerator : MonoBehaviour
             var resistance = ResolveResistanceProfile(gp, regrowRole, context: "CommitRegrowCell");
             dust.clearing.drainResistance01 = resistance.drainResistance01;
             int maxUnits = roleProfile != null ? roleProfile.maxEnergyUnits : 1;
+            // Must be armed before ApplyRoleAndCharge/BloomFlower below — both snap to full
+            // brightness with no fade in this same frame, and this cap is what's supposed to
+            // dim that initial flash. Arming it after (as before) left the flash unprotected.
+            dust.regrowAlphaCapped = true;
             dust.ApplyRoleAndCharge(regrowRole, regrowTint, regrowTint.a, maxUnits);
 
             if (regrowSource == DustClearSource.VehiclePlow)
@@ -508,7 +512,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 denyColor = (shadow != Color.clear && shadow != Color.magenta) ? shadow : Color.darkGray;
             }
             dust.SetFeedbackColors(Color.white, denyColor);
-            dust.regrowAlphaCapped = true;
             dust.Begin();
             SetDustCollision(dust, false);
 
