@@ -19,7 +19,6 @@ public partial class CosmicDust
     public bool regrowAlphaCapped = false;
     private const float kRegrowAlphaCap = 0.20f;
     [SerializeField] private float colliderDisabledAlpha = 0.08f;
-    [SerializeField] private bool useWorkShaderParams = true;
 
 // Single managed tint pulse lane (charge + deny both use this).
 private Coroutine _tintPulseRoutine;
@@ -60,10 +59,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
     /// </summary>
     public void SyncParticleColor()
     {
-        if (useWorkShaderParams)
-            ApplyWorkShaderParamsParticlesOnly(roleColor: _currentTint, workSigned01: 0f);
-        else
-            SetDustColorAllParticles(_currentTint);
+        ApplyWorkShaderParamsParticlesOnly(roleColor: _currentTint, workSigned01: 0f);
     }
     private void ApplyDisplayedTint(Color tint)
     {
@@ -163,10 +159,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
     internal void ApplyTintVisual(Color tint)
     {
         ApplyDisplayedTint(tint);
-        if (useWorkShaderParams)
-            ApplyWorkShaderParamsParticlesOnly(roleColor: tint, workSigned01: 0f);
-        else
-            SetDustColorAllParticles(tint);
+        ApplyWorkShaderParamsParticlesOnly(roleColor: tint, workSigned01: 0f);
         var explode = GetComponentInChildren<Explode>(true);
         if (explode != null) explode.SetTint(tint);
     }
