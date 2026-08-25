@@ -16,20 +16,15 @@ public partial class CosmicDust
     [SerializeField] private float flowerSwayAmplitudeWorld = 0.08f;
     [Tooltip("How quickly the bud sway wanders -- low, matching the dust particles' own noise drift, for a breeze-like rather than mechanical feel.")]
     [SerializeField] private float flowerSwayFrequency = 0.3f;
-    [Tooltip("Peak random rotation (degrees), applied independently to each diamond so they flutter " +
-             "slightly differently from each other -- like two leaves attached to the same swaying bud.")]
-    [SerializeField] private float flowerLeafRotationDegrees = 8f;
-    [Tooltip("How quickly each leaf's independent rotation wanders.")]
-    [SerializeField] private float flowerLeafRotationFrequency = 0.4f;
+    [Tooltip("Continuous whole-bud rotation speed (degrees/sec), like a pinwheel -- both diamonds turn together as one rigid unit.")]
+    [SerializeField] private float flowerSpinDegPerSec = 45f;
 
     private Color _flowerRoleColor = Color.white;
     private float _flowerBloomTime;
     private bool _flowerRootTransformCaptured;
     private Vector3 _flowerRootBasePos;
     private Vector3 _flowerRootBaseScale = Vector3.one;
-    private bool _flowerLeafRotBaseCaptured;
-    private Quaternion _flowerDiamondABaseRot = Quaternion.identity;
-    private Quaternion _flowerDiamondBBaseRot = Quaternion.identity;
+    private Quaternion _flowerRootBaseRot = Quaternion.identity;
     private Coroutine _flowerGrowInRoutine;
 
     public bool HasBloomedFlower { get; private set; }
@@ -40,19 +35,13 @@ public partial class CosmicDust
         _flowerRoleColor = roleColorRgb;
         _flowerBloomTime = Time.time;
 
-        if (!_flowerLeafRotBaseCaptured)
-        {
-            if (flowerDiamondA != null) _flowerDiamondABaseRot = flowerDiamondA.transform.localRotation;
-            if (flowerDiamondB != null) _flowerDiamondBBaseRot = flowerDiamondB.transform.localRotation;
-            _flowerLeafRotBaseCaptured = true;
-        }
-
         if (flowerRoot != null)
         {
             if (!_flowerRootTransformCaptured)
             {
                 _flowerRootBasePos = flowerRoot.transform.localPosition;
                 _flowerRootBaseScale = flowerRoot.transform.localScale;
+                _flowerRootBaseRot = flowerRoot.transform.localRotation;
                 _flowerRootTransformCaptured = true;
             }
             flowerRoot.SetActive(true);
@@ -62,7 +51,7 @@ public partial class CosmicDust
 
         ApplyFlowerShimmerColor();
         ApplyFlowerSway();
-        ApplyFlowerLeafRotation();
+        ApplyFlowerSpin();
     }
 
     public void HideFlower()
@@ -89,14 +78,14 @@ public partial class CosmicDust
     }
 
     // Shimmer/glow tell: smoothly pulse-lerps between the cell's role color and white, sways
-    // as one bud, and wobbles each diamond/leaf independently -- see ApplyFlowerSway and
-    // ApplyFlowerLeafRotation below.
+    // as one bud, and spins continuously like a pinwheel -- see ApplyFlowerSway and
+    // ApplyFlowerSpin below.
     private void TickFlowerShimmer()
     {
         if (!HasBloomedFlower) return;
         ApplyFlowerShimmerColor();
         ApplyFlowerSway();
-        ApplyFlowerLeafRotation();
+        ApplyFlowerSpin();
     }
 
     private void ApplyFlowerShimmerColor()
@@ -128,22 +117,15 @@ public partial class CosmicDust
         flowerRoot.transform.localPosition = _flowerRootBasePos + new Vector3(nx, ny, 0f) * flowerSwayAmplitudeWorld;
     }
 
-    // The "variation" half of the sway: each diamond/leaf gets its own small, independently-
-    // seeded random rotation on top of the shared bud translation above, so the two leaves
-    // flutter slightly differently from each other rather than staying rigidly parallel.
-    private void ApplyFlowerLeafRotation()
+    // Continuous whole-bud spin, like a pinwheel -- both diamonds are children of flowerRoot,
+    // so rotating the root turns them together as one rigid piece instead of independently.
+    // A steady, unmistakably-turning silhouette reads as something growing/spinning amongst
+    // the dust rather than a static shape sitting on the grid. Phased off this cell's own
+    // bloom time so flowers across the maze aren't all at the same rotation angle at once.
+    private void ApplyFlowerSpin()
     {
-        float t = (Time.time - _flowerBloomTime) * flowerLeafRotationFrequency;
-
-        if (flowerDiamondA != null)
-        {
-            float angleA = (Mathf.PerlinNoise(t, 5f) * 2f - 1f) * flowerLeafRotationDegrees;
-            flowerDiamondA.transform.localRotation = _flowerDiamondABaseRot * Quaternion.Euler(0f, 0f, angleA);
-        }
-        if (flowerDiamondB != null)
-        {
-            float angleB = (Mathf.PerlinNoise(t + 70f, 5f) * 2f - 1f) * flowerLeafRotationDegrees;
-            flowerDiamondB.transform.localRotation = _flowerDiamondBBaseRot * Quaternion.Euler(0f, 0f, angleB);
-        }
+        if (flowerRoot == null) return;
+        float elapsed = Time.time - _flowerBloomTime;
+        flowerRoot.transform.localRotation = _flowerRootBaseRot * Quaternion.Euler(0f, 0f, elapsed * flowerSpinDegPerSec);
     }
 }
