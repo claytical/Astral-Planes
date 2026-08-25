@@ -414,7 +414,10 @@ public partial class Vehicle
         // -----------------------------------------------------------------
         // Root vehicle sprite: color resonance only
         // -----------------------------------------------------------------
-        if (baseSprite != null)
+        // Skipped while a damage flicker/thud coroutine owns baseSprite.color — it snapshots
+        // and hard-restores color on its own schedule (VisualFeedbackUtility), so writing here
+        // concurrently would just get stomped and cause a visible pop when the flicker ends.
+        if (baseSprite != null && !isFlickering)
         {
             Color targetVehicleColor = Color.Lerp(_vehicleDefaultColor, roleColor, tint01);
             baseSprite.color = Color.Lerp(

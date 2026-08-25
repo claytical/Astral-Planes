@@ -88,6 +88,17 @@ public partial class Vehicle
                 rb.angularVelocity = 0f;
                 rb.simulated = false;
 
+                // Stop any in-flight damage flicker so it can't keep running after the sprite
+                // is hidden below, and so isFlickering/flickerPulseRoutine end in a clean,
+                // terminal state instead of a stale non-null/true left over from the coroutine
+                // Unity silently halts when this object is eventually destroyed.
+                if (flickerPulseRoutine != null)
+                {
+                    StopCoroutine(flickerPulseRoutine);
+                    flickerPulseRoutine = null;
+                }
+                isFlickering = false;
+
                 // Hide the vehicle immediately so the explosion VFX (a separate, independently
                 // timed object) reads as the vehicle being destroyed, not as it surviving and
                 // flying off while the explosion happens to its name.
