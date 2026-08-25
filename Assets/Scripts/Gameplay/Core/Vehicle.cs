@@ -13,8 +13,11 @@ public partial class Vehicle : MonoBehaviour
     private bool  _isDead;
     private bool  _isActivePlow;
     private float _plowVelocityDrain;
-    private float _plowResistance01; // current tick's chip resistance (0=light, 1=max); feeds the fuel-bar "heaviness" FX
-    private float _collisionResistance01; // current tick's physical dust-contact resistance (0=light, 1=max); feeds the fuel-bar "heaviness" FX
+    // Current tick's dust resistance (0=light, 1=max), from either plow-chip carving (DoPlowTick)
+    // or physical contact (CosmicDust -> ReportCollisionResistance); feeds the fuel-bar "heaviness"
+    // FX. Reset once per tick in FixedUpdate (not by either writer) so both can safely Mathf.Max
+    // into it regardless of which fires first this tick.
+    private float _dustResistance01;
     private float _lastPressureFactor;
     private static readonly Collider2D[] _pressureHits = new Collider2D[8];
     private int _mineNodeLayerMask;
@@ -222,6 +225,7 @@ public partial class Vehicle : MonoBehaviour
         float dt = Time.fixedDeltaTime;
 
         _isActivePlow = false;   // always reset; DoPlowTick sets true only when cells are carved
+        _dustResistance01 = 0f;  // always reset; DoPlowTick and CosmicDust.ReportCollisionResistance both feed it this tick
 
         DoPlowTick();
         UpdateScoutingPreview();

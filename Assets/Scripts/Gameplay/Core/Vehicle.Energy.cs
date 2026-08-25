@@ -25,7 +25,7 @@ public partial class Vehicle
 }
 
     public void ReportCollisionResistance(float resistance01) =>
-        _collisionResistance01 = Mathf.Max(_collisionResistance01, Mathf.Clamp01(resistance01));
+        _dustResistance01 = Mathf.Max(_dustResistance01, Mathf.Clamp01(resistance01));
 
     // Average fuel ratio (energyLevel/capacity) across all active local players' vehicles.
     // Defaults to 1 (full fuel -> low pressure) when no vehicles are present, so a boot/
@@ -111,7 +111,7 @@ public partial class Vehicle
             // Update UI
             if (playerStatsUI != null)
             {
-                playerStatsUI.UpdateFuel(energyLevel, capacity, Mathf.Max(_plowResistance01, _collisionResistance01));
+                playerStatsUI.UpdateFuel(energyLevel, capacity, _dustResistance01);
             }
         }
 }

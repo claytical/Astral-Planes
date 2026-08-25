@@ -1,4 +1,5 @@
 using UnityEngine;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -112,6 +113,26 @@ public partial class Vehicle
     // actual plow footprint so it reads as "what's just ahead," not "see the whole maze."
     private const int kScoutingPreviewDepthCells = 2;
 
+    // Walks a forward-facing rectangle of grid cells — halfWidthCells wide, from minDepthCells to
+    // maxDepthCells deep ahead of the vehicle along `forward` — converting each sampled world
+    // position to a grid cell and invoking visit(cell). Shared by DoPlowTick (carve) and
+    // UpdateScoutingPreview (non-destructive telegraph) so both stay in lockstep if footprint
+    // shape ever changes.
+    private void ForEachFootprintCell(Vector2 forward, int minDepthCells, int maxDepthCells, int halfWidthCells, float cellSize, Action<Vector2Int> visit)
+    {
+        Vector2 perp = new Vector2(-forward.y, forward.x);
+        for (int d = minDepthCells; d <= maxDepthCells; d++)
+        {
+            for (int s = -halfWidthCells; s <= halfWidthCells; s++)
+            {
+                Vector2 sampleWorld = rb.position
+                    + forward * (d * cellSize)
+                    + perp    * (s * cellSize);
+                visit(drumTrack.WorldToGridPosition(sampleWorld));
+            }
+        }
+    }
+
     // Non-destructive resistance telegraph: tints upcoming solid cells by predicted resistance
     // before contact, so route choice is visible instead of discovered by draining fuel. Runs
     // whenever the vehicle isn't boosting — boosting already gives direct carve feedback via
@@ -128,32 +149,22 @@ public partial class Vehicle
         var gen = gfm.dustGenerator;
         float cellSize  = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
         Vector2 forward = dir.normalized;
-        Vector2 perp    = new Vector2(-forward.y, forward.x);
         int halfW       = Mathf.Max(0, profile.plowHalfWidthCells);
 
-        for (int d = 1; d <= kScoutingPreviewDepthCells; d++)
+        ForEachFootprintCell(forward, 1, kScoutingPreviewDepthCells, halfW, cellSize, cell =>
         {
-            for (int s = -halfW; s <= halfW; s++)
-            {
-                Vector2    sampleWorld = rb.position
-                    + forward * (d * cellSize)
-                    + perp    * (s * cellSize);
-                Vector2Int cell = drumTrack.WorldToGridPosition(sampleWorld);
-                if (!gen.TryGetCellState(cell, out var cellState) || cellState != DustCellState.Solid) continue;
+            if (!gen.TryGetCellState(cell, out var cellState) || cellState != DustCellState.Solid) return;
 
-                float resistance = gen.GetLiveCarveResistance01(cell);
-                if (resistance <= 0f) continue;
-                if (gen.TryGetDustAt(cell, out var dust) && dust != null)
-                    dust.PreviewResistance(resistance);
-            }
-        }
+            float resistance = gen.GetLiveCarveResistance01(cell);
+            if (resistance <= 0f) return;
+            if (gen.TryGetDustAt(cell, out var dust) && dust != null)
+                dust.PreviewResistance(resistance);
+        });
     }
 
     private void DoPlowTick()
     {
         _plowVelocityDrain = 0f;
-        _plowResistance01  = 0f;
-        _collisionResistance01 = 0f;
         if (gfm == null || gfm.dustGenerator == null || drumTrack == null) return;
         if (gfm.BridgePending || gfm.GhostCycleInProgress) return;
         if (!boosting) return;
@@ -162,7 +173,6 @@ public partial class Vehicle
         var gen = gfm.dustGenerator;
         float cellSize  = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
         Vector2 forward = vel.normalized;
-        Vector2 perp    = new Vector2(-forward.y, forward.x);
         float fade      = Mathf.Max(0.01f, vehicleConfig.plowFadeSeconds);
         int halfW       = Mathf.Max(0, profile.plowHalfWidthCells);
         int depth       = Mathf.Max(0, profile.plowDepthCells);
@@ -172,35 +182,28 @@ public partial class Vehicle
         bool canCarve = vel.magnitude >= profile.plowMinSpeed;
         float totalVelocityDrain = 0f;
 
-        for (int d = 0; d <= depth; d++)
+        ForEachFootprintCell(forward, 0, depth, halfW, cellSize, cell =>
         {
-            for (int s = -halfW; s <= halfW; s++)
-            {
-                Vector2    sampleWorld = rb.position
-                    + forward * (d * cellSize)
-                    + perp    * (s * cellSize);
-                Vector2Int cell = drumTrack.WorldToGridPosition(sampleWorld);
-                if (!gen.TryGetCellState(cell, out var cellState)) continue;
-                bool isSolid    = cellState == DustCellState.Solid;
-                bool isClearing = cellState == DustCellState.Clearing;
-                if (!isSolid && !isClearing) continue;
+            if (!gen.TryGetCellState(cell, out var cellState)) return;
+            bool isSolid    = cellState == DustCellState.Solid;
+            bool isClearing = cellState == DustCellState.Clearing;
+            if (!isSolid && !isClearing) return;
 
-                float liveRes      = gen.GetLiveCarveResistance01(cell);
-                float effectiveRes = liveRes * (1f - Mathf.Clamp01(profile.carveResistanceBypass01));
+            float liveRes      = gen.GetLiveCarveResistance01(cell);
+            float effectiveRes = liveRes * (1f - Mathf.Clamp01(profile.carveResistanceBypass01));
 
-                if (profile.carveVelocityDrainPerCell > 0f)
-                    totalVelocityDrain = Mathf.Max(totalVelocityDrain, liveRes * profile.carveVelocityDrainPerCell);
+            if (profile.carveVelocityDrainPerCell > 0f)
+                totalVelocityDrain = Mathf.Max(totalVelocityDrain, liveRes * profile.carveVelocityDrainPerCell);
 
-                if (!isSolid) continue;
-                if (effectiveRes >= 1f) continue;
-                if (!canCarve) continue;
+            if (!isSolid) return;
+            if (effectiveRes >= 1f) return;
+            if (!canCarve) return;
 
-                gen.SuppressCellColliderForPlow(cell);
-                gen.ChipDustByVehicle(cell, chipAmount, fade, profile.carveResistanceBypass01, profile);
-                _isActivePlow = true;
-                _plowResistance01 = Mathf.Max(_plowResistance01, effectiveRes);
-            }
-        }
+            gen.SuppressCellColliderForPlow(cell);
+            gen.ChipDustByVehicle(cell, chipAmount, fade, profile.carveResistanceBypass01, profile);
+            _isActivePlow = true;
+            _dustResistance01 = Mathf.Max(_dustResistance01, effectiveRes);
+        });
 
         _plowVelocityDrain = totalVelocityDrain;
     }
