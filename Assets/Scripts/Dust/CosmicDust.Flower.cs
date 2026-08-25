@@ -11,6 +11,7 @@ public partial class CosmicDust
     [SerializeField] private float flowerShimmerSpeed = 1.2f;
 
     private Color _flowerRoleColor = Color.white;
+    private float _flowerBloomTime;
 
     public bool HasBloomedFlower { get; private set; }
 
@@ -18,6 +19,7 @@ public partial class CosmicDust
     {
         HasBloomedFlower = true;
         _flowerRoleColor = roleColorRgb;
+        _flowerBloomTime = Time.time;
         if (flowerRoot != null) flowerRoot.SetActive(true);
         ApplyFlowerShimmerColor();
     }
@@ -38,7 +40,11 @@ public partial class CosmicDust
 
     private void ApplyFlowerShimmerColor()
     {
-        float t = (Mathf.Sin(Time.time * flowerShimmerSpeed * Mathf.PI * 2f) + 1f) * 0.5f;
+        // Phased off this cell's own bloom time, not the shared global clock -- otherwise
+        // every flower in the maze pulses in lockstep regardless of when each one bloomed.
+        // 1-Cos (not Sin) so elapsed=0 starts exactly at the role color, not mid-pulse.
+        float elapsed = Time.time - _flowerBloomTime;
+        float t = (1f - Mathf.Cos(elapsed * flowerShimmerSpeed * Mathf.PI * 2f)) * 0.5f;
         Color c = Color.Lerp(_flowerRoleColor, Color.white, t);
         c.a = flowerBloomAlpha;
         if (flowerDiamondA != null) flowerDiamondA.color = c;
