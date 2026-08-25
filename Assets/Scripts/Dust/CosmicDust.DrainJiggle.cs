@@ -21,7 +21,9 @@ public partial class CosmicDust
 {
     const float duration  = 0.28f;
     const float frequency = 28f;   // oscillations per second
-    const float amplitude = 0.18f; // peak scale offset
+    // Kept subtle so the vehicle-nose push/displacement (CosmicDust.VehicleCompression.cs)
+    // reads as the primary bump feedback instead of competing with a high-frequency shake.
+    const float amplitude = 0.05f; // peak scale offset
 
     Vector3 baseScale = _dustSpriteBaseVisualScale;
     float elapsed = 0f;

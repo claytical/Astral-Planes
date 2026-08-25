@@ -6,7 +6,7 @@ public partial class CosmicDust
     [SerializeField] private GameObject flowerRoot;
     [SerializeField] private SpriteRenderer flowerDiamondA;
     [SerializeField] private SpriteRenderer flowerDiamondB;
-    [SerializeField] private float flowerBloomAlpha = 0.404f;
+    [SerializeField] private float flowerBloomAlpha = 0.75f;
     [SerializeField] private float flowerRotationSpeedDegPerSec = 12f;
 
     public bool HasBloomedFlower { get; private set; }

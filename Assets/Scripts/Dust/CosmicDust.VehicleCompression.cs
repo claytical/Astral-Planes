@@ -16,16 +16,16 @@ public partial class CosmicDust
     [SerializeField] private NoseCompressionSettings noseCompression = new()
     {
         enabled = true,
-        compressAmount = 0.22f,
-        bulgeAmount = 0.10f,
-        maxOffsetWorld = 0.16f,
+        compressAmount = 0.40f,
+        bulgeAmount = 0.18f,
+        maxOffsetWorld = 0.30f,
         probeWorld = 0.55f,
         speedForFull = 10f,
         boostBonus = 0.20f,
         contactGraceSeconds = 0.35f,
         minimumVisibleSeconds = 0.050f,
         attackSharpness = 10f,
-        releaseSharpness = 16f
+        releaseSharpness = 20f
     };
 
     private void DriveVehicleCompression(Vehicle vehicle, Collision2D collision)

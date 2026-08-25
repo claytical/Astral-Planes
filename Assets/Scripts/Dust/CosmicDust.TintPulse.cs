@@ -298,7 +298,9 @@ private void ClearRainbowParticleDirtyIfNeeded()
     private void TriggerBumpPulse()
     {
         Color.RGBToHSV(_currentTint, out float h, out float s, out float v);
-        Color pulseTint = Color.HSVToRGB(h, s, Mathf.Clamp01(v + 0.4f));
+        // Kept small so this reads as a soft accent, not a flash — the vehicle-nose
+        // push/displacement (CosmicDust.VehicleCompression.cs) is the primary bump cue.
+        Color pulseTint = Color.HSVToRGB(h, s, Mathf.Clamp01(v + 0.15f));
         pulseTint.a = _currentTint.a;
         CancelTintPulse(restoreToBase: false);
         _tintPulseToken++;
