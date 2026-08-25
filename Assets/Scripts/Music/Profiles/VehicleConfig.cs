@@ -3,6 +3,10 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "VehicleConfig", menuName = "Astral Planes/Vehicle Config")]
 public class VehicleConfig : ScriptableObject
 {
+    [Header("Physics Safety")]
+    [Tooltip("Hard ceiling on rigidbody angular velocity (deg/s), applied every physics tick regardless of ship. Safety clamp, not a per-ship feel knob — see arcadeAngularDamping on ShipMusicalProfile for day-to-day rotational feel.")]
+    public float maxAngularVelocityDegPerSec = 540f;
+
     [Header("Manual Note Release")]
     public int manualReleaseQueueCapacity = 9;
     [Tooltip("When releasing onto an already-occupied step, multiply committed velocity by this factor.")]

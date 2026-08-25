@@ -52,6 +52,22 @@ public class ShipMusicalProfile : ScriptableObject
     [Range(0.5f, 3f)]
     [Tooltip("Multiplier on arcadeMaxSpeed used as the velocity ceiling in ComputeHitVelocity127. 1.0 = max speed is a full hit. 1.5 = spread hits across a wider range (harder to peg).")]
     public float hitVelocityMultiplier = 1.0f;
+    [Tooltip("Exponent applied to normalized impact speed before mapping to damage. >1 = damage ramps up sharply near top speed; 1 = linear.")]
+    public float damageCurveExponent = 1.75f;
+    [Tooltip("Damage dealt at zero effective impact speed (curvedSpeed = 0).")]
+    public float minImpactDamage = 25f;
+    [Tooltip("Damage dealt at full effective impact speed (curvedSpeed = 1), before mass multiplier.")]
+    public float maxImpactDamage = 100f;
+    [Tooltip("Minimum mass multiplier applied to base damage (light ships hit softer).")]
+    public float massDamageMultiplierMin = 0.75f;
+    [Tooltip("Maximum mass multiplier applied to base damage (heavy ships hit harder).")]
+    public float massDamageMultiplierMax = 2f;
+    [Tooltip("Seconds since the last hit within which a follow-up impact is padded up to followUpDamageFloor.")]
+    public float followUpDamageWindowSeconds = 0.5f;
+    [Tooltip("Minimum damage for a follow-up hit landing within followUpDamageWindowSeconds of the previous one.")]
+    public float followUpDamageFloor = 10f;
+    [Tooltip("Absolute damage ceiling for a single impact, after mass multiplier and follow-up floor.")]
+    public float damageCeiling = 120f;
 
     [Header("Fuel Tradeoffs")]
     public float capacity = 10f;              // tank size (Vehicle energyLevel starts here)

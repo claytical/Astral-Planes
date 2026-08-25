@@ -448,7 +448,7 @@ public partial class Vehicle : MonoBehaviour
 
     private void ClampAngularVelocity()
         {
-            float maxAngularVelocity = 540f;
+            float maxAngularVelocity = vehicleConfig.maxAngularVelocityDegPerSec;
             if (rb != null)
             {
                 rb.angularVelocity = Mathf.Clamp(rb.angularVelocity, -maxAngularVelocity, maxAngularVelocity);
