@@ -80,4 +80,16 @@ public struct NoseCompressionSettings
     [Tooltip("Lower = slower, more cushioned. Higher = snappier.")]
     [Min(0.01f)] public float attackSharpness;
     [Min(0.01f)] public float releaseSharpness;
+
+    [Header("Particle Reactivity (contact disturbance)")]
+    [Tooltip("Multiplies the particle system's authored noise strength at full contact (1 = no change). " +
+             "Makes individual particles visibly scatter/jitter under contact instead of the whole cloud " +
+             "moving as one shape -- this is what should read as \"hundreds of things being disturbed.\"")]
+    [Min(1f)] public float noiseBurstMultiplier;
+    [Tooltip("Peak emission-rate multiplier for the brief scatter-poof fired at the start of a new contact.")]
+    [Min(1f)] public float emissionBurstPeakMultiplier;
+    [Tooltip("Seconds to ramp up to the emission burst peak.")]
+    [Min(0.01f)] public float emissionBurstAttackSeconds;
+    [Tooltip("Seconds to decay from the emission burst peak back to normal.")]
+    [Min(0.01f)] public float emissionBurstDecaySeconds;
 }

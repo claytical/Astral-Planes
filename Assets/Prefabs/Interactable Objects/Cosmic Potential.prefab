@@ -68,9 +68,9 @@ MonoBehaviour:
   colliderDisabledAlpha: 0.08
   noseCompression:
     enabled: 1
-    compressAmount: 0.4
-    bulgeAmount: 0.18
-    maxOffsetWorld: 0.3
+    compressAmount: 0.28
+    bulgeAmount: 0.12
+    maxOffsetWorld: 0.2
     probeWorld: 0.55
     speedForFull: 10
     boostBonus: 0.2
