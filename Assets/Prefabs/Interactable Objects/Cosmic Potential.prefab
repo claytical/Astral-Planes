@@ -59,7 +59,7 @@ MonoBehaviour:
   flowerRoot: {fileID: 1505405486306624559}
   flowerDiamondA: {fileID: 6771263445632034394}
   flowerDiamondB: {fileID: 6349677698668529810}
-  flowerBloomAlpha: 0.35
+  flowerBloomAlpha: 0.75
   flowerRotationSpeedDegPerSec: 12
   revealedEmissionMultiplier: 1.1
   _chargeColor: {r: 1, g: 1, b: 1, a: 0.23529412}
@@ -68,16 +68,16 @@ MonoBehaviour:
   colliderDisabledAlpha: 0.08
   noseCompression:
     enabled: 1
-    compressAmount: 0.22
-    bulgeAmount: 0.1
-    maxOffsetWorld: 0.16
+    compressAmount: 0.4
+    bulgeAmount: 0.18
+    maxOffsetWorld: 0.3
     probeWorld: 0.55
     speedForFull: 10
     boostBonus: 0.2
     contactGraceSeconds: 0.35
     minimumVisibleSeconds: 0.05
     attackSharpness: 10
-    releaseSharpness: 16
+    releaseSharpness: 20
   visual:
     prefabReferenceScale: {x: 1, y: 1, z: 1}
     particleSystem: {fileID: 5371160903463010692}
