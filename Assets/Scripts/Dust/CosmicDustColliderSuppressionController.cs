@@ -25,9 +25,17 @@ public sealed class CosmicDustColliderSuppressionController
     // Vehicle.DoPlowTick refreshes the stamp each tick; Tick() re-enables colliders
     // on cells that survive once the plow moves on.
     private readonly Dictionary<Vector2Int, float> _plowSuppressedColliders = new();
+    // First-suppressed timestamp per cell, set once and never refreshed — used to bound
+    // total suppression time regardless of continued vehicle overlap (see Tick()).
+    private readonly Dictionary<Vector2Int, float> _plowSuppressionStartTime = new();
     // Reusable snapshot buffer for Tick() to avoid per-frame allocation.
     private List<Vector2Int> _plowSuppressedKeys;
     private const float kPlowColliderRecoveryGraceSeconds = 0.25f;
+    // Hard cap on suppression regardless of continued overlap — a vehicle parked on a still-
+    // solid cell (stopped mid-carve, or driven back onto one) must eventually be repelled
+    // again instead of sitting inside it indefinitely, which is what an unbounded "defer while
+    // overlapping" wait would otherwise allow.
+    private const float kPlowColliderMaxSuppressionSeconds = 1.0f;
     private Collider2D[] _vehicleVetoHits;
 
     public CosmicDustColliderSuppressionController(
@@ -67,6 +75,8 @@ public sealed class CosmicDustColliderSuppressionController
     {
         if (!_isInBounds(cell)) return;
         DisableCellCollider(cell);
+        if (!_plowSuppressedColliders.ContainsKey(cell))
+            _plowSuppressionStartTime[cell] = Time.time;
         _plowSuppressedColliders[cell] = Time.time;
     }
 
@@ -74,7 +84,11 @@ public sealed class CosmicDustColliderSuppressionController
     /// Drops the suppression stamp for a cell without touching its collider — used when
     /// the cell has been fully carved and the clear/regrow path now owns the collider.
     /// </summary>
-    public void ClearSuppression(Vector2Int cell) => _plowSuppressedColliders.Remove(cell);
+    public void ClearSuppression(Vector2Int cell)
+    {
+        _plowSuppressedColliders.Remove(cell);
+        _plowSuppressionStartTime.Remove(cell);
+    }
 
     public void Tick()
     {
@@ -94,15 +108,21 @@ public sealed class CosmicDustColliderSuppressionController
             {
                 // Fully carved (or repurposed): the clear/regrow path owns the collider now.
                 _plowSuppressedColliders.Remove(gp);
+                _plowSuppressionStartTime.Remove(gp);
                 continue;
             }
 
-            // Defer while a vehicle still overlaps so the collider doesn't pop it out.
-            if (IsVehicleOverlappingCell(gp)) continue;
+            // Defer while a vehicle still overlaps so the collider doesn't pop it out --
+            // unless suppression has run past the hard cap, in which case a still-solid cell
+            // must re-collide regardless (a parked vehicle would otherwise never be repelled).
+            bool suppressedTooLong = _plowSuppressionStartTime.TryGetValue(gp, out float startedAt)
+                && (now - startedAt) >= kPlowColliderMaxSuppressionSeconds;
+            if (IsVehicleOverlappingCell(gp) && !suppressedTooLong) continue;
 
             var dust = _gridState.CellDust?[gp.x, gp.y];
             if (dust != null) _setDustCollision(dust, true);
             _plowSuppressedColliders.Remove(gp);
+            _plowSuppressionStartTime.Remove(gp);
         }
     }
 
