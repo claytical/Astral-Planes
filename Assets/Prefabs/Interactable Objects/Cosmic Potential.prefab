@@ -59,14 +59,13 @@ MonoBehaviour:
   flowerRoot: {fileID: 1505405486306624559}
   flowerDiamondA: {fileID: 6771263445632034394}
   flowerDiamondB: {fileID: 6349677698668529810}
-  flowerBloomAlpha: 0.404
+  flowerBloomAlpha: 0.35
   flowerRotationSpeedDegPerSec: 12
-  revealedEmissionMultiplier: 1.35
+  revealedEmissionMultiplier: 1.1
   _chargeColor: {r: 1, g: 1, b: 1, a: 0.23529412}
   _denyColor: {r: 0.8156863, g: 0.1254902, b: 0.5647059, a: 1}
   regrowAlphaCapped: 0
   colliderDisabledAlpha: 0.08
-  useWorkShaderParams: 1
   noseCompression:
     enabled: 1
     compressAmount: 0.22
@@ -75,7 +74,7 @@ MonoBehaviour:
     probeWorld: 0.55
     speedForFull: 10
     boostBonus: 0.2
-    contactGraceSeconds: 0.075
+    contactGraceSeconds: 0.35
     minimumVisibleSeconds: 0.05
     attackSharpness: 10
     releaseSharpness: 16
@@ -325,7 +324,7 @@ ParticleSystem:
   m_GameObject: {fileID: 2371707622271433480}
   serializedVersion: 8
   lengthInSec: 0.5
-  simulationSpeed: 0.8
+  simulationSpeed: 0.3
   stopAction: 0
   cullingMode: 0
   ringBufferMode: 0
@@ -506,7 +505,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 1, g: 1, b: 1, a: 1}
-      maxColor: {r: 1, g: 1, b: 1, a: 0.34901962}
+      maxColor: {r: 1, g: 1, b: 1, a: 0.14901961}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -1092,8 +1091,8 @@ ParticleSystem:
           m_RotationOrder: 4
     arc:
       value: 360
-      mode: 0
-      spread: 0
+      mode: 3
+      spread: 1
       speed:
         serializedVersion: 2
         minMaxState: 0
@@ -1600,7 +1599,7 @@ ParticleSystem:
         key6: {r: 0, g: 0, b: 0, a: 0}
         key7: {r: 0, g: 0, b: 0, a: 0}
         ctime0: 0
-        ctime1: 20113
+        ctime1: 65535
         ctime2: 65535
         ctime3: 0
         ctime4: 0
@@ -1609,7 +1608,7 @@ ParticleSystem:
         ctime7: 0
         atime0: 0
         atime1: 6537
-        atime2: 20616
+        atime2: 14750
         atime3: 65535
         atime4: 65535
         atime5: 0
@@ -1617,7 +1616,7 @@ ParticleSystem:
         atime7: 0
         m_Mode: 0
         m_ColorSpace: 0
-        m_NumColorKeys: 3
+        m_NumColorKeys: 2
         m_NumAlphaKeys: 4
       minGradient:
         serializedVersion: 2
