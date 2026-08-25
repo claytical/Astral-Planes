@@ -560,7 +560,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
             dust.EnsureMinSolidAlpha(0.55f);
             SetDustCollision(dust, true);
         }
-        _roleDensity.RemoveExcludedRole(gp);
         _regrowthScheduler.CommitRegrowCoroutines.Remove(gp);
     }
 

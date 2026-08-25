@@ -23,11 +23,6 @@ public sealed class DustRoleDensityTracker
     private readonly Func<Vector2Int, bool> _isCellSolid;
     private readonly Func<Vector2Int, CosmicDust> _tryGetDustAt;
 
-    // Cell -> role that should be excluded from regrow resolution (currently never written
-    // anywhere in the repo, so this exclusion branch is a permanent no-op today; carried
-    // over verbatim rather than fixed/removed — see project memory for the flagged follow-up).
-    private readonly Dictionary<Vector2Int, MusicalRole> _regrowExcludeRoleByCell = new Dictionary<Vector2Int, MusicalRole>(2048);
-
     private readonly Dictionary<RoleVoiceKey, int> _solidCountByVoice = new Dictionary<RoleVoiceKey, int>();
 
     private List<MusicalRole> _activeRoles;   // set from motif at phase start via SetActiveRoles
@@ -85,8 +80,6 @@ public sealed class DustRoleDensityTracker
             if (cfg?.roleProfile != null) _roleProfileByVoice[v] = cfg.roleProfile;
         }
     }
-
-    public void RemoveExcludedRole(Vector2Int gp) => _regrowExcludeRoleByCell.Remove(gp);
 
     // Prefers the motif-assigned profile for this voice; falls back to the library's arbitrary
     // first-loaded profile only when no motif has configured this role/voice yet (e.g. before
@@ -156,38 +149,6 @@ public sealed class DustRoleDensityTracker
         return best;
     }
 
-    private RoleVoiceKey GetLeastDenseVoiceExcluding(RoleVoiceKey excluded)
-    {
-        RoleVoiceKey best = new RoleVoiceKey(MusicalRole.None, 0);
-        int bestCount = int.MaxValue;
-
-        var voices = (_activeVoices != null && _activeVoices.Count > 0)
-            ? (IReadOnlyList<RoleVoiceKey>)_activeVoices
-            : DefaultVoices();
-
-        foreach (var v in voices)
-        {
-            if (v.Equals(excluded)) continue;
-            int cnt = _solidCountByVoice.TryGetValue(v, out var c) ? c : 0;
-            if (cnt < bestCount)
-            {
-                bestCount = cnt;
-                best = v;
-            }
-            else if (cnt == bestCount && Random.value > 0.5f)
-            {
-                best = v; // random tie-break
-            }
-        }
-
-        // If excluded was the only active voice, ignore the exclusion rather than
-        // returning None or a voice outside the motif's active set.
-        if (best.role == MusicalRole.None)
-            best = GetLeastDenseVoice();
-
-        return best;
-    }
-
     public int TotalSolidCount()
     {
         // _gridState.AllSolidCount tracks ALL solid cells including MusicalRole.None.
@@ -200,10 +161,6 @@ public sealed class DustRoleDensityTracker
 
     public RoleVoiceKey ResolveRegrowVoice(Vector2Int gp)
     {
-        RoleVoiceKey excludedVoice = new RoleVoiceKey(MusicalRole.None, 0);
-        if (_regrowExcludeRoleByCell.TryGetValue(gp, out var ex))
-            excludedVoice = new RoleVoiceKey(ex, 0);
-
         if (_imprints != null && _imprints.TryGetValue(gp, out var existingImp))
         {
             if (existingImp.role == MusicalRole.None)
@@ -233,8 +190,8 @@ public sealed class DustRoleDensityTracker
         if (_hasForceGrayRegrowFlag(gp))
             return new RoleVoiceKey(MusicalRole.None, 0);
 
-        var neighborVoice = GetPluralityNeighborVoice(gp, excludedVoice);
-        return neighborVoice.role != MusicalRole.None ? neighborVoice : GetLeastDenseVoiceExcluding(excludedVoice);
+        var neighborVoice = GetPluralityNeighborVoice(gp);
+        return neighborVoice.role != MusicalRole.None ? neighborVoice : GetLeastDenseVoice();
     }
 
     /// <summary>
@@ -242,7 +199,7 @@ public sealed class DustRoleDensityTracker
     /// Ties broken by global density (least-dense wins). Returns None when no imprinted
     /// solid neighbors exist.
     /// </summary>
-    private RoleVoiceKey GetPluralityNeighborVoice(Vector2Int cell, RoleVoiceKey excluded)
+    private RoleVoiceKey GetPluralityNeighborVoice(Vector2Int cell)
     {
         if (_imprints == null) return new RoleVoiceKey(MusicalRole.None, 0);
 
@@ -256,7 +213,7 @@ public sealed class DustRoleDensityTracker
             if (!_imprints.TryGetValue(n, out var imp) || imp.role == MusicalRole.None) continue;
 
             var key = new RoleVoiceKey(imp.role, imp.voiceIndex);
-            if (key.Equals(excluded) || !IsVoiceActive(key)) continue;
+            if (!IsVoiceActive(key)) continue;
 
             counts[key] = counts.TryGetValue(key, out var c) ? c + 1 : 1;
         }
