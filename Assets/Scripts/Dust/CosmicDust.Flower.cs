@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 public partial class CosmicDust
@@ -7,18 +8,23 @@ public partial class CosmicDust
     [SerializeField] private SpriteRenderer flowerDiamondA;
     [SerializeField] private SpriteRenderer flowerDiamondB;
     [SerializeField] private float flowerBloomAlpha = 0.75f;
+    [Tooltip("Seconds for the flower to scale in from 0 when it blooms.")]
+    [SerializeField] private float flowerGrowInSeconds = 0.18f;
     [Tooltip("Shimmer cycles per second -- how fast the flower pulses between its role color and white.")]
     [SerializeField] private float flowerShimmerSpeed = 1.2f;
     [Tooltip("How far each petal bobs from its resting position while swaying, in world units.")]
-    [SerializeField] private float flowerSwayAmplitudeWorld = 0.03f;
+    [SerializeField] private float flowerSwayAmplitudeWorld = 0.08f;
     [Tooltip("How quickly the sway wanders -- low, matching the dust particles' own noise drift, for a breeze-like rather than mechanical feel.")]
-    [SerializeField] private float flowerSwayFrequency = 0.22f;
+    [SerializeField] private float flowerSwayFrequency = 0.3f;
 
     private Color _flowerRoleColor = Color.white;
     private float _flowerBloomTime;
     private bool _flowerSwayBaseCaptured;
     private Vector3 _flowerDiamondABasePos;
     private Vector3 _flowerDiamondBBasePos;
+    private bool _flowerRootScaleCaptured;
+    private Vector3 _flowerRootBaseScale = Vector3.one;
+    private Coroutine _flowerGrowInRoutine;
 
     public bool HasBloomedFlower { get; private set; }
 
@@ -33,7 +39,19 @@ public partial class CosmicDust
             if (flowerDiamondB != null) _flowerDiamondBBasePos = flowerDiamondB.transform.localPosition;
             _flowerSwayBaseCaptured = true;
         }
-        if (flowerRoot != null) flowerRoot.SetActive(true);
+
+        if (flowerRoot != null)
+        {
+            if (!_flowerRootScaleCaptured)
+            {
+                _flowerRootBaseScale = flowerRoot.transform.localScale;
+                _flowerRootScaleCaptured = true;
+            }
+            flowerRoot.SetActive(true);
+            if (_flowerGrowInRoutine != null) StopCoroutine(_flowerGrowInRoutine);
+            _flowerGrowInRoutine = StartCoroutine(FlowerGrowInRoutine());
+        }
+
         ApplyFlowerShimmerColor();
         ApplyFlowerSway();
     }
@@ -41,7 +59,24 @@ public partial class CosmicDust
     public void HideFlower()
     {
         HasBloomedFlower = false;
+        if (_flowerGrowInRoutine != null) { StopCoroutine(_flowerGrowInRoutine); _flowerGrowInRoutine = null; }
         if (flowerRoot != null) flowerRoot.SetActive(false);
+    }
+
+    private IEnumerator FlowerGrowInRoutine()
+    {
+        flowerRoot.transform.localScale = Vector3.zero;
+        float t = 0f;
+        float duration = Mathf.Max(0.01f, flowerGrowInSeconds);
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            float u = Mathf.SmoothStep(0f, 1f, t / duration);
+            flowerRoot.transform.localScale = _flowerRootBaseScale * u;
+            yield return null;
+        }
+        flowerRoot.transform.localScale = _flowerRootBaseScale;
+        _flowerGrowInRoutine = null;
     }
 
     // Shimmer/glow tell: smoothly pulse-lerps between the cell's role color and white instead
