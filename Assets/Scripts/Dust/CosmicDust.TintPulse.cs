@@ -109,7 +109,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
     public void SetTint(Color tint)
     {
         SetBaseTint(tint, applyImmediatelyIfNoPulse: true);
-        OnTintStateChanged?.Invoke(_currentTint);
+        ApplyTintVisual(_currentTint);
     }
     // Now the real particle tint path (dust is going particle-only — see CosmicDust migration
     // plan). Mirrors SetRainbowParticleColor: sets startColor for future emissions and rewrites

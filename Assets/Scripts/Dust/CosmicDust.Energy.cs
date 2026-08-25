@@ -21,8 +21,7 @@ public partial class CosmicDust
             if (_currentEnergyUnits <= 0)
                 _currentEnergyUnits = 1;
         }
-        ApplyDisplayedTint(_currentTint);
-        OnChargeChanged?.Invoke(Charge01);
+        ApplyTintVisual(_currentTint);
     }
 
     // maxUnits: pass > 0 to update the cell's max energy units (from a role profile).
@@ -32,7 +31,6 @@ public partial class CosmicDust
         Role = r;
         VoiceIndex = voiceIndex;
         if (r != MusicalRole.None) _hiddenHintColor = Color.clear;
-        OnRoleChanged?.Invoke(Role);
         if (maxUnits > 0) _maxEnergyUnits = maxUnits;
         SetEnergyUnits(Mathf.RoundToInt(Mathf.Clamp01(charge) * _maxEnergyUnits));
 
@@ -42,8 +40,7 @@ public partial class CosmicDust
         // Do NOT floor it here — cells that aren't Solid yet must stay dim.
         // The generator enforces a visible-alpha floor when solidifying.
         SetBaseTint(roleColorRgb, applyImmediatelyIfNoPulse: false);
-        OnTintStateChanged?.Invoke(_currentTint);
-        OnChargeChanged?.Invoke(Charge01);
+        ApplyTintVisual(_currentTint);
     }
 
     // Sets current energy units, clamped [0, max]. Updates tint alpha accordingly.
@@ -52,8 +49,7 @@ public partial class CosmicDust
         _currentEnergyUnits = Mathf.Clamp(units, 0, _maxEnergyUnits);
         float visibleAlpha = Mathf.Lerp(kSolidAlphaFloor, 1f, Charge01);
         _currentTint.a = visibleAlpha;
-        OnTintStateChanged?.Invoke(_currentTint);
-        OnChargeChanged?.Invoke(Charge01);
+        ApplyTintVisual(_currentTint);
     }
 
     // Decrements energy units by amount. Drives visual drain. Returns actual units removed.
@@ -74,8 +70,7 @@ public partial class CosmicDust
         drained.a = Mathf.Lerp(0.05f, _currentTint.a, Charge01);
 
         _currentTint = drained;
-        OnTintStateChanged?.Invoke(_currentTint);
-        OnChargeChanged?.Invoke(Charge01);
+        ApplyTintVisual(_currentTint);
 
         if (_currentEnergyUnits <= 0)
             SetTerrainColliderEnabled(false);

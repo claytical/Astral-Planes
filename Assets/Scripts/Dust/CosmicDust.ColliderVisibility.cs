@@ -61,8 +61,6 @@ public partial class CosmicDust
         {
             RebuildColliderForCurrentScale();
         }
-
-        OnCollisionStateChanged?.Invoke(enabled);
     }
     public bool IsVisuallyPresentForTargeting(float minEffectiveAlpha = 0.05f, float minAbsScale = 0.01f)
     {

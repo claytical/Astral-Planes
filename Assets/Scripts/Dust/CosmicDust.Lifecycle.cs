@@ -26,14 +26,6 @@ public partial class CosmicDust
             return;
         }
 
-        if (OnSpawnVisualRequested != null)
-        {
-            OnSpawnVisualRequested.Invoke();
-            return;
-        }
-
-        // Backstop for lifecycle ordering: if Begin is called before the visual controller
-        // subscribes (or if no controller is present), still run the spawn visuals.
         RunSpawnVisuals(ResolveGrowDurationSeconds());
     }
     public void DissipateAndHideVisualOnly(float fadeSeconds = -1f)
@@ -42,10 +34,7 @@ public partial class CosmicDust
         _isDespawned = true;
 
         float d = (fadeSeconds > 0f) ? fadeSeconds : _timings.clearSpriteScaleOutSeconds;
-        if (OnClearVisualRequested != null)
-            OnClearVisualRequested.Invoke(d);
-        else
-            RunClearVisuals(d);
+        RunClearVisuals(d);
 
         // Notify generator after the carve-out read, so it can finalize state bookkeeping.
         if (_fadeRoutine != null) { StopCoroutine(_fadeRoutine); _fadeRoutine = null; }

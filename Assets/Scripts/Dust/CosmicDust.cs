@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 
 public partial class CosmicDust : MonoBehaviour {
@@ -12,13 +11,6 @@ public partial class CosmicDust : MonoBehaviour {
     // CosmicDustGenerator owns: grid cell state (DustGridState), imprint dictionary.
     // CosmicDust never queries Generator directly; Generator drives CosmicDust via public API.
     // PrepareForReuse() resets CosmicDust's local fields; callers must also update the grid via SetCellState().
-
-    public event Action<float> OnChargeChanged;
-    public event Action<MusicalRole> OnRoleChanged;
-    public event Action<bool> OnCollisionStateChanged;
-    public event Action<Color> OnTintStateChanged;
-    public event Action OnSpawnVisualRequested;
-    public event Action<float> OnClearVisualRequested;
 
     // Interaction-mode contract (implemented by CosmicDustGenerator):
     // Carve: resistance-aware depletion used by Vehicle/DiscoveryTrackNode interactions.
@@ -52,14 +44,12 @@ public partial class CosmicDust : MonoBehaviour {
 
     private DrumTrack _drumTrack;
     private CosmicDustGenerator gen;
-    private CosmicDustVisualController _visualController;
 
     private bool _isBreaking;
     [SerializeField] private float _baseEmission = 1;
 
 private GameFlowManager _gfm;
     void Awake() {
-        _visualController = GetComponent<CosmicDustVisualController>();
         if (!_cachedInitialScale)
         {
 
