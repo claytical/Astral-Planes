@@ -548,7 +548,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         if (dust != null)
         {
             dust.regrowAlphaCapped = false;
-            dust.EnsureMinSolidAlpha(0.55f);
+            dust.EnsureMinSolidAlpha(0.30f);
             SetDustCollision(dust, true);
         }
         _regrowthScheduler.CommitRegrowCoroutines.Remove(gp);

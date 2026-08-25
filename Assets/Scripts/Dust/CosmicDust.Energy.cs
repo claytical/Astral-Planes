@@ -10,7 +10,10 @@ public partial class CosmicDust
     public float Charge01 => (float)_currentEnergyUnits / Mathf.Max(1, _maxEnergyUnits);
     public MusicalRole Role { get; private set; } = MusicalRole.None;
     public int VoiceIndex { get; private set; } = 0;
-    private const float kSolidAlphaFloor = .55f;
+    // Ceiling kept below 1.0 so even a fully-charged solid cell stays translucent (wispy)
+    // instead of reading as an opaque, heavy block.
+    private const float kSolidAlphaFloor = .30f;
+    private const float kSolidAlphaCeiling = .72f;
 
     public void EnsureMinSolidAlpha(float minAlpha)
     {
@@ -34,7 +37,7 @@ public partial class CosmicDust
         if (maxUnits > 0) _maxEnergyUnits = maxUnits;
         SetEnergyUnits(Mathf.RoundToInt(Mathf.Clamp01(charge) * _maxEnergyUnits));
 
-        float visibleAlpha = Mathf.Lerp(kSolidAlphaFloor, 1f, Charge01);
+        float visibleAlpha = Mathf.Lerp(kSolidAlphaFloor, kSolidAlphaCeiling, Charge01);
         roleColorRgb.a = visibleAlpha;
         // Alpha comes from the caller (roleProfile.baseAlpha via GetBaseColor()).
         // Do NOT floor it here — cells that aren't Solid yet must stay dim.
@@ -47,7 +50,7 @@ public partial class CosmicDust
     private void SetEnergyUnits(int units)
     {
         _currentEnergyUnits = Mathf.Clamp(units, 0, _maxEnergyUnits);
-        float visibleAlpha = Mathf.Lerp(kSolidAlphaFloor, 1f, Charge01);
+        float visibleAlpha = Mathf.Lerp(kSolidAlphaFloor, kSolidAlphaCeiling, Charge01);
         _currentTint.a = visibleAlpha;
         ApplyTintVisual(_currentTint);
     }

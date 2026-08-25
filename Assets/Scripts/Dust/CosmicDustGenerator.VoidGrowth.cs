@@ -449,7 +449,7 @@ public partial class CosmicDustGenerator
         if (dust != null)
         {
             dust.regrowAlphaCapped = false;
-            dust.EnsureMinSolidAlpha(0.55f);
+            dust.EnsureMinSolidAlpha(0.30f);
             SetDustCollision(dust, true);
         }
 
