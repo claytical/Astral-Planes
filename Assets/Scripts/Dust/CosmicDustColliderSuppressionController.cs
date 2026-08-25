@@ -114,39 +114,23 @@ public sealed class CosmicDustColliderSuppressionController
 
         float cellWorld = Mathf.Max(0.001f, _getCellWorldSize());
         Vector2 center = _gridToWorldPosition(gp);
-        Vector2 size = Vector2.one * (cellWorld * _getRegrowVetoBoxMul());
-
-        EnsureVetoHitsBuffer();
-
-        var filter = new ContactFilter2D();
-        filter.SetLayerMask(vehicleMask);
-        filter.useTriggers = Physics2D.queriesHitTriggers;
-        int hits = Physics2D.OverlapBox(center, size, 0f, filter, _vehicleVetoHits);
-        if (hits <= 0) return false;
-
-        for (int i = 0; i < hits; i++)
-        {
-            var col = _vehicleVetoHits[i];
-            if (col == null) continue;
-
-            if (col.GetComponentInParent<Vehicle>() != null)
-                return true;
-        }
-
-        return false;
+        return OverlapVehicleAt(center, cellWorld);
     }
 
-    public bool IsVehicleOverlappingCellWorld(Vector3 cellWorld, float cellWorldSize)
+    public bool IsVehicleOverlappingCellWorld(Vector3 cellWorld, float cellWorldSize) =>
+        OverlapVehicleAt(cellWorld, cellWorldSize);
+
+    // NOTE: even if vehicleMask is broad/misconfigured, we only veto if a Vehicle is present.
+    private bool OverlapVehicleAt(Vector2 center, float cellWorldSize)
     {
         Vector2 size = Vector2.one * Mathf.Max(0.001f, cellWorldSize * _getRegrowVetoBoxMul());
 
         EnsureVetoHitsBuffer();
 
-        // NOTE: even if vehicleMask is broad/misconfigured, we only veto if a Vehicle is present.
         var filter = new ContactFilter2D();
         filter.SetLayerMask(_getVehicleMask());
         filter.useTriggers = Physics2D.queriesHitTriggers;
-        int hits = Physics2D.OverlapBox(cellWorld, size, 0f, filter, _vehicleVetoHits);
+        int hits = Physics2D.OverlapBox(center, size, 0f, filter, _vehicleVetoHits);
         if (hits <= 0) return false;
 
         for (int i = 0; i < hits; i++)
