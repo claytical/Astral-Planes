@@ -60,8 +60,8 @@ public partial class CosmicDust
         {
             _currentPluckVehicle = vehicle;
             _nextDustPluckTime = Time.time;
-            TriggerBumpPulse();
-            TriggerJiggle();
+            // Highlight is now a continuous ramp tied to the contact envelope, not a fixed-
+            // duration pulse — see TickCollisionHighlight (CosmicDust.VehicleCompression.cs).
         }
 
         if (Role == MusicalRole.None || Time.time < _nextDustPluckTime) return;

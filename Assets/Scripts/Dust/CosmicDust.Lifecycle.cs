@@ -99,7 +99,6 @@ public partial class CosmicDust
         if (_growInRoutine      != null) { StopCoroutine(_growInRoutine);      _growInRoutine      = null; }
         if (_spriteScaleRoutine != null) { StopCoroutine(_spriteScaleRoutine); _spriteScaleRoutine = null; }
         if (_emissionMulRoutine != null) { StopCoroutine(_emissionMulRoutine); _emissionMulRoutine = null; }
-        if (_jiggleRoutine      != null) { StopCoroutine(_jiggleRoutine);      _jiggleRoutine      = null; }
         if (_drainBuildupRoutine != null) { StopCoroutine(_drainBuildupRoutine); _drainBuildupRoutine = null; }
         if (_retintOverRoutine  != null) { StopCoroutine(_retintOverRoutine);  _retintOverRoutine  = null; }
         if (_tintFadeInRoutine  != null) { StopCoroutine(_tintFadeInRoutine);  _tintFadeInRoutine  = null; }

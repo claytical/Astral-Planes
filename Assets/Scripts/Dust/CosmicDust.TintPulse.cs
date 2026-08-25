@@ -292,22 +292,6 @@ private void ClearRainbowParticleDirtyIfNeeded()
     }
 }
 
-    // Non-boost bump feedback: a brief brighten-and-settle on top of whatever the cell's already
-    // showing (its true role color, always — there's no hidden state to reveal anymore). Purely
-    // transient; RestoreDisplayToBaseTint (end of TintPulseRoutine) snaps back to _currentTint.
-    private void TriggerBumpPulse()
-    {
-        Color.RGBToHSV(_currentTint, out float h, out float s, out float v);
-        // Kept small so this reads as a soft accent, not a flash — the vehicle-nose
-        // push/displacement (CosmicDust.VehicleCompression.cs) is the primary bump cue.
-        Color pulseTint = Color.HSVToRGB(h, s, Mathf.Clamp01(v + 0.15f));
-        pulseTint.a = _currentTint.a;
-        CancelTintPulse(restoreToBase: false);
-        _tintPulseToken++;
-        int token = _tintPulseToken;
-        _tintPulseRoutine = StartCoroutine(TintPulseRoutine(token, pulseTint, 0.4f));
-    }
-
     // Triggered maze-wide by CosmicDustGenerator.BeginRainbowPulseAllDust on wisp consume.
     // Same fade-in/hold/fade-out shape as TintPulseRoutine, except "hold" continuously
     // advances an HSV hue cycle instead of holding one constant color.

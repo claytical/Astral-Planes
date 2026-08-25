@@ -3,47 +3,15 @@ using UnityEngine;
 
 public partial class CosmicDust
 {
-    private Coroutine _jiggleRoutine;
     private Coroutine _drainBuildupRoutine;
 
     // Shudder writes through SetBaseSpriteScale, which mutates _dustSpriteBaseVisualScale —
     // so the pre-buildup base must be captured here for CancelDrainBuildup to restore.
     private Vector3 _drainBuildupBaseScale = Vector3.one;
 
-    private void TriggerJiggle()
-{
-    if (_jiggleRoutine != null)
-        StopCoroutine(_jiggleRoutine);
-    _jiggleRoutine = StartCoroutine(JiggleRoutine());
-}
-
-    private IEnumerator JiggleRoutine()
-{
-    const float duration  = 0.28f;
-    const float frequency = 28f;   // oscillations per second
-    // Kept subtle so the vehicle-nose push/displacement (CosmicDust.VehicleCompression.cs)
-    // reads as the primary bump feedback instead of competing with a high-frequency shake.
-    const float amplitude = 0.05f; // peak scale offset
-
-    Vector3 baseScale = _dustSpriteBaseVisualScale;
-    float elapsed = 0f;
-
-    while (elapsed < duration)
-    {
-        elapsed += Time.deltaTime;
-        float decay  = 1f - Mathf.Clamp01(elapsed / duration);
-        float offset = Mathf.Sin(elapsed * frequency * Mathf.PI * 2f) * amplitude * decay;
-        SetBaseSpriteScale(baseScale * (1f + offset));
-        yield return null;
-    }
-
-    SetBaseSpriteScale(baseScale);
-    _jiggleRoutine = null;
-}
-
     // Anticipation FX while a PhaseStar tentacle charges up its drain: scale shudder that
-    // ramps UP (inverse of JiggleRoutine's decay) plus a brightening toward white on the
-    // display lane only — _currentTint stays authoritative so charge/tint events are unaffected.
+    // ramps up over the duration, plus a brightening toward white on the display lane only —
+    // _currentTint stays authoritative so charge/tint events are unaffected.
     public void BeginDrainBuildup(float seconds)
     {
         if (_drainBuildupRoutine != null)

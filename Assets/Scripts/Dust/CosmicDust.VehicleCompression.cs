@@ -17,6 +17,8 @@ public partial class CosmicDust
     private float _noseBaseNoiseStrengthMin;
     private float _noseBaseNoiseStrengthMax;
     private bool _noseCompressWasActive;
+    private bool _noseCompressIsBoosting;
+    private bool _bumpHighlightActive;
 
     [SerializeField] private NoseCompressionSettings noseCompression = new()
     {
@@ -39,7 +41,8 @@ public partial class CosmicDust
         noiseBurstMultiplier = 2.2f,
         emissionBurstPeakMultiplier = 2.5f,
         emissionBurstAttackSeconds = 0.06f,
-        emissionBurstDecaySeconds = 0.25f
+        emissionBurstDecaySeconds = 0.25f,
+        bumpHighlightValueBoost = 0.15f
     };
 
     private void DriveVehicleCompression(Vehicle vehicle, Collision2D collision)
@@ -69,6 +72,7 @@ public partial class CosmicDust
 
         float boostBonus = vehicle.boosting ? noseCompression.boostBonus : 0f;
         _noseCompressTarget01 = Mathf.Clamp01(Mathf.Max(0.18f, speed01 + boostBonus));
+        _noseCompressIsBoosting = vehicle.boosting;
         _lastNoseContactTime = Time.time;
         _noseVisibleUntil = Mathf.Max(_noseVisibleUntil, Time.time + noseCompression.minimumVisibleSeconds);
     }
@@ -96,6 +100,7 @@ public partial class CosmicDust
         if (desired01 <= 0.0001f && _noseCompressCurrent01 <= 0.001f) _noseCompressCurrent01 = 0f;
 
         TickCollisionParticleReactivity(desired01);
+        TickCollisionHighlight();
 
         if (_noseCompressCurrent01 <= 0.0001f)
         {
@@ -169,6 +174,36 @@ public partial class CosmicDust
 
         float burstMul = activeNow ? Mathf.Lerp(1f, noseCompression.noiseBurstMultiplier, _noseCompressCurrent01) : 1f;
         noise.strength = new ParticleSystem.MinMaxCurve(_noseBaseNoiseStrengthMin * burstMul, _noseBaseNoiseStrengthMax * burstMul);
+    }
+
+    // Continuous non-boost "I touched you" color ramp -- tracks the same contact envelope as
+    // the squash/noise above, so it ramps up while contact persists and back down as it fades,
+    // instead of playing a fixed-duration pulse independent of how long contact actually lasts.
+    // Boost contact has its own distinct signal (TriggerChargeTintPulse on a successful carve,
+    // CosmicDust.Collision.cs) and deliberately doesn't use this.
+    private void TickCollisionHighlight()
+    {
+        bool shouldHighlight = !_noseCompressIsBoosting && _noseCompressCurrent01 > 0.0001f;
+
+        if (shouldHighlight && !_bumpHighlightActive)
+            CancelTintPulse(restoreToBase: false); // claim the display from any competing pulse
+
+        if (!shouldHighlight)
+        {
+            if (_bumpHighlightActive)
+            {
+                ApplyDisplayedTint(_currentTint);
+                _bumpHighlightActive = false;
+            }
+            return;
+        }
+
+        Color.RGBToHSV(_currentTint, out float h, out float s, out float v);
+        Color highlightTint = Color.HSVToRGB(h, s, Mathf.Clamp01(v + noseCompression.bumpHighlightValueBoost));
+        highlightTint.a = _currentTint.a;
+
+        ApplyDisplayedTint(Color.Lerp(_currentTint, highlightTint, _noseCompressCurrent01));
+        _bumpHighlightActive = true;
     }
 
     // Shares the same tracked emission-multiplier lane as TriggerCarveEmissionSpike

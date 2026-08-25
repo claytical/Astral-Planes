@@ -92,4 +92,9 @@ public struct NoseCompressionSettings
     [Min(0.01f)] public float emissionBurstAttackSeconds;
     [Tooltip("Seconds to decay from the emission burst peak back to normal.")]
     [Min(0.01f)] public float emissionBurstDecaySeconds;
+    [Tooltip("HSV value (brightness) boost for the non-boost bump highlight, blended in proportional " +
+             "to contact intensity so it ramps up/down with the same envelope as the squash/noise, " +
+             "instead of playing as a fixed-duration flash independent of how long contact lasts. " +
+             "Boost contact has its own distinct signal (the charge-tint pulse on carve) and doesn't use this.")]
+    [Range(0f, 1f)] public float bumpHighlightValueBoost;
 }
