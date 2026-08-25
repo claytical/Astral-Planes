@@ -169,6 +169,36 @@ private void ClearRainbowParticleDirtyIfNeeded()
         var explode = GetComponentInChildren<Explode>(true);
         if (explode != null) explode.SetTint(tint);
     }
+    private Coroutine _retintOverRoutine;
+    private Coroutine _tintFadeInRoutine;
+
+    // Tracked entry point for RetintOver — starts the coroutine on this cell (not the caller)
+    // and remembers the handle so StopAllVisualCoroutines/PrepareForReuse can cancel it. An
+    // untracked, caller-owned version of this coroutine could keep animating a pooled-and-
+    // reused cell's tint after the cell was handed to a new motif.
+    public void RetintOverManaged(float seconds, Color toTint)
+    {
+        if (_retintOverRoutine != null) StopCoroutine(_retintOverRoutine);
+        _retintOverRoutine = StartCoroutine(RetintOverAndClear(seconds, toTint));
+    }
+    private IEnumerator RetintOverAndClear(float seconds, Color toTint)
+    {
+        yield return RetintOver(seconds, toTint);
+        _retintOverRoutine = null;
+    }
+
+    // Tracked entry point for TintFadeIn — same rationale as RetintOverManaged above.
+    public void TintFadeInManaged(float seconds, Color fromTint, Color toTint)
+    {
+        if (_tintFadeInRoutine != null) StopCoroutine(_tintFadeInRoutine);
+        _tintFadeInRoutine = StartCoroutine(TintFadeInAndClear(seconds, fromTint, toTint));
+    }
+    private IEnumerator TintFadeInAndClear(float seconds, Color fromTint, Color toTint)
+    {
+        yield return TintFadeIn(seconds, fromTint, toTint);
+        _tintFadeInRoutine = null;
+    }
+
     public IEnumerator RetintOver(float seconds, Color toTint)
     {
         if (visual.particleSystem == null) yield break;

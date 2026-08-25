@@ -101,6 +101,8 @@ public partial class CosmicDust
         if (_emissionMulRoutine != null) { StopCoroutine(_emissionMulRoutine); _emissionMulRoutine = null; }
         if (_jiggleRoutine      != null) { StopCoroutine(_jiggleRoutine);      _jiggleRoutine      = null; }
         if (_drainBuildupRoutine != null) { StopCoroutine(_drainBuildupRoutine); _drainBuildupRoutine = null; }
+        if (_retintOverRoutine  != null) { StopCoroutine(_retintOverRoutine);  _retintOverRoutine  = null; }
+        if (_tintFadeInRoutine  != null) { StopCoroutine(_tintFadeInRoutine);  _tintFadeInRoutine  = null; }
         CancelTintPulse(restoreToBase: false);
     }
     public void PrepareForReuse()

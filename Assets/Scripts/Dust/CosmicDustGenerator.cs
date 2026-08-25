@@ -784,7 +784,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                         && (imp.role != MusicalRole.None || imp.hiddenRole != MusicalRole.None))
                         continue;
 
-                    StartCoroutine(d.RetintOver(seconds, config.mazeTint));
+                    d.RetintOverManaged(seconds, config.mazeTint);
                 }
             }
             return;
@@ -813,7 +813,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                         continue;
                 }
 
-                StartCoroutine(d.RetintOver(seconds, config.mazeTint));
+                d.RetintOverManaged(seconds, config.mazeTint);
             }
         }
     }

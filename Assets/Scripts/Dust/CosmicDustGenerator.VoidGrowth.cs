@@ -404,7 +404,7 @@ public partial class CosmicDustGenerator
             Color dormantStart = config.mazeTint;
             dormantStart.a = tintWithAlpha.a;
             dust.ApplyTintVisual(dormantStart);
-            dust.StartCoroutine(dust.TintFadeIn(config.voidDustGrowInSeconds, dormantStart, tintWithAlpha));
+            dust.TintFadeInManaged(config.voidDustGrowInSeconds, dormantStart, tintWithAlpha);
 
             // Always non-colliding during grow
             SetDustCollision(dust, false);
