@@ -99,6 +99,12 @@ private void ClearRainbowParticleDirtyIfNeeded()
 
         _tintPulseActive = false;
 
+        // A new pulse should own the display exclusively — an in-flight drain-buildup writes
+        // the same display tint every frame via its own coroutine and would otherwise keep
+        // fighting the new pulse until it finishes on its own.
+        if (_drainBuildupRoutine != null)
+            CancelDrainBuildup();
+
         if (restoreToBase)
             RestoreDisplayToBaseTint();
     }
