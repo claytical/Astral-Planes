@@ -12,18 +12,24 @@ public partial class CosmicDust
     [SerializeField] private float flowerGrowInSeconds = 0.18f;
     [Tooltip("Shimmer cycles per second -- how fast the flower pulses between its role color and white.")]
     [SerializeField] private float flowerShimmerSpeed = 1.2f;
-    [Tooltip("How far each petal bobs from its resting position while swaying, in world units.")]
+    [Tooltip("How far the whole bud sways from its resting position, in world units. Both diamonds move together as one unit.")]
     [SerializeField] private float flowerSwayAmplitudeWorld = 0.08f;
-    [Tooltip("How quickly the sway wanders -- low, matching the dust particles' own noise drift, for a breeze-like rather than mechanical feel.")]
+    [Tooltip("How quickly the bud sway wanders -- low, matching the dust particles' own noise drift, for a breeze-like rather than mechanical feel.")]
     [SerializeField] private float flowerSwayFrequency = 0.3f;
+    [Tooltip("Peak random rotation (degrees), applied independently to each diamond so they flutter " +
+             "slightly differently from each other -- like two leaves attached to the same swaying bud.")]
+    [SerializeField] private float flowerLeafRotationDegrees = 8f;
+    [Tooltip("How quickly each leaf's independent rotation wanders.")]
+    [SerializeField] private float flowerLeafRotationFrequency = 0.4f;
 
     private Color _flowerRoleColor = Color.white;
     private float _flowerBloomTime;
-    private bool _flowerSwayBaseCaptured;
-    private Vector3 _flowerDiamondABasePos;
-    private Vector3 _flowerDiamondBBasePos;
-    private bool _flowerRootScaleCaptured;
+    private bool _flowerRootTransformCaptured;
+    private Vector3 _flowerRootBasePos;
     private Vector3 _flowerRootBaseScale = Vector3.one;
+    private bool _flowerLeafRotBaseCaptured;
+    private Quaternion _flowerDiamondABaseRot = Quaternion.identity;
+    private Quaternion _flowerDiamondBBaseRot = Quaternion.identity;
     private Coroutine _flowerGrowInRoutine;
 
     public bool HasBloomedFlower { get; private set; }
@@ -33,19 +39,21 @@ public partial class CosmicDust
         HasBloomedFlower = true;
         _flowerRoleColor = roleColorRgb;
         _flowerBloomTime = Time.time;
-        if (!_flowerSwayBaseCaptured)
+
+        if (!_flowerLeafRotBaseCaptured)
         {
-            if (flowerDiamondA != null) _flowerDiamondABasePos = flowerDiamondA.transform.localPosition;
-            if (flowerDiamondB != null) _flowerDiamondBBasePos = flowerDiamondB.transform.localPosition;
-            _flowerSwayBaseCaptured = true;
+            if (flowerDiamondA != null) _flowerDiamondABaseRot = flowerDiamondA.transform.localRotation;
+            if (flowerDiamondB != null) _flowerDiamondBBaseRot = flowerDiamondB.transform.localRotation;
+            _flowerLeafRotBaseCaptured = true;
         }
 
         if (flowerRoot != null)
         {
-            if (!_flowerRootScaleCaptured)
+            if (!_flowerRootTransformCaptured)
             {
+                _flowerRootBasePos = flowerRoot.transform.localPosition;
                 _flowerRootBaseScale = flowerRoot.transform.localScale;
-                _flowerRootScaleCaptured = true;
+                _flowerRootTransformCaptured = true;
             }
             flowerRoot.SetActive(true);
             if (_flowerGrowInRoutine != null) StopCoroutine(_flowerGrowInRoutine);
@@ -54,6 +62,7 @@ public partial class CosmicDust
 
         ApplyFlowerShimmerColor();
         ApplyFlowerSway();
+        ApplyFlowerLeafRotation();
     }
 
     public void HideFlower()
@@ -79,14 +88,15 @@ public partial class CosmicDust
         _flowerGrowInRoutine = null;
     }
 
-    // Shimmer/glow tell: smoothly pulse-lerps between the cell's role color and white instead
-    // of rotating, so a vehicle-carved regrow cell reads as gently glowing rather than spinning.
-    // Also sways/bobs gently in place, echoing the dust particles' own noise-driven drift.
+    // Shimmer/glow tell: smoothly pulse-lerps between the cell's role color and white, sways
+    // as one bud, and wobbles each diamond/leaf independently -- see ApplyFlowerSway and
+    // ApplyFlowerLeafRotation below.
     private void TickFlowerShimmer()
     {
         if (!HasBloomedFlower) return;
         ApplyFlowerShimmerColor();
         ApplyFlowerSway();
+        ApplyFlowerLeafRotation();
     }
 
     private void ApplyFlowerShimmerColor()
@@ -102,25 +112,38 @@ public partial class CosmicDust
         if (flowerDiamondB != null) flowerDiamondB.color = c;
     }
 
-    // Perlin (not periodic sine) so the bob wanders irregularly like a breeze rather than
+    // Perlin (not periodic sine) so the sway wanders irregularly like a breeze rather than
     // mechanically oscillating -- closer in character to the particle system's own noise
-    // module. Each diamond/axis samples a differently-seeded slice of the noise field so the
-    // two petals don't bob in lockstep with each other. Anchored on each diamond's own
-    // authored rest position (captured once), never accumulating -- just wanders around it.
+    // module. Moves flowerRoot itself (not the individual diamonds), so both diamonds
+    // translate together as one bud, anchored on the root's own authored rest position
+    // (captured once) and never accumulating -- just wanders around it.
     private void ApplyFlowerSway()
     {
-        float t = (Time.time - _flowerBloomTime) * flowerSwayFrequency;
+        if (flowerRoot == null) return;
 
-        if (flowerDiamondA != null)
-            flowerDiamondA.transform.localPosition = _flowerDiamondABasePos + SwayOffset(t, 0f);
-        if (flowerDiamondB != null)
-            flowerDiamondB.transform.localPosition = _flowerDiamondBBasePos + SwayOffset(t, 40f);
+        float t = (Time.time - _flowerBloomTime) * flowerSwayFrequency;
+        float nx = Mathf.PerlinNoise(t, 0f) * 2f - 1f;
+        float ny = Mathf.PerlinNoise(0f, t + 10f) * 2f - 1f;
+
+        flowerRoot.transform.localPosition = _flowerRootBasePos + new Vector3(nx, ny, 0f) * flowerSwayAmplitudeWorld;
     }
 
-    private Vector3 SwayOffset(float t, float phaseSeed)
+    // The "variation" half of the sway: each diamond/leaf gets its own small, independently-
+    // seeded random rotation on top of the shared bud translation above, so the two leaves
+    // flutter slightly differently from each other rather than staying rigidly parallel.
+    private void ApplyFlowerLeafRotation()
     {
-        float nx = Mathf.PerlinNoise(t + phaseSeed, phaseSeed) * 2f - 1f;
-        float ny = Mathf.PerlinNoise(phaseSeed, t + phaseSeed + 10f) * 2f - 1f;
-        return new Vector3(nx, ny, 0f) * flowerSwayAmplitudeWorld;
+        float t = (Time.time - _flowerBloomTime) * flowerLeafRotationFrequency;
+
+        if (flowerDiamondA != null)
+        {
+            float angleA = (Mathf.PerlinNoise(t, 5f) * 2f - 1f) * flowerLeafRotationDegrees;
+            flowerDiamondA.transform.localRotation = _flowerDiamondABaseRot * Quaternion.Euler(0f, 0f, angleA);
+        }
+        if (flowerDiamondB != null)
+        {
+            float angleB = (Mathf.PerlinNoise(t + 70f, 5f) * 2f - 1f) * flowerLeafRotationDegrees;
+            flowerDiamondB.transform.localRotation = _flowerDiamondBBaseRot * Quaternion.Euler(0f, 0f, angleB);
+        }
     }
 }
