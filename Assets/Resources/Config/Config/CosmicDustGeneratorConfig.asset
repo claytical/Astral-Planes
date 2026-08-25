@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: CosmicDustGeneratorConfig
   m_EditorClassIdentifier: Assembly-CSharp::CosmicDustGeneratorConfig
   cellClearanceWorld: 0
-  dustFootprintMul: 1.15
+  dustFootprintMul: 1.4
   maxSpawnMillisPerFrame: 1.2
   hexGrowInSeconds: 0.45
   regrowCellsPerStep: 1

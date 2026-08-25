@@ -6,8 +6,8 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     [Header("Grid & Collision")]
     [Tooltip("World-units clearance inside each cell. 0 = watertight.")]
     public float cellClearanceWorld = 0f;
-    [Tooltip("Sprite footprint relative to one grid cell. >1.0 = slight overlap with neighbours.")]
-    [Range(0.8f, 1.6f)] public float dustFootprintMul = 1.15f;
+    [Tooltip("Sprite footprint relative to one grid cell. >1.0 = overlap with neighbours, blending the grid into a dustier cloud.")]
+    [Range(0.8f, 1.6f)] public float dustFootprintMul = 1.4f;
 
     [Header("Spawn")]
     [Tooltip("Frame budget for initial maze spawn (milliseconds). Tune for target hardware.")]
@@ -103,10 +103,10 @@ public class CosmicDustGeneratorConfig : ScriptableObject
              "(0.2s default) — EnsureMinSolidAlpha fires at that mark and boosts the cell to full opacity while " +
              "the pulse coroutine is still tracking live alpha, so a pulse that outlasts that delay ends up held " +
              "fully opaque for its remaining duration instead of fading out quickly.")]
-    [Min(0.01f)] public float regrowSpeedPreviewPulseSeconds = 0.4f;
+    [Min(0.01f)] public float regrowSpeedPreviewPulseSeconds = 0.15f;
     [Tooltip("Blends the pulse color toward white by this fraction. Keep small — held at full opacity past " +
              "regrowColliderEnableDelaySeconds, even a moderate boost reads as a wash of white rather than a tint.")]
-    [Range(0f, 1f)] public float regrowSpeedPreviewGlowBoost01 = 0.1f;
+    [Range(0f, 1f)] public float regrowSpeedPreviewGlowBoost01 = 0.05f;
 
     [Header("Regrow Density Easing")]
     [Tooltip("Shared with GravityVoidController.ApplyDensityThrottle — solid fraction at which density pressure starts easing (regrow slows, new void-growth rings halve).")]
