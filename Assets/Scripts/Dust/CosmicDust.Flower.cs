@@ -7,18 +7,19 @@ public partial class CosmicDust
     [SerializeField] private SpriteRenderer flowerDiamondA;
     [SerializeField] private SpriteRenderer flowerDiamondB;
     [SerializeField] private float flowerBloomAlpha = 0.75f;
-    [SerializeField] private float flowerRotationSpeedDegPerSec = 12f;
+    [Tooltip("Shimmer cycles per second -- how fast the flower pulses between its role color and white.")]
+    [SerializeField] private float flowerShimmerSpeed = 1.2f;
+
+    private Color _flowerRoleColor = Color.white;
 
     public bool HasBloomedFlower { get; private set; }
 
     public void BloomFlower(Color roleColorRgb)
     {
         HasBloomedFlower = true;
+        _flowerRoleColor = roleColorRgb;
         if (flowerRoot != null) flowerRoot.SetActive(true);
-        var c = roleColorRgb;
-        c.a = flowerBloomAlpha;
-        if (flowerDiamondA != null) flowerDiamondA.color = c;
-        if (flowerDiamondB != null) flowerDiamondB.color = c;
+        ApplyFlowerShimmerColor();
     }
 
     public void HideFlower()
@@ -27,13 +28,20 @@ public partial class CosmicDust
         if (flowerRoot != null) flowerRoot.SetActive(false);
     }
 
-    // Counter-rotating petals read as the flower slowly opening while bloomed. Each petal
-    // keeps whatever angle it was at when last hidden, so re-blooming resumes rather than snaps.
-    private void TickFlowerRotation()
+    // Shimmer/glow tell: smoothly pulse-lerps between the cell's role color and white instead
+    // of rotating, so a vehicle-carved regrow cell reads as gently glowing rather than spinning.
+    private void TickFlowerShimmer()
     {
         if (!HasBloomedFlower) return;
-        float delta = flowerRotationSpeedDegPerSec * Time.deltaTime;
-        if (flowerDiamondA != null) flowerDiamondA.transform.Rotate(0f, 0f, delta);
-        if (flowerDiamondB != null) flowerDiamondB.transform.Rotate(0f, 0f, -delta);
+        ApplyFlowerShimmerColor();
+    }
+
+    private void ApplyFlowerShimmerColor()
+    {
+        float t = (Mathf.Sin(Time.time * flowerShimmerSpeed * Mathf.PI * 2f) + 1f) * 0.5f;
+        Color c = Color.Lerp(_flowerRoleColor, Color.white, t);
+        c.a = flowerBloomAlpha;
+        if (flowerDiamondA != null) flowerDiamondA.color = c;
+        if (flowerDiamondB != null) flowerDiamondB.color = c;
     }
 }

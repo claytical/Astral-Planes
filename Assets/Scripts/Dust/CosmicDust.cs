@@ -118,7 +118,7 @@ private GameFlowManager _gfm;
     void Update()
     {
         TickVehicleCompression();
-        TickFlowerRotation();
+        TickFlowerShimmer();
     }
     /// <summary>
     /// Called by the generator when a cell becomes Solid. Ensures the sprite alpha

@@ -60,7 +60,6 @@ MonoBehaviour:
   flowerDiamondA: {fileID: 6771263445632034394}
   flowerDiamondB: {fileID: 6349677698668529810}
   flowerBloomAlpha: 0.75
-  flowerRotationSpeedDegPerSec: 50
   revealedEmissionMultiplier: 1.1
   _chargeColor: {r: 1, g: 1, b: 1, a: 0.23529412}
   _denyColor: {r: 0.8156863, g: 0.1254902, b: 0.5647059, a: 1}
@@ -78,6 +77,10 @@ MonoBehaviour:
     minimumVisibleSeconds: 0.05
     attackSharpness: 10
     releaseSharpness: 20
+    noiseBurstMultiplier: 2.2
+    emissionBurstPeakMultiplier: 2.5
+    emissionBurstAttackSeconds: 0.06
+    emissionBurstDecaySeconds: 0.25
   visual:
     prefabReferenceScale: {x: 1, y: 1, z: 1}
     particleSystem: {fileID: 5371160903463010692}
@@ -237,7 +240,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 3625043607559282579, guid: 19fb86013d8c24d6cb8410c0aadf30fa,
+  m_Sprite: {fileID: 1211849485947851915, guid: 2567647a21ff74869b8d376521716000,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 0.40392157}
   m_FlipX: 0
@@ -275,8 +278,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.25, y: 0.25, z: 0.5}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.35, y: 0.35, z: 0.7}
+  m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 8744892058522842785}
   - {fileID: 5784744820997802100}
@@ -5200,7 +5203,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 3625043607559282579, guid: 19fb86013d8c24d6cb8410c0aadf30fa,
+  m_Sprite: {fileID: 1211849485947851915, guid: 2567647a21ff74869b8d376521716000,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 0.40392157}
   m_FlipX: 0
