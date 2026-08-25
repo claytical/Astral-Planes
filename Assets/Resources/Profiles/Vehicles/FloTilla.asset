@@ -47,7 +47,7 @@ MonoBehaviour:
   pressureInstabilityRadius: 3
   pressureInstabilityStrength01: 0.55
   soulMinScale: 0.3
-  soulMaxScale: 1.2
-  soulScaleLerpSpeed: 14
+  soulMaxScale: 1
+  soulScaleLerpSpeed: 7
   soulAlphaMin: 0
-  soulAlphaMax: 0.85
+  soulAlphaMax: 0.5

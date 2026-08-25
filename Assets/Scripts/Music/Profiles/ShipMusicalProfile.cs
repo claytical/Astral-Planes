@@ -125,13 +125,13 @@ public class ShipMusicalProfile : ScriptableObject
     [Tooltip("Local scale for the hidden soul sprite when inactive.")]
     public float soulMinScale = 0.3f;
     [Tooltip("Local scale for the soul sprite at full placement readiness.")]
-    public float soulMaxScale = 1.2f;
+    public float soulMaxScale = 1.0f;
     [Tooltip("How quickly the soul sprite scale follows the pulse.")]
-    public float soulScaleLerpSpeed = 14f;
+    public float soulScaleLerpSpeed = 7f;
     [Range(0f, 1f)]
     [Tooltip("Soul alpha at the first visible hint of placement availability.")]
     public float soulAlphaMin = 0.0f;
     [Range(0f, 1f)]
     [Tooltip("Soul alpha at full placement readiness.")]
-    public float soulAlphaMax = 0.85f;
+    public float soulAlphaMax = 0.5f;
 }
