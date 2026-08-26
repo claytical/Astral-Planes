@@ -26,6 +26,14 @@ public sealed class SceneFlowCoordinator
     private const float IntroHoldDuration    = 2.0f;
     private const float IntroFadeOutDuration = 0.8f;
 
+    // Maze staggered-spawn duration — shared so the first-motif record fade-out
+    // (concurrent with maze generation) can't drift out of sync with the maze itself.
+    private const float MazeSpawnDuration = 1.0f;
+
+    // How long the initial record holds at full opacity before it starts fading out,
+    // so the player has time to actually register it before it's gone.
+    private const float RecordHoldDuration = 1.5f;
+
     private CanvasGroup _screenFadeOverlay;
 
     public SceneFlowCoordinator(GameFlowManager gameFlow, SessionStateCoordinator session, BridgeCoordinator bridge)
@@ -197,10 +205,24 @@ public sealed class SceneFlowCoordinator
         {
             _gameFlow.phaseTransitionManager.AdvancePhase("GFM/StartNextMotifInPhase(Exhausted)");
             yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
+            yield return RevealAndFadeRecordAfterMaze();
             yield break;
         }
 
         yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
+        yield return RevealAndFadeRecordAfterMaze();
+    }
+
+    // Ordinary/path-choice motif transitions: the new maze has already fully finished
+    // generating by the time this runs, so the record shows over it, holds at full
+    // opacity so the player registers it, then fades on the config default timer
+    // instead of being synced to maze-generation duration.
+    private IEnumerator RevealAndFadeRecordAfterMaze()
+    {
+        var binRings = _gameFlow.GetBinRingController();
+        binRings?.ShowInitialRecord();
+        yield return new WaitForSeconds(RecordHoldDuration);
+        binRings?.FadeInitialRecordOut();
     }
 
     public void HandleTrackFinishedSceneSetup()
@@ -268,6 +290,13 @@ public sealed class SceneFlowCoordinator
         _gameFlow.dustGenerator.ManualStart();
         _gameFlow.SetupBinRingController();
 
+        // Very first motif of the session: show the record immediately, in darkness,
+        // before the maze exists. Hold at full opacity so the player registers it,
+        // then it fades out concurrently with the maze growing in (see the
+        // FadeInitialRecordOut call right before StartNextPhaseMazeAndStar below).
+        _gameFlow.GetBinRingController()?.ShowInitialRecord();
+        yield return new WaitForSeconds(RecordHoldDuration);
+
         foreach (var lp in _session.Players)
             lp?.Launch();
 
@@ -276,6 +305,7 @@ public sealed class SceneFlowCoordinator
         if (_gameFlow.phaseTransitionManager.currentMotif != null)
             _gameFlow.harmony.SetActiveProfile(_gameFlow.phaseTransitionManager.currentMotif.chordProgression, true);
 
+        _gameFlow.GetBinRingController()?.FadeInitialRecordOut(MazeSpawnDuration);
         yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
         yield return null;
 
@@ -425,6 +455,7 @@ public sealed class SceneFlowCoordinator
         var entryCells = StageVehiclesOffscreenAtEdge(entryEdge, exitAnchorCell, lockedOwners);
 
         yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false, vehicleCellOverrides: entryCells));
+        _gameFlow.StartCoroutine(RevealAndFadeRecordAfterMaze()); // not yielded — holds/fades while vehicles drive in below
 
         yield return _gameFlow.StartCoroutine(DriveVehiclesInFromOffscreen(entryCells));
 
@@ -755,7 +786,7 @@ public sealed class SceneFlowCoordinator
             };
         }
 
-        yield return _gameFlow.StartCoroutine(dust.GenerateMazeForPhaseWithPaths(starCell, _vehicleCellsScratch, 1.0f, onBeforeGrowth: trapCallback));
+        yield return _gameFlow.StartCoroutine(dust.GenerateMazeForPhaseWithPaths(starCell, _vehicleCellsScratch, MazeSpawnDuration, onBeforeGrowth: trapCallback));
 
         dust.SetTravelCorridors(_vehicleCellsScratch, starCell, radiusCells: 1);
 

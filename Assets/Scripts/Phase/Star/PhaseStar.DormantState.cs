@@ -3,13 +3,19 @@ using UnityEngine;
 
 public partial class PhaseStar
 {
+    [SerializeField, Min(0f)]
+    [Tooltip("Delay after the star becomes visible (dormant reveal) before tentacles begin hunting/growing.")]
+    private float tentacleActivationDelay = 0.5f;
+
     private bool _pendingDormantActivation;
     private Coroutine _waitForDustCo;
+    private Coroutine _tentacleActivationCo;
 
     public void EnterInMaze(Vector2 worldPos)
     {
         EnsureSubcomponents();
         StopManagedCoroutine(ref _waitForDustCo);
+        StopManagedCoroutine(ref _tentacleActivationCo);
 
         _state = PhaseStarState.Dormant;
 
@@ -57,8 +63,10 @@ public partial class PhaseStar
         DisableColliders();
         _hasReceivedEnergy = false;
 
-        // Tentacles + navigator active during Dormant — they drain dust to build charge.
-        dust?.SetTentaclesActive(true);
+        // Navigator active immediately, but tentacles wait a beat so the star
+        // reads as appearing before it starts reaching for dust.
+        StopManagedCoroutine(ref _tentacleActivationCo);
+        _tentacleActivationCo = StartCoroutine(Co_ActivateTentaclesAfterDelay());
         cravingNavigator?.SetActive(true);
 
         // Stay pinned in place while charging.
@@ -67,6 +75,16 @@ public partial class PhaseStar
 
         if (_waitForDustCo == null)
             _waitForDustCo = StartCoroutine(Co_WaitForColoredDust());
+    }
+
+    private IEnumerator Co_ActivateTentaclesAfterDelay()
+    {
+        if (tentacleActivationDelay > 0f)
+            yield return new WaitForSeconds(tentacleActivationDelay);
+
+        _tentacleActivationCo = null;
+        if (_state != PhaseStarState.Dormant) yield break;
+        dust?.SetTentaclesActive(true);
     }
 
     private void TransitionDormantToActive()
@@ -87,6 +105,7 @@ public partial class PhaseStar
         }
 
         StopManagedCoroutine(ref _waitForDustCo);
+        StopManagedCoroutine(ref _tentacleActivationCo);
         _pendingDormantActivation = true;
 
         // If we are already latched/retracted, don't force WaitingForRetract again.

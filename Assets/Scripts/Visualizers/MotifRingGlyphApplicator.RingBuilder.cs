@@ -65,6 +65,85 @@ public partial class MotifRingGlyphApplicator
         };
     }
 
+    // ── Background discs ────────────────────────────────────────────────────
+    // Two solid backdrop discs behind the whole ring stack: inner sized to placed
+    // (completed) rings, outer sized to the entire record (placed + remaining).
+
+    private void EnsureBackgroundDiscs()
+    {
+        if (_fullBgDisc == null)   _fullBgDisc   = CreateBackgroundDisc("FullRecordBackdrop", -2);
+        if (_placedBgDisc == null) _placedBgDisc = CreateBackgroundDisc("PlacedRecordBackdrop", -1);
+        _placedBgMpb ??= new MaterialPropertyBlock();
+        _fullBgMpb   ??= new MaterialPropertyBlock();
+    }
+
+    private MeshRenderer CreateBackgroundDisc(string goName, int sortingOrder)
+    {
+        var go = new GameObject(goName);
+        go.transform.SetParent(transform, worldPositionStays: false);
+
+        var mf = go.AddComponent<MeshFilter>();
+        mf.sharedMesh = new Mesh();
+
+        var mr = go.AddComponent<MeshRenderer>();
+        mr.sharedMaterial    = config.ringMeshMaterial;
+        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        mr.receiveShadows    = false;
+        mr.sortingOrder      = sortingOrder;
+        return mr;
+    }
+
+    private void UpdateBackgroundDiscRadii(int placedCount, int totalCount)
+    {
+        if (config == null) return;
+        EnsureBackgroundDiscs();
+        int segs = Mathf.Max(16, config.segments);
+
+        float placedR = placedCount > 0 ? RingInnerRadius(placedCount - 1) + config.ringThickness : 0f;
+        _placedBgDisc.GetComponent<MeshFilter>().sharedMesh = BuildDiscMesh(placedR, segs);
+        SetFillColor(_placedBgDisc,
+            new Color(config.backgroundDiscColor.r, config.backgroundDiscColor.g, config.backgroundDiscColor.b, config.placedBackgroundAlpha),
+            _placedBgMpb);
+
+        float fullR = totalCount > 0 ? RingInnerRadius(totalCount - 1) + config.ringThickness : 0f;
+        _fullBgDisc.GetComponent<MeshFilter>().sharedMesh = BuildDiscMesh(fullR, segs);
+        SetFillColor(_fullBgDisc,
+            new Color(config.backgroundDiscColor.r, config.backgroundDiscColor.g, config.backgroundDiscColor.b, config.fullBackgroundAlpha),
+            _fullBgMpb);
+    }
+
+    private static Mesh BuildDiscMesh(float radius, int segments)
+    {
+        int n     = Mathf.Max(3, segments);
+        var verts = new Vector3[n + 1];
+        var uvs   = new Vector2[n + 1];
+        verts[0]  = Vector3.zero;
+        uvs[0]    = new Vector2(0.5f, 0.5f);
+
+        for (int i = 0; i < n; i++)
+        {
+            float angle = i / (float)n * Mathf.PI * 2f;
+            float cos = Mathf.Cos(angle), sin = Mathf.Sin(angle);
+            verts[i + 1] = new Vector3(cos * radius, sin * radius, 0f);
+            uvs[i + 1]   = new Vector2(cos * 0.5f + 0.5f, sin * 0.5f + 0.5f);
+        }
+
+        var tris = new int[n * 3];
+        for (int i = 0; i < n; i++)
+        {
+            int next = (i + 1) % n;
+            int t    = i * 3;
+            tris[t] = 0; tris[t + 1] = i + 1; tris[t + 2] = next + 1;
+        }
+
+        var mesh = new Mesh();
+        mesh.vertices  = verts;
+        mesh.uv        = uvs;
+        mesh.triangles = tris;
+        mesh.RecalculateBounds();
+        return mesh;
+    }
+
     private static MaterialPropertyBlock[] MakeMpbs(int count)
     {
         var arr = new MaterialPropertyBlock[count];

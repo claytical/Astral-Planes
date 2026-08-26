@@ -60,6 +60,32 @@ public class BinRingController : MonoBehaviour
 
     public void CancelPendingDraw() { }
 
+    /// <summary>
+    /// Populate and show the full placeholder record stack for the current motif —
+    /// called explicitly by SceneFlowCoordinator at the right point in each motif-start
+    /// flow (immediately, before the maze exists, for the very first motif; or after the
+    /// new maze has already finished generating for every other transition).
+    /// </summary>
+    public void ShowInitialRecord()
+    {
+        if (_ringApplicator == null)
+            _ringApplicator = GameFlowManager.Instance?.GetMotifRingGlyphApplicator();
+        if (_ringApplicator == null) return;
+
+        var motif = GameFlowManager.Instance?.phaseTransitionManager?.currentMotif;
+        int total = Mathf.Max(1, motif?.nodesPerStar ?? 1);
+        _ringApplicator.SetRemainingProgressRings(total);
+    }
+
+    /// <summary>Fade the initial record out. Pass an explicit duration to sync with maze
+    /// generation (first motif); omit to use the config default (every other transition).</summary>
+    public void FadeInitialRecordOut(float? duration = null)
+    {
+        if (_ringApplicator == null)
+            _ringApplicator = GameFlowManager.Instance?.GetMotifRingGlyphApplicator();
+        _ringApplicator?.FadeRecordOut(duration);
+    }
+
     // ── Event handlers ───────────────────────────────────────────────────────
 
     private void OnBinFilled(InstrumentTrack track, int binIndex)

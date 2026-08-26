@@ -77,6 +77,16 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
     private Vector3 _fitScale;
     private int     _pendingDeformationCount;
     private Coroutine _gameplayHideCoroutine;
+    private Coroutine _nextUpColorCoroutine;
+    private Coroutine _recordFadeOutCoroutine;
+    private Color     _nextUpCurrentColor; // live lerped RGB of the next-up ring, for fade-out to read
+
+    // Solid backdrop discs behind the whole ring stack — inner one sized to placed
+    // (completed) rings, outer one sized to the entire record (placed + remaining).
+    private MeshRenderer _placedBgDisc;
+    private MeshRenderer _fullBgDisc;
+    private MaterialPropertyBlock _placedBgMpb;
+    private MaterialPropertyBlock _fullBgMpb;
 
     // Physical collision for gameplay bin rings only — never added for library-card
     // (RecordRings) instances, since only SpawnBinRing lazily creates it.
@@ -105,6 +115,8 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
         _recordRings.Clear();
         _gameplayRings.Clear();
         _remainingRings.Clear();
+        _placedBgDisc = null;
+        _fullBgDisc   = null;
     }
 
     public void FitToPlayArea(float width, float height, float cx, float cy)

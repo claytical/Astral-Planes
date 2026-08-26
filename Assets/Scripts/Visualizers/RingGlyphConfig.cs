@@ -44,6 +44,27 @@ public class RingGlyphConfig : ScriptableObject
     [Tooltip("Contour alpha for remaining-progress placeholder rings.")]
     public float remainingContourAlpha = 0.25f;
 
+    [Tooltip("Seconds to lerp from one active role color to the next on the next-up placeholder ring.")]
+    public float nextUpColorCycleDuration = 1.5f;
+
+    [Header("Record Fade Out")]
+    [Tooltip("Default seconds for the initial record to fade out when not synced to maze generation " +
+             "(ordinary/path-choice motif transitions, where the new maze is already fully generated " +
+             "by the time the record reappears).")]
+    public float recordFadeOutDuration = 0.75f;
+
+    [Header("Background Discs")]
+    [Tooltip("Color for the two solid backdrop discs behind the ring stack (alpha is set separately per disc).")]
+    public Color backgroundDiscColor = Color.black;
+
+    [Range(0f, 1f)]
+    [Tooltip("Alpha for the inner backdrop disc, sized to rings already placed. More opaque than the full-record disc.")]
+    public float placedBackgroundAlpha = 0.35f;
+
+    [Range(0f, 1f)]
+    [Tooltip("Alpha for the outer backdrop disc, sized to the entire record (placed + remaining). Fainter than the placed disc.")]
+    public float fullBackgroundAlpha = 0.15f;
+
     [Header("Line")]
     [Tooltip("LineRenderer width in local units.")]
     public float lineWidth = 0.003f;
