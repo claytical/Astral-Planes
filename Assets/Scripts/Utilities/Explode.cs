@@ -227,7 +227,7 @@ public class Explode : MonoBehaviour
             return;
         }
 
-        if (GameFlowManager.VerboseLogging) Debug.Log("[EXPLODE] PreExplode");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[EXPLODE] PreExplode with {explosionTint}");
         var go = Instantiate(preExplosion, transform.position, Quaternion.identity);
         ApplyTintToInstance(go, explosionTint);
         if (_burstDir.sqrMagnitude > 0.0001f)

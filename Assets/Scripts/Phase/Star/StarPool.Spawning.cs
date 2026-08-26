@@ -6,6 +6,9 @@ public sealed partial class StarPool
     // Guard against spawning the same role twice in a single Tick().
     private readonly HashSet<MusicalRole> _spawningThisFrame = new();
 
+    // Throttles the per-role diagnostic dump below to ~1/sec so it doesn't spam every frame.
+    private float _lastDiagLogTime;
+
     // ── Tick: reactive Star spawning ──────────────────────────────────────────
 
     private void Tick()
@@ -17,21 +20,32 @@ public sealed partial class StarPool
         var roles = _activeMotif?.GetActiveRoles();
         if (roles == null || roles.Count == 0) return;
 
+        // Diagnostic-only: dumps every active role's gating state on a throttled cadence,
+        // independent of whether it can spawn — the success-only log below can't explain a
+        // role that's stuck blocked (e.g. the pink/Lead-never-spawns report), since a blocked
+        // role never reaches that line.
+        bool logDiagThisTick = GameFlowManager.VerboseLogging && Time.time - _lastDiagLogTime > 1f;
+        if (logDiagThisTick) _lastDiagLogTime = Time.time;
+
         foreach (var role in roles)
         {
             // Budget is committed at EJECT time (CanStarCommitEjection), not at spawn —
             // every role with dust gets a star so the player chooses which roles spend the
             // nodesPerStar total. Leftover stars despawn when the budget hits zero.
 
-            // Only block this role's slot if its own DiscoveryTrackNode sequence is pending.
-            if (role == _lastEjectedRole && (_mineNodePending || HasUnresolvedMineNodeSequence())) continue;
+            bool mineBlocked = role == _lastEjectedRole && (_mineNodePending || HasUnresolvedMineNodeSequence());
 
             bool hasKey = _activeStars.ContainsKey(role);
             bool notNull = hasKey && _activeStars[role] != null;
             bool slotEmpty = !hasKey || !notNull;
             bool alreadySpawning = _spawningThisFrame.Contains(role);
-            bool hasDust = _dustGen.HasAnyDustWithRole(role);
-            bool canSpawn = slotEmpty && !alreadySpawning && hasDust;
+            bool hasDust = !mineBlocked && _dustGen.HasAnyDustWithRole(role);
+            bool canSpawn = !mineBlocked && slotEmpty && !alreadySpawning && hasDust;
+
+            if (logDiagThisTick)
+                Debug.Log($"[StarPool] Tick diag role={role} lastEjected={_lastEjectedRole} mineBlocked={mineBlocked} minePending={_mineNodePending} unresolved={HasUnresolvedMineNodeSequence()} slotEmpty={slotEmpty} alreadySpawning={alreadySpawning} hasDust={hasDust} canSpawn={canSpawn} remainingEjections={_remainingEjectionsTotal}");
+
+            if (mineBlocked) continue;
 
             if (canSpawn)
             {

@@ -62,6 +62,9 @@ public class MotifProfile : ScriptableObject
     [Tooltip("Per-role geographic feature overrides. When empty, feature defaults are derived from mazePattern.patternType (e.g. RingChokepoints → Rings, DrunkenStrokes → Archipelago). Add entries here only to break the natural pairing.")]
     public List<MazeRoleGeoConfig> roleGeoConfigs = new();
 
+    [Range(0f, 1f), Tooltip("Exact-count mode only: fraction of leftover (unclaimed) cells that become permanent filler dust — never regrows for the rest of this motif, darker gray. The remainder regrows normally on the standard cadence with the ordinary gray tint. Ignored when no role in roleGeoConfigs uses exact-count sizing.")]
+    public float genericFillNeverRegrowRatio = 1f;
+
     [Header("Harmony")]
     [Tooltip("Chord progression used while this motif is active.")]
     public ChordProgressionProfile chordProgression;

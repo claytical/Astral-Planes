@@ -26,8 +26,11 @@ MonoBehaviour:
   zapFadeSeconds: 1.5
   zapRegrowDelaySeconds: -1
   zapScaleOutSeconds: 0.12
-  mazeTint: {r: 0.461, g: 0.461, b: 0.461, a: 0.25}
+  mazeTint: {r: 0.8679245, g: 0.8679245, b: 0.8679245, a: 0.6}
+  genericFillTint: {r: 0.2830189, g: 0.2830189, b: 0.2830189, a: 0.6}
   solidDustTint: {r: 0.28, g: 0.25, b: 0.32, a: 1}
+  hideDustColorAtSpawn: 0
+  hiddenRoleColorDarken01: 0.55
   toroidal: 0
   minNotesPerBinPerVoice: 2
   maxNotesPerBinPerVoice: 16
@@ -39,3 +42,13 @@ MonoBehaviour:
   tintDiffusionPropagateOnChange: 1
   tintDiffusionMinDelta: 0.0025
   tintDirtyMarkRadius: 1
+  regrowSpeedPreviewEnabled: 1
+  regrowSpeedPreviewFastSeconds: 0.5
+  regrowSpeedPreviewSlowSeconds: 2.5
+  regrowSpeedPreviewFastColor: {r: 1, g: 0.55, b: 0.15, a: 1}
+  regrowSpeedPreviewSlowColor: {r: 0.3, g: 0.85, b: 1, a: 1}
+  regrowSpeedPreviewPulseSeconds: 0.15
+  regrowSpeedPreviewGlowBoost01: 0.05
+  densityThrottleHalfAt: 0.5
+  densityThrottleSkipAt: 0.8
+  regrowDensityEaseMaxMultiplier: 2.5

@@ -44,6 +44,8 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     
     [Header("Visual")]
     public Color mazeTint = new Color(0.7f, 0.7f, 0.7f, 0.25f);
+    [Tooltip("Distinct darker gray for cells deliberately filled with permanent generic MusicalRole.None dust (exact-count mode's leftover territory) — visually distinguishes 'permanent filler, never regrows this motif' cells from ordinary quick-regrowing gray dust (mazeTint), from the moment the maze spawns.")]
+    public Color genericFillTint = new Color(0.35f, 0.35f, 0.35f, 0.25f);
     [Tooltip("Color for the bypass-proof 'Solid' dust type (CellFlags.Solid) — uncarveable " +
              "walls used by the path-choice interstitial maze and its resealed losing tunnels. " +
              "Deliberately dim/desaturated against mazeTint so it reads as impassable. Kept off " +

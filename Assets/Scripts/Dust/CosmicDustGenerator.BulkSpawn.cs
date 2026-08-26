@@ -27,6 +27,11 @@ public partial class CosmicDustGenerator
             // Track which dust we spawned so we can re-enable colliders in a controlled way.
             var spawnedDust = new List<CosmicDust>(cells.Count);
 
+            // TEMP DIAGNOSTIC: tally which config tint each None-role spawn actually received,
+            // to pin down a report that genericFillTint never visibly renders despite imprints
+            // being built with the correct light/dark split. Remove once resolved.
+            int diagMazeTintCount = 0, diagGenericFillTintCount = 0, diagOtherCount = 0;
+
             while (i < cells.Count)
             {
                 float frameStart  = Time.realtimeSinceStartup;
@@ -95,6 +100,11 @@ public partial class CosmicDustGenerator
                             // Full charge (1f) — plow energy system requires non-zero units to chip.
                             dust.ApplyRoleAndCharge(MusicalRole.None, cellColor, 1f);
                             _imprints.ApplyHiddenHintToDust(grid, dust, _roleDensity.GetResolvedRoleProfile);
+
+                            // TEMP DIAGNOSTIC — see note above.
+                            if (ColorsApproxEqual(cellColor, config.genericFillTint)) diagGenericFillTintCount++;
+                            else if (ColorsApproxEqual(cellColor, config.mazeTint)) diagMazeTintCount++;
+                            else diagOtherCount++;
                         }
 
                         // Use the role's shadow color as the deny feedback color.
@@ -138,6 +148,11 @@ public partial class CosmicDustGenerator
 
                 lastPacedAt = Time.realtimeSinceStartup;
             }
+
+            // TEMP DIAGNOSTIC: see note at diagMazeTintCount declaration above.
+            if (GameFlowManager.VerboseLogging)
+                Debug.Log($"[DIAG] StaggeredGrowthFitDuration None-role spawn tint tally: " +
+                    $"mazeTint={diagMazeTintCount}, genericFillTint={diagGenericFillTintCount}, other={diagOtherCount}");
 
             // --------------------------------------------------------------------
             // PHYSICS PHASE: re-enable colliders gradually
@@ -190,6 +205,10 @@ public partial class CosmicDustGenerator
 
         }
     }
+
+    // TEMP DIAGNOSTIC helper — see note at diagMazeTintCount declaration above. Remove once resolved.
+    private static bool ColorsApproxEqual(Color a, Color b, float tolerance = 0.01f) =>
+        Mathf.Abs(a.r - b.r) < tolerance && Mathf.Abs(a.g - b.g) < tolerance && Mathf.Abs(a.b - b.b) < tolerance;
 
     private void RegisterHex(Vector2Int gridPos, GameObject hex)
     {

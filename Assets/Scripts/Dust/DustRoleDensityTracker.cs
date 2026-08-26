@@ -24,6 +24,8 @@ public sealed class DustRoleDensityTracker
     private readonly Func<Vector2Int, CosmicDust> _tryGetDustAt;
 
     private readonly Dictionary<RoleVoiceKey, int> _solidCountByVoice = new Dictionary<RoleVoiceKey, int>();
+    private int _genericFillSolidCount;
+    public int GenericFillSolidCount => _genericFillSolidCount;
 
     private List<MusicalRole> _activeRoles;   // set from motif at phase start via SetActiveRoles
     private List<RoleVoiceKey> _activeVoices; // set from motif at phase start via SetActiveVoices
@@ -103,14 +105,24 @@ public sealed class DustRoleDensityTracker
     {
         MusicalRole role = MusicalRole.None;
         int voiceIndex = 0;
+        bool isGenericFill = false;
         if (_imprints != null && _imprints.TryGetValue(gp, out var imp))
         {
             role = imp.role;
             voiceIndex = imp.voiceIndex;
+            isGenericFill = imp.hiddenRoleIsGenericFill;
         }
         // Also check the live dust object in case the imprint was removed but Role was set.
         if (role == MusicalRole.None)
         {
+            // Generic-fill cells (exact-count leftover) are tracked separately so density-easing
+            // math can exclude inert filler from its solid-fraction figure — see
+            // CosmicDustGenerator.CellLifecycle.cs's GetRoleRelevantSolidFraction.
+            if (isGenericFill)
+            {
+                _genericFillSolidCount = Mathf.Max(0, _genericFillSolidCount + (becomesSolid ? 1 : -1));
+                return;
+            }
             var d = _tryGetDustAt(gp);
             if (d != null) { role = d.Role; voiceIndex = d.VoiceIndex; }
         }
@@ -169,6 +181,12 @@ public sealed class DustRoleDensityTracker
                 // Falling through to neighbor/density here would re-tint (and re-charge)
                 // cells the player never earned, feeding stars from untouched dust.
                 if (_hasForceGrayRegrowFlag(gp))
+                    return new RoleVoiceKey(MusicalRole.None, 0);
+
+                // Exact-count maze generation deliberately filled this cell with generic None
+                // dust — keep it None forever rather than letting it drift into a neighboring
+                // role's color via the plurality/least-dense fallback below.
+                if (existingImp.hiddenRoleIsGenericFill)
                     return new RoleVoiceKey(MusicalRole.None, 0);
 
                 // Gray-start cell: consult hidden imprint before giving up.

@@ -4,7 +4,7 @@ using UnityEngine;
 
 public partial class CosmicDustGenerator
 {
-    public void ClearCell(Vector2Int gp, DustClearMode mode, float fadeSeconds, bool scheduleRegrow, DustClearSource source = DustClearSource.System, float regrowDelaySeconds = -1f, bool runPreExplode = false, Color? explosionTintOverride = null, Vector2 burstDirection = default, float preExplodeScaleOutSeconds = -1f) {
+    public void ClearCell(Vector2Int gp, DustClearMode mode, float fadeSeconds, bool scheduleRegrow, DustClearSource source = DustClearSource.System, float regrowDelaySeconds = -1f, bool runPreExplode = false, Color? explosionTintOverride = null, Vector2 burstDirection = default, float preExplodeScaleOutSeconds = -1f, DustInteractionMode interactionMode = DustInteractionMode.Zap) {
         if (!TryGetCellState(gp, out var st)) return;
         if (st == DustCellState.Empty || st == DustCellState.Clearing || st == DustCellState.PendingRegrow) {
             // Optionally refresh regrow timer even if already empty.
@@ -43,7 +43,12 @@ public partial class CosmicDustGenerator
                      // Always set the direction: zero clears stale state left on this
                      // pooled instance by a previous directed burst.
                      explode.SetBurstDirection(burstDirection);
-                     explode.ZapExplode();
+                     // Carve (vehicle) and Zap (tentacle) read as visually distinct events:
+                     // carve uses the softer preExplosion burst, zap uses the full explosion.
+                     if (interactionMode == DustInteractionMode.Carve)
+                         explode.PreExplode();
+                     else
+                         explode.ZapExplode();
                  }
              }
 
@@ -109,9 +114,9 @@ public partial class CosmicDustGenerator
         CarveCell(cell, fadeSeconds, scheduleRegrow: true, source: source, regrowDelaySeconds: regrowDelaySeconds, runPreExplode: runPreExplode);
     }
 
-    public void CarveCell(Vector2Int cell, float fadeSeconds, bool scheduleRegrow = true, DustClearSource source = DustClearSource.VehiclePlow, float regrowDelaySeconds = -1f, bool runPreExplode = true)
+    public void CarveCell(Vector2Int cell, float fadeSeconds, bool scheduleRegrow = true, DustClearSource source = DustClearSource.VehiclePlow, float regrowDelaySeconds = -1f, bool runPreExplode = true, Color? explosionTintOverride = null)
     {
-        var req = new DustClearRequest(DustInteractionMode.Carve, DustClearMode.FadeAndHide, fadeSeconds, scheduleRegrow, source, regrowDelaySeconds, runPreExplode);
+        var req = new DustClearRequest(DustInteractionMode.Carve, DustClearMode.FadeAndHide, fadeSeconds, scheduleRegrow, source, regrowDelaySeconds, runPreExplode, explosionTintOverride);
         ClearCellByInteraction(cell, req);
     }
 
@@ -130,7 +135,8 @@ public partial class CosmicDustGenerator
             runPreExplode: request.RunPreExplode,
             explosionTintOverride: request.ExplosionTintOverride,
             burstDirection: request.BurstDirection,
-            preExplodeScaleOutSeconds: request.PreExplodeScaleOutSeconds);
+            preExplodeScaleOutSeconds: request.PreExplodeScaleOutSeconds,
+            interactionMode: request.InteractionMode);
     }
 
     /// <summary>

@@ -251,6 +251,15 @@ public partial class Collectable : MonoBehaviour
             energySprite.transform.localScale = _baseVisualScale * (_roleProfile != null ? Mathf.Max(0.01f, _roleProfile.collectableVisualScaleMul) : 1f);
     }
 
+    private static (MusicalRole role, MusicalRoleProfile profile) ResolveRoleAndProfile(InstrumentTrack track)
+    {
+        MusicalRole role = track != null ? track.assignedRole : MusicalRole.None;
+        MusicalRoleProfile profile = (track != null && track.ActiveProfile != null)
+            ? track.ActiveProfile
+            : MusicalRoleProfileLibrary.GetProfile(role);
+        return (role, profile);
+    }
+
     private void Initialize(int note, int duration, InstrumentTrack track, NoteSet noteSet, List<int> steps)
     {
         EnsureTuning();
@@ -265,13 +274,10 @@ public partial class Collectable : MonoBehaviour
         if (sharedTargetSteps.Count == 0)
             Debug.LogWarning($"{gameObject.name} - No target steps provided.");
 
-        _role = assignedInstrumentTrack != null ? assignedInstrumentTrack.assignedRole : MusicalRole.None;
         // Prefer the motif-selected profile installed on the track; the library keeps only
         // the first-loaded asset per role, so it can't see per-motif tuning. Resolved before
         // ApplyTrackVisuals so its catch-radius/visual-scale multipliers are available.
-        _roleProfile = (assignedInstrumentTrack != null && assignedInstrumentTrack.ActiveProfile != null)
-            ? assignedInstrumentTrack.ActiveProfile
-            : MusicalRoleProfileLibrary.GetProfile(_role);
+        (_role, _roleProfile) = ResolveRoleAndProfile(assignedInstrumentTrack);
         _orbitalChirality = (_id & 1) == 0 ? 1f : -1f;
         if (assignedInstrumentTrack != null)
         {
@@ -285,6 +291,7 @@ public partial class Collectable : MonoBehaviour
             Debug.LogError($"Collectable {gameObject.name} - assignedInstrumentTrack is NULL on initialization!");
 
         if (_rb == null) TryGetComponent(out _rb);
+        if (_rb != null) _rb.linearDamping = tuning.baseMotion.linearDamping;
         _rng ??= new System.Random(StableSeed());
         _leadHeadingDeg = (float)(_rng.NextDouble() * 360.0);
 

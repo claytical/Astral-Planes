@@ -40,7 +40,8 @@ MonoBehaviour:
     pressure01: 0.5
   entryLoopCount: 16
   resetFirstCarryOnStart: 0
-  bridgeSamples: []
+  bridgeSamples:
+  - {fileID: 8300000, guid: 9cd80b32a196747aca22eb0da4edc2c8, type: 3}
   bridgeSampleVolume: 0.027
   quantizeBridgeSampleToBeat: 1
   bpm: 75
@@ -49,7 +50,18 @@ MonoBehaviour:
   nodesPerStar: 2
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
   mazePattern: {fileID: 11400000, guid: c90fade64b1a04f608cacc42c162a9a6, type: 2}
-  roleGeoConfigs: []
+  roleGeoConfigs:
+  - role: 1
+    feature: 2
+    seedCount: 0
+    radiusCells: 0
+    gladeRadius: 0
+    gladeCount: 0
+    useExactNoteCount: 1
+    notesToCellsMultiplier: 20
+    centerBiasFraction01: 0.35
+    centerBiasMinDensity01: 0.3
+  genericFillNeverRegrowRatio: 0.485
   chordProgression: {fileID: 11400000, guid: b956b0bff50d748d88897368376e5eeb, type: 2}
   alternateChordProgressionProfile: {fileID: 11400000, guid: 04a688fc570cd408bb4261ed5647fa97,
     type: 2}
@@ -58,7 +70,7 @@ MonoBehaviour:
   selectionWeight: 1
   beatIntroCount: 0
   driveBeatsFromDensity: 1
-  spawnVehicleTrap: 1
+  spawnVehicleTrap: 0
   trapShape: 0
   trapRadius: 3
   trapGrowSeconds: 0.4

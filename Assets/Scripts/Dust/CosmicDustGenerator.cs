@@ -347,7 +347,9 @@ public partial class CosmicDustGenerator : MonoBehaviour
             startCommitRegrowCell: gp => _regrowthScheduler.CommitRegrowCoroutines[gp] = StartCoroutine(CommitRegrowCell(gp)),
 
             getRegrowVetoRetryDelaySeconds: () => Mathf.Max(0.05f, config.regrowVetoRetryDelaySeconds),
-            getRegrowCellsPerStep: () => Mathf.Max(0, config.regrowCellsPerStep)
+            getRegrowCellsPerStep: () => Mathf.Max(0, config.regrowCellsPerStep),
+            shouldBypassStepGate: gp => _imprints != null && _imprints.TryGetValue(gp, out var bypassImp)
+                && bypassImp.hiddenRoleIsGenericFill && !bypassImp.genericFillNeverRegrows
         );
     }
     private void TryEnsureRefs()
@@ -497,9 +499,12 @@ public partial class CosmicDustGenerator : MonoBehaviour
             // brightness with no fade in this same frame, and this cap is what's supposed to
             // dim that initial flash. Arming it after (as before) left the flash unprotected.
             dust.regrowAlphaCapped = true;
-            dust.ApplyRoleAndCharge(regrowRole, regrowTint, regrowTint.a, maxUnits);
+            // Regrow at full charge. baseAlpha is a rendering knob, not a charge fraction —
+            // passing regrowTint.a here previously let baseAlpha*maxEnergyUnits round to 0
+            // energy for some role profiles, leaving them permanently un-driveable.
+            dust.ApplyRoleAndCharge(regrowRole, regrowTint, 1f, maxUnits);
 
-            if (regrowSource == DustClearSource.VehiclePlow)
+            if (regrowSource == DustClearSource.VehiclePlow && regrowRole != MusicalRole.None)
                 dust.BloomFlower(regrowTint);
 
             if (regrowRole == MusicalRole.None)
@@ -782,9 +787,13 @@ public partial class CosmicDustGenerator : MonoBehaviour
                     // show ApplyHiddenColorPreview's darkened preview, not a flat-gray placeholder;
                     // erasing it here was silently reverting every not-yet-carved cell to gray
                     // shortly after spawn, since this guard only used to check the revealed role.
+                    // Also skip exact-count mode's generic-fill cells (hiddenRoleIsGenericFill) —
+                    // their color is already authoritative (set once by SetHiddenRoleGenericFill to
+                    // either genericFillTint or mazeTint per the never-regrow split) even though
+                    // hiddenRole stays None for both sub-types since generic fill isn't role-owned.
                     var gp = new Vector2Int(x, y);
                     if (_imprints != null && _imprints.TryGetValue(gp, out var imp)
-                        && (imp.role != MusicalRole.None || imp.hiddenRole != MusicalRole.None))
+                        && (imp.role != MusicalRole.None || imp.hiddenRole != MusicalRole.None || imp.hiddenRoleIsGenericFill))
                         continue;
 
                     d.RetintOverManaged(seconds, config.mazeTint);
@@ -806,13 +815,14 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
                 if (d.Role != MusicalRole.None) continue;
 
-                // Same hiddenRole-preview check as the primary path above — d.Role alone can't
-                // distinguish a darkened-preview cell from plain gray filler, so resolve grid
-                // coords to consult the imprint.
+                // Same hiddenRole-preview / generic-fill check as the primary path above — d.Role
+                // alone can't distinguish a darkened-preview or generic-fill cell from plain gray
+                // filler, so resolve grid coords to consult the imprint.
                 if (drums != null && _imprints != null)
                 {
                     var gp = drums.WorldToGridPosition(d.transform.position);
-                    if (_imprints.TryGetValue(gp, out var imp) && imp.hiddenRole != MusicalRole.None)
+                    if (_imprints.TryGetValue(gp, out var imp)
+                        && (imp.hiddenRole != MusicalRole.None || imp.hiddenRoleIsGenericFill))
                         continue;
                 }
 

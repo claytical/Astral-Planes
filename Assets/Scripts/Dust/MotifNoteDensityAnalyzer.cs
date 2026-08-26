@@ -12,12 +12,16 @@ public sealed class DustMotifDensitySnapshot
     public float MotifBusyness01;
     public Dictionary<RoleVoiceKey, float> WeightNorm01ByVoice = new();
     public Dictionary<MusicalRole, float> WeightNorm01ByRole = new();
+    public Dictionary<RoleVoiceKey, float> AvgNoteCountByVoice = new();
 
     public float GetWeightNorm01ByVoice(RoleVoiceKey voice) =>
         WeightNorm01ByVoice.TryGetValue(voice, out var w) ? w : 0.5f;
 
     public float GetWeightNorm01ByRole(MusicalRole role) =>
         WeightNorm01ByRole.TryGetValue(role, out var w) ? w : 0.5f;
+
+    public float GetAvgNoteCount(RoleVoiceKey voice) =>
+        AvgNoteCountByVoice.TryGetValue(voice, out var v) ? v : 0f;
 }
 
 public static class MotifNoteDensityAnalyzer
@@ -54,6 +58,8 @@ public static class MotifNoteDensityAnalyzer
         }
 
         if (avgByVoice.Count == 0) return snapshot;
+
+        foreach (var kv in avgByVoice) snapshot.AvgNoteCountByVoice[kv.Key] = kv.Value;
 
         float sum = 0f;
         foreach (var kv in avgByVoice) sum += kv.Value;

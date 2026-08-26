@@ -27,4 +27,20 @@ public class MazeRoleGeoConfig
 
     [Min(1), UnityEngine.Tooltip("Glade: number of punch-out clearings.")]
     public int gladeCount = 2;
+
+    [UnityEngine.Tooltip("If true, this role's territory size is computed directly from its average note count for this motif instead of the relative density-weight formula. Roles NOT flagged this way get no territory at all in a motif where at least one role uses this — their would-be cells become generic MusicalRole.None dust instead.")]
+    public bool useExactNoteCount = false;
+
+    [Min(0f), UnityEngine.Tooltip("Exact-count mode only: cellCount = round(avgNoteCount * this).")]
+    public float notesToCellsMultiplier = 1f;
+
+    [Range(0f, 1f), UnityEngine.Tooltip("Exact-count mode only: once this role's claimed territory covers at least " +
+        "centerBiasMinDensity01 of the maze, seed placement is restricted to the innermost this-fraction " +
+        "of unclaimed cells (by distance to the maze's bounding-box center) instead of the default farthest-" +
+        "point-from-star search. 0 (default) disables center bias.")]
+    public float centerBiasFraction01 = 0f;
+
+    [Range(0f, 1f), UnityEngine.Tooltip("Exact-count mode only: minimum claimed-territory fraction (targetCount / total " +
+        "maze cells) required before centerBiasFraction01 takes effect.")]
+    public float centerBiasMinDensity01 = 0.35f;
 }

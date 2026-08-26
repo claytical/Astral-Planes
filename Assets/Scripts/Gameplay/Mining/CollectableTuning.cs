@@ -49,6 +49,15 @@ public sealed class BaseMotionParams
 {
     [Tooltip("World units/sec of linear drift at multiplier 1.0 (base speed before role multiplier and MIDI-velocity modulation).")]
     public float baseLinearSpeed = 2.4f;
+
+    [Tooltip("Rigidbody2D linear damping applied to every Collectable once in-grid movement begins — ambient drag that helps velocity bleed off naturally (dust-trapped braking, post-bounce settling) instead of snapping to zero.")]
+    [Range(0f, 2f)] public float linearDamping = 0.2f;
+
+    [Tooltip("Headroom multiplier over the current steering accel / desired speed when clamping the force-based steering AddForce magnitude. Prevents a large single-frame velocity delta (e.g. right after a dust-bounce impulse) from injecting an oversized corrective force.")]
+    [Range(1f, 5f)] public float forceAccelHeadroomMul = 2.5f;
+
+    [Tooltip("Fraction of the current steering accel used as extra braking force whenever the Collectable is moving faster than its desired speed, or while fully trapped in dust (braking to rest).")]
+    [Range(0f, 1f)] public float forceBrakingFraction = 0.25f;
 }
 
 [Serializable]

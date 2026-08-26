@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   role: 1
   dustColors:
-    baseColor: {r: 0.7137255, g: 1, b: 0.8156863, a: 0.7607843}
-    shadowColor: {r: 0.52910286, g: 0.76841974, b: 0.7735849, a: 1}
+    baseColor: {r: 0.6627451, g: 1, b: 0, a: 1}
+    shadowColor: {r: 0, g: 0.6886792, b: 0.15034547, a: 1}
   baseAlpha: 0.5
   maxEnergyUnits: 2
   carveResistance01: 0.575

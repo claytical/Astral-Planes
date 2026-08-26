@@ -10,6 +10,7 @@ public partial class CosmicDustGenerator
     private List<MazeRoleGeoConfig> _roleGeoConfigs;
     private MazePatternType _activePatternType = MazePatternType.FullFill;
     private DustMotifDensitySnapshot _densitySnapshot;
+    private float _genericFillNeverRegrowRatio = 1f;
 
     public void ApplyMotifGeoConfig(MotifProfile motif, IReadOnlyList<InstrumentTrack> tracks = null)
     {
@@ -17,6 +18,7 @@ public partial class CosmicDustGenerator
             ? new List<MazeRoleGeoConfig>(motif.roleGeoConfigs)
             : null;
         _activePatternType = motif?.mazePattern?.patternType ?? MazePatternType.FullFill;
+        _genericFillNeverRegrowRatio = motif != null ? Mathf.Clamp01(motif.genericFillNeverRegrowRatio) : 1f;
         _densitySnapshot = MotifNoteDensityAnalyzer.Analyze(
             motif,
             tracks,
@@ -241,6 +243,18 @@ public partial class CosmicDustGenerator
 
         var occupied = BuildOccupiedCells(cells);
 
+        List<RoleVoiceKey> exactVoices = null;
+        for (int i = 0; i < voicesList.Count; i++)
+            if (TryGetGeoConfig(voicesList[i].role, out var exactCfg) && exactCfg.useExactNoteCount)
+                (exactVoices ??= new List<RoleVoiceKey>()).Add(voicesList[i]);
+
+        if (exactVoices != null && exactVoices.Count > 0)
+        {
+            ClaimExactCountTerritoryAndFillGeneric(occupied, exactVoices, starCell);
+            ApplyHiddenColorPreview(occupied);
+            return;
+        }
+
         if (voicesList.Count == 1)
         {
             RoleVoiceKey onlyVoice = voicesList[0];
@@ -276,6 +290,135 @@ public partial class CosmicDustGenerator
 
         string summary = string.Join(", ", counts.Select(kv => $"{kv.Key}={kv.Value}"));
         if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden Voronoi voices={hiddenCount}, seeds={actualSeedCount}, distribution=({summary})");
+    }
+
+    // Exact-count mode: each exact-flagged voice claims exactly round(avgNoteCount * multiplier)
+    // cells nearest to a set of greedily-spread seed points, instead of Voronoi-partitioning the
+    // whole maze. Every cell left over once all exact voices have claimed their share — including
+    // whatever non-exact active roles would otherwise have taken — becomes generic None dust.
+    private void ClaimExactCountTerritoryAndFillGeneric(
+        List<Vector2Int> occupied,
+        List<RoleVoiceKey> exactVoices,
+        Vector2Int starCell)
+    {
+        var unclaimed = new List<Vector2Int>(occupied);
+        var counts = new Dictionary<RoleVoiceKey, int>();
+        Vector2 gridCenter = ComputeBoundsCenter(occupied);
+
+        foreach (var voice in exactVoices)
+        {
+            TryGetGeoConfig(voice.role, out var cfg);
+            float avgCount = _densitySnapshot?.GetAvgNoteCount(voice) ?? 0f;
+            float multiplier = cfg != null ? cfg.notesToCellsMultiplier : 1f;
+            int targetCount = Mathf.Clamp(Mathf.RoundToInt(avgCount * multiplier), 0, unclaimed.Count);
+            counts[voice] = 0;
+            if (targetCount <= 0 || unclaimed.Count == 0) continue;
+
+            int seedCount = (cfg != null && cfg.feature == MazeGeoFeature.Archipelago)
+                ? Mathf.Clamp(cfg.seedCount, 1, unclaimed.Count)
+                : 1;
+
+            var seedPool = unclaimed;
+            float density = occupied.Count > 0 ? (float)targetCount / occupied.Count : 0f;
+            if (cfg != null && cfg.centerBiasFraction01 > 0f && density >= cfg.centerBiasMinDensity01)
+            {
+                var byCenterDist = new List<Vector2Int>(unclaimed);
+                byCenterDist.Sort((a, b) =>
+                    ((Vector2)a - gridCenter).sqrMagnitude.CompareTo(((Vector2)b - gridCenter).sqrMagnitude));
+                int keep = Mathf.Clamp(Mathf.RoundToInt(unclaimed.Count * cfg.centerBiasFraction01), seedCount, unclaimed.Count);
+                seedPool = byCenterDist.GetRange(0, keep);
+            }
+
+            var seeds = PickFarthestSeeds(seedPool, starCell, seedCount);
+
+            unclaimed.Sort((a, b) => MinSqrDistToAny(a, seeds).CompareTo(MinSqrDistToAny(b, seeds)));
+
+            int claim = Mathf.Min(targetCount, unclaimed.Count);
+            for (int i = 0; i < claim; i++)
+                _imprints.SetHiddenRole(unclaimed[i], voice.role, voice.voiceIndex);
+            counts[voice] = claim;
+            unclaimed.RemoveRange(0, claim);
+        }
+
+        // Shuffle before splitting so the never-regrow/quick-regrow sub-types interleave
+        // across the leftover territory instead of one sub-type clumping wherever it
+        // happened to land in claim order.
+        for (int s = unclaimed.Count - 1; s > 0; s--)
+        {
+            int r = Random.Range(0, s + 1);
+            (unclaimed[s], unclaimed[r]) = (unclaimed[r], unclaimed[s]);
+        }
+        int neverRegrowCount = Mathf.Clamp(Mathf.RoundToInt(unclaimed.Count * _genericFillNeverRegrowRatio), 0, unclaimed.Count);
+        for (int i = 0; i < unclaimed.Count; i++)
+        {
+            bool neverRegrow = i < neverRegrowCount;
+            _imprints.SetHiddenRoleGenericFill(unclaimed[i], neverRegrow ? config.genericFillTint : config.mazeTint, neverRegrow);
+        }
+
+        if (GameFlowManager.VerboseLogging)
+        {
+            string summary = string.Join(", ", counts.Select(kv => $"{kv.Key}={kv.Value}"));
+            Debug.Log($"[MAZE] BuildMazeRoleImprints: exact-count mode, cells={occupied.Count}, claimed=({summary}), generic(None)={unclaimed.Count} (neverRegrow={neverRegrowCount}, quickRegrow={unclaimed.Count - neverRegrowCount})");
+        }
+    }
+
+    // Greedy farthest-point seeding scoped to an arbitrary cell pool: first seed is farthest from
+    // starCell, each subsequent seed maximizes its minimum distance to seeds already chosen.
+    // Mirrors the same idiom used by SelectRoleSeedsWithGeo's fallback pass, just pool-scoped.
+    private static List<Vector2Int> PickFarthestSeeds(List<Vector2Int> pool, Vector2Int starCell, int seedCount)
+    {
+        var chosen = new List<Vector2Int>();
+        if (pool.Count == 0) return chosen;
+
+        int bestIdx = 0;
+        float bestDist = -1f;
+        for (int i = 0; i < pool.Count; i++)
+        {
+            float d = (pool[i] - starCell).sqrMagnitude;
+            if (d > bestDist) { bestDist = d; bestIdx = i; }
+        }
+        chosen.Add(pool[bestIdx]);
+
+        while (chosen.Count < seedCount && chosen.Count < pool.Count)
+        {
+            int nextIdx = -1;
+            float nextBest = -1f;
+            for (int i = 0; i < pool.Count; i++)
+            {
+                var candidate = pool[i];
+                if (chosen.Contains(candidate)) continue;
+                float minDist = MinSqrDistToAny(candidate, chosen);
+                if (minDist > nextBest) { nextBest = minDist; nextIdx = i; }
+            }
+            if (nextIdx < 0) break;
+            chosen.Add(pool[nextIdx]);
+        }
+        return chosen;
+    }
+
+    private static float MinSqrDistToAny(Vector2Int cell, List<Vector2Int> seeds)
+    {
+        float best = float.MaxValue;
+        for (int i = 0; i < seeds.Count; i++)
+        {
+            float d = (cell - seeds[i]).sqrMagnitude;
+            if (d < best) best = d;
+        }
+        return best;
+    }
+
+    private static Vector2 ComputeBoundsCenter(List<Vector2Int> cells)
+    {
+        if (cells.Count == 0) return Vector2.zero;
+        int minX = cells[0].x, maxX = cells[0].x, minY = cells[0].y, maxY = cells[0].y;
+        for (int i = 1; i < cells.Count; i++)
+        {
+            if (cells[i].x < minX) minX = cells[i].x;
+            if (cells[i].x > maxX) maxX = cells[i].x;
+            if (cells[i].y < minY) minY = cells[i].y;
+            if (cells[i].y > maxY) maxY = cells[i].y;
+        }
+        return new Vector2((minX + maxX) / 2f, (minY + maxY) / 2f);
     }
 
     // Cosmetic only — leaves imprint.role at MusicalRole.None (and therefore Role/targeting/

@@ -17,7 +17,7 @@ public partial class CosmicDust
     private Color _hiddenHintColor; // Color.clear = no hint stored
     private bool _hasFeedbackColors = false;
     public bool regrowAlphaCapped = false;
-    private const float kRegrowAlphaCap = 0.20f;
+    private const float kRegrowAlphaCap = 0.40f;
     [SerializeField] private float colliderDisabledAlpha = 0.08f;
 
 // Single managed tint pulse lane (charge + deny both use this).

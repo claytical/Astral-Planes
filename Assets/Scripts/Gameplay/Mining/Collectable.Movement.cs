@@ -56,7 +56,7 @@ public partial class Collectable
             // anything less keeps moving (and bouncing) so it never reads as stuck.
             if (IsFullyTrapped(cur, drums, dustGen))
             {
-                _rb.linearVelocity = Vector2.MoveTowards(_rb.linearVelocity, Vector2.zero, SteerAccel() * fdt);
+                ApplyBrakingForce(SteerAccel());
                 continue;
             }
 
@@ -106,16 +106,33 @@ public partial class Collectable
             // before the intent reasserts itself. Accel scales with the desired speed so
             // duration-derived slams/surges still reach full speed in _accelSeconds.
             _bounceRecoverTimer = Mathf.Max(0f, _bounceRecoverTimer - fdt);
-            float steer = Mathf.Max(SteerAccel(), desired.magnitude / _accelSeconds)
+            float accel = Mathf.Max(SteerAccel(), desired.magnitude / _accelSeconds)
                           * (_bounceRecoverTimer > 0f ? 0.25f : 1f);
 
-            _rb.linearVelocity = Vector2.MoveTowards(_rb.linearVelocity, desired, steer * fdt);
+            // Mass-respecting force steering (mirrors DiscoveryTrackNode.Locomotion's
+            // ApplyLocomotion) instead of a MoveTowards clamp, so accel/decel integrates
+            // through the rigidbody's physics rather than snapping to a computed velocity.
+            Vector2 delta = desired - _rb.linearVelocity;
+            float forceCap = Mathf.Max(accel, desired.magnitude) * ForceAccelHeadroomMul();
+            _rb.AddForce(Vector2.ClampMagnitude(delta * accel * _rb.mass, forceCap * _rb.mass), ForceMode2D.Force);
+
+            if (_rb.linearVelocity.magnitude > desired.magnitude)
+                ApplyBrakingForce(accel);
 
             ClampToViewportRb();
         }
     }
 
     private float SteerAccel() => _steerAccel;
+
+    private float ForceAccelHeadroomMul() => tuning != null ? tuning.baseMotion.forceAccelHeadroomMul : 2.5f;
+    private float ForceBrakingFraction() => tuning != null ? tuning.baseMotion.forceBrakingFraction : 0.25f;
+
+    private void ApplyBrakingForce(float accel)
+    {
+        if (_rb.linearVelocity.sqrMagnitude < 0.0001f) return;
+        _rb.AddForce(-_rb.linearVelocity * (accel * ForceBrakingFraction()) * _rb.mass, ForceMode2D.Force);
+    }
 
     /// <summary>
     /// Timeline ghost pulse: fired by DrumTrack.OnStepChanged (absolute step on the

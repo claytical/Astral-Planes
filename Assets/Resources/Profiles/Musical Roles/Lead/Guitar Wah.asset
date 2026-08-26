@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MusicalRoleProfile
   role: 2
   dustColors:
-    baseColor: {r: 0.9372549, g: 0.31372547, b: 0.6402022, a: 1}
-    shadowColor: {r: 0.36862746, g: 0.086274505, b: 0.27977395, a: 0.83137256}
+    baseColor: {r: 1, g: 0, b: 0.6193181, a: 0.7607843}
+    shadowColor: {r: 0.5568628, g: 0, b: 0.4413007, a: 1}
   baseAlpha: 0.25
   maxEnergyUnits: 1
   carveResistance01: 0.7
@@ -31,6 +31,8 @@ MonoBehaviour:
   collectableHomePullPerUnit: 1.5
   collectableFleeRadiusCells: 2
   collectableFleeSpeedMul: 1.3
+  collectableCatchRadiusMul: 1
+  collectableVisualScaleMul: 1
   midiPreset: 26
   lowestNote: 45
   highestNote: 84

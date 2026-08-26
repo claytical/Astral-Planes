@@ -108,6 +108,22 @@ public partial class CosmicDustGenerator
 
     private void FinalizeVehicleCarve(Vector2Int cell, float fadeSeconds, ShipMusicalProfile shipProfile = null)
     {
+        // dust.CurrentTint has usually been lerped toward gray by prior ChipEnergy calls
+        // (see CosmicDust.Energy.cs) by the time this fires — capture the role's true,
+        // undrained color for the explosion burst instead, mirroring how the tentacle-zap
+        // path captures its tint before draining (PhaseStarDustAffect.TentacleLifecycle.cs).
+        // Must use GetProspectiveRegrowRole, not dust.Role: a cell showing its darkened
+        // hidden-role preview (StaggeredGrowthFitDuration's "gray start" branch) still has
+        // dust.Role == None until this carve promotes it — dust.Role alone can't see the
+        // color the player is actually looking at for an as-yet-unrevealed cell.
+        Color? explosionTint = null;
+        MusicalRole prospectiveRole = GetProspectiveRegrowRole(cell);
+        if (prospectiveRole != MusicalRole.None)
+        {
+            var roleProfile = _roleDensity.GetResolvedRoleProfile(prospectiveRole);
+            if (roleProfile != null) explosionTint = roleProfile.GetBaseColor();
+        }
+
         _colliderSuppression.ClearSuppression(cell);
         _imprints.EnsureAllocated();
         if (!_imprints.RestoreVoronoiImprint(cell))
@@ -125,7 +141,7 @@ public partial class CosmicDustGenerator
         if (shipProfile != null && shipProfile.regrowDelayMultipliers != null)
             delay *= shipProfile.regrowDelayMultipliers.GetFor(GetProspectiveRegrowRole(cell));
 
-        CarveCell(cell, fadeSeconds, scheduleRegrow: true, source: DustClearSource.VehiclePlow, regrowDelaySeconds: delay, runPreExplode: true);
+        CarveCell(cell, fadeSeconds, scheduleRegrow: true, source: DustClearSource.VehiclePlow, regrowDelaySeconds: delay, runPreExplode: true, explosionTintOverride: explosionTint);
     }
 
     /// <summary>
@@ -177,9 +193,23 @@ public partial class CosmicDustGenerator
     /// </summary>
     private float ApplyDensityRegrowEasing(float baseDelay)
     {
-        float solidFraction = GetSolidFraction();
+        float solidFraction = GetRoleRelevantSolidFraction();
         float t = Mathf.InverseLerp(config.densityThrottleHalfAt, config.densityThrottleSkipAt, solidFraction);
         return baseDelay * Mathf.Lerp(1f, config.regrowDensityEaseMaxMultiplier, Mathf.Clamp01(t));
+    }
+
+    // Excludes generic-fill (exact-count leftover) cells from the density-pressure figure that
+    // paces regrow delay — hundreds of inert filler cells shouldn't make a role's authored
+    // regrowthDelay read as inflated near motif start. GetSolidFraction() itself is left
+    // untouched: GravityVoidController's void-growth throttle and DrumTrack's density-driven
+    // beat intensity both intentionally key off the literal, filler-inclusive figure.
+    private float GetRoleRelevantSolidFraction()
+    {
+        int w = _gridState.Width;
+        int h = _gridState.Height;
+        if (w <= 0 || h <= 0) return 0f;
+        int relevantSolid = _roleDensity.TotalSolidCount() - _roleDensity.GenericFillSolidCount;
+        return Mathf.Clamp01(Mathf.Max(0, relevantSolid) / (float)(w * h));
     }
 
     /// <summary>
@@ -284,6 +314,18 @@ public partial class CosmicDustGenerator
         // (it removes the cell from the set before requesting).
         if (_heldRegrowCells.Contains(gridPos))
             return;
+
+        // Exact-count mode's permanent-filler (None) dust is permanent scenery for the rest of
+        // the motif once cleared — it never re-enters the regrow cadence like quick-regrow
+        // generic dust does. ClearMaze()'s _permanentClearCells.Clear() lifts this at the next
+        // motif's maze generation.
+        if (_imprints != null && _imprints.TryGetValue(gridPos, out var fillImp)
+            && fillImp.hiddenRoleIsGenericFill && fillImp.genericFillNeverRegrows)
+        {
+            _permanentClearCells.Add(gridPos);
+            _regrow?.CancelRegrow(gridPos);
+            return;
+        }
 
         bool shouldSchedule = !_permanentClearCells.Contains(gridPos);
 

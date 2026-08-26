@@ -10,10 +10,11 @@ public partial class CosmicDust
     public float Charge01 => (float)_currentEnergyUnits / Mathf.Max(1, _maxEnergyUnits);
     public MusicalRole Role { get; private set; } = MusicalRole.None;
     public int VoiceIndex { get; private set; } = 0;
-    // Ceiling kept below 1.0 so even a fully-charged solid cell stays translucent (wispy)
-    // instead of reading as an opaque, heavy block.
-    private const float kSolidAlphaFloor = .30f;
-    private const float kSolidAlphaCeiling = .72f;
+    // Raised toward full opacity for brightness/legibility — the maze's roles were reading
+    // as too dim/hard to differentiate. Kept just under 1.0 to leave headroom for pulse/
+    // charge effects that lerp on top without clipping.
+    private const float kSolidAlphaFloor = .55f;
+    private const float kSolidAlphaCeiling = .95f;
 
     public void EnsureMinSolidAlpha(float minAlpha)
     {

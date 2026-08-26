@@ -12,6 +12,8 @@ public struct DustImprint
     public MusicalRole hiddenRole; // permanent Voronoi ground-truth; None = not set
     public int voiceIndex;         // voice within role; 0 for every existing single-voice motif
     public int hiddenVoiceIndex;   // voice pair to hiddenRole, promoted together
+    public bool hiddenRoleIsGenericFill; // true only when exact-count mode deliberately filled this cell with MusicalRole.None
+    public bool genericFillNeverRegrows; // true only for the permanent-filler sub-type; false = quick-regrow generic
 }
 
 /// <summary>
@@ -97,6 +99,27 @@ public sealed class DustImprintStore
         TryGetValue(gp, out var imp);
         imp.hiddenRole = role;
         imp.hiddenVoiceIndex = voiceIndex;
+        imp.hiddenRoleIsGenericFill = false;
+        this[gp] = imp;
+    }
+
+    /// <summary>
+    /// Marks a cell as deliberately generic (MusicalRole.None) filler dust — distinct from a
+    /// cell whose hidden role was simply never assigned. ResolveRegrowVoice checks
+    /// hiddenRoleIsGenericFill so generic-fill cells (either sub-type) stay None across
+    /// carve/regrow cycles instead of drifting into a neighboring role's color via the
+    /// plurality/least-dense fallback. RequestRegrowCellAt separately checks
+    /// genericFillNeverRegrows to decide whether this specific cell ever re-enters the
+    /// regrow cadence once cleared, or is permanently gone for the rest of the motif.
+    /// </summary>
+    public void SetHiddenRoleGenericFill(Vector2Int gp, Color color, bool neverRegrows)
+    {
+        TryGetValue(gp, out var imp);
+        imp.hiddenRole = MusicalRole.None;
+        imp.hiddenVoiceIndex = 0;
+        imp.hiddenRoleIsGenericFill = true;
+        imp.genericFillNeverRegrows = neverRegrows;
+        imp.color = color;
         this[gp] = imp;
     }
 
