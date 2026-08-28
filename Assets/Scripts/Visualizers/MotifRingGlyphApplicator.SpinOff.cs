@@ -71,6 +71,8 @@ public partial class MotifRingGlyphApplicator
         // Restore to full scale — handles both "hidden after deformation" and "mid-fade interrupted".
         transform.localScale = _fitScale.sqrMagnitude > 0.0001f ? _fitScale : Vector3.one;
 
+        DetachPendingRingTethers(config != null ? config.noteTetherGrowDuration : 0.25f);
+
         yield return RunSpinRollScale(
             _gameplayRings.Concat(_remainingRings).ToArray(), spinDuration, rollDuration);
 

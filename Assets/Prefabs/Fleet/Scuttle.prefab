@@ -27,14 +27,14 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: -5}
-  m_LocalScale: {x: 0.14999999, y: 0.14999999, z: 0.29999998}
+  m_LocalScale: {x: 1, y: 1, z: 2}
   m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 2614095863033673403}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &3066586038676526099
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -79,9 +79,9 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: -49
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 7223363152320260212, guid: 2f30de0d052204e9ebd3f9f8b6452a57,
+  m_Sprite: {fileID: -8181438857914743230, guid: 1d8d911bd0dda45beab2fe1460640c87,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -92,6 +92,7 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &5120608187766906454
 GameObject:
   m_ObjectHideFlags: 0
@@ -153,9 +154,6 @@ MonoBehaviour:
   gravityVoidMask:
     serializedVersion: 2
     m_Bits: 0
-  dustLayerMask:
-    serializedVersion: 2
-    m_Bits: 0
   energyLevel: 60
   boosting: 0
   trail: {fileID: 5973205746167519599, guid: ae1d684c553f50e4da4037ae2b6369fe, type: 3}
@@ -166,7 +164,7 @@ MonoBehaviour:
   releaseCue: {fileID: 0}
 --- !u!212 &1970310610805977373
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -213,7 +211,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: -20
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 7523207921349720078, guid: cac17b2ae5a6949bf9f126cf845bae11,
+  m_Sprite: {fileID: -1066313109638005927, guid: 1c5657b83bf3844b29109e331665f74e,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -224,6 +222,7 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!50 &3138199776794840757
 Rigidbody2D:
   serializedVersion: 5
@@ -421,7 +420,7 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.64, y: 0.7}
+    oldSize: {x: 0.75, y: 0.68}
     newSize: {x: 0.9, y: 0.98}
     adaptiveTilingThreshold: 0.5
     drawMode: 0

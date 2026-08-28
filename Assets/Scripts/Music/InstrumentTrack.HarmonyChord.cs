@@ -101,7 +101,11 @@ public partial class InstrumentTrack
     {
         regionCount = Mathf.Max(1, regionCount);
         if (_activeProfile != null && _activeProfile.sameRootAcrossBins) return 0;
-        return ((bin % regionCount) + regionCount) % regionCount;
+
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        int offset = _gfm?.harmony != null ? _gfm.harmony.ProgressionOffset : 0;
+
+        return (((bin + offset) % regionCount) + regionCount) % regionCount;
     }
 
     private static List<int> BuildChordTones(Chord chord, int lowestNote, int highestNote)

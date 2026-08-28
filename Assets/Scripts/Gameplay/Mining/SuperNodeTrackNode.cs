@@ -397,7 +397,7 @@ public class SuperNodeTrackNode : TrackNode
             }
             else
             {
-                AssignedTrack.controller?.CheckAndTriggerAllTracksMaxed();
+                AssignedTrack.controller?.CheckAndTriggerAllTracksMaxed(applyImmediately: false);
             }
 
             AssignedTrack.controller?.StageAltChordIfAllTracksMaxed();

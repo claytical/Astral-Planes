@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RiffAsset
   riff:
     id: waiting-palm-1
-    authoredRootMidi: 46
+    authoredRootMidi: 70
     loopSteps: 16
     events:
     - step: 0

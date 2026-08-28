@@ -75,6 +75,22 @@ public sealed partial class NoteAscensionDirector
         }
     }
 
+    /// <summary>
+    /// Removes the given marker from ascension tracking without firing its arrival
+    /// side effects (OnNoteReachedAscent, LineCharge01) — used when a caller elsewhere
+    /// has already decided the note is gone (e.g. a broken preview tether) and is about
+    /// to destroy the marker itself. Prunes the owning track's task if it becomes empty.
+    /// </summary>
+    public void CancelAscension(InstrumentTrack track, GameObject go)
+    {
+        if (track == null || go == null) return;
+        if (!_ascendTasks.TryGetValue(track, out var task) || task.markers == null) return;
+
+        task.markers.RemoveAll(ms => ms.go == go);
+        if (task.markers.Count == 0)
+            _ascendTasks.Remove(track);
+    }
+
     // -------------------------------------------------------------------------
     // Loop boundary — step all ascend tasks
     // -------------------------------------------------------------------------

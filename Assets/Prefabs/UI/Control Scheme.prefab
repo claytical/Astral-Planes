@@ -693,10 +693,10 @@ MonoBehaviour:
   labelAttentionScale: 0.06
   labelScaleLerpSpeed: 14
   deactivateLabelWhenHidden: 1
-  pressAnySequence: 04000000
-  driftText: Fly
-  boostText: Push
-  releaseText: Commit
+  pressAnySequence: 06000000
+  driftText: Drift
+  boostText: Energize
+  releaseText: Place
   instructionText: {fileID: 8806483350426262609}
   labelFadeOutSeconds: 0.12
   hideTextOnClear: 1

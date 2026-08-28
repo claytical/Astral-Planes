@@ -18,6 +18,16 @@ MonoBehaviour:
   fitPaddingFraction: 0.05
   ringMeshMaterial: {fileID: 2100000, guid: db6f88bb6fd04da5bdaac2167f76440b, type: 2}
   ringAlpha: 0.339
+  contourAlpha: 1
+  remainingRingColor: {r: 0.6, g: 0.6, b: 0.6, a: 1}
+  remainingRingAlpha: 0.12
+  remainingContourAlpha: 0.25
+  nextUpColorCycleDuration: 0.5
+  recordHoldDuration: 5
+  recordFadeOutDuration: 0.75
+  backgroundDiscColor: {r: 0, g: 0, b: 0, a: 1}
+  placedBackgroundAlpha: 0.388
+  fullBackgroundAlpha: 0.692
   lineWidth: 0.02
   segments: 256
   tugDepthFraction: 0.25
@@ -26,22 +36,15 @@ MonoBehaviour:
   ringStaggerDelay: 0.08
   rotSpeedBase: 25
   rotSpeedMax: 174
-  fadeOutDuration: 0.5
   noteDotRadius: 0.01
   noteTravelDuration: 1
-  ringHoldScale: 0.25
-  bouncePressScale: 0.12
-  bouncePressDuration: 0.25
-  bounceSettleDuration: 0.35
+  noteTetherGrowDuration: 0.25
   rollOffDuration: 2
   ringAppearDuration: 0.1
-  noteLaunchLeadSteps: 2
   launchSfx: {fileID: 8300000, guid: 16b44a33b73884ed08017ba01d7f61bc, type: 3}
   launchSfxVolume: 0.115
   impactSfx: {fileID: 8300000, guid: bc570d14f72164a12a7c8adccbb03ca8, type: 3}
   impactSfxVolume: 0.135
-  spinOffExtraDegPerSec: 720
   spinOffDuration: 2
   tiltXDegrees: 75
-  tiltXDuration: 3
   scaleDownDuration: 3

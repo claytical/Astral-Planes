@@ -49,13 +49,13 @@ public partial class InstrumentTrackController
     // end the motif — SuperNode capture always shifts the chord, but the motif only ends when
     // StarPool's nodesPerStar harvest budget is satisfied, either through normal play or a full
     // completionist shard sweep (see NotifySuperNodeResolved / TryCompleteFullSweepHarvestIfReady).
-    public void CheckAndTriggerAllTracksMaxed()
+    public void CheckAndTriggerAllTracksMaxed(bool applyImmediately = true)
     {
         if (_pendingSuperNodeCompletions > 0) return;
         if (!TryGetAllTracksMaxedAltProfile(out var gfm, out var alt)) return;
         if (gfm.GhostCycleInProgress || gfm.BridgePending) return;
 
-        gfm.harmony?.SetActiveProfile(alt, applyImmediately: true);
+        gfm.harmony?.SetActiveProfile(alt, applyImmediately: applyImmediately);
     }
 
     // Sticky flag set when a SuperNode resolves with every shard caught. Consumed once

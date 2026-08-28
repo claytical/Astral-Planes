@@ -11,6 +11,7 @@ public partial class Vehicle
     // Only record anchor when we are reasonably “in play”.
     // (Avoid recording while already offscreen or during a trap.)
     if (IsFarOutsideViewport(vehicleConfig.viewportOobMargin * 0.5f)) return;
+    if (IsOutsidePlayArea(vehicleConfig.playAreaOobMargin * 0.5f)) return;
 
     // If you want, you can also avoid anchoring while inside a void:
     // if (IsInsideGravityVoid(out _, out _)) return;
@@ -30,6 +31,15 @@ public partial class Vehicle
     if (IsFarOutsideViewport(vehicleConfig.viewportOobMargin))
     {
         DoSnapRespawn("viewport_oob");
+        return;
+    }
+
+    // 1b) Hard OOB: outside the safe play area (e.g. tunneled into the NoteVisualizer
+    // strip at the bottom, which is still within the full camera viewport and so
+    // wouldn't trip the check above).
+    if (IsOutsidePlayArea(vehicleConfig.playAreaOobMargin))
+    {
+        DoSnapRespawn("play_area_oob");
         return;
     }
 
@@ -69,6 +79,40 @@ public partial class Vehicle
     if (vp.z < 0f) return true;
 
     return (vp.x < -margin || vp.x > 1f + margin || vp.y < -margin || vp.y > 1f + margin);
+}
+
+    private bool IsOutsidePlayArea(float margin)
+{
+    if (drumTrack == null || !drumTrack.TryGetPlayAreaWorld(out var area)) return false;
+
+    Vector2 pos = rb.position;
+    return pos.x < area.left - margin || pos.x > area.right + margin ||
+           pos.y < area.bottom - margin || pos.y > area.top + margin;
+}
+
+    /// <summary>
+    /// Immediately relocates the vehicle to just outside a circular region if it's currently
+    /// inside — e.g. a ring collider that just activated/grew and happened to enclose it.
+    /// Unlike TryEjectFromVoid, this is instant (not animated): the vehicle was never meant to
+    /// be inside this collider, so snapping out now — before Physics2D's next step ever sees
+    /// an overlap — means no spurious OnCollisionEnter2D fires against it.
+    /// </summary>
+    public void EjectFromCircleIfInside(Vector2 center, float radius, float margin = 0.15f)
+{
+    if (rb == null) return;
+    Vector2 pos = rb.position;
+    if ((pos - center).sqrMagnitude >= radius * radius) return; // not inside, no-op
+
+    Vector2 away = pos - center;
+    away = away.sqrMagnitude < 0.0001f ? Random.insideUnitCircle.normalized : away.normalized;
+
+    Vector2 targetWorld = center + away * (radius + margin);
+    if (drumTrack != null &&
+        TryFindNearbyEmptyCell(drumTrack.WorldToGridPosition(targetWorld), 4, out var emptyCell))
+        targetWorld = drumTrack.GridToWorldPosition(emptyCell);
+
+    rb.position = targetWorld;
+    rb.linearVelocity = away * Mathf.Max(rb.linearVelocity.magnitude, 1f);
 }
 
     private bool IsInsideGravityVoid(out Vector2 center, out float radius)

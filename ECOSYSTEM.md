@@ -194,7 +194,7 @@ The per-role drain/eject actor spawned and gated by `StarPool`. Siphons dust fro
 
 **Owns:** attuned role, safety-bubble-free tentacle set, armed/disarmed state, `_activeNode` / `_activeSuperNode` guards, `_shardsEjectedCount`, `_heldDrainCells` (cells drained since the last node spawn).
 
-Readiness is **zap-count-only** — there is no charge/threshold gate. `_displayedCharge01` (`PhaseStar.cs:149`) is a pure visual lerp of `ZapProgress01` (drives the diamond-fill animation); it does not gate ejection. `IsEjectionReady()` = descriptor valid + `ReadyLatched` (zap quota met), period.
+Readiness is **zap-count-only** — there is no charge/threshold gate. `_displayedCharge01` (`PhaseStar.cs:149`) is a pure visual lerp of `ZapProgress01` (drives the diamond-fill animation); it does not gate ejection. `IsEjectionReady()` = descriptor valid + `ReadyLatched` (zap quota met), period. On entering Dormant (`EnterInMaze`), the navigator activates immediately but tentacles wait `tentacleActivationDelay` seconds (`PhaseStar.DormantState.cs`) before `dust.SetTentaclesActive(true)` fires, so the star visibly appears before it starts reaching for dust.
 
 **Tentacle drain (`PhaseStarDustAffect`):** one tentacle grows per available role-carved cell, capped by the node payload — the zap budget is `RemainingZapCount` minus in-flight tentacles, so a 5-note payload with 3 carved cells grows 3 tentacles at once and adds more as cells are carved. Each drained cell goes through `CosmicDustGenerator.ZapClearCellHeld()` (no regrow while held) and is registered on the star; the zap is credited immediately on drain (`CreditZap()`), not deferred to full tentacle retraction. When the payload's zap count is met, acquisition disables and the star latches `ReadyLatched`. Targeting itself is gated on `CosmicDust.IsVisuallyPresentForTargeting()`, which since the flower-bloom redesign also requires `HasBloomedFlower` — a freshly-generated or non-vehicle-regrown cell is invisible to tentacles even if solid and role-carved, until a vehicle has plow-carved it at least once.
 
@@ -423,7 +423,24 @@ Authoritative 2D grid. All spatial state lives here — cell solid/empty status,
 
 Role imprinting: a vehicle plow-carve promotes the cell's hidden Voronoi role into the active imprint, so it regrows in its true role color with charge. Same-role cells attract nearby `DiscoveryTrackNode`/`SuperNodeTrackNode` and `Collectable` movement.
 
+**Spawn-time color reveal is not hidden by default.** Every occupied cell's `hiddenRole` is a Voronoi ground-truth assigned at maze build time, but `imp.role`/`dust.Role` stay `MusicalRole.None` until a vehicle actually carves it — that's what gates targeting, carve resistance, and star-arming (untouched by any of this). The cell's *displayed color*, though, is a separate, purely cosmetic pass: `ApplyHiddenColorPreview` (`CosmicDustGenerator.MazeGeneration.cs`, run at the end of every `BuildMazeRoleImprints` path — single-voice, multi-voice Voronoi, and Exact-Count below) colors each cell with `Color.Lerp(hiddenRole's true MusicalRoleProfile color, Color.black, hiddenRoleColorDarken01)` instead of flat `mazeTint` gray, so the maze reads as "roughly what it is" from the moment it spawns, well before any carving. `CosmicDustGeneratorConfig.hideDustColorAtSpawn` (default `false`) is the one switch that turns this off entirely, falling back to flat `mazeTint` for every cell. Carving still promotes the real `Role` and reveals the full, un-darkened color exactly as before — this preview only narrows the gap between "secret" and "revealed," it doesn't erase it.
+
+**"No musical role" dust is not the same thing as this gray/darkened preview.** A `hiddenRole`-bearing cell is *always* owned by some role underneath, whether it's currently showing a darkened preview, mid-regrow gray (`ForceGrayRegrow`/`ZapForceGray`, see Regrow delay resolution above), or fully revealed. True `MusicalRole.None` dust — no hidden role at all, permanently — only exists via Exact-Count Maze Mode's leftover generic fill, in two visually- and behaviorally-distinct sub-types (never-regrow vs. quick-regrow); see below.
+
 Flower bloom (`CosmicDust.Flower.cs`): each cell carries a hidden `Flower` child sprite pair, normally inactive. `CommitRegrowCell` persists the `DustClearSource` that triggered a pending regrow (`_pendingRegrowSource`, written in `ClearCell`) and, only when that source was `VehiclePlow`, calls `dust.BloomFlower(regrowTint)` — the flower fades in role-tinted alongside the regrowing dust. Every `ClearCell` call unconditionally calls `dust.HideFlower()` first, so any clear (vehicle re-carve, tentacle drain, any other source) resets the tell; only a vehicle carve can re-bloom it. `HasBloomedFlower` gates `CosmicDust.IsVisuallyPresentForTargeting()` (see PhaseStar below) — dust regrown by any non-vehicle source still regrows and is still solid/collidable, it's just untargetable by tentacles until a vehicle carves it at least once.
+
+---
+
+### Exact-Count Maze Mode ("Puzzle" Territory Sizing)
+`CosmicDustGenerator.MazeGeneration.cs` (`ClaimExactCountTerritoryAndFillGeneric`), `DustImprintStore.cs`, `DustRoleDensityTracker.cs`, `MazeGeoFeature.cs` (`MazeRoleGeoConfig`), `MotifNoteDensityAnalyzer.cs`, `MotifProfile.cs`
+
+An alternate to the default Voronoi-partition maze build. A per-role `MazeRoleGeoConfig.useExactNoteCount` flag switches that role's territory from the relative density-weight formula to an absolute cell count: `cellCount = round(avgNoteCount * notesToCellsMultiplier)`, claimed by nearest-cell assignment out from greedily-spread seed points (`PickFarthestSeeds`) rather than a full-maze Voronoi split. If *any* active role in the motif uses exact-count sizing, **every** role does — a non-flagged role gets no territory at all in that motif; its would-be cells fall into the leftover pool instead.
+
+Leftover (unclaimed) cells become generic `MusicalRole.None` filler dust, split by `MotifProfile.genericFillNeverRegrowRatio` into two visually-distinct sub-types (`DustImprintStore.SetHiddenRoleGenericFill`, tagged `hiddenRoleIsGenericFill`/`genericFillNeverRegrows`):
+- **Permanent filler** (darker `CosmicDustGeneratorConfig.genericFillTint`) — once cleared, never re-enters the regrow cadence for the rest of the motif (`CosmicDustGenerator.CellLifecycle.cs` checks the flag in `RequestRegrowCellAt` and adds the cell to `_permanentClearCells` instead of scheduling regrow).
+- **Quick-regrow filler** (ordinary `mazeTint`) — regrows normally, but bypasses the shared step-gate queue entirely (`CosmicDustRegrowthController`'s `shouldBypassStepGate` hook) so hundreds of inert filler cells can't starve real role-dust out of the queue.
+
+`DustRoleDensityTracker` tracks generic-fill solid count separately (`GenericFillSolidCount`) so `GetRoleRelevantSolidFraction()` — which paces regrow-delay density easing — can exclude inert filler from the density figure a role's authored `regrowthDelay` is judged against; the literal filler-inclusive `GetSolidFraction()` is left untouched for the systems that intentionally key off it (`GravityVoidController`, `DrumTrack`'s density-driven beat intensity, Flow D). `ResolveRegrowVoice` also special-cases `hiddenRoleIsGenericFill` so a generic cell always regrows `None` rather than drifting into a neighboring role's color via the normal plurality/least-dense fallback.
 
 ---
 
@@ -455,9 +472,13 @@ Renders the loop grid, DSP-synced playhead, manual-release ghost cue, note ascen
 ### Glyph & Ring Systems
 
 **Ring glyph (live, record/vinyl metaphor):**
-`Assets/Scripts/Visualizers/MotifRingGlyphApplicator.cs` + `RingGlyphConfig.cs` (SO knobs) + `MotifRingGlyphGenerator.cs` (geometry) + `Assets/Scripts/Managers/BinRingController.cs` (drives gameplay ring spawn/deformation off the drum playhead).
+`Assets/Scripts/Visualizers/MotifRingGlyphApplicator.cs` (+ `.GameplayRings.cs`, `.RingBuilder.cs`, `.Animation.cs`) + `RingGlyphConfig.cs` (SO knobs) + `MotifRingGlyphGenerator.cs` (geometry) + `Assets/Scripts/Managers/BinRingController.cs` (drives gameplay ring spawn/deformation off the drum playhead) + `Assets/Scripts/Visualizers/Notes/NoteTether.cs` (shared cable renderer, also used for the manual-release ghost cue).
 
-Each ring is a filled annulus tinted by musical role, plus a contour line that dips inward ("tug") at each note position — the applicator's own header comment describes the look as record-groove tracks. Two separate rings collections exist on the applicator: `_gameplayRings` accumulate live, one per completed bin, during play; `_recordRings` render a full completed-motif snapshot for browsing UI.
+Each ring is a filled annulus tinted by musical role, plus a contour line that dips inward ("tug") at each note position — the applicator's own header comment describes the look as record-groove tracks. Two separate rings collections exist on the applicator: `_gameplayRings` accumulate live, one per completed bin, during play; `_recordRings` render a full completed-motif snapshot for browsing UI. A fixed sorting-order stack keeps the whole thing layered correctly over the maze (`MotifRingGlyphApplicator.RingBuilder.cs`): background discs (1–2) → ring `Fill` (3) → `Contour` (4) → travel dot (5) → `NoteTether` cable (`Foreground` layer, order 10) — without it the record reads as a see-through wireframe with dust visible behind it.
+
+**Motif-start record reveal:** `SceneFlowCoordinator` calls `BinRingController.ShowInitialRecord()` / `FadeInitialRecordOut()` (thin forwarders onto the applicator) at the start of every motif — immediately, in darkness, before the maze exists for the very first motif of a session; after the new maze has already fully generated for every other transition. `ShowInitialRecord()` populates the full placeholder-ring stack via `SetRemainingProgressRings(nodesPerStar)`. The record holds at full opacity for `RingGlyphConfig.recordHoldDuration`, then `FadeRecordOut()` fades everything (placed + remaining rings, both background discs) out over `recordFadeOutDuration` — or, for the very first motif, over an explicit duration passed in so the fade finishes exactly as the maze fully grows in. Two solid backdrop discs (`_placedBgDisc` sized to completed rings, `_fullBgDisc` sized to the whole record, both built by `CreateBackgroundDisc`/`BuildDiscMesh`) give the record a genuine opaque backing instead of a wireframe. The innermost not-yet-filled placeholder ring previews the motif's active role palette — static if the motif has one role, cycling through them (`AnimateNextUpRingColorCycle`, `nextUpColorCycleDuration`) if it has several — so the "next up" ring always hints at what's coming.
+
+**Note preview tethers + ring-collision breaking:** while a bin's rings are deforming in (`DeformBinRingCoroutine`), each note about to land gets a `NoteTether` cable that grows in (`GrowIn`) from its timeline marker to its future ring landing spot, tracked in `_pendingRingNotes`. The tether retracts and self-destroys (`RetractAndDestroy`) the instant its travel dot actually departs (`onDepart`). While a tether is still live, a `Vehicle` colliding with the ring's `CircleCollider2D` can break it: `Vehicle.OnCollisionEnter2D` (`Vehicle.Damage.cs`) calls `MotifRingGlyphApplicator.TryBreakNextPendingTether(contactPoint)`, which finds the pending note whose ring-side anchor is closest to the contact point, cancels its travel-dot launch, retracts its tether, and calls `InstrumentTrack.RemovePersistentNoteAtStep()` + `NoteVisualizer.RemoveCommittedMarkerAtStep()` (which cancels the note out of `NoteAscensionDirector` first, via `CancelAscension()`, so ascension doesn't hold a dangling reference) — the note is undone as if it had never landed. A successful break plays a low-frequency "released spring" shake (`PlayBreakShake`) and spawns a tint-matched particle burst at both the marker and the ring anchor; colliding with the ring when nothing is pending instead plays a short, stiff denial shake (`PlayDenialShake`) — both driven by Perlin-noise-decayed `transform.localPosition` jitter (`ShakeRoutine`), config'd via `RingGlyphConfig`'s Ring Collision Feedback knobs. A bin emptied this way re-fires `OnBinFilled`/`SpawnBinRing` when it refills; `SpawnBinRing` replaces the stale ring entry in place (matched by `binIndex`+`role`) instead of appending a duplicate.
 
 There are **two distinct consumers**, and they use different methods — this is the biggest place the old documentation was wrong:
 - **Live bridge:** `BridgeCoordinator.PlayMotifBridgeAndRestart()` calls `MotifRingGlyphApplicator.SpinAndRollOffActiveRings(spinDur, rollOffDuration)` on the accumulated gameplay rings (spin 360°, tilt, scale to zero). It does **not** call `AnimateApply`/`FadeOutAndClear` — `FadeOutAndClear()` doesn't exist anywhere in the codebase.
@@ -593,3 +614,24 @@ is a separate per-role knob (`discardBlastRadiusCells`) — heavier roles (Bass)
 tuned to a bigger radius than lighter ones (Lead), and that one radius drives the vehicle
 falloff, the dust-clear disk, and the flash-visual size together, so the visible blast is
 exactly the area that gets cleared.
+
+### Flow G — Ring Note Preview → Vehicle Break
+```
+InstrumentTrack bin fills → MotifRingGlyphApplicator.SpawnBinRing() → BeginBinRingDeformation()
+  → DeformBinRingCoroutine(), per note in the bin:
+      NoteTether.GrowIn() from timeline marker (BindStartByStep) to ring landing anchor
+      → registered in _pendingRingNotes (tether, anchor, track, step, cancel flag)
+      → WaitAndLaunchDot() waits for the note's live-recomputed trigger step
+  [vehicle collides with ring's CircleCollider2D before the note's step arrives]
+    → Vehicle.OnCollisionEnter2D → MotifRingGlyphApplicator.TryBreakNextPendingTether(contactPoint)
+        nearest-anchor pending note found → cancel flag set → tether.RetractAndDestroy()
+        → InstrumentTrack.RemovePersistentNoteAtStep()
+        → NoteVisualizer.RemoveCommittedMarkerAtStep()
+            → NoteAscensionDirector.CancelAscension() (drops it from ascension tracking first)
+        → PlayBreakShake() + tint-matched particle burst at marker + ring anchor
+    [no tether pending] → PlayDenialShake() only, no state change
+  [note's step reached first] → onDepart: tether retracts, dot launches → onLaunch reveals
+      the note on the ring's persisted contour (survives into the eventual MotifSnapshot)
+```
+A bin emptied by a break re-fires `OnBinFilled` once refilled; `SpawnBinRing` replaces the
+stale ring entry in place (matched by `binIndex`+`role`) rather than duplicating it.

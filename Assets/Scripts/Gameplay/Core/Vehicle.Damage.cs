@@ -74,6 +74,13 @@ public partial class Vehicle
         {
             TriggerThud(coll.contacts[0].point);
         }
+
+        var ringApplicator = coll.gameObject.GetComponent<MotifRingGlyphApplicator>();
+        if (ringApplicator != null)
+        {
+            if (!ringApplicator.TryBreakNextPendingTether(coll.contacts[0].point))
+                ringApplicator.PlayDenialShake();
+        }
 }
 
     private void TriggerThud(Vector2 collisionPoint)

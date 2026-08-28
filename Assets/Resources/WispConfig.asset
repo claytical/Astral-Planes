@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4684fad16b34b4da9af4a44a83716dcf, type: 3}
   m_Name: WispConfig
   m_EditorClassIdentifier: Assembly-CSharp::WispConfig
-  approachRadius: 1
+  approachRadius: 7
   recheckPeriod: 0.2
   seekSpeed: 1
   waypointArriveDistance: 0.3
@@ -24,16 +24,6 @@ MonoBehaviour:
   wanderNoiseFrequency: 0.15
   spawnMinCellsFromVehicle: 4
   spawnMinCellsFromExit: 4
-  bridgeSamples:
-  - {fileID: 8300000, guid: bfc65bcb301c64a22b68667f7c3166db, type: 3}
-  - {fileID: 8300000, guid: a6a1d0f6a5f8747b0abd801af4fd16dc, type: 3}
-  - {fileID: 8300000, guid: af1ef47bd5c0142729ae7ce631a28ba3, type: 3}
-  - {fileID: 8300000, guid: e13485dffbb154ace8ad189d054eb5f4, type: 3}
-  - {fileID: 8300000, guid: 4d602b26399ea45a2a4d7355b4f62f85, type: 3}
-  - {fileID: 8300000, guid: 834d57a1060d4422a9441ce658364db7, type: 3}
-  - {fileID: 8300000, guid: f23da9bdd93984e1ca9418797de0778a, type: 3}
-  sampleVolume: 0.25
-  quantizeToBeat: 1
   mazePulseSeconds: 1.2
   mazePulseHueCyclesPerSecond: 0.8
   mazePulseSaturation: 0.85

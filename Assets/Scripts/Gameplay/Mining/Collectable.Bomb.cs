@@ -250,7 +250,7 @@ public partial class Collectable
             {
                 var centerGP = drums.CellOf(transform.position);
                 int radiusCellsInt = Mathf.Max(1, Mathf.RoundToInt(_bombBlastRadiusCells));
-                _gfm?.dustGenerator?.TriggerDiscardBlast(centerGP, radiusCellsInt);
+                _gfm?.dustGenerator?.TriggerDiscardBlast(centerGP, radiusCellsInt, source: DustClearSource.CollectableBombBlast);
             }
         }
         catch (Exception ex)

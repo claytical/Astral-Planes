@@ -23,6 +23,8 @@ public sealed class BridgeCoordinator
 
     public IReadOnlyList<MotifSnapshot> MotifSnapshots => _motifSnapshots;
 
+    public void ClearSessionMotifs() => _motifSnapshots.Clear();
+
     public IEnumerator PlayMotifBridgeAndRestart()
     {
         _session.SetGhostCycleInProgress(true);
@@ -74,6 +76,11 @@ public sealed class BridgeCoordinator
             yield return _gameFlow.StartCoroutine(
                 rings.SpinAndRollOffActiveRings(spinDur, rings.config?.rollOffDuration ?? 1.5f));
         }
+
+        // Final safety sweep for any stray tether that didn't already retract gracefully
+        // (e.g. DetachPendingRingTethers only covers ring preview tethers). Runs after the
+        // spin-off, not before, so it no longer stomps on the graceful detach timed to it.
+        _gameFlow.CleanupAllNoteTethers();
 
         // Let all bins finish their final cycle before clearing the loop.
         // If the ring animation already outlasted the loop, this is a no-op.
@@ -156,8 +163,11 @@ public sealed class BridgeCoordinator
 
     private void FreezeGameplayForBridge()
     {
-        _gameFlow.CleanupAllNoteTethers();
-
+        // Ring preview tethers are no longer hard-killed here — they detach gracefully in sync
+        // with the ring's spin-off (see DetachPendingRingTethers, called from
+        // SpinAndRollOffActiveRings). Vehicle carry-tethers are torn down below via
+        // ClearPendingNotesForBridge -> DestroyVehicleTether. A final CleanupAllNoteTethers()
+        // safety sweep still runs after the spin-off completes (see PlayMotifBridgeAndRestart).
         foreach (var v in _gameFlow.GetVehicles())
             v?.ClearPendingNotesForBridge();
 

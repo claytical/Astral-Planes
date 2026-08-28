@@ -112,6 +112,36 @@ public class MidiVoice : MonoBehaviour
         midiStreamPlayer.MPTK_Channels[channel].Volume = volume;
     }
 
+    private Coroutine _rampInCoroutine;
+
+    /// <summary>
+    /// Fades this voice's channel volume up from a low starting fraction to targetVolume
+    /// over duration seconds. Used to soften a track's first-ever SuperNode instant-fill
+    /// instead of snapping straight to full volume.
+    /// </summary>
+    public void RampInVolume(float targetVolume, float duration, float startFraction = 0.15f)
+    {
+        if (_rampInCoroutine != null) StopCoroutine(_rampInCoroutine);
+        _rampInCoroutine = StartCoroutine(RampInVolumeRoutine(targetVolume, duration, startFraction));
+    }
+
+    private IEnumerator RampInVolumeRoutine(float targetVolume, float duration, float startFraction)
+    {
+        float start = targetVolume * startFraction;
+        float elapsed = 0f;
+        SetVolume(start);
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            SetVolume(Mathf.Lerp(start, targetVolume, elapsed / duration));
+            yield return null;
+        }
+
+        SetVolume(targetVolume);
+        _rampInCoroutine = null;
+    }
+
     /// <summary>
     /// Routes this voice's AudioSource to the given mixer group (per-role bus). No-op if group is null.
     /// </summary>

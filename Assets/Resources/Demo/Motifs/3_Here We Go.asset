@@ -51,6 +51,7 @@ MonoBehaviour:
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
   mazePattern: {fileID: 11400000, guid: dc7bcb920eadd40139a254499c81741c, type: 2}
   roleGeoConfigs: []
+  genericFillNeverRegrowRatio: 0.1
   chordProgression: {fileID: 11400000, guid: 874324c48423a4416a080b72af67574b, type: 2}
   alternateChordProgressionProfile: {fileID: 11400000, guid: 83ee4248a89074b5cbd9eb62015f0abf,
     type: 2}

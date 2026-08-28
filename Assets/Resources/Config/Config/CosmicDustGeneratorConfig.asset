@@ -26,9 +26,9 @@ MonoBehaviour:
   zapFadeSeconds: 1.5
   zapRegrowDelaySeconds: -1
   zapScaleOutSeconds: 0.12
-  mazeTint: {r: 0.8679245, g: 0.8679245, b: 0.8679245, a: 0.6}
-  genericFillTint: {r: 0.2830189, g: 0.2830189, b: 0.2830189, a: 0.6}
-  solidDustTint: {r: 0.28, g: 0.25, b: 0.32, a: 1}
+  mazeTint: {r: 0.3962264, g: 0.3962264, b: 0.3962264, a: 0.6}
+  genericFillTint: {r: 0.16037738, g: 0.16037738, b: 0.16037738, a: 0.6}
+  solidDustTint: {r: 0.2599235, g: 0.299533, b: 0.31132078, a: 1}
   hideDustColorAtSpawn: 0
   hiddenRoleColorDarken01: 0.55
   toroidal: 0

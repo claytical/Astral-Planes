@@ -5,6 +5,47 @@ using UnityEngine;
 // ── Low-level draw-in / travel-dot animation coroutines ─────────────────
 public partial class MotifRingGlyphApplicator
 {
+    private Coroutine _shakeCoroutine;
+
+    /// <summary>Larger, lower-frequency shake for a successful tether break — reads as a released spring.</summary>
+    public void PlayBreakShake()
+    {
+        if (config == null) return;
+        PlayShake(config.breakShakeDuration, config.breakShakeAmplitude, config.breakShakeFrequency);
+    }
+
+    /// <summary>Short, high-frequency shake for a denied collision (nothing pending to break) — reads as hitting a wall.</summary>
+    public void PlayDenialShake()
+    {
+        if (config == null) return;
+        PlayShake(config.denialShakeDuration, config.denialShakeAmplitude, config.denialShakeFrequency);
+    }
+
+    private void PlayShake(float duration, float amplitude, float frequency)
+    {
+        if (_shakeCoroutine != null) StopCoroutine(_shakeCoroutine);
+        _shakeCoroutine = StartCoroutine(ShakeRoutine(duration, amplitude, frequency));
+    }
+
+    // Drives transform.localPosition only — never written elsewhere in this class, so this can't
+    // fight the show/hide (localScale), play-area fit (position), or spin-off exit (rotation)
+    // coroutines that already own the other transform fields.
+    private IEnumerator ShakeRoutine(float duration, float amplitude, float frequency)
+    {
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            float decay   = 1f - (t / duration);
+            float offsetX = (Mathf.PerlinNoise(Time.time * frequency, 0f) - 0.5f) * 2f * amplitude * decay;
+            float offsetY = (Mathf.PerlinNoise(0f, Time.time * frequency) - 0.5f) * 2f * amplitude * decay;
+            transform.localPosition = new Vector3(offsetX, offsetY, 0f);
+            yield return null;
+        }
+        transform.localPosition = Vector3.zero;
+        _shakeCoroutine = null;
+    }
+
     private static IEnumerator AnimateMeshFill(
         Mesh mesh, int[] fullTris, int segments, float delay, float drawDuration)
     {
@@ -102,7 +143,6 @@ public partial class MotifRingGlyphApplicator
         ApplyContourPoints(lr, flatPts);
 
         var drumRef     = GameFlowManager.Instance?.activeDrumTrack;
-        int leaderSteps = drumRef != null ? drumRef.GetLeaderSteps() : binSteps;
 
         float stepDurRec = 0f;
         drumRef?.TryGetNextBaseStepDsp(out _, out stepDurRec);
@@ -117,9 +157,6 @@ public partial class MotifRingGlyphApplicator
         {
             if (shouldStop()) break;
 
-            int noteLeaderStep = info.AbsStep % leaderSteps;
-            int triggerStep    = (noteLeaderStep - leadSteps + leaderSteps) % leaderSteps;
-
             Transform markerTr = null;
             if (noteViz?.noteMarkers != null && info.Track != null)
                 noteViz.noteMarkers.TryGetValue((info.Track, info.AbsStep), out markerTr);
@@ -128,7 +165,7 @@ public partial class MotifRingGlyphApplicator
             StartCoroutine(WaitAndLaunchDot(
                 ringTransform, info.TugLocalPos, info.DotColor,
                 markerTr, outerR, info.NoteAngle,
-                drumRef, triggerStep, config.noteTravelDuration, shouldStop,
+                drumRef, info.AbsStep, leadSteps, config.noteTravelDuration, shouldStop,
                 onLaunch: () =>
                 {
                     if (capturedInfo.SourceNote == null) return;
@@ -159,20 +196,42 @@ public partial class MotifRingGlyphApplicator
     private IEnumerator WaitAndLaunchDot(
         Transform ringTransform, Vector3 tugLocal, Color dotColor,
         Transform markerTr, float outerR, float angle,
-        DrumTrack drumRef, int triggerStep,
+        DrumTrack drumRef, int absStep, int leadSteps,
         float travelDuration, System.Func<bool> shouldStop,
-        System.Action onLaunch = null)
+        System.Action onLaunch = null,
+        System.Action onDepart = null,
+        System.Func<bool> isCancelled = null)
     {
-        if (drumRef != null && drumRef.currentStep != triggerStep)
+        if (drumRef != null)
         {
+            // Recompute the trigger step against the LIVE leaderSteps on every check, not a
+            // snapshot taken before this coroutine started. leaderSteps can change while this
+            // wait is pending — most notably right around a bin completing, when a track's
+            // committed width grows on demand (see InstrumentTrack.BinState.cs) — and a step
+            // baked against the old domain may never recur, hanging this wait forever (see
+            // DrumTrack.Transport.cs:311-317 for the same risk acknowledged elsewhere).
             bool stepFired = false;
-            System.Action<int, int> onStep = (s, _) => { if (s == triggerStep) stepFired = true; };
-            drumRef.OnStepChanged += onStep;
-            yield return new WaitUntil(() => stepFired || shouldStop());
-            drumRef.OnStepChanged -= onStep;
+            System.Action<int, int> onStep = (s, liveLeaderSteps) =>
+            {
+                if (liveLeaderSteps <= 0) return;
+                int liveNoteLeaderStep = ((absStep % liveLeaderSteps) + liveLeaderSteps) % liveLeaderSteps;
+                int liveTriggerStep    = (liveNoteLeaderStep - leadSteps + liveLeaderSteps) % liveLeaderSteps;
+                if (s == liveTriggerStep) stepFired = true;
+            };
+            onStep(drumRef.currentStep, drumRef.GetLeaderSteps()); // in case we're already there
+            if (!stepFired)
+            {
+                drumRef.OnStepChanged += onStep;
+                yield return new WaitUntil(() => stepFired || shouldStop() || (isCancelled?.Invoke() ?? false));
+                drumRef.OnStepChanged -= onStep;
+            }
         }
 
-        if (shouldStop() || ringTransform == null) yield break;
+        if (shouldStop() || (isCancelled?.Invoke() ?? false) || ringTransform == null) yield break;
+
+        // The step has been reached and the dot is about to depart — the "snap" moment for
+        // any preview tether tracking this note (see DeformBinRingCoroutine).
+        onDepart?.Invoke();
 
         if (config?.launchSfx != null)
         {
@@ -262,6 +321,9 @@ public partial class MotifRingGlyphApplicator
             lr.loop              = false;
             lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             lr.receiveShadows    = false;
+            // Above the backdrop discs/Fill/Contour — the traveling dot must stay visible as it
+            // crosses the ring, not disappear behind the record's solid backing.
+            lr.sortingOrder      = TravelDotSortingOrder;
 
             const int segs = 8;
             float dotR = config.noteDotRadius;

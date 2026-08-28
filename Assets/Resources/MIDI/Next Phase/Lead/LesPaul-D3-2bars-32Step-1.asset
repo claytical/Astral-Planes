@@ -15,7 +15,7 @@ MonoBehaviour:
   riff:
     id: LesPaul-D3-2bars-32Step-1
     authoredRootMidi: 62
-    loopSteps: 48
+    loopSteps: 32
     events:
     - step: 0
       midiNote: 62

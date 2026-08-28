@@ -152,7 +152,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
     private Dictionary<Vector2Int, float> _carveAccumulator = new();
     // Persists the DustClearSource that triggered a cell's pending regrow, from clear-time
     // (ClearCell) through to regrow-time (CommitRegrowCell), so the flower bloom can be gated
-    // on VehiclePlow specifically. Written whenever a regrow is scheduled; read-and-removed once.
+    // to specific sources (VehiclePlow, CollectableBombBlast). Written whenever a regrow is
+    // scheduled; read-and-removed once.
     private readonly Dictionary<Vector2Int, DustClearSource> _pendingRegrowSource = new();
     private Coroutine _spawnRoutine;
     private DrumTrack drums;
@@ -504,7 +505,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
             // energy for some role profiles, leaving them permanently un-driveable.
             dust.ApplyRoleAndCharge(regrowRole, regrowTint, 1f, maxUnits);
 
-            if (regrowSource == DustClearSource.VehiclePlow && regrowRole != MusicalRole.None)
+            if ((regrowSource == DustClearSource.VehiclePlow || regrowSource == DustClearSource.CollectableBombBlast)
+                && regrowRole != MusicalRole.None)
                 dust.BloomFlower(regrowTint);
 
             if (regrowRole == MusicalRole.None)

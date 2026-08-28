@@ -3,7 +3,8 @@ using System.Linq;
 using UnityEngine;
 
 /// <summary>
-/// TrackFinished scene: arranges all saved ring records as flat vinyl discs orbiting the player.
+/// TrackFinished scene: arranges this session's played motif rings as flat vinyl discs orbiting the player,
+/// in the order the player played them.
 /// Pivots rotate on world Y so records travel around the player (left, behind, right, in front).
 /// Each disc tilts on X via a per-record wobble to read like a vinyl record from the camera.
 /// Scale is capped so that no record's outermost ring exceeds maxRecordRadius world units.
@@ -55,10 +56,11 @@ public class SolarSystemRecordDisplay : MonoBehaviour
 
     void Start()
     {
-        var rings = RingSessionStore.LoadAllRingsFromDisk();
-        rings.Sort((a, b) => a.PhaseIndex != b.PhaseIndex
-            ? a.PhaseIndex.CompareTo(b.PhaseIndex)
-            : a.MotifIndex.CompareTo(b.MotifIndex));
+        // This session's motifs, in the order the player actually played them —
+        // not the on-disk history (that's PhaseLibraryCarousel's job) and not
+        // sorted by library position.
+        var rings = GameFlowManager.Instance?.BridgeFlow?.MotifSnapshots?.ToList()
+            ?? new List<MotifSnapshot>();
 
         if (rings.Count == 0) return;
 

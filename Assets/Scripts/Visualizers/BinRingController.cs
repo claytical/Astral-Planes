@@ -86,6 +86,14 @@ public class BinRingController : MonoBehaviour
         _ringApplicator?.FadeRecordOut(duration);
     }
 
+    /// <summary>Tunable seconds the record stays at full opacity before fading (RingGlyphConfig.recordHoldDuration).</summary>
+    public float GetRecordHoldDuration(float fallback = 1.5f)
+    {
+        if (_ringApplicator == null)
+            _ringApplicator = GameFlowManager.Instance?.GetMotifRingGlyphApplicator();
+        return _ringApplicator?.config != null ? _ringApplicator.config.recordHoldDuration : fallback;
+    }
+
     // ── Event handlers ───────────────────────────────────────────────────────
 
     private void OnBinFilled(InstrumentTrack track, int binIndex)

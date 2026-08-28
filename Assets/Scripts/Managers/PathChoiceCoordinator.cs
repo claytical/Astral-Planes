@@ -369,12 +369,18 @@ public sealed class PathChoiceCoordinator
         Vector2 outward = SceneFlowCoordinator.OutwardDirection(side);
         float offscreenMargin = _gameFlow.PathTransitionOffscreenMargin;
 
-        // Two stages, driven in the same loop: losers converge on the winner's exit anchor, then
-        // (like the winner, who's already there) get carried outward through the boundary until
-        // they clear the true screen edge — so the maze swap never fires while a vehicle is
-        // still visibly mid-tunnel. All vehicles get input locked, including the winner, so the
-        // carry-through reads as a scripted exit rather than fighting player input.
-        var losers = new List<Vehicle>();
+        // Two stages, driven in the same loop: every vehicle (winner included) first converges
+        // on the winner's exit anchor, then gets carried outward through the boundary until it
+        // clears the true screen edge — so the maze swap never fires while a vehicle is still
+        // visibly mid-tunnel. The winner isn't skipped straight to the carry-out stage: the exit
+        // trigger is deliberately wider than the corridor's visual opening (a forgiving capture
+        // zone), so the winner may have touched it off-center or from an angle. Routing it
+        // through the same converge-then-carry motion pulls it onto the corridor's center line
+        // and squares its heading to the outward direction before it ever crosses the threshold,
+        // instead of carrying it out from wherever it happened to collide. All vehicles get
+        // input locked, including the winner, so the carry-through reads as a scripted exit
+        // rather than fighting player input.
+        var converging = new List<Vehicle>();
         var carrying = new List<Vehicle>();
         var lockedOwners = new List<LocalPlayer>();
         foreach (var v in _gameFlow.GetVehicles())
@@ -391,30 +397,30 @@ public sealed class PathChoiceCoordinator
                 }
             }
 
+            // The winner has already touched the (wide) trigger, so it's already at/against the
+            // solid boundary wall — make it non-solid right away rather than waiting for
+            // "arrival" like losers, or the wall would bounce it back onto screen while it's
+            // still being pulled toward the anchor.
             if (v == winnerVehicle)
-            {
-                carrying.Add(v);
-                // Solid collision with the boundary wall would otherwise bounce the vehicle back
-                // onto the screen instead of letting it carry through — see SetVehicleSolid.
                 SceneFlowCoordinator.SetVehicleSolid(v, false);
-            }
-            else losers.Add(v);
+
+            converging.Add(v);
         }
 
         float timeout = _gameFlow.PathTransitionTravelTimeout;
         const float arriveDistanceSq = 0.75f * 0.75f;
         float elapsed = 0f;
-        while (elapsed < timeout && (losers.Count > 0 || carrying.Count > 0))
+        while (elapsed < timeout && (converging.Count > 0 || carrying.Count > 0))
         {
-            for (int i = losers.Count - 1; i >= 0; i--)
+            for (int i = converging.Count - 1; i >= 0; i--)
             {
-                var v = losers[i];
-                if (v == null) { losers.RemoveAt(i); continue; }
+                var v = converging[i];
+                if (v == null) { converging.RemoveAt(i); continue; }
 
                 Vector2 toTarget = targetWorld - (Vector2)v.transform.position;
                 if (toTarget.sqrMagnitude <= arriveDistanceSq)
                 {
-                    losers.RemoveAt(i);
+                    converging.RemoveAt(i);
                     carrying.Add(v);
                     SceneFlowCoordinator.SetVehicleSolid(v, false);
                     continue;

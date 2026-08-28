@@ -72,6 +72,11 @@ public class ShipMusicalProfile : ScriptableObject
     [Header("Fuel Tradeoffs")]
     public float capacity = 10f;              // tank size (Vehicle energyLevel starts here)
     [Range(0.25f, 2f)] public float burnRate = 1.0f; // fuel units/sec at full trigger pressure
+    [Tooltip("Seconds of continuously holding boost before fuel drain (both the flat burnRate cost and " +
+             "cosmic-dust resistance drain) reaches full strength. 0 = disabled (default): full cost from " +
+             "the first frame of boost. While ramping, the flat drain starts at 25% of burnRate and climbs " +
+             "to 100%; dust-resistance drain starts as if unresisted and climbs to its normal cost.")]
+    [Min(0f)] public float boostSpoolUpSeconds = 0f;
 
     [Header("Plow — Footprint")]
     [Tooltip("Role-capture half-width (cells). Only plow-carved cells have their Voronoi role promoted into the active imprint, " +
@@ -120,6 +125,11 @@ public class ShipMusicalProfile : ScriptableObject
     [Tooltip("Maximum authority reduction when a DiscoveryTrackNode is at the inner edge of pressureInstabilityRadius. " +
              "0.55 → controls become ~45% effective at full pressure.")]
     [Range(0f, 1f)] public float pressureInstabilityStrength01 = 0f;
+
+    [Header("Archetype — Redline")]
+    [Tooltip("Steering authority reduction that ramps in as current speed approaches arcadeMaxSpeed. " +
+             "0 = disabled (default). 0.5 = up to 50% authority loss right at top speed.")]
+    [Range(0f, 1f)] public float speedInstabilityStrength01 = 0f;
 
     [Header("Soul Sprite")]
     [Tooltip("Local scale for the hidden soul sprite when inactive.")]

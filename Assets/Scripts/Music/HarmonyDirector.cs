@@ -10,8 +10,41 @@ public class HarmonyDirector : MonoBehaviour
     public ChordProgressionProfile ActiveProfile => profile;
     [SerializeField] private int cursor = 0;
 
+    // Rotation applied to per-bin chord-index resolution (InstrumentTrack.ResolveChordRegionIndex),
+    // recomputed fresh at every profile swap — see ComputeProgressionOffset. Not persistent state;
+    // it exists only to pivot smoothly into whichever chord was sounding right before the swap.
+    private int _progressionOffset = 0;
+    public int ProgressionOffset => _progressionOffset;
+
     private bool _hasPendingProfileSwap;
     private int  _pendingCharges = 0, _lastPreviewLoopIdx    = -1, _ringsArmedThisLoop    = 0, _globalBuiltCount = 1, _previewChordIdx = -1;   // the palette index we're previewing this loop
+
+    // Re-key offset so TryGetChordAt agrees with NoteSetFactory's authored register:
+    // NoteSetFactory rekeys chordSequence[0].rootNote to the current motif's keyRootMidi
+    // when it first builds a track's notes (see NoteSetFactory.cs "chordDelta"). Without
+    // mirroring that here, every HarmonyDirector-driven retune (chord swaps, flipping back
+    // to the base progression) would transpose against the profile's raw, un-rekeyed root
+    // instead of the register notes were actually authored in.
+    private int _keyRekeyDelta = 0;
+
+    private int ResolveCurrentKeyRootMidi()
+    {
+        var motif = GameFlowManager.Instance?.phaseTransitionManager?.currentMotif;
+        return motif != null ? motif.keyRootMidi : 0;
+    }
+
+    private void RecomputeKeyRekeyDelta()
+    {
+        if (profile?.chordSequence != null && profile.chordSequence.Count > 0)
+        {
+            int keyRoot = ResolveCurrentKeyRootMidi();
+            _keyRekeyDelta = keyRoot > 0 ? keyRoot - profile.chordSequence[0].rootNote : 0;
+        }
+        else
+        {
+            _keyRekeyDelta = 0;
+        }
+    }
 
     private readonly Dictionary<InstrumentTrack, List<int>> _trackSeq = new();
     private readonly Dictionary<InstrumentTrack, int> _trackPos = new();
@@ -187,7 +220,9 @@ public class HarmonyDirector : MonoBehaviour
         if (applyImmediately)
         {
             // Swap NOW and snap everyone to chord 0
+            _progressionOffset = ComputeProgressionOffset(profile, GetPlayheadBinSafe());
             this.profile = profile;
+            RecomputeKeyRekeyDelta();
             _globalBuiltCount = (this.profile.chordSequence != null && this.profile.chordSequence.Count > 0) ? 1 : 0;
             _previewChordIdx  = -1;
 
@@ -210,6 +245,66 @@ public class HarmonyDirector : MonoBehaviour
             _hasPendingProfileSwap = true;
         }
     }
+    private int GetPlayheadBinSafe()
+    {
+        var ctrl = GameFlowManager.Instance?.controller;
+        return ctrl != null ? ctrl.GetTransportFrame().playheadBin : 0;
+    }
+
+    // Picks the rotation into newProfile.chordSequence that lands the closest-matching chord
+    // (by shared/near pitch classes) at playheadBin, relative to whatever this.profile (the OLD
+    // profile) has sounding there right now — a common-tone pivot instead of always resetting to
+    // chordSequence[0]. Ties favor the smallest rotation for determinism.
+    private int ComputeProgressionOffset(ChordProgressionProfile newProfile, int playheadBin)
+    {
+        var newSeq = newProfile?.chordSequence;
+        if (newSeq == null || newSeq.Count <= 1) return 0;
+
+        if (!TryGetChordAt(playheadBin, out var currentChord)) return 0;
+
+        int newLen = newSeq.Count;
+        int bestR = 0;
+        float bestDist = float.MaxValue;
+        for (int r = 0; r < newLen; r++)
+        {
+            var candidate = newSeq[((playheadBin + r) % newLen + newLen) % newLen];
+            float dist = ChordPitchClassDistance(currentChord, candidate);
+            if (dist < bestDist) { bestDist = dist; bestR = r; }
+        }
+        return bestR;
+    }
+
+    private static float ChordPitchClassDistance(Chord a, Chord b)
+    {
+        var pcsA = PitchClasses(a);
+        var pcsB = PitchClasses(b);
+        if (pcsA.Count == 0 || pcsB.Count == 0) return float.MaxValue;
+
+        float total = 0f;
+        foreach (int pa in pcsA)
+        {
+            int best = 12;
+            foreach (int pb in pcsB) best = Mathf.Min(best, CircularPcDistance(pa, pb));
+            total += best;
+        }
+        return total;
+    }
+
+    private static HashSet<int> PitchClasses(Chord c)
+    {
+        var pcs = new HashSet<int>();
+        int root = ((c.rootNote % 12) + 12) % 12;
+        if (c.intervals == null || c.intervals.Count == 0) { pcs.Add(root); return pcs; }
+        foreach (int iv in c.intervals) pcs.Add(((root + iv) % 12 + 12) % 12);
+        return pcs;
+    }
+
+    private static int CircularPcDistance(int pcA, int pcB)
+    {
+        int d = Mathf.Abs(pcA - pcB) % 12;
+        return Mathf.Min(d, 12 - d);
+    }
+
     public bool TryGetChordAt(int index, out Chord chord)
     {
         chord = default;
@@ -218,6 +313,7 @@ public class HarmonyDirector : MonoBehaviour
 
         int i = ((index % profile.chordSequence.Count) + profile.chordSequence.Count) % profile.chordSequence.Count;
         chord = profile.chordSequence[i];
+        chord.rootNote += _keyRekeyDelta;
         return true;
     }
     public int ProgressionLength
@@ -271,7 +367,9 @@ public class HarmonyDirector : MonoBehaviour
             // IMPORTANT: only a real profile swap should reset all tracks to chord 0.
             if (_hasPendingProfileSwap && _pendingProfile != null)
             {
+                _progressionOffset = ComputeProgressionOffset(_pendingProfile, GetPlayheadBinSafe());
                 profile = _pendingProfile;
+                RecomputeKeyRekeyDelta();
                 _pendingProfile = null;
                 _hasPendingProfileSwap = false;
                 appliedProfileSwap = true;

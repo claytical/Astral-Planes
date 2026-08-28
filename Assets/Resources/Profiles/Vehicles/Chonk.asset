@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e03bd7d4d4f1b4a41a62831d24c5f8bf, type: 3}
+  m_Name: Chonk
+  m_EditorClassIdentifier: 
+  shipName: Chonk
+  description: Plow
+  arcadeMaxSpeed: 11
+  arcadeAccel: 5
+  arcadeBoostAccel: 140
+  arcadeLinearDamping: 0.08
+  arcadeAngularDamping: 0.5
+  coastBrakeForce: 0.7
+  stopSpeed: 0.03
+  stopAngularSpeed: 5
+  inputDeadzone: 0.2
+  mass: 2.5
+  impactSpeedCap: 32
+  hitVelocityMultiplier: 1
+  damageCurveExponent: 1.75
+  minImpactDamage: 25
+  maxImpactDamage: 100
+  massDamageMultiplierMin: 0.75
+  massDamageMultiplierMax: 2
+  followUpDamageWindowSeconds: 0.5
+  followUpDamageFloor: 10
+  damageCeiling: 120
+  capacity: 50
+  burnRate: 0.35
+  boostSpoolUpSeconds: 0
+  plowHalfWidthCells: 2
+  vehicleKeepClearRadiusCells: 0
+  plowDepthCells: 4
+  plowMinSpeed: 2
+  plowChipAmount: 2
+  regrowDelayMultipliers:
+    bass: 1
+    harmony: 1
+    lead: 1
+    groove: 1
+    rhythm: 1
+    gray: 1
+  carveResistanceBypass01: 0.8
+  carveVelocityDrainPerCell: 0
+  directionalAuthority01: 0.85
+  plowSteeringPenalty01: 0.65
+  pressureInstabilityRadius: 0
+  pressureInstabilityStrength01: 0
+  speedInstabilityStrength01: 0
+  soulMinScale: 0.3
+  soulMaxScale: 1
+  soulScaleLerpSpeed: 7
+  soulAlphaMin: 0
+  soulAlphaMax: 0.5

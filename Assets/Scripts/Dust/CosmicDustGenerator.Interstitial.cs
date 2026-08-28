@@ -129,7 +129,7 @@ public partial class CosmicDustGenerator
         EnterRuntimeVoidOnlyDustCreationMode();
         _spawnRoutine = null;
 
-        const int vehicleHoleRadiusCells = 2;
+        const int vehicleHoleRadiusCells = 3;
         if (vehicleCells != null)
             foreach (var vehCell in vehicleCells)
                 CarvePermanentDisk(vehCell, vehicleHoleRadiusCells);

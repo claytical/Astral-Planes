@@ -55,13 +55,11 @@ MonoBehaviour:
   vehicleConfig: {fileID: 11400000, guid: 5eac3be187b634316af147683372ab22, type: 2}
   capacity: 85
   arcadeMaxSpeed: 14
+  vehicleKeepClearRadiusCells: 1
   soulSprite: {fileID: 1466181140352930863}
   gravityVoidMask:
     serializedVersion: 2
     m_Bits: 0
-  dustLayerMask:
-    serializedVersion: 2
-    m_Bits: 128
   energyLevel: 85
   boosting: 0
   trail: {fileID: 5973205746167519599, guid: b8208b79aa374604699ea6099e1fbff6, type: 3}
@@ -69,11 +67,10 @@ MonoBehaviour:
   playerStatsUI: {fileID: 0}
   playerStats: {fileID: 0}
   rb: {fileID: 0}
-  vehicleKeepClearRadiusCells: 1
   releaseCue: {fileID: 0}
 --- !u!212 &1970310610805977373
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -120,17 +117,18 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: -8
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 7223363152320260212, guid: 2f30de0d052204e9ebd3f9f8b6452a57,
+  m_Sprite: {fileID: -5708978242785828952, guid: 52c38f819cf9d40ffbf6fb5513874143,
     type: 3}
-  m_Color: {r: 1, g: 0.79607844, b: 0.019607844, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 0.88, y: 0.74}
+  m_Size: {x: 2.13, y: 1.8}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!50 &3138199776794840757
 Rigidbody2D:
   serializedVersion: 5
@@ -173,6 +171,7 @@ MonoBehaviour:
   explosion: {fileID: 2567590292593330884, guid: 24a07d73c693a3e44b073e4e6534b58d,
     type: 3}
   preExplosion: {fileID: 0}
+  expireExplosion: {fileID: 0}
   lifetime: 0
   randomizeLifetimer: 0
   tintExplosions: 1
@@ -327,110 +326,24 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.62, y: 0.52}
-    newSize: {x: 0.88, y: 0.74}
+    oldSize: {x: 0.65, y: 0.55}
+    newSize: {x: 2.13, y: 1.8}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
   m_Points:
     m_Paths:
-    - - {x: 0.44, y: -0.34}
-      - {x: 0.44, y: -0.14999999}
-      - {x: 0.32, y: 0.06}
-      - {x: 0.06, y: 0.37}
-      - {x: -0.06, y: 0.37}
-      - {x: -0.26, y: 0.14}
-      - {x: -0.41, y: -0.08}
-      - {x: -0.44, y: -0.16}
-      - {x: -0.44, y: -0.34}
-      - {x: -0.38, y: -0.37}
-      - {x: -0.19999999, y: -0.37}
-      - {x: 0.06, y: -0.28}
-      - {x: 0.26, y: -0.37}
-      - {x: 0.41, y: -0.37}
-    - - {x: -0.38, y: -0.25}
-      - {x: -0.37, y: -0.24}
-      - {x: -0.35999998, y: -0.17999999}
-      - {x: -0.29999998, y: -0.089999996}
-      - {x: -0.26999998, y: -0.04}
-      - {x: -0.22, y: 0.04}
-      - {x: -0.16, y: 0.12}
-      - {x: -0.16, y: 0.13}
-      - {x: -0.07, y: 0.22999999}
-      - {x: -0.03, y: 0.28}
-      - {x: -0.04, y: 0.19999999}
-      - {x: -0.08, y: 0.14999999}
-      - {x: -0.16, y: 0.01}
-      - {x: -0.19, y: -0.04}
-      - {x: -0.24, y: -0.14}
-      - {x: -0.26, y: -0.16}
-      - {x: -0.32, y: -0.26}
-      - {x: -0.34, y: -0.29999998}
-    - - {x: 0.25, y: -0.14999999}
-      - {x: 0.22999999, y: -0.13}
-      - {x: 0.16, y: 0.01}
-      - {x: 0.14, y: 0.03}
-      - {x: 0.13, y: 0.06}
-      - {x: 0.11, y: 0.08}
-      - {x: 0.089999996, y: 0.13}
-      - {x: 0.07, y: 0.14999999}
-      - {x: 0.04, y: 0.19999999}
-      - {x: 0.03, y: 0.28}
-      - {x: 0.06, y: 0.25}
-      - {x: 0.06, y: 0.24}
-      - {x: 0.11, y: 0.19}
-      - {x: 0.11, y: 0.17999999}
-      - {x: 0.19, y: 0.089999996}
-      - {x: 0.19, y: 0.08}
-      - {x: 0.22, y: 0.049999997}
-      - {x: 0.22, y: 0.04}
-      - {x: 0.24, y: 0.02}
-      - {x: 0.24, y: 0.01}
-      - {x: 0.29999998, y: -0.07}
-      - {x: 0.31, y: -0.11}
-      - {x: 0.32999998, y: -0.13}
-      - {x: 0.35, y: -0.16}
-      - {x: 0.35, y: -0.17999999}
-      - {x: 0.37, y: -0.21}
-      - {x: 0.37, y: -0.25}
-      - {x: 0.38, y: -0.26}
-      - {x: 0.37, y: -0.26999998}
-      - {x: 0.37, y: -0.29}
-      - {x: 0.35999998, y: -0.29999998}
-      - {x: 0.32, y: -0.29999998}
-      - {x: 0.32, y: -0.29}
-    - - {x: -0.17999999, y: -0.21}
-      - {x: -0.17, y: -0.19}
-      - {x: -0.14999999, y: -0.17}
-      - {x: -0.13, y: -0.11}
-      - {x: -0.13, y: -0.17}
-      - {x: -0.12, y: -0.19}
-      - {x: -0.17999999, y: -0.22}
-      - {x: -0.22, y: -0.25}
-      - {x: -0.21, y: -0.25}
-    - - {x: 0.19, y: -0.24}
-      - {x: 0.17999999, y: -0.22}
-      - {x: 0.12, y: -0.19}
-      - {x: 0.13, y: -0.16}
-      - {x: 0.13, y: -0.11}
-      - {x: 0.14, y: -0.16}
-      - {x: 0.17999999, y: -0.22}
-      - {x: 0.21, y: -0.25}
-      - {x: 0.19999999, y: -0.24}
-    - - {x: -0.049999997, y: -0.089999996}
-      - {x: -0.06, y: -0.08}
-      - {x: -0.06, y: -0.03}
-      - {x: -0.07, y: -0.01}
-      - {x: -0.049999997, y: 0}
-      - {x: -0.03, y: 0.06}
-      - {x: -0.04, y: -0.17}
-    - - {x: 0.03, y: 0.06}
-      - {x: 0.06, y: 0}
-      - {x: 0.06, y: -0.06}
-      - {x: 0.049999997, y: -0.07}
-      - {x: 0.04, y: -0.17}
-  m_UseDelaunayMesh: 0
+    - - {x: 0.095, y: 0.265}
+      - {x: 0.065, y: 0.275}
+      - {x: -0.085, y: 0.275}
+      - {x: -0.205, y: 0.105}
+      - {x: -0.325, y: -0.055}
+      - {x: -0.325, y: -0.275}
+      - {x: 0.325, y: -0.275}
+      - {x: 0.325, y: -0.085}
+      - {x: 0.21499999, y: 0.095}
+  m_UseDelaunayMesh: 1
 --- !u!1 &7225605324551572477
 GameObject:
   m_ObjectHideFlags: 0
@@ -458,14 +371,14 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 4}
-  m_LocalScale: {x: 0.3, y: 0.3, z: 0.3}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 2614095863033673403}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &1466181140352930863
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -510,7 +423,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: -10
   m_MaskInteraction: 0
   m_Sprite: {fileID: 7223363152320260212, guid: 2f30de0d052204e9ebd3f9f8b6452a57,
     type: 3}
@@ -523,3 +436,4 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []

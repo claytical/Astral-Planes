@@ -4,11 +4,11 @@ public partial class CosmicDustGenerator
 {
     /// <summary>
     /// Carves every currently-solid dust cell within radiusCells of centerGP, as a detonation
-    /// blast from a discarded carried note. Reuses the standard carve/regrow pipeline so each
-    /// cell's identity (revealed role, or hidden Voronoi ground-truth if still gray) is preserved
-    /// exactly like every other clear source.
+    /// blast (from a discarded carried note, a time bomb collectable, etc). Reuses the standard
+    /// carve/regrow pipeline so each cell's identity (revealed role, or hidden Voronoi
+    /// ground-truth if still gray) is preserved exactly like every other clear source.
     /// </summary>
-    public int TriggerDiscardBlast(Vector2Int centerGP, int radiusCells, float fadeSeconds = 0.15f, float regrowDelaySeconds = -1f)
+    public int TriggerDiscardBlast(Vector2Int centerGP, int radiusCells, float fadeSeconds = 0.15f, float regrowDelaySeconds = -1f, DustClearSource source = DustClearSource.CollectableDiscard)
     {
         if (radiusCells <= 0) return 0;
         EnsureCellGrid();
@@ -23,7 +23,7 @@ public partial class CosmicDustGenerator
             if (!IsInBounds(gp)) continue;
             if (!TryGetCellState(gp, out var st) || st != DustCellState.Solid) continue;
 
-            CarveCell(gp, fadeSeconds, scheduleRegrow: true, source: DustClearSource.CollectableDiscard, regrowDelaySeconds: regrowDelaySeconds, runPreExplode: true);
+            CarveCell(gp, fadeSeconds, scheduleRegrow: true, source: source, regrowDelaySeconds: regrowDelaySeconds, runPreExplode: true);
             affected++;
         }
         return affected;

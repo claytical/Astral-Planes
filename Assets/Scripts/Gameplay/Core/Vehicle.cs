@@ -50,6 +50,8 @@ public partial class Vehicle : MonoBehaviour
     private Vector2 _moveInput;
     public float energyLevel;
     public bool boosting = false;
+    private float _boostHeldSeconds;
+    public float BoostHeldSeconds => _boostHeldSeconds;
     private Vector2 _lastNonZeroInput; // remembers the last aim direction
     public GameObject trail; // Trail prefab
     public AudioClip thrustClip;
@@ -294,6 +296,8 @@ public partial class Vehicle : MonoBehaviour
         // the scripted return.
         if (_movementLocked) return;
 
+        if (boosting) _boostHeldSeconds += dt;
+
         bool hasInput = _moveInput.sqrMagnitude > 0.0001f;
 
         if (hasInput || boosting)
@@ -333,7 +337,15 @@ public partial class Vehicle : MonoBehaviour
             rb.linearVelocity *= Mathf.Max(0f, 1f - _plowVelocityDrain);
 
         if (boosting && energyLevel > 0f)
-            ConsumeEnergy(_burnRateMultiplier * profile.burnRate);
+        {
+            float flatBoostCost = _burnRateMultiplier * profile.burnRate;
+            if (profile.boostSpoolUpSeconds > 0f)
+            {
+                float spoolUp01 = Mathf.Clamp01(_boostHeldSeconds / profile.boostSpoolUpSeconds);
+                flatBoostCost *= Mathf.Lerp(0.25f, 1f, spoolUp01);
+            }
+            ConsumeEnergy(flatBoostCost);
+        }
 
         if (rb.linearVelocity.sqrMagnitude > 0.0001f)
             rb.rotation = Mathf.Atan2(rb.linearVelocity.y, rb.linearVelocity.x) * Mathf.Rad2Deg - 90f;
@@ -360,6 +372,12 @@ public partial class Vehicle : MonoBehaviour
 
         if (profile.pressureInstabilityStrength01 > 0f && _lastPressureFactor > 0f)
             auth *= 1f - _lastPressureFactor * profile.pressureInstabilityStrength01;
+
+        if (profile.speedInstabilityStrength01 > 0f)
+        {
+            float speedFactor = Mathf.Clamp01(rb.linearVelocity.magnitude / profile.arcadeMaxSpeed);
+            auth *= 1f - speedFactor * profile.speedInstabilityStrength01;
+        }
 
         return Mathf.Clamp01(auth);
     }
@@ -400,6 +418,7 @@ public partial class Vehicle : MonoBehaviour
 
         if (energyLevel > 0 && !boosting)        {
             boosting = true;
+            _boostHeldSeconds = 0f;
 
             if (audioManager != null && thrustClip != null)
                 audioManager.PlayLoopingSound(thrustClip, .1f);
@@ -415,6 +434,7 @@ public partial class Vehicle : MonoBehaviour
         }
         boosting = false;
         _isActivePlow = false;
+        _boostHeldSeconds = 0f;
         _burnRateMultiplier = 0f; // Reset the multiplier when not boosting
 
         if (_activeTrailRenderer != null)

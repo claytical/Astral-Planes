@@ -10,6 +10,8 @@ public class NoteTether : MonoBehaviour
     public Transform end;   // the ribbon marker transform
     public InstrumentTrack boundTrack;
     public int boundStep = -1;
+    public InstrumentTrack boundStartTrack;
+    public int boundStartStep = -1;
     public NoteVisualizer boundVisualizer;
     [Header("Curve")]
     [Range(8,128)] public int segments = 32;
@@ -99,6 +101,25 @@ private int     _cachedHash  = 0;
     bool hasStart = _hasStartOverride || (start != null);
     if (!hasStart || !end)
     {
+        // Try to resolve 'start' from the visualizer's marker table every few frames
+        // (mirrors the 'end' resolution below — used when the tether's near/timeline end is
+        // itself a note marker that may not be registered yet, e.g. the ring preview tether).
+        if (!hasStart && boundVisualizer && boundStartTrack && boundStartStep >= 0)
+        {
+            _rebindTimer -= Time.deltaTime;
+            if (_rebindTimer <= 0f)
+            {
+                _rebindTimer = _rebindPollInterval;
+                if (boundVisualizer.noteMarkers != null &&
+                    boundVisualizer.noteMarkers.TryGetValue((boundStartTrack, boundStartStep), out var s) &&
+                    s)
+                {
+                    start = s;
+                    _endpointNullTimer = 0f;
+                }
+            }
+        }
+
         // Try to resolve 'end' from the visualizer’s marker table every few frames
         if (!end && boundVisualizer && boundTrack && boundStep >= 0)
         {
@@ -120,9 +141,12 @@ private int     _cachedHash  = 0;
         _endpointNullTimer += Time.deltaTime;
         if (_endpointNullTimer > _endpointNullGrace)
         {
-            // If we still have a visualizer + binding info, don’t destroy yet—keep trying.
-            // Only self-destruct if we truly have no way to resolve the anchor anymore.
-            bool hopeless = (!boundVisualizer || !boundTrack || boundStep < 0);
+            // Only self-destruct if some endpoint that's still missing has no binding info
+            // left to resolve it from. An endpoint that's already present (e.g. 'end' set
+            // directly, with only 'start' pending via BindStartByStep) never counts against us.
+            bool startStuck = !hasStart && !(boundVisualizer && boundStartTrack && boundStartStep >= 0);
+            bool endStuck   = !end      && !(boundVisualizer && boundTrack      && boundStep >= 0);
+            bool hopeless = startStuck || endStuck;
             if (hopeless)
             {
                 Destroy(gameObject);
@@ -209,6 +233,10 @@ private int     _cachedHash  = 0;
         _lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         _lr.receiveShadows = false;
         _lr.material = _lr.material ? _lr.material : new Material(Shader.Find("Sprites/Default"));
+        // Same layer as the shimmer particles below, so the cable always renders above
+        // ring backing/Fill/Contour and dust/maze (all in "Default"), never occluded by them.
+        _lr.sortingLayerName = "Foreground";
+        _lr.sortingOrder = 10;
 
         // neutral gradient; will be replaced in SetEndpoints
         var g = new Gradient();
@@ -244,6 +272,26 @@ private int     _cachedHash  = 0;
         else
         {
             end = null; // Update() will poll for it
+        }
+    }
+
+    // Mirror of BindByStep for the 'start' endpoint — used when the timeline-side end of the
+    // tether is itself a note marker that may not be registered in noteMarkers yet (e.g. the
+    // ring preview tether, created the instant a bin fills). Resolves immediately if the
+    // marker already exists, otherwise Update() polls for it indefinitely.
+    public void BindStartByStep(InstrumentTrack track, int step, NoteVisualizer viz) {
+        boundStartTrack = track;
+        boundStartStep  = step;
+        boundVisualizer = viz;
+        if (viz != null && viz.noteMarkers != null &&
+            viz.noteMarkers.TryGetValue((track, step), out var marker) && marker != null)
+        {
+            start = marker;
+            _endpointNullTimer = 0f;
+        }
+        else
+        {
+            start = null; // Update() will poll for it
         }
     }
     [Header("Release Progress")]
@@ -298,6 +346,58 @@ private int     _cachedHash  = 0;
         _lr.enabled = true;
         // Fade from ghost (faint, window just opened) to exact (bright, perfect timing).
         _lr.colorGradient = LerpGradient(_ghostGradient, _exactGradient, Mathf.Clamp01(windowLerp01));
+    }
+
+    [Header("Grow / Retract")]
+    [Tooltip("Fraction of the curve (0..1) where drawing begins. Recedes toward 1 during retract.")]
+    [Range(0f, 1f)] public float visibleStart01 = 0f;
+    [Tooltip("Fraction of the curve (0..1) where drawing ends. Advances toward 1 during grow-in.")]
+    [Range(0f, 1f)] public float visibleEnd01 = 1f;
+
+    // Grows the tether in from nothing (visibleEnd01: 0 -> 1) over `duration`.
+    public Coroutine GrowIn(float duration)
+    {
+        return StartCoroutine(GrowInRoutine(duration));
+    }
+
+    private IEnumerator GrowInRoutine(float duration)
+    {
+        visibleStart01 = 0f;
+        visibleEnd01 = 0f;
+        duration = Mathf.Max(0.0001f, duration);
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            visibleEnd01 = Mathf.Clamp01(t / duration);
+            yield return null;
+        }
+        visibleEnd01 = 1f;
+    }
+
+    // Detaches the start end and reels the tether in toward its end (visibleStart01: 0 -> 1)
+    // over `duration`, destroying the tether once it fully retracts.
+    public Coroutine RetractAndDestroy(float duration)
+    {
+        return StartCoroutine(RetractAndDestroyRoutine(duration));
+    }
+
+    private IEnumerator RetractAndDestroyRoutine(float duration)
+    {
+        // Don't race a still-in-progress grow-in — let it finish first.
+        while (visibleEnd01 < 0.999f)
+            yield return null;
+
+        visibleEnd01 = 1f;
+        duration = Mathf.Max(0.0001f, duration);
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            visibleStart01 = Mathf.Clamp01(t / duration);
+            yield return null;
+        }
+        Destroy(gameObject);
     }
 
     public void SetEndpoints(Transform a, Transform b, Color c, float widthMul = 1f)
@@ -483,6 +583,8 @@ private int     _cachedHash  = 0;
             float t = (segments <= 1) ? 1f : i / (float)(segments - 1);
             _points[i] = Vector3.Lerp(aW, dW, t);
         }
+        ApplyVisibleRangeTrim();
+        _lr.positionCount = _points.Length;
         _lr.SetPositions(_points);
         return;
     }
@@ -578,8 +680,27 @@ private int     _cachedHash  = 0;
         _points[i] = pW;
     }
 
+    ApplyVisibleRangeTrim();
     _lr.positionCount = _points.Length;
     _lr.SetPositions(_points);
 }
+
+    // Resamples _points down to the [visibleStart01, visibleEnd01] sub-range of the curve,
+    // via the same Catmull-Rom evaluation EvaluatePosition01 uses. No-op at the default [0,1]
+    // range (EvaluatePosition01 reproduces the source points exactly at their own sample t's).
+    private void ApplyVisibleRangeTrim()
+    {
+        if (visibleStart01 <= 0f && visibleEnd01 >= 1f) return;
+
+        var trimmed = new Vector3[_points.Length];
+        int count = trimmed.Length;
+        for (int i = 0; i < count; i++)
+        {
+            float u = (count <= 1) ? 0f : i / (float)(count - 1);
+            float uu = Mathf.Lerp(visibleStart01, visibleEnd01, u);
+            trimmed[i] = EvaluatePosition01(uu);
+        }
+        _points = trimmed;
+    }
 
 }

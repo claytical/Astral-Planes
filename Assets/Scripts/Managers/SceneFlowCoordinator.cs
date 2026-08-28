@@ -30,9 +30,9 @@ public sealed class SceneFlowCoordinator
     // (concurrent with maze generation) can't drift out of sync with the maze itself.
     private const float MazeSpawnDuration = 1.0f;
 
-    // How long the initial record holds at full opacity before it starts fading out,
-    // so the player has time to actually register it before it's gone.
-    private const float RecordHoldDuration = 1.5f;
+    // Fallback if the record hold duration can't be read from RingGlyphConfig (config missing) —
+    // the real tunable is RingGlyphConfig.recordHoldDuration, surfaced via BinRingController.GetRecordHoldDuration().
+    private const float RecordHoldDurationFallback = 1.5f;
 
     private CanvasGroup _screenFadeOverlay;
 
@@ -221,7 +221,7 @@ public sealed class SceneFlowCoordinator
     {
         var binRings = _gameFlow.GetBinRingController();
         binRings?.ShowInitialRecord();
-        yield return new WaitForSeconds(RecordHoldDuration);
+        yield return new WaitForSeconds(binRings?.GetRecordHoldDuration(RecordHoldDurationFallback) ?? RecordHoldDurationFallback);
         binRings?.FadeInitialRecordOut();
     }
 
@@ -253,6 +253,8 @@ public sealed class SceneFlowCoordinator
             _setupInFlight = false;
             yield break;
         }
+
+        _bridge.ClearSessionMotifs();
 
         float hardTimeout = 8f;
         float startTime = Time.time;
@@ -294,8 +296,9 @@ public sealed class SceneFlowCoordinator
         // before the maze exists. Hold at full opacity so the player registers it,
         // then it fades out concurrently with the maze growing in (see the
         // FadeInitialRecordOut call right before StartNextPhaseMazeAndStar below).
-        _gameFlow.GetBinRingController()?.ShowInitialRecord();
-        yield return new WaitForSeconds(RecordHoldDuration);
+        var firstMotifBinRings = _gameFlow.GetBinRingController();
+        firstMotifBinRings?.ShowInitialRecord();
+        yield return new WaitForSeconds(firstMotifBinRings?.GetRecordHoldDuration(RecordHoldDurationFallback) ?? RecordHoldDurationFallback);
 
         foreach (var lp in _session.Players)
             lp?.Launch();
@@ -455,14 +458,16 @@ public sealed class SceneFlowCoordinator
         var entryCells = StageVehiclesOffscreenAtEdge(entryEdge, exitAnchorCell, lockedOwners);
 
         yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false, vehicleCellOverrides: entryCells));
-        _gameFlow.StartCoroutine(RevealAndFadeRecordAfterMaze()); // not yielded — holds/fades while vehicles drive in below
-
         yield return _gameFlow.StartCoroutine(DriveVehiclesInFromOffscreen(entryCells));
 
         foreach (var lp in lockedOwners)
             lp?.SetInputLocked(false);
 
         _gameFlow.PlayVehiclePhaseInFx();
+        // Not yielded — starts once input is back and the drive-in/FX have the player's
+        // attention on the play field, so the hold+fade window is actually visible instead of
+        // ticking down while the vehicle is still off-screen and input is locked.
+        _gameFlow.StartCoroutine(RevealAndFadeRecordAfterMaze());
         if (_gameFlow.GetVehiclePhaseInDelaySeconds() > 0f)
             yield return new WaitForSeconds(_gameFlow.GetVehiclePhaseInDelaySeconds());
     }

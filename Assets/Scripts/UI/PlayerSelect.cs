@@ -11,6 +11,7 @@ public class PlayerSelect : MonoBehaviour
     public GameObject controlsAndStats;
     public GameObject tutorialControls;
     public Image border;
+    public TMP_Text modelNameLabel;
 
     private int _selectedColor = 0;
     private Hangar _hangar;
@@ -74,6 +75,9 @@ public class PlayerSelect : MonoBehaviour
                       * (1f + profile.carveResistanceBypass01)
                       / 15f;
             fuel    = (profile.capacity / profile.burnRate) / 700f;
+
+            if (modelNameLabel != null)
+                modelNameLabel.text = profile.shipName;
         }
         else
         {
@@ -81,6 +85,9 @@ public class PlayerSelect : MonoBehaviour
             agility = 0.5f;
             power   = 0.5f;
             fuel    = vehicle.capacity / 50f;
+
+            if (modelNameLabel != null)
+                modelNameLabel.text = _currentShipName;
         }
 
         statDisplay.SetStats(

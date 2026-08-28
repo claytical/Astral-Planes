@@ -47,6 +47,9 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
     [Tooltip("Prefab instantiated for each note travel dot. Must have a LineRenderer or SpriteRenderer to receive the note color.")]
     [SerializeField] private GameObject noteTravelDotPrefab;
 
+    [Tooltip("One-shot particle prefab instantiated at both ends of a broken tether (timeline marker and ring landing point). Must self-destroy (e.g. via Explosion.cs) and expose a ParticleSystem to receive the track color.")]
+    [SerializeField] private GameObject tetherBreakEffectPrefab;
+
     private static readonly int BasePropId  = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorPropId = Shader.PropertyToID("_Color");
 
@@ -91,6 +94,22 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
     // Physical collision for gameplay bin rings only — never added for library-card
     // (RecordRings) instances, since only SpawnBinRing lazily creates it.
     private CircleCollider2D _ringCollider;
+
+    // A note whose preview tether is still live (created, not yet departed toward the ring).
+    // Populated/retired by DeformBinRingCoroutine; consumed by TryBreakNextPendingTether when
+    // the vehicle collides with _ringCollider (see MotifRingGlyphApplicator.GameplayRings.cs).
+    private class PendingRingNote
+    {
+        public NoteTether       Tether;
+        public GameObject       Anchor;
+        public InstrumentTrack  Track;
+        public int              Step;
+        public bool[]           CancelFlag; // shared with the WaitAndLaunchDot closure
+        // Lets the owning DeformBinRingCoroutine know this note will never reach onLaunch, so its
+        // completion wait doesn't hang forever waiting for a note that's been broken.
+        public System.Action    OnCancelled;
+    }
+    private readonly List<PendingRingNote> _pendingRingNotes = new();
 
     private struct NoteAnimInfo
     {

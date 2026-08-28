@@ -14,6 +14,7 @@ public partial class InstrumentTrack
     /// </summary>
     public (int fromBin, int toBin) InstantFillAllBins(bool toMaxCapacity = false)
     {
+        bool wasEmpty = persistentLoopNotes.Count == 0;
         int binSz = BinSize();
         int bins  = toMaxCapacity ? Mathf.Max(1, maxLoopMultiplier) : Mathf.Max(1, loopMultiplier);
 
@@ -62,7 +63,17 @@ public partial class InstrumentTrack
                 {
                     int absStep = binStart + localStep;
                     int note    = ns.GetNoteForPhaseAndRole(this, localStep);
-                    AddNoteToLoop(absStep, note, 120, 1.0f, lightMarkerNow: true, authoredRootMidi);
+
+                    int authoredRoot = ns.GetAuthoredRootMidi(localStep);
+                    if (authoredRoot == int.MinValue) authoredRoot = authoredRootMidi;
+
+                    if (!ns.TryGetTemplateTimingAtStep(localStep, out int dur, out float vel))
+                    {
+                        dur = 480;
+                        vel = 100f;
+                    }
+
+                    AddNoteToLoop(absStep, note, dur, vel, lightMarkerNow: true, authoredRoot);
                     addedAnyNote = true;
                 }
             }
@@ -74,6 +85,13 @@ public partial class InstrumentTrack
                 if (fromBin < 0) fromBin = b;
                 toBin = b + 1;
             }
+        }
+
+        if (toMaxCapacity && wasEmpty && toBin > fromBin && midiVoice != null)
+        {
+            var rp = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+            const float kRampInSeconds = 1.5f;
+            midiVoice.RampInVolume(rp != null ? rp.volumeMultiplier : 1f, kRampInSeconds);
         }
 
         _loopCacheDirtyPending = true;

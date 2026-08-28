@@ -42,6 +42,12 @@ public partial class CosmicDust
         vehicle.ReportCollisionResistance(effectiveResistance);
 
         float energyCostMul = Mathf.Lerp(1f, 5f, liveResistance);
+        float spoolUpSeconds = vehicle.profile != null ? vehicle.profile.boostSpoolUpSeconds : 0f;
+        if (spoolUpSeconds > 0f)
+        {
+            float spoolUp01 = Mathf.Clamp01(vehicle.BoostHeldSeconds / spoolUpSeconds);
+            energyCostMul = Mathf.Lerp(1f, energyCostMul, spoolUp01);
+        }
         // drainResistance01: 0 = full drain rate, 1 = no drain (see MusicalRoleProfile.cs) — Lerp
         // must run from full (1.0) down to minimal (0.1) as drainRes rises, not the reverse.
         vehicle.DrainEnergy(drainPerSec * Mathf.Lerp(1.0f, 0.1f, drainRes) * energyCostMul * dt);

@@ -6,7 +6,7 @@ public partial class ControlTutorialHighlight
     [Header("Press-Any-Button Guide (singular highlights)")]
     [SerializeField] private ButtonId[] pressAnySequence = new[]
     {
-        ButtonId.East
+        ButtonId.South
     };
 
     // ============================================================

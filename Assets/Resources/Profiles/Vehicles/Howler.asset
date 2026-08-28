@@ -42,10 +42,11 @@ MonoBehaviour:
     gray: 1
   carveResistanceBypass01: 0
   carveVelocityDrainPerCell: 0.12
-  directionalAuthority01: 0.7
+  directionalAuthority01: 0.95
   plowSteeringPenalty01: 0
   pressureInstabilityRadius: 0
   pressureInstabilityStrength01: 0
+  speedInstabilityStrength01: 0.5
   soulMinScale: 0.3
   soulMaxScale: 1
   soulScaleLerpSpeed: 7

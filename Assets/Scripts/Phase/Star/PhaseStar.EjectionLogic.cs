@@ -334,7 +334,7 @@ public partial class PhaseStar
                 }
                 else
                 {
-                    targetTrack.controller?.CheckAndTriggerAllTracksMaxed();
+                    targetTrack.controller?.CheckAndTriggerAllTracksMaxed(applyImmediately: false);
                 }
 
                 targetTrack.controller?.StageAltChordIfAllTracksMaxed();

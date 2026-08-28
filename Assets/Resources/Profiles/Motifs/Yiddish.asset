@@ -39,13 +39,9 @@ MonoBehaviour:
     breadth01: 0.4
     pressure01: 0.1
   - clip: {fileID: 8300000, guid: e040c75e3f2bf4f47b3fcb93db90fbae, type: 3}
-    depth01: 0.4
+    depth01: 0.086
     breadth01: 0.5
     pressure01: 0.2
-  - clip: {fileID: 8300000, guid: d02a209a4e3fd40149c31a71de3dff3d, type: 3}
-    depth01: 0.4
-    breadth01: 0.5
-    pressure01: 0.4
   entryLoopCount: 1
   resetFirstCarryOnStart: 0
   bridgeSamples:
@@ -59,6 +55,7 @@ MonoBehaviour:
   starBehavior: {fileID: 11400000, guid: 9dd08ed983d384107aaff4f28fa8803d, type: 2}
   mazePattern: {fileID: 11400000, guid: 48fdff80018f043e3aab3afff01f7e46, type: 2}
   roleGeoConfigs: []
+  genericFillNeverRegrowRatio: 1
   chordProgression: {fileID: 11400000, guid: 1b9beaba57f834469ac1482d07ad9210, type: 2}
   alternateChordProgressionProfile: {fileID: 11400000, guid: e7e83b9a382cd456a99566c339aaadc1,
     type: 2}

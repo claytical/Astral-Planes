@@ -61,9 +61,6 @@ MonoBehaviour:
   gravityVoidMask:
     serializedVersion: 2
     m_Bits: 0
-  dustLayerMask:
-    serializedVersion: 2
-    m_Bits: 0
   energyLevel: 70
   boosting: 0
   trail: {fileID: 5973205746167519599, guid: 4f48472fa779ab944bdf83b19c9fc7c7, type: 3}
@@ -74,7 +71,7 @@ MonoBehaviour:
   releaseCue: {fileID: 0}
 --- !u!212 &1970310610805977373
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -121,17 +118,18 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: -10
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 8563771761307995811, guid: 5a2c3287586914668b386b9d44a42033,
+  m_Sprite: {fileID: 2730416705253543434, guid: 738b7968fd41349bfbf44d65d0744f64,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 0.35, y: 0.54}
+  m_Size: {x: 0.75, y: 0.85}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!114 &964252887607637339
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -354,44 +352,24 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.35, y: 0.54}
-    newSize: {x: 0.35, y: 0.54}
+    oldSize: {x: 0.75, y: 0.85}
+    newSize: {x: 0.75, y: 0.85}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
   m_Points:
     m_Paths:
-    - - {x: 0.065, y: -0.17}
-      - {x: 0.175, y: -0.22}
-      - {x: 0.175, y: -0.13}
-      - {x: 0.13499999, y: -0.06}
-      - {x: 0.024999999, y: 0.01}
-      - {x: -0.044999998, y: 0.01}
-      - {x: -0.175, y: -0.08}
-      - {x: -0.175, y: -0.26999998}
-      - {x: -0.145, y: -0.26999998}
-      - {x: -0.035, y: -0.17999999}
-      - {x: -0.044999998, y: -0.14999999}
-      - {x: -0.085, y: -0.14}
-    - - {x: 0.055, y: -0.14}
-      - {x: 0.024999999, y: -0.17}
-      - {x: 0.024999999, y: -0.19999999}
-      - {x: 0.145, y: -0.26999998}
-      - {x: 0.175, y: -0.26999998}
-      - {x: 0.175, y: -0.21}
-      - {x: 0.105, y: -0.14999999}
-    - - {x: -0.005, y: -0.11}
-      - {x: 0.024999999, y: -0.099999994}
-      - {x: 0.024999999, y: -0.07}
-      - {x: -0.005, y: -0.06}
-      - {x: -0.024999999, y: -0.08}
-    - - {x: -0.024999999, y: 0.26999998}
-      - {x: -0.035, y: 0.19}
-      - {x: -0.015, y: 0.17}
-      - {x: 0.015, y: 0.17}
-      - {x: 0.035, y: 0.19}
-      - {x: 0.024999999, y: 0.26999998}
+    - - {x: 0.37, y: -0.105}
+      - {x: 0.25, y: 0.005}
+      - {x: 0.04, y: 0.3}
+      - {x: 0, y: 0.32}
+      - {x: -0.375, y: -0.045}
+      - {x: -0.36, y: -0.425}
+      - {x: -0.19, y: -0.21}
+      - {x: 0.15, y: -0.22}
+      - {x: 0.37, y: -0.425}
+      - {x: 0.38, y: -0.425}
   m_UseDelaunayMesh: 1
 --- !u!1 &7076781707541423879
 GameObject:
@@ -420,14 +398,14 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 4}
-  m_LocalScale: {x: 0.14999999, y: 0.14999999, z: 0.29999998}
+  m_LocalScale: {x: 0.99999994, y: 1, z: 2}
   m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 2614095863033673403}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &2059141339769553833
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -472,16 +450,17 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: -26
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 8563771761307995811, guid: 5a2c3287586914668b386b9d44a42033,
+  m_Sprite: {fileID: 3214780712834771001, guid: af54d467f014e445197359b5f452ff3b,
     type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 0.35, y: 0.54}
+  m_Size: {x: 0.75, y: 0.85}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []

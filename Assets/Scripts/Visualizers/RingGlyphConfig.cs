@@ -48,6 +48,10 @@ public class RingGlyphConfig : ScriptableObject
     public float nextUpColorCycleDuration = 1.5f;
 
     [Header("Record Fade Out")]
+    [Tooltip("Seconds the completed record stays fully visible (100% opacity) before it starts " +
+             "fading out, once shown at the start of a new motif.")]
+    public float recordHoldDuration = 1.5f;
+
     [Tooltip("Default seconds for the initial record to fade out when not synced to maze generation " +
              "(ordinary/path-choice motif transitions, where the new maze is already fully generated " +
              "by the time the record reappears).")]
@@ -102,6 +106,10 @@ public class RingGlyphConfig : ScriptableObject
     [Tooltip("Duration in seconds for each note-to-tug travel animation.")]
     public float noteTravelDuration = 0.35f;
 
+    [Header("Note Tether")]
+    [Tooltip("Seconds for a note's preview tether to grow in from the timeline marker to its ring landing spot.")]
+    public float noteTetherGrowDuration = 0.25f;
+
     [Tooltip("Seconds for the ring to slide from center to off the left edge at the second loop boundary.")]
     public float rollOffDuration = 1.5f;
 
@@ -131,4 +139,23 @@ public class RingGlyphConfig : ScriptableObject
 
     [Tooltip("Duration (seconds) for the ring to scale from its current size to zero after the tilt.")]
     public float scaleDownDuration = 0.5f;
+
+    [Header("Ring Collision Feedback")]
+    [Tooltip("Seconds the ring shakes for after successfully breaking a pending tether.")]
+    public float breakShakeDuration = 0.35f;
+
+    [Tooltip("Peak position offset (local units) for the break shake.")]
+    public float breakShakeAmplitude = 0.18f;
+
+    [Tooltip("Perlin-noise sample frequency for the break shake — lower reads as a looser, springier wobble.")]
+    public float breakShakeFrequency = 18f;
+
+    [Tooltip("Seconds the ring shakes for on a denied collision (no pending tether to break).")]
+    public float denialShakeDuration = 0.14f;
+
+    [Tooltip("Peak position offset (local units) for the denial shake.")]
+    public float denialShakeAmplitude = 0.07f;
+
+    [Tooltip("Perlin-noise sample frequency for the denial shake — higher reads as a stiff, clipped jitter.")]
+    public float denialShakeFrequency = 40f;
 }

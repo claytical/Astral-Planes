@@ -30,19 +30,22 @@ public sealed class DustTimingParams
     public float starDrainReleaseDelay = -1f;
     [Tooltip("Delay applied to cells cleared by a discarded carried note's detonation blast.")]
     public float collectableDiscardRegrowDelay = -1f;
+    [Tooltip("Delay applied to cells cleared by a time bomb collectable's detonation blast.")]
+    public float collectableBombBlastRegrowDelay = -1f;
 
     /// <summary>Per-source delay, or -1 to fall back to the base regrowDelay.</summary>
     public float GetDelayFor(DustClearSource source) => source switch
     {
-        DustClearSource.VehiclePlow        => vehiclePlowRegrowDelay,
-        DustClearSource.StarDrain          => starDrainReleaseDelay,
-        DustClearSource.Zap                => zapRegrowDelay,
-        DustClearSource.CollectableArrival => collectableArrivalRegrowDelay,
-        DustClearSource.CollectablePlow    => collectablePlowRegrowDelay,
-        DustClearSource.Jail               => jailRegrowDelay,
-        DustClearSource.SuperNode          => superNodeRegrowDelay,
-        DustClearSource.CollectableDiscard => collectableDiscardRegrowDelay,
-        _                                  => -1f,
+        DustClearSource.VehiclePlow          => vehiclePlowRegrowDelay,
+        DustClearSource.StarDrain            => starDrainReleaseDelay,
+        DustClearSource.Zap                  => zapRegrowDelay,
+        DustClearSource.CollectableArrival   => collectableArrivalRegrowDelay,
+        DustClearSource.CollectablePlow      => collectablePlowRegrowDelay,
+        DustClearSource.Jail                 => jailRegrowDelay,
+        DustClearSource.SuperNode            => superNodeRegrowDelay,
+        DustClearSource.CollectableDiscard   => collectableDiscardRegrowDelay,
+        DustClearSource.CollectableBombBlast => collectableBombBlastRegrowDelay,
+        _                                    => -1f,
     };
 
     public void Validate()
@@ -56,6 +59,7 @@ public sealed class DustTimingParams
         zapRegrowDelay                = Mathf.Max(-1f, zapRegrowDelay);
         starDrainReleaseDelay         = Mathf.Max(-1f, starDrainReleaseDelay);
         collectableDiscardRegrowDelay = Mathf.Max(-1f, collectableDiscardRegrowDelay);
+        collectableBombBlastRegrowDelay = Mathf.Max(-1f, collectableBombBlastRegrowDelay);
     }
 }
 

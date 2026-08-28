@@ -12,6 +12,94 @@ public partial class MotifRingGlyphApplicator
     public void SetSuperNodeMode(bool active) => _superNodeMode = active;
 
     /// <summary>
+    /// Called when the vehicle collides with this ring's collider. Breaks whichever pending note's
+    /// preview tether landing point is closest to the collision contact point: retracts/destroys
+    /// the tether, cancels its dot-launch, and removes the note from the loop so it's neither heard
+    /// again nor included in the ring's eventual persisted record. Returns false (no-op) if no
+    /// tether is currently pending.
+    /// </summary>
+    /// <remarks>
+    /// _pendingRingNotes is shared across every bin/track currently mid-deformation (this
+    /// applicator represents the whole ring stack behind one collider, not one ring each) — so
+    /// picking by proximity to the actual contact point, rather than always the oldest entry,
+    /// is what keeps a hit on one ring from breaking a note that belongs to a different bin.
+    /// </remarks>
+    public bool TryBreakNextPendingTether(Vector3 contactPoint)
+    {
+        if (_pendingRingNotes.Count == 0) return false;
+
+        int bestIdx = 0;
+        float bestDistSqr = float.MaxValue;
+        for (int i = 0; i < _pendingRingNotes.Count; i++)
+        {
+            var anchor = _pendingRingNotes[i].Anchor;
+            if (anchor == null) continue;
+            float d = (anchor.transform.position - contactPoint).sqrMagnitude;
+            if (d < bestDistSqr) { bestDistSqr = d; bestIdx = i; }
+        }
+
+        var entry = _pendingRingNotes[bestIdx];
+        _pendingRingNotes.RemoveAt(bestIdx);
+        entry.CancelFlag[0] = true;
+        entry.OnCancelled?.Invoke();
+
+        // Capture break-effect positions before the tether/anchor retract out from under them.
+        Vector3? markerPos = entry.Tether != null && entry.Tether.start != null ? entry.Tether.start.position : (Vector3?)null;
+        Vector3? anchorPos = entry.Anchor != null ? entry.Anchor.transform.position : (Vector3?)null;
+
+        if (entry.Tether != null) entry.Tether.RetractAndDestroy(config.noteTetherGrowDuration);
+        // Keep the anchor (the tether's 'end') alive through the retract animation — destroying
+        // it now would null 'end' with no rebind info, tripping NoteTether's own "hopeless"
+        // self-destruct on the next frame before the retract can play.
+        if (entry.Anchor != null) Destroy(entry.Anchor, config.noteTetherGrowDuration);
+
+        entry.Track?.RemovePersistentNoteAtStep(entry.Step);
+        noteVisualizer?.RemoveCommittedMarkerAtStep(entry.Track, entry.Step);
+
+        PlayBreakShake();
+        if (tetherBreakEffectPrefab != null)
+        {
+            if (markerPos.HasValue) SpawnBreakEffect(markerPos.Value, entry.Track);
+            if (anchorPos.HasValue) SpawnBreakEffect(anchorPos.Value, entry.Track);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Gracefully retracts every still-pending note tether (preview tethers whose notes haven't
+    /// departed yet) instead of leaving them to the deformation coroutines' normal onDepart timing.
+    /// Called right as the ring begins its end-of-motif spin so tethers detach in sync with the
+    /// record turning, rather than lingering or vanishing abruptly. Unlike TryBreakNextPendingTether,
+    /// this doesn't remove notes from the persistent loop or play break effects — the notes already
+    /// completed; only their in-flight preview visuals are being wound down.
+    /// </summary>
+    public void DetachPendingRingTethers(float retractDuration)
+    {
+        if (_pendingRingNotes.Count == 0) return;
+
+        foreach (var entry in _pendingRingNotes)
+        {
+            entry.CancelFlag[0] = true;
+            entry.OnCancelled?.Invoke();
+            if (entry.Tether != null) entry.Tether.RetractAndDestroy(retractDuration);
+            if (entry.Anchor != null) Destroy(entry.Anchor, retractDuration);
+        }
+        _pendingRingNotes.Clear();
+    }
+
+    private void SpawnBreakEffect(Vector3 worldPos, InstrumentTrack track)
+    {
+        var go = Instantiate(tetherBreakEffectPrefab, worldPos, Quaternion.identity);
+        var ps = go.GetComponentInChildren<ParticleSystem>();
+        if (ps != null && track != null)
+        {
+            var main = ps.main;
+            main.startColor = track.DisplayColor;
+        }
+    }
+
+    /// <summary>
     /// Spawn one flat circle ring for a just-completed bin. Deformation fires
     /// separately via <see cref="BeginBinRingDeformation"/> when the playhead
     /// reaches the bin's start step.
@@ -25,7 +113,16 @@ public partial class MotifRingGlyphApplicator
         EnsureRingCollider();
         _ringCollider.enabled = true;
 
-        int   idx    = _gameplayRings.Count;
+        // A bin can empty (its last pending note broken via TryBreakNextPendingTether, which
+        // un-fills the bin so BinFrontierAllocator offers it again) and later refill, re-firing
+        // OnBinFilled → SpawnBinRing for the same (binIndex, role). Replace that stale entry in
+        // place instead of appending a duplicate, so stacking radii stay consistent and
+        // BeginBinRingDeformation's FindIndex targets the fresh ring instead of the old one.
+        int existingIdx = _gameplayRings.FindIndex(r => r.BinIndex == binIndex && r.Role == role);
+        int idx = existingIdx >= 0 ? existingIdx : _gameplayRings.Count;
+        if (existingIdx >= 0 && _gameplayRings[existingIdx].Root != null)
+            Destroy(_gameplayRings[existingIdx].Root);
+
         float innerR = RingInnerRadius(idx);
         float outerR = innerR + config.ringThickness;
         int   segs   = Mathf.Max(16, config.segments);
@@ -33,7 +130,8 @@ public partial class MotifRingGlyphApplicator
         var entry = BuildRingEntry($"GameplayRing_Bin{binIndex}_{role}",
             innerR, outerR, segs, color, role, binIndex,
             new List<MotifSnapshot.NoteEntry>(), totalSteps);
-        _gameplayRings.Add(entry);
+        if (existingIdx >= 0) _gameplayRings[existingIdx] = entry;
+        else _gameplayRings.Add(entry);
 
         var   drum            = GameFlowManager.Instance?.activeDrumTrack;
         float stepDurationSec = 0f;
@@ -63,6 +161,24 @@ public partial class MotifRingGlyphApplicator
         RefreshPlayAreaFit(totalRingCount);
         UpdateRingColliderRadius(_gameplayRings.Count);
         UpdateBackgroundDiscRadii(_gameplayRings.Count, totalRingCount);
+        EjectVehiclesFromRing();
+    }
+
+    // Guards against a vehicle getting fully engulfed the instant this collider is enabled or
+    // grows to newly enclose it — Box2D's solver can't push out something that's entirely inside
+    // a solid collider (only edge-overlap separations resolve reliably), so without this a
+    // vehicle near center would stay trapped, and each stray contact while trapped would
+    // incorrectly fire Vehicle.Damage.cs's ring-hit handler (TryBreakNextPendingTether).
+    private void EjectVehiclesFromRing()
+    {
+        if (_ringCollider == null || !_ringCollider.enabled) return;
+        var vehicles = GameFlowManager.Instance?.GetVehicles();
+        if (vehicles == null) return;
+
+        Vector2 center = _ringCollider.bounds.center;
+        float   radius = _ringCollider.bounds.extents.x;
+        foreach (var v in vehicles)
+            if (v != null) v.EjectFromCircleIfInside(center, radius);
     }
 
     /// <summary>
@@ -116,7 +232,14 @@ public partial class MotifRingGlyphApplicator
 
         var      revealedNotes = new List<MotifSnapshot.NoteEntry>();
         Coroutine contourTween = null;
-        bool      contourSettled = sortedNotes.Count == 0;
+        // True only while a contour tween is actually in flight — NOT "every note has landed at
+        // least once." A note broken via TryBreakNextPendingTether never reaches onLaunch, so if
+        // every note in the bin ends up cancelled (trivially true for a 1-note bin), no tween
+        // ever starts; this must default to "nothing to settle," not "permanently unsettled" —
+        // the old inverted flag (start false, wait to become true) hung this coroutine forever
+        // whenever a bin's only note(s) were all broken rather than landed.
+        bool      contourTweenActive = false;
+        int       cancelledCount = 0; // notes broken by the vehicle never reach onLaunch
 
         // shouldStop: only hard-clear kills deformation; spin-off lets it finish naturally.
         System.Func<bool> shouldStop = () => _clearingGameplayRings || ring.Root == null;
@@ -125,8 +248,6 @@ public partial class MotifRingGlyphApplicator
         {
             if (shouldStop()) break;
 
-            int   noteLeaderStep = note.Step % leaderSteps;
-            int   triggerStep    = (noteLeaderStep - leadSteps + leaderSteps) % leaderSteps;
             int   localStep      = note.Step % binSteps;
             float angle          = localStep / (float)binSteps * Mathf.PI * 2f;
             var   tugLocal       = new Vector3(Mathf.Cos(angle) * tugR, Mathf.Sin(angle) * tugR, 0f);
@@ -135,11 +256,62 @@ public partial class MotifRingGlyphApplicator
             if (noteVisualizer?.noteMarkers != null && track != null)
                 noteVisualizer.noteMarkers.TryGetValue((track, note.Step), out markerTr);
 
+            // Preview tether: grows in immediately (all notes in the bin grow together, since
+            // nothing in this loop yields) from the note's timeline marker to its future
+            // landing spot on the ring. Retracts and self-destroys once the note's step is
+            // reached (see onDepart below), in sync with its travel dot's departure/arrival.
+            NoteTether tether = null;
+            GameObject tetherAnchor = null;
+            if (noteVisualizer?.noteTetherPrefab != null && track != null)
+            {
+                var ringLocalPos = new Vector3(Mathf.Cos(angle) * outerR, Mathf.Sin(angle) * outerR, 0f);
+                tetherAnchor = new GameObject($"TetherAnchor_Bin{ring.BinIndex}_Step{note.Step}");
+                tetherAnchor.transform.SetParent(ring.Root.transform, worldPositionStays: false);
+                tetherAnchor.transform.localPosition = ringLocalPos;
+
+                var tetherGo = Instantiate(noteVisualizer.noteTetherPrefab);
+                tether = tetherGo.GetComponent<NoteTether>() ?? tetherGo.AddComponent<NoteTether>();
+                tether.SetEndpoints(markerTr, tetherAnchor.transform, note.TrackColor);
+                // The marker may not be registered in noteVisualizer.noteMarkers yet — this
+                // resolves it immediately if it already exists, otherwise NoteTether polls for
+                // it indefinitely (see NoteTether.Update()), so a lagging marker never silently
+                // drops the preview the way a fixed-timeout wait here would.
+                tether.BindStartByStep(track, note.Step, noteVisualizer);
+                tether.GrowIn(config.noteTetherGrowDuration);
+            }
+
             var capturedNote = note;
+            var capturedTether = tether;
+            var capturedAnchor = tetherAnchor;
+
+            // While this note's tether is live (not yet departed), the vehicle can break it by
+            // colliding with the ring — see TryBreakNextPendingTether.
+            PendingRingNote pendingEntry = null;
+            if (tether != null)
+            {
+                pendingEntry = new PendingRingNote
+                {
+                    Tether      = tether,
+                    Anchor      = tetherAnchor,
+                    Track       = track,
+                    Step        = note.Step,
+                    CancelFlag  = new bool[1],
+                    OnCancelled = () => cancelledCount++,
+                };
+                _pendingRingNotes.Add(pendingEntry);
+            }
+
             StartCoroutine(WaitAndLaunchDot(
                 ring.Root.transform, tugLocal, note.TrackColor,
                 markerTr, outerR, angle,
-                drumRef, triggerStep, config.noteTravelDuration, shouldStop,
+                drumRef, note.Step, leadSteps, config.noteTravelDuration, shouldStop,
+                isCancelled: pendingEntry != null ? () => pendingEntry.CancelFlag[0] : null,
+                onDepart: () =>
+                {
+                    if (pendingEntry != null) _pendingRingNotes.Remove(pendingEntry);
+                    if (capturedTether != null) capturedTether.RetractAndDestroy(config.noteTravelDuration);
+                    if (capturedAnchor != null) Destroy(capturedAnchor, config.noteTravelDuration);
+                },
                 onLaunch: () =>
                 {
                     revealedNotes.Add(capturedNote);
@@ -148,16 +320,16 @@ public partial class MotifRingGlyphApplicator
                     var targetPts = targetPoly?.Points;
                     if (targetPts != null)
                     {
-                        contourSettled = false;
+                        contourTweenActive = true;
                         if (contourTween != null) StopCoroutine(contourTween);
                         contourTween = StartCoroutine(
                             TweenContour(ring.Contour, targetPts, config.noteTravelDuration,
-                                onComplete: () => contourSettled = true));
+                                onComplete: () => contourTweenActive = false));
                     }
                 }));
         }
 
-        while (!contourSettled || revealedNotes.Count < sortedNotes.Count)
+        while (contourTweenActive || revealedNotes.Count + cancelledCount < sortedNotes.Count)
         {
             if (shouldStop()) { _pendingDeformationCount--; yield break; }
             yield return null;
@@ -266,6 +438,7 @@ public partial class MotifRingGlyphApplicator
         RefreshPlayAreaFit(totalRingCount);
         UpdateRingColliderRadius(_gameplayRings.Count);
         UpdateBackgroundDiscRadii(_gameplayRings.Count, totalRingCount);
+        EjectVehiclesFromRing();
 
         // Innermost not-yet-filled ring previews the motif's active role palette instead of
         // staying flat gray — static if the motif has one role, cycling if it has several.
@@ -328,11 +501,14 @@ public partial class MotifRingGlyphApplicator
     public void ClearGameplayRings()
     {
         StopAllCoroutines(); // prevent ghost decrements from old deformation coroutines
+        _shakeCoroutine = null; // StopAllCoroutines above killed it without resetting localPosition
+        transform.localPosition = Vector3.zero;
         _clearingGameplayRings   = true;
         _gameplayFadingOut       = true;
         _superNodeMode           = false;
         _spinOffPending          = false;
         _pendingDeformationCount = 0;
+        _pendingRingNotes.Clear();
         DestroyList(_gameplayRings);
         DestroyList(_remainingRings);
         _remainingRings.Clear();

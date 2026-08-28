@@ -128,6 +128,25 @@ public partial class NoteVisualizer
     }
 
     /// <summary>
+    /// Removes and destroys the marker at stepAbs for the given track unconditionally,
+    /// including markers currently ascending (cancels them out of the ascension director's
+    /// tracking first, so it doesn't hold a dangling reference) — used when the caller has
+    /// already decided the note is gone (e.g. TryBreakNextPendingTether removing a
+    /// committed note), unlike RemoveOrphanMarkerAtStep which only cleans up markers
+    /// that were never committed.
+    /// </summary>
+    public void RemoveCommittedMarkerAtStep(InstrumentTrack track, int stepAbs)
+    {
+        var key = (track, stepAbs);
+        if (!noteMarkers.TryGetValue(key, out var tr) || tr == null) return;
+
+        ascensionDirector?.CancelAscension(track, tr.gameObject);
+
+        noteMarkers.Remove(key);
+        Destroy(tr.gameObject);
+    }
+
+    /// <summary>
     /// Removes and destroys all placeholder markers for the given track and burst.
     /// Called on burst completion so authored-step placeholders that were never
     /// committed (collectables picked up and released elsewhere, or discarded) don't linger.

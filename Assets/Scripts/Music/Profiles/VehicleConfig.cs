@@ -40,6 +40,8 @@ public class VehicleConfig : ScriptableObject
     public bool enableRecovery = true;
     [Tooltip("Allow some overshoot before recovery triggers.")]
     public float viewportOobMargin = 0.15f;
+    [Tooltip("World-space margin outside DrumTrack.PlayArea before recovery triggers. Tighter than viewportOobMargin — catches cases like ending up inside the NoteVisualizer strip, which is still within the full camera viewport.")]
+    public float playAreaOobMargin = 0.5f;
     public float minSecondsBetweenRecoveries = 0.75f;
     public int respawnSearchRadiusCells = 8;
     [Tooltip("Speed threshold below which vehicle is considered 'not moving'.")]

@@ -28,6 +28,10 @@ public partial class MotifRingGlyphApplicator
         mr.sharedMaterial    = config.ringMeshMaterial;
         mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         mr.receiveShadows    = false;
+        // Above the backdrop discs (see CreateBackgroundDisc) so the record reads as a solid
+        // black backing with the ring lines on top of it, not a see-through wireframe with the
+        // background (e.g. CosmicDust) showing through.
+        mr.sortingOrder      = FillSortingOrder;
 
         var mpb = new MaterialPropertyBlock();
         SetFillColor(mr, new Color(color.r, color.g, color.b, fillAlphaOverride ?? config.ringAlpha), mpb);
@@ -51,6 +55,8 @@ public partial class MotifRingGlyphApplicator
         lr.positionCount     = 0;
         lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         lr.receiveShadows    = false;
+        // Topmost — the visible "groove" lines sit above the Fill and the backdrop discs.
+        lr.sortingOrder      = ContourSortingOrder;
 
         return new RingEntry
         {
@@ -68,11 +74,22 @@ public partial class MotifRingGlyphApplicator
     // ── Background discs ────────────────────────────────────────────────────
     // Two solid backdrop discs behind the whole ring stack: inner sized to placed
     // (completed) rings, outer sized to the entire record (placed + remaining).
+    //
+    // Sorting order for the whole ring-glyph stack, back-to-front. All of these render in the
+    // same ("Default") sorting layer as everything else in the play scene, including the
+    // CosmicDust maze — the discs must sit above dust's sortingOrder (0) or the record reads as
+    // a see-through wireframe with dust showing through it instead of a solid backing; Fill and
+    // Contour then sit above the discs so the ring lines stay visible on top of that backing.
+    private const int FullBgDiscSortingOrder   = 1;
+    private const int PlacedBgDiscSortingOrder = 2;
+    private const int FillSortingOrder         = 3;
+    private const int ContourSortingOrder      = 4;
+    private const int TravelDotSortingOrder    = 5;
 
     private void EnsureBackgroundDiscs()
     {
-        if (_fullBgDisc == null)   _fullBgDisc   = CreateBackgroundDisc("FullRecordBackdrop", -2);
-        if (_placedBgDisc == null) _placedBgDisc = CreateBackgroundDisc("PlacedRecordBackdrop", -1);
+        if (_fullBgDisc == null)   _fullBgDisc   = CreateBackgroundDisc("FullRecordBackdrop", FullBgDiscSortingOrder);
+        if (_placedBgDisc == null) _placedBgDisc = CreateBackgroundDisc("PlacedRecordBackdrop", PlacedBgDiscSortingOrder);
         _placedBgMpb ??= new MaterialPropertyBlock();
         _fullBgMpb   ??= new MaterialPropertyBlock();
     }
