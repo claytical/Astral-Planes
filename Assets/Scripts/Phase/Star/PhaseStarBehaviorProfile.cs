@@ -1,4 +1,3 @@
-    using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Astral Planes/PhaseStar Behavior Profile")]
@@ -20,9 +19,6 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Min(0)]
     [Tooltip("If waiting for collectables to clear but nothing is in flight, re-arm/advance after this many loop boundaries. 0 disables.")]
     public int collectableClearTimeoutLoops = 2;
-
-    [Tooltip("Secondary timeout in seconds (DSP time). Used if loop counter is unavailable. <= 0 disables.")]
-    public float collectableClearTimeoutSeconds = 0f;
 
     // =====================================================================
     // Star body motion (PhaseStarMotion2D)

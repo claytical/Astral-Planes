@@ -76,6 +76,8 @@ public partial class Collectable
         ResolveAndCacheBombBlastRadius();
         EnsureBombTelegraphRing();
         UpdateBombTelegraphRing(0f);
+        EnsureBombBlastOverlay();
+        UpdateBombBlastOverlay(0f);
 
         _bombCoreParticles = TryGetComponent(out CollectableParticles cp) ? cp.coreParticleSystem : null;
         _bombCoreBaseColor = _bombCoreParticles != null ? (Color)_bombCoreParticles.main.startColor.color : Color.white;
@@ -115,7 +117,8 @@ public partial class Collectable
     {
         var drums = assignedInstrumentTrack != null ? assignedInstrumentTrack.drumTrack : null;
         float cellSize = drums != null ? Mathf.Max(0.001f, drums.GetCellWorldSize()) : 1f;
-        _bombBlastRadiusCells = tuning.bomb.blastRadius / cellSize;
+        float roleMul = _roleProfile != null ? Mathf.Max(0.1f, _roleProfile.bombBlastRadiusMul) : 1f;
+        _bombBlastRadiusCells = (tuning.bomb.blastRadius * roleMul) / cellSize;
         _bombEffectiveBlastRadius = _bombBlastRadiusCells * cellSize;
     }
 
@@ -158,6 +161,11 @@ public partial class Collectable
 
             float remaining = (float)(_bombDetonateDsp - AudioSettings.dspTime);
             float t = Mathf.Clamp01(1f - remaining / Mathf.Max(0.001f, (float)_bombFuseTotalSeconds));
+            // Urgency is a FIXED seconds-before-detonation window, independent of total fuse
+            // length — unlike t (whole-fuse progress), which still drives pulse Hz/swell below.
+            // A long fuse (many seconds, up to a full loop) stays at urgency01=0 (calm) for most
+            // of its length; only the final dangerWindowSeconds ramp to full warning.
+            float urgency01 = 1f - Mathf.Clamp01(remaining / Mathf.Max(0.0001f, tuning.bomb.dangerWindowSeconds));
 
             float hz = Mathf.Lerp(tuning.bomb.minPulseHz, tuning.bomb.maxPulseHz, t);
             float pulse = (Mathf.Sin(Time.time * hz * Mathf.PI * 2f) * 0.5f) + 0.5f;
@@ -168,15 +176,16 @@ public partial class Collectable
             float scaleMul = Mathf.Lerp(1f, tuning.bomb.maxPulseScale, t * pulse);
             BombVisualRoot.localScale = _bombBaseScale * scaleMul;
             ApplyParticleScaleLockstep(scaleMul);
-            UpdateBombTelegraphRing(t);
+            UpdateBombTelegraphRing(urgency01);
+            UpdateBombBlastOverlay(urgency01);
 
             if (energySprite != null)
-                energySprite.color = Color.Lerp(_bombBaseColor, tuning.bomb.warningColor, t);
+                energySprite.color = Color.Lerp(_bombBaseColor, tuning.bomb.warningColor, urgency01);
 
             if (_bombCoreParticles != null)
             {
                 var coreMain = _bombCoreParticles.main;
-                coreMain.startColor = Color.Lerp(_bombCoreBaseColor, tuning.bomb.warningColor, t);
+                coreMain.startColor = Color.Lerp(_bombCoreBaseColor, tuning.bomb.warningColor, urgency01);
             }
 
             yield return null;
@@ -200,6 +209,7 @@ public partial class Collectable
         // The telegraph's job (showing danger before impact) is done now that damage/knockback
         // are about to land.
         HideBombTelegraphRing();
+        HideBombBlastOverlay();
 
         // Dealing damage must never be able to skip cleanup: DrainEnergy can cascade into a
         // vehicle dying (Explode, OnVehicleDied, discarding ITS carried notes, ...), and if any
@@ -250,7 +260,8 @@ public partial class Collectable
             {
                 var centerGP = drums.CellOf(transform.position);
                 int radiusCellsInt = Mathf.Max(1, Mathf.RoundToInt(_bombBlastRadiusCells));
-                _gfm?.dustGenerator?.TriggerDiscardBlast(centerGP, radiusCellsInt, source: DustClearSource.CollectableBombBlast);
+                float permanentRatio = _roleProfile != null ? Mathf.Clamp01(_roleProfile.bombPermanentClearRatio01) : 0f;
+                _gfm?.dustGenerator?.TriggerDiscardBlast(centerGP, radiusCellsInt, source: DustClearSource.CollectableBombBlast, permanentClearRatio01: permanentRatio);
             }
         }
         catch (Exception ex)

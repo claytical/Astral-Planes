@@ -108,6 +108,12 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("Seconds before this cell regrows after being carved. −1 = use the active maze pattern's default.")]
     public float regrowthDelay = -1f;
 
+    [Header("Collectable Bomb")]
+    [Tooltip("Multiplier on the discard-time-bomb's global blast radius (CollectableTuning.BombParams.blastRadius) for notes of this role. 1 = unchanged.")]
+    [Min(0.1f)] public float bombBlastRadiusMul = 1f;
+    [Tooltip("Fraction of this role's blast-cleared dust cells that are permanently cleared (never regrow this motif) instead of following the normal regrow-after-delay path. 0 = all cells regrow normally (unchanged). 1 = the entire blast footprint is a permanent crater.")]
+    [Range(0f, 1f)] public float bombPermanentClearRatio01 = 0f;
+
     [Header("Chord Voices (Advanced)")]
     [Tooltip("ByBin: configs rotate by bin index (default for all roles). ByVoice: configs are pinned by voiceIndex — voice 0 always uses config[0], voice 1 uses config[1], etc. RandomPerBin: one config is drawn independently at random per bin, stable for the session, varies across playthroughs.")]
     public RoleConfigSelectionMode configSelectionMode = RoleConfigSelectionMode.ByBin;

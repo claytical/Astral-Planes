@@ -131,7 +131,14 @@ public partial class Vehicle
         // but wrong pitch. Using the authored note ensures each step gets its intended melody.
         // Same-bin: keep the raw collected note (already a chord tone of that bin).
         if (crossBinComposition)
+        {
+            int preSwapMidi = chosenMidi;
             chosenMidi = p.track.GetAuthoredNoteAtAbsStep(targetAbsStep);
+            if (GameFlowManager.VerboseLogging) Debug.Log(
+                $"[CROSSBIN_SWAP] track={p.track.name} spawnBin={spawnBin} targetBin={targetBin} " +
+                $"authoredAbsStep={p.authoredAbsStep} targetAbsStep={targetAbsStep} " +
+                $"collectedMidi={preSwapMidi} -> authoredNote={chosenMidi}");
+        }
 
         bool occupied = p.track.IsPersistentStepOccupied(targetAbsStep);
         float commitVel = releaseVelocity >= 0f ? releaseVelocity : p.velocity127;

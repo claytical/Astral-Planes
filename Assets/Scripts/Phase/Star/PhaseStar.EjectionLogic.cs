@@ -470,7 +470,6 @@ public partial class PhaseStar
         _awaitingCollectableClearSinceLoop = (_drum != null)
             ? _drum.completedLoops
             : (_gfm?.activeDrumTrack?.completedLoops ?? -1);
-        _awaitingCollectableClearSinceDsp = AudioSettings.dspTime;
         HideInPlaceForBurst();
         Disarm(PhaseStarDisarmReason.NodeResolving, tint);
         LogState(logTag);

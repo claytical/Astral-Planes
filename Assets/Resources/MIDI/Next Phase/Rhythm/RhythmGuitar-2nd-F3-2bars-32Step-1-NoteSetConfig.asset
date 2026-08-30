@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: RhythmGuitar-2nd-F3-2bars-32Step-1-NoteSetConfig
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: RhythmGuitar-2nd-F3-2bars-32Step-1
-  roleProfile: {fileID: 11400000, guid: b91b19a8922104670a5e43a6e78149a3, type: 2}
+  roleProfile: {fileID: 11400000, guid: b3057cdc4b5d94cf09f4033758a96330, type: 2}
   riff: {fileID: 11400000, guid: 611fff332dca34efe8776c85cea5567f, type: 2}
   mineNodeExpireAfterLoops: 3
   ascendLoops: 0

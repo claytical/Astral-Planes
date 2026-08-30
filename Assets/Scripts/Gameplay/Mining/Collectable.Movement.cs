@@ -146,7 +146,11 @@ public partial class Collectable
         if (step != intendedStep) return;
 
         if (assignedInstrumentTrack != null)
+        {
+            if (GameFlowManager.VerboseLogging) Debug.Log(
+                $"[DUST_PULSE] track={assignedInstrumentTrack.name} intendedStep={intendedStep} assignedNote={assignedNote}");
             assignedInstrumentTrack.PlayOneShotMidi(assignedNote, spawnVelocity127 * 0.5f, noteDurationTicks);
+        }
 
         PickIntent();
         _intentTimer = _intentInterval;

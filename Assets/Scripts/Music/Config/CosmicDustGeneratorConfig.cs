@@ -42,6 +42,16 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     [Tooltip("Sprite scale-out duration when a star drain clears a cell. Shorter = punchier.")]
     [Min(0.01f)] public float zapScaleOutSeconds = 0.12f;
     
+    [Header("Generic Fill Resistance")]
+    [Range(0f, 1f), Tooltip("Baseline carve resistance for MusicalRole.None dust, baked into the " +
+        "imprint at spawn/regrow time instead of the previous hardcoded 0. Default 0 reproduces " +
+        "current behavior (instant carve).")]
+    public float noneCarveResistance01 = 0f;
+    [Range(0f, 1f), Tooltip("Baseline drain resistance for MusicalRole.None dust. Default 0 reproduces current behavior.")]
+    public float noneDrainResistance01 = 0f;
+    [Min(1), Tooltip("Baseline max energy units for MusicalRole.None dust. Default 1 reproduces current behavior.")]
+    public int noneMaxEnergyUnits = 1;
+
     [Header("Visual")]
     public Color mazeTint = new Color(0.7f, 0.7f, 0.7f, 0.25f);
     [Tooltip("Distinct darker gray for cells deliberately filled with permanent generic MusicalRole.None dust (exact-count mode's leftover territory) — visually distinguishes 'permanent filler, never regrows this motif' cells from ordinary quick-regrowing gray dust (mazeTint), from the moment the maze spawns.")]
@@ -71,6 +81,14 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     public float minNotesPerBinPerVoice = 2f;
     [Tooltip("Average notes-per-bin per active voice at/above which a motif's busyness01 saturates to 1.")]
     public float maxNotesPerBinPerVoice = 16f;
+    [Tooltip("Motif bpm at/below which drum-tempo busyness reads as 0. Reference scale, not per-motif authoring.")]
+    public float minBpmForDensity = 80f;
+    [Tooltip("Motif bpm at/above which drum-tempo busyness saturates to 1.")]
+    public float maxBpmForDensity = 160f;
+    [Tooltip("Weight of note-density busyness in the final MotifBusyness01 blend. Paired with bpmDensityWeight; both normalize internally so they need not sum to 1.")]
+    public float noteDensityWeight = 1f;
+    [Tooltip("Weight of drum-tempo (MotifProfile.bpm) busyness in the final MotifBusyness01 blend. 0 = current behavior (note-density only).")]
+    public float bpmDensityWeight = 0f;
 
     [Header("Tint Diffusion")]
     [Tooltip("If enabled, recently modified cells gradually blend toward their neighbours.")]

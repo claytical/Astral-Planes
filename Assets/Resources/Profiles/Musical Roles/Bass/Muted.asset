@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   role: 0
   dustColors:
-    baseColor: {r: 0.69348705, g: 0.48584908, b: 1, a: 0.6509804}
+    baseColor: {r: 0.4220384, g: 0.29214135, b: 0.6132076, a: 0.6509804}
     shadowColor: {r: 0.4524111, g: 0, b: 0.7830189, a: 1}
   baseAlpha: 0.875
   maxEnergyUnits: 5
@@ -40,8 +40,10 @@ MonoBehaviour:
     type: 2}
   volumeMultiplier: 0.8
   minVelocity: 60
-  maxVelocity: 127
+  maxVelocity: 115
   regrowthDelay: 2.5
+  bombBlastRadiusMul: 3
+  bombPermanentClearRatio01: 0.399
   configSelectionMode: 2
   chordVoiceColors: []
   sameRootAcrossBins: 0

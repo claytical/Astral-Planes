@@ -34,4 +34,5 @@ MonoBehaviour:
     phaseId: 7372954664d149969c3d8cf05cef0823
     motifs:
     - {fileID: 11400000, guid: 0dfacc5b336a449a68b1538328875e4f, type: 2}
+    - {fileID: 11400000, guid: c713eb220ad7e40b8a1ec429390a50ef, type: 2}
     loopMotifs: 0

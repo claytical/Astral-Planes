@@ -482,12 +482,21 @@ public partial class CosmicDustGenerator : MonoBehaviour
             // Preserve hiddenRole (permanent Voronoi ground-truth) across the rewrite.
             _imprints.EnsureAllocated();
             _imprints.TryGetValue(gp, out var existingImp);
+
+            // Generic-fill cells (hiddenRoleIsGenericFill) regrowing back to None get an extra
+            // softness multiplier on top of the None baseline — role-tinted and force-gray
+            // regrows (regrowRole == None but hiddenRoleIsGenericFill == false) are unaffected.
+            bool isGenericFillRegrow = existingImp.hiddenRoleIsGenericFill;
+            float genericFillSoftenMul = (regrowRole == MusicalRole.None && isGenericFillRegrow)
+                ? _genericFillRegrowSoftenMultiplier01
+                : 1f;
+
             _imprints[gp] = new DustImprint
             {
                 color               = regrowTint,
-                carveResistance01   = roleProfile != null ? roleProfile.carveResistance01 : 0f,
-                drainResistance01   = roleProfile != null ? roleProfile.drainResistance01 : 0f,
-                maxEnergyUnits      = roleProfile != null ? roleProfile.maxEnergyUnits : 1,
+                carveResistance01   = (roleProfile != null ? roleProfile.carveResistance01 : config.noneCarveResistance01) * genericFillSoftenMul,
+                drainResistance01   = (roleProfile != null ? roleProfile.drainResistance01 : config.noneDrainResistance01) * genericFillSoftenMul,
+                maxEnergyUnits      = roleProfile != null ? roleProfile.maxEnergyUnits : config.noneMaxEnergyUnits,
                 role                = regrowRole,
                 healDelay           = 0f,
                 hiddenRole          = existingImp.hiddenRole,
@@ -495,7 +504,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
             var resistance = ResolveResistanceProfile(gp, regrowRole, context: "CommitRegrowCell");
             dust.clearing.drainResistance01 = resistance.drainResistance01;
-            int maxUnits = roleProfile != null ? roleProfile.maxEnergyUnits : 1;
+            int maxUnits = roleProfile != null ? roleProfile.maxEnergyUnits : config.noneMaxEnergyUnits;
             // Must be armed before ApplyRoleAndCharge/BloomFlower below — both snap to full
             // brightness with no fade in this same frame, and this cap is what's supposed to
             // dim that initial flash. Arming it after (as before) left the flash unprotected.

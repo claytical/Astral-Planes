@@ -180,22 +180,43 @@ public partial class InstrumentTrack
         if (allowed.Count == 0) return shifted;
         allowed.Sort();
 
-        return ShiftByOctavesIntoTrackRange(SnapToNearestChordTone(shifted, allowed));
+        int snapped = ShiftByOctavesIntoTrackRange(SnapToNearestChordTone(shifted, allowed));
+
+        if (GameFlowManager.VerboseLogging) Debug.Log(
+            $"[QUANTIZE] track={name} step={stepIndex} bin={bin} in={midiNote} authoredRoot={authoredRootMidi} " +
+            $"chordRoot={chord.rootNote} rootDelta={rootDelta} shifted={shifted} allowed=[{string.Join(",", allowed)}] " +
+            $"snapped={snapped} range=[{lowestAllowedNote},{highestAllowedNote}]");
+
+        return snapped;
 }
 
     public void PlayQuantizedNoteForStep(int stepIndex, int rawMidi, int durationTicks, float velocity)
     {
+        int authoredRoot = ResolveAuthoredRootForStep(stepIndex);
+        int qNote = QuantizeNoteToBinChord(stepIndex, rawMidi, authoredRoot);
+        if (GameFlowManager.VerboseLogging) Debug.Log(
+            $"[BUMP_PREVIEW] track={name} step={stepIndex} rawNote={rawMidi} qNote={qNote}");
+        PlayNote127(qNote, durationTicks, velocity);
+    }
+
+    /// <summary>
+    /// Resolves the authored chord-root register to quantize a note against for an absolute
+    /// step: the bin's own per-step authored root when the NoteSet template has one, otherwise
+    /// the motif's key root. Shared by the pickup preview (PlayQuantizedNoteForStep) and the
+    /// loop-commit path (InstrumentTrack.CollectionResolution.OnCollectableCollected) so both
+    /// always land on the same pitch for the same note/step.
+    /// </summary>
+    internal int ResolveAuthoredRootForStep(int absStep)
+    {
         int binSize   = Mathf.Max(1, BinSize());
-        int binIdx    = BinIndexForStep(stepIndex);
-        int localStep = ((stepIndex % binSize) + binSize) % binSize;
+        int binIdx    = BinIndexForStep(absStep);
+        int localStep = ((absStep % binSize) + binSize) % binSize;
 
         int authoredRoot = int.MinValue;
         if (_binNoteSets != null && binIdx >= 0 && binIdx < _binNoteSets.Length && _binNoteSets[binIdx] != null)
             authoredRoot = _binNoteSets[binIdx].GetAuthoredRootMidi(localStep);
-        if (authoredRoot == int.MinValue)
-            authoredRoot = GetAuthoredRootMidiExact();
 
-        PlayNote127(QuantizeNoteToBinChord(stepIndex, rawMidi, authoredRoot), durationTicks, velocity);
+        return authoredRoot != int.MinValue ? authoredRoot : GetAuthoredRootMidiExact();
     }
 
     /// <summary>
@@ -280,6 +301,9 @@ public partial class InstrumentTrack
             // encoded in the progression. Octave-fit only if the result is unplayable.
             int shifted = ShiftByOctavesIntoTrackRange(note + rootDelta);
             int retuned = ShiftByOctavesIntoTrackRange(SnapToNearestChordTone(shifted, allowed));
+            if (GameFlowManager.VerboseLogging && retuned != note) Debug.Log(
+                $"[RETUNE_CHANGED] track={name} step={step} bin={bin} noteIn={note} authoredRoot={authoredRoot} " +
+                $"chordRoot={chord.rootNote} rootDelta={rootDelta} retuned={retuned}");
             modified.Add((step, retuned, dur, vel, authoredRoot));
         }
 

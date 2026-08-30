@@ -579,7 +579,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     private int AddNoteToLoop(int stepIndex, int note, int durationTicks, float force, bool lightMarkerNow, int authoredRootMidi = int.MinValue, bool skipChordQuantize = false)
     {
         int qNote = skipChordQuantize ? ShiftByOctavesIntoTrackRange(note) : QuantizeNoteToBinChord(stepIndex, note, authoredRootMidi);
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[COMMIT] track={name} stepAbs={stepIndex} nowDsp={AudioSettings.dspTime:F6} leaderStart={drumTrack.leaderStartDspTime:F6}");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[COMMIT] track={name} stepAbs={stepIndex} rawNote={note} qNote={qNote} skipQuantize={skipChordQuantize} nowDsp={AudioSettings.dspTime:F6} leaderStart={drumTrack.leaderStartDspTime:F6}");
         if (qNote < lowestAllowedNote || qNote > highestAllowedNote)
             Debug.LogError($"[TRK:COMMIT_OOB] track={name} step={stepIndex} rawNote={note} qNote={qNote} range=[{lowestAllowedNote},{highestAllowedNote}] skipQuantize={skipChordQuantize} authoredRoot={authoredRootMidi}\n{System.Environment.StackTrace}");
         persistentLoopNotes.Add((stepIndex, qNote, durationTicks, force, authoredRootMidi));

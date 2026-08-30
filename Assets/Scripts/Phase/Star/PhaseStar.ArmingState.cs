@@ -6,14 +6,10 @@ public partial class PhaseStar
     private IPhaseStarBurstCoordinator _burstCoordinator;
 
     // _awaitingCollectableClear: true while we are blocked waiting for in-flight collectables
-    // to land before re-arming the star. Two independent timers enforce a timeout so a
-    // stalled or destroyed collectable can't lock the star forever:
-    //   • SinceLoop — counts loop boundaries elapsed (reliable in sync with music tempo).
-    //   • SinceDsp  — counts real wall-clock DSP seconds (catches edge cases where loop
-    //                 boundaries stop firing, e.g. if DrumTrack is paused mid-flight).
-    // Both timers start on the first loop boundary that arrives while waiting. -1 means unset.
+    // to land before re-arming the star. A timeout counted in elapsed loop boundaries (reliable
+    // in sync with music tempo) ensures a stalled or destroyed collectable can't lock the star
+    // forever. -1 means unset; starts counting from the first loop boundary that arrives while waiting.
     private int _awaitingCollectableClearSinceLoop = -1;
-    private double _awaitingCollectableClearSinceDsp = -1.0;
 
     private PhaseStarInteractionSnapshot BuildInteractionSnapshot(bool anyCollectablesInFlight = false, bool anyExpansionPending = false)
     {
@@ -240,16 +236,6 @@ public partial class PhaseStar
                 $"[PS:LB/AWAIT.LOOPS] nowLoop={nowLoop} sinceLoop={_awaitingCollectableClearSinceLoop} waitedLoops={waitedLoops} loopsTimeout={CollectableClearTimeoutLoops} -> timedOut={timedOut}");
         }
 
-        if (!timedOut && CollectableClearTimeoutSeconds > 0f)
-        {
-            double nowDsp = AudioSettings.dspTime;
-            if (_awaitingCollectableClearSinceDsp < 0.0)
-                _awaitingCollectableClearSinceDsp = nowDsp;
-
-            if ((nowDsp - _awaitingCollectableClearSinceDsp) >= CollectableClearTimeoutSeconds)
-                timedOut = true;
-        }
-
         if (!timedOut)
         {
             if (GameFlowManager.VerboseLogging) Debug.Log($"[PS:LB/AWAIT] -> continue waiting (not timed out)");
@@ -261,7 +247,6 @@ public partial class PhaseStar
 
         _awaitingCollectableClear = false;
         _awaitingCollectableClearSinceLoop = -1;
-        _awaitingCollectableClearSinceDsp = -1.0;
 
         if (!CanAdvancePhaseNow())
         {

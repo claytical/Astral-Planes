@@ -40,8 +40,10 @@ MonoBehaviour:
     type: 2}
   volumeMultiplier: 1
   minVelocity: 60
-  maxVelocity: 127
+  maxVelocity: 117
   regrowthDelay: 1
+  bombBlastRadiusMul: 2
+  bombPermanentClearRatio01: 0.326
   configSelectionMode: 2
   chordVoiceColors: []
   sameRootAcrossBins: 0

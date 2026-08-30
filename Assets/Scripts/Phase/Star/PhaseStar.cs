@@ -48,9 +48,6 @@ public partial class PhaseStar : MonoBehaviour
 
     private int CollectableClearTimeoutLoops => behaviorProfile ? behaviorProfile.collectableClearTimeoutLoops : 2;
 
-    private float CollectableClearTimeoutSeconds =>
-        behaviorProfile ? behaviorProfile.collectableClearTimeoutSeconds : 0f;
-
     private float ReadyRotSpeedMul => behaviorProfile ? behaviorProfile.readyRotSpeedMul : 2.5f;
 
     [Header("Subcomponents (optional)")] [SerializeField]

@@ -174,9 +174,30 @@ public class NoteSetFactory : MonoBehaviour
     // must pull the riff down with it.
     int delta = targetRoot - authoredAnchor + riff.octaveShift * 12;
 
+    // Fold the WHOLE riff by one consistent number of octaves, chosen to best center the
+    // riff's own transposed span inside the track's playable range, instead of letting each
+    // note independently decide its own fold amount. Per-note folding silently discarded
+    // octaveShift whenever a given note already landed in-range on its own, and scrambled the
+    // composed line's intervals whenever some notes needed an extra fold and others didn't.
+    // Anchoring the fold on the riff's own root alone isn't enough either: a riff whose notes
+    // span well below (or above) that root — like a bass line dipping a tenth under the tonic —
+    // can still leave its far end clamped hard against the range boundary depending on which
+    // chord it lands on, flattening exactly the notes furthest from the root. Centering on the
+    // riff's full authored span (not just its root) keeps that from depending on which chord
+    // this bin happens to land on. Only a riff wider than the track's own range still needs the
+    // final per-note clamp below, and only at its extremes.
+    int riffMinNote = riff.events.Min(e => e.midiNote);
+    int riffMaxNote = riff.events.Max(e => e.midiNote);
+    int spanLo = riffMinNote + delta;
+    int spanHi = riffMaxNote + delta;
+    int spanMid = (spanLo + spanHi) / 2;
+    int rangeMid = (track.lowestAllowedNote + track.highestAllowedNote) / 2;
+    int groupFoldOffset = Mathf.RoundToInt((rangeMid - spanMid) / 12f) * 12;
+
     if (GameFlowManager.VerboseLogging) Debug.Log(
         $"[NoteSetFactory] RIFF TRANSPOSE bin={binIndex} voiceIndex={track.voiceIndex} authoredAnchor={authoredAnchor} " +
-        $"chordRoot={targetChord.rootNote} chordToneOffset={chordToneOffset} targetRoot={targetRoot} delta={delta} (riff.authoredRootMidi was {riff.authoredRootMidi})"
+        $"chordRoot={targetChord.rootNote} chordToneOffset={chordToneOffset} targetRoot={targetRoot} delta={delta} " +
+        $"groupFoldOffset={groupFoldOffset} (riff.authoredRootMidi was {riff.authoredRootMidi})"
     );
 
     var ordered = riff.events.OrderBy(e => e.step).ToList();
@@ -189,9 +210,7 @@ public class NoteSetFactory : MonoBehaviour
         int step = e.step;
         if (step < 0 || step >= totalSteps) continue;
 
-        // Hybrid rule: the exact transposed note wins whenever it is playable;
-        // only out-of-range notes get octave-shifted (per note, final note only).
-        int midi = ShiftIntoRange(e.midiNote + delta, track.lowestAllowedNote, track.highestAllowedNote);
+        int midi = Mathf.Clamp(e.midiNote + delta + groupFoldOffset, track.lowestAllowedNote, track.highestAllowedNote);
 
         int durTicks = Mathf.Max(ticksPerStep, e.durSteps * ticksPerStep);
         float vel127 = Mathf.Clamp01(e.velocity01) * 127f;

@@ -15,7 +15,6 @@ MonoBehaviour:
   starKeepsDustClear: 1
   starKeepClearRadiusCells: 3
   collectableClearTimeoutLoops: 2
-  collectableClearTimeoutSeconds: 0
   starDriftSpeed: 0.5
   starHungrySpeed: 1.1
   starDriftJitter: 0.2

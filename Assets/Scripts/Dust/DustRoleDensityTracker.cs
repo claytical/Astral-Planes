@@ -91,8 +91,12 @@ public sealed class DustRoleDensityTracker
         if (_roleProfileByVoice.TryGetValue(key, out var p) && p != null) return p;
         // TEMP DIAGNOSTIC: pin down the dust-color-drift-on-regrow report. Should be rare —
         // fires only when this voice was never (or no longer) in the motif's active-voice cache.
-        Debug.LogWarning($"[DustRoleDensityTracker] GetResolvedRoleProfile cache MISS for {key} " +
-            $"(cachedVoices=[{string.Join(",", _roleProfileByVoice.Keys)}]) — falling back to MusicalRoleProfileLibrary.");
+        // None is excluded: generic-fill/force-gray cells legitimately resolve here on every
+        // regrow (None is never in the active-voice cache by construction), so warning here
+        // would just be permanent, expected log noise rather than a diagnostic signal.
+        if (key.role != MusicalRole.None)
+            Debug.LogWarning($"[DustRoleDensityTracker] GetResolvedRoleProfile cache MISS for {key} " +
+                $"(cachedVoices=[{string.Join(",", _roleProfileByVoice.Keys)}]) — falling back to MusicalRoleProfileLibrary.");
         return MusicalRoleProfileLibrary.GetProfile(key.role);
     }
 

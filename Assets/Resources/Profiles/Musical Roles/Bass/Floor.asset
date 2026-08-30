@@ -42,6 +42,8 @@ MonoBehaviour:
   minVelocity: 60
   maxVelocity: 127
   regrowthDelay: 2.5
+  bombBlastRadiusMul: 3
+  bombPermanentClearRatio01: 0.399
   configSelectionMode: 2
   chordVoiceColors: []
   sameRootAcrossBins: 0

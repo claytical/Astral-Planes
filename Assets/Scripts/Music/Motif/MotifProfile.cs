@@ -62,8 +62,14 @@ public class MotifProfile : ScriptableObject
     [Tooltip("Per-role geographic feature overrides. When empty, feature defaults are derived from mazePattern.patternType (e.g. RingChokepoints → Rings, DrunkenStrokes → Archipelago). Add entries here only to break the natural pairing.")]
     public List<MazeRoleGeoConfig> roleGeoConfigs = new();
 
-    [Range(0f, 1f), Tooltip("Exact-count mode only: fraction of leftover (unclaimed) cells that become permanent filler dust — never regrows for the rest of this motif, darker gray. The remainder regrows normally on the standard cadence with the ordinary gray tint. Ignored when no role in roleGeoConfigs uses exact-count sizing.")]
+    [Range(0f, 1f), Tooltip("Fraction of filler cells (from genericFillRatio01's universal reservation, and/or exact-count mode's leftover cells) that become permanent filler dust — never regrows for the rest of this motif, darker gray. The remainder regrows normally on the standard cadence with the ordinary gray tint.")]
     public float genericFillNeverRegrowRatio = 1f;
+
+    [Range(0f, 1f), Tooltip("Fraction of ALL occupied maze cells — every generation mode (default Voronoi, single-voice, exact-count) — reserved as generic filler BEFORE role-territory assignment runs. 0 = no universal filler (default; existing motifs unaffected). Composes additively with exact-count mode's own per-voice leftover-becomes-filler math: cells reserved here are removed from the pool exact-count voices claim from, so an exact-count motif can end up with MORE total filler than this ratio alone implies. Split into never-regrow/quick-regrow sub-types via genericFillNeverRegrowRatio, same as exact-count leftover.")]
+    public float genericFillRatio01 = 0f;
+
+    [Range(0f, 1f), Tooltip("Additional multiplier applied to carve/drain resistance ON TOP OF the already-softer None baseline (CosmicDustGeneratorConfig.noneCarveResistance01/noneDrainResistance01), applied ONLY when a generic-fill cell (hiddenRoleIsGenericFill) regrows back to None. Role-tinted regrowth is never affected. 1 = no extra softening (default).")]
+    public float genericFillRegrowSoftenMultiplier01 = 1f;
 
     [Header("Harmony")]
     [Tooltip("Chord progression used while this motif is active.")]

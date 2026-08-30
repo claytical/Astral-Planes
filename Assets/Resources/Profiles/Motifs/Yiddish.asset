@@ -51,11 +51,13 @@ MonoBehaviour:
   bpm: 160
   stepsPerLoop: 32
   phraseLengthLoopsOverride: 0
-  nodesPerStar: 12
+  nodesPerStar: 8
   starBehavior: {fileID: 11400000, guid: 9dd08ed983d384107aaff4f28fa8803d, type: 2}
   mazePattern: {fileID: 11400000, guid: 48fdff80018f043e3aab3afff01f7e46, type: 2}
   roleGeoConfigs: []
-  genericFillNeverRegrowRatio: 1
+  genericFillNeverRegrowRatio: 0.523
+  genericFillRatio01: 0.519
+  genericFillRegrowSoftenMultiplier01: 1
   chordProgression: {fileID: 11400000, guid: 1b9beaba57f834469ac1482d07ad9210, type: 2}
   alternateChordProgressionProfile: {fileID: 11400000, guid: e7e83b9a382cd456a99566c339aaadc1,
     type: 2}

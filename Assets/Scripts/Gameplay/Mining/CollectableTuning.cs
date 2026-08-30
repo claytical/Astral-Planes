@@ -207,6 +207,18 @@ public sealed class BombParams
     [Tooltip("Peak alpha the blast-radius telegraph ring reaches at fuse end. The ring is sized to the true blast radius throughout the fuse (unlike the body/particle swell, which is a fixed cosmetic multiplier), so this is the player's actual read on the danger zone.")]
     [Range(0f, 1f)] public float telegraphMaxAlpha = 0.35f;
 
+    [Tooltip("Color the telegraph ring and blast-footprint overlay sit at when urgency is 0 (more than dangerWindowSeconds remain before detonation). Lerped toward warningColor as urgency rises.")]
+    public Color calmColor = new Color(0.05f, 0.05f, 0.08f, 0.9f);
+
+    [Tooltip("Seconds before detonation during which the ring/overlay ramp from calm to full warning intensity. Outside this window (more than this many seconds remain) everything sits at the calm baseline regardless of total fuse length. A fuse shorter than this starts already partway (or fully) urgent — there's no time to be calm about it.")]
+    public float dangerWindowSeconds = 2.5f;
+
+    [Tooltip("Alpha of the interior blast-footprint overlay the instant the bomb arms (urgency01 = 0) — kept above 0 so the true blast radius is visible immediately, unlike the ring, which stays fully invisible until urgency rises.")]
+    [Range(0f, 1f)] public float overlayMinAlpha = 0.12f;
+
+    [Tooltip("Alpha of the interior blast-footprint overlay at full urgency (about to detonate).")]
+    [Range(0f, 1f)] public float overlayMaxAlpha = 0.55f;
+
     [Tooltip("Pulse frequency (Hz) of the telegraph ring — independent of the body's ramping pulse.")]
     public float telegraphPulseHz = 1.5f;
 
@@ -231,6 +243,9 @@ public sealed class BombParams
         detonationFlashSeconds = Mathf.Max(0.01f, detonationFlashSeconds);
         implosionSeconds = Mathf.Max(0.01f, implosionSeconds);
         telegraphMaxAlpha = Mathf.Clamp01(telegraphMaxAlpha);
+        dangerWindowSeconds = Mathf.Max(0.05f, dangerWindowSeconds);
+        overlayMinAlpha = Mathf.Clamp01(overlayMinAlpha);
+        overlayMaxAlpha = Mathf.Clamp(overlayMaxAlpha, overlayMinAlpha, 1f);
         telegraphPulseHz = Mathf.Max(0.01f, telegraphPulseHz);
         telegraphPulseMin = Mathf.Clamp(telegraphPulseMin, 0.5f, 1f);
         knockbackImpulse = Mathf.Max(0f, knockbackImpulse);

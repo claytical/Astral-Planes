@@ -11,6 +11,8 @@ public partial class CosmicDustGenerator
     private MazePatternType _activePatternType = MazePatternType.FullFill;
     private DustMotifDensitySnapshot _densitySnapshot;
     private float _genericFillNeverRegrowRatio = 1f;
+    private float _genericFillRatio01 = 0f;
+    private float _genericFillRegrowSoftenMultiplier01 = 1f;
 
     public void ApplyMotifGeoConfig(MotifProfile motif, IReadOnlyList<InstrumentTrack> tracks = null)
     {
@@ -19,11 +21,17 @@ public partial class CosmicDustGenerator
             : null;
         _activePatternType = motif?.mazePattern?.patternType ?? MazePatternType.FullFill;
         _genericFillNeverRegrowRatio = motif != null ? Mathf.Clamp01(motif.genericFillNeverRegrowRatio) : 1f;
+        _genericFillRatio01 = motif != null ? Mathf.Clamp01(motif.genericFillRatio01) : 0f;
+        _genericFillRegrowSoftenMultiplier01 = motif != null ? Mathf.Clamp01(motif.genericFillRegrowSoftenMultiplier01) : 1f;
         _densitySnapshot = MotifNoteDensityAnalyzer.Analyze(
             motif,
             tracks,
             config != null ? config.minNotesPerBinPerVoice : 2f,
-            config != null ? config.maxNotesPerBinPerVoice : 16f);
+            config != null ? config.maxNotesPerBinPerVoice : 16f,
+            config != null ? config.minBpmForDensity : 80f,
+            config != null ? config.maxBpmForDensity : 160f,
+            config != null ? config.noteDensityWeight : 1f,
+            config != null ? config.bpmDensityWeight : 0f);
     }
 
     private float GetWeightNorm01ByVoice(RoleVoiceKey voice) =>
@@ -234,14 +242,16 @@ public partial class CosmicDustGenerator
             {
                 role               = MusicalRole.None,
                 color              = config.mazeTint,
-                carveResistance01  = 0f,
-                drainResistance01  = 0f,
-                maxEnergyUnits     = 1,
+                carveResistance01  = config.noneCarveResistance01,
+                drainResistance01  = config.noneDrainResistance01,
+                maxEnergyUnits     = config.noneMaxEnergyUnits,
                 healDelay          = 0f
             };
         }
 
         var occupied = BuildOccupiedCells(cells);
+        if (_genericFillRatio01 > 0f && occupied.Count > 0)
+            occupied = ReserveUniversalGenericFill(occupied);
 
         List<RoleVoiceKey> exactVoices = null;
         for (int i = 0; i < voicesList.Count; i++)
@@ -360,6 +370,34 @@ public partial class CosmicDustGenerator
             string summary = string.Join(", ", counts.Select(kv => $"{kv.Key}={kv.Value}"));
             Debug.Log($"[MAZE] BuildMazeRoleImprints: exact-count mode, cells={occupied.Count}, claimed=({summary}), generic(None)={unclaimed.Count} (neverRegrow={neverRegrowCount}, quickRegrow={unclaimed.Count - neverRegrowCount})");
         }
+    }
+
+    // Universal filler pre-step: runs before role assignment in every mode (default Voronoi,
+    // single-voice, exact-count). Uses the same Fisher-Yates-shuffle-then-take-N idiom as the
+    // exact-count leftover split (below) rather than a seed+claim scatter (PickFarthestSeeds/
+    // SelectRoleSeedsWithGeo), since those produce contiguous blob territories — the wrong shape
+    // for isolated stippled filler cells.
+    private List<Vector2Int> ReserveUniversalGenericFill(List<Vector2Int> occupied)
+    {
+        var pool = new List<Vector2Int>(occupied);
+        for (int s = pool.Count - 1; s > 0; s--)
+        {
+            int r = Random.Range(0, s + 1);
+            (pool[s], pool[r]) = (pool[r], pool[s]);
+        }
+
+        int fillCount = Mathf.Clamp(Mathf.RoundToInt(occupied.Count * _genericFillRatio01), 0, occupied.Count);
+        int neverRegrowCount = Mathf.Clamp(Mathf.RoundToInt(fillCount * _genericFillNeverRegrowRatio), 0, fillCount);
+
+        for (int i = 0; i < fillCount; i++)
+        {
+            bool neverRegrow = i < neverRegrowCount;
+            _imprints.SetHiddenRoleGenericFill(pool[i], neverRegrow ? config.genericFillTint : config.mazeTint, neverRegrow);
+        }
+
+        var remaining = new List<Vector2Int>(occupied.Count - fillCount);
+        for (int i = fillCount; i < pool.Count; i++) remaining.Add(pool[i]);
+        return remaining;
     }
 
     // Greedy farthest-point seeding scoped to an arbitrary cell pool: first seed is farthest from
@@ -518,21 +556,46 @@ public partial class CosmicDustGenerator
         // Desired slot count per voice, then interleaved round-robin (not appended as sequential
         // per-voice blocks) so that if occupied.Count ever truncates the list below, every active
         // voice loses slots evenly instead of the last voice in voicesList order losing all of its own.
+        //
+        // The seed BUDGET itself is a per-ROLE quantity (seedCount/density banding is authored/
+        // computed at role granularity), so a role with multiple ByVoice voices (e.g. a 3-voice
+        // chord Rhythm part) must not get that budget applied once per voice — that would give it
+        // 3x the territory of a single-voice role for the same authored/density-implied budget.
+        // Compute the total once per distinct role, then split it as evenly as possible across
+        // that role's own voices. (The dedicated Ridge seeding pass below still grants a flat 2
+        // seeds per Ridge voice independent of this array — a similar latent fan-out risk for a
+        // multi-voice Ridge role, not fixed here since no current content hits it.)
+        var voiceCountByRole = new Dictionary<MusicalRole, int>();
+        foreach (var v in voicesList)
+            voiceCountByRole[v.role] = voiceCountByRole.TryGetValue(v.role, out var c) ? c + 1 : 1;
+
+        var roleTotals = new Dictionary<MusicalRole, int>();
+        var roleVoiceOrdinal = new Dictionary<MusicalRole, int>();
         var desiredCounts = new int[voicesList.Count];
         for (int vi = 0; vi < voicesList.Count; vi++)
         {
             var voice = voicesList[vi];
             int roleIdx = roleIndexByRole[voice.role];
-            MazeGeoFeature feature = ResolveGeoFeature(voice.role, roleIdx);
-            MazeRoleGeoConfig cfg = ResolveGeoConfig(voice.role);
-            desiredCounts[vi] = feature switch
+
+            if (!roleTotals.TryGetValue(voice.role, out int roleTotal))
             {
-                MazeGeoFeature.Archipelago => cfg != null
-                    ? Mathf.Clamp(cfg.seedCount, 2, 8)
-                    : Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(2, 8, GetWeightNorm01ByVoice(voice))), 2, 8),
-                MazeGeoFeature.Ridge => 2,
-                _ => 1,
-            };
+                MazeGeoFeature feature = ResolveGeoFeature(voice.role, roleIdx);
+                MazeRoleGeoConfig cfg = ResolveGeoConfig(voice.role);
+                roleTotal = feature switch
+                {
+                    MazeGeoFeature.Archipelago => cfg != null
+                        ? Mathf.Clamp(cfg.seedCount, 2, 8)
+                        : Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(2, 8, GetWeightNorm01ByRole(voice.role))), 2, 8),
+                    MazeGeoFeature.Ridge => 2,
+                    _ => 1,
+                };
+                roleTotals[voice.role] = roleTotal;
+            }
+
+            int voiceCount = voiceCountByRole[voice.role];
+            int ordinal = roleVoiceOrdinal.TryGetValue(voice.role, out var o) ? o : 0;
+            roleVoiceOrdinal[voice.role] = ordinal + 1;
+            desiredCounts[vi] = roleTotal / voiceCount + (ordinal < roleTotal % voiceCount ? 1 : 0);
         }
         int maxCount = desiredCounts.Length > 0 ? desiredCounts.Max() : 0;
         var slotVoices = new List<RoleVoiceKey>();
@@ -667,6 +730,15 @@ public partial class CosmicDustGenerator
         var pendingReassignments = new List<(Vector2Int cell, RoleVoiceKey newVoice)>();
         var roleIndexByRole = BuildRoleIndexByRole(voicesList);
 
+        // Same per-role-budget-then-split rationale as SelectRoleSeedsWithGeo's desiredCounts:
+        // a Glade role's clearing count is authored/computed at role granularity, so a multi-voice
+        // (ByVoice) role must not give away that many clearings PER voice.
+        var voiceCountByRole = new Dictionary<MusicalRole, int>();
+        foreach (var v in voicesList)
+            voiceCountByRole[v.role] = voiceCountByRole.TryGetValue(v.role, out var c) ? c + 1 : 1;
+        var gladeRoleTotals = new Dictionary<MusicalRole, int>();
+        var gladeRoleOrdinal = new Dictionary<MusicalRole, int>();
+
         for (int vi = 0; vi < voicesList.Count; vi++)
         {
             RoleVoiceKey voice = voicesList[vi];
@@ -730,8 +802,18 @@ public partial class CosmicDustGenerator
                 // Glade means yielding territory to another role, so — inverted vs. Island/
                 // Archipelago's radius growth — a busy/dominant voice yields LESS (fewer, smaller
                 // clearings) while a sparse voice yields more.
+                if (!gladeRoleTotals.TryGetValue(voice.role, out int gladeRoleTotal))
+                {
+                    float gladeRoleWeight = GetWeightNorm01ByRole(voice.role);
+                    gladeRoleTotal = cfg != null ? cfg.gladeCount : Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(4, 1, gladeRoleWeight)), 1, 4);
+                    gladeRoleTotals[voice.role] = gladeRoleTotal;
+                }
+                int gladeVoiceCount = voiceCountByRole[voice.role];
+                int gladeOrdinal = gladeRoleOrdinal.TryGetValue(voice.role, out var go) ? go : 0;
+                gladeRoleOrdinal[voice.role] = gladeOrdinal + 1;
+                int gladeCount2 = gladeRoleTotal / gladeVoiceCount + (gladeOrdinal < gladeRoleTotal % gladeVoiceCount ? 1 : 0);
+
                 float gladeWeight = GetWeightNorm01ByVoice(voice);
-                int gladeCount2 = cfg != null ? cfg.gladeCount : Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(4, 1, gladeWeight)), 1, 4);
                 float gladeRadius2 = cfg != null ? cfg.gladeRadius : Mathf.Lerp(4f, 2f, gladeWeight);
                 float gladeRadiusSq = gladeRadius2 * gladeRadius2;
 

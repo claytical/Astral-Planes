@@ -25,7 +25,7 @@ public partial class InstrumentTrack
         SnapshotBurstLeaderBins(collectable.burstId, finalTargetStep);
 
         int note = collectable.GetNote();
-        CollectNote(vehicle, finalTargetStep, note, durationTicks, force, ResolveAuthoredRootMidi(finalTargetStep, note));
+        CollectNote(vehicle, finalTargetStep, note, durationTicks, force, ResolveAuthoredRootForStep(finalTargetStep));
 
         int targetBin = BinIndexForStep(finalTargetStep);
         if (GameFlowManager.VerboseLogging) Debug.Log($"[CURSOR] Target Bin={targetBin} binCursor: {_binCursor} allocated: {binAllocated} filled: {_binFilled}");
@@ -41,24 +41,6 @@ public partial class InstrumentTrack
             if (_currentBurstRemaining == 0)
                 _currentBurstArmed = false;
         }
-    }
-
-    private int ResolveAuthoredRootMidi(int finalTargetStep, int note)
-    {
-        int authoredRootMidi = LookUpAuthoredRootMidi(finalTargetStep);
-        if (authoredRootMidi != int.MinValue) return authoredRootMidi;
-
-        int resolveBin = BinIndexForStep(finalTargetStep);
-        var resolveNs  = GetNoteSetForBin(resolveBin);
-        if (resolveNs?.chordRegion != null && resolveNs.chordRegion.Count > 0)
-            return resolveNs.chordRegion[ResolveChordRegionIndex(resolveBin, resolveNs.chordRegion.Count)].rootNote;
-
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        int chordIdx = Harmony_GetChordIndexForBin(resolveBin);
-        if (chordIdx >= 0 && _gfm?.harmony != null && _gfm.harmony.TryGetChordAt(chordIdx, out var chord))
-            return chord.rootNote;
-
-        return GetAuthoredRootMidiExact();
     }
 
     private void FinalizeAutoCollect(Collectable collectable, int targetBin)
@@ -383,17 +365,6 @@ public partial class InstrumentTrack
         if (state.leaderBins != 0) return; // already snapshotted
         state.leaderBins = controller != null ? Mathf.Max(1, controller.GetMaxLoopMultiplier()) : loopMultiplier;
         state.wroteBin = BinIndexForStep(targetStep);
-    }
-
-    // Looks up the authored MIDI root stored in the per-bin NoteSet for a given absolute step.
-    // Returns int.MinValue when no bin-specific NoteSet exists (caller uses default quantization).
-    private int LookUpAuthoredRootMidi(int finalTargetStep)
-    {
-        int binIdx = BinIndexForStep(finalTargetStep);
-        int localStep = finalTargetStep % Mathf.Max(1, BinSize());
-        if (_binNoteSets != null && binIdx >= 0 && binIdx < _binNoteSets.Length && _binNoteSets[binIdx] != null)
-            return _binNoteSets[binIdx].GetAuthoredRootMidi(localStep);
-        return int.MinValue;
     }
 
     // Increments the per-burst collection counter and pushes the playhead energy UI.

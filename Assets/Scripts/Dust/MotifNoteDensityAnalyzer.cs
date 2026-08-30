@@ -41,13 +41,20 @@ public static class MotifNoteDensityAnalyzer
         MotifProfile motif,
         IReadOnlyList<InstrumentTrack> tracks,
         float minNotesPerBinPerVoice,
-        float maxNotesPerBinPerVoice)
+        float maxNotesPerBinPerVoice,
+        float minBpmForDensity,
+        float maxBpmForDensity,
+        float noteDensityWeight,
+        float bpmDensityWeight)
     {
         var snapshot = new DustMotifDensitySnapshot();
 
         var voices = motif?.GetActiveVoices();
         if (voices == null || voices.Count == 0 || tracks == null || tracks.Count == 0)
+        {
+            snapshot.MotifBusyness01 = BlendBusyness01(0f, motif, minBpmForDensity, maxBpmForDensity, noteDensityWeight, bpmDensityWeight);
             return snapshot;
+        }
 
         var avgByVoice = new Dictionary<RoleVoiceKey, float>(voices.Count);
         foreach (var voice in voices)
@@ -57,7 +64,11 @@ public static class MotifNoteDensityAnalyzer
             avgByVoice[voice] = AverageNoteCount(track);
         }
 
-        if (avgByVoice.Count == 0) return snapshot;
+        if (avgByVoice.Count == 0)
+        {
+            snapshot.MotifBusyness01 = BlendBusyness01(0f, motif, minBpmForDensity, maxBpmForDensity, noteDensityWeight, bpmDensityWeight);
+            return snapshot;
+        }
 
         foreach (var kv in avgByVoice) snapshot.AvgNoteCountByVoice[kv.Key] = kv.Value;
 
@@ -65,10 +76,11 @@ public static class MotifNoteDensityAnalyzer
         foreach (var kv in avgByVoice) sum += kv.Value;
         float motifMean = sum / avgByVoice.Count;
 
-        snapshot.MotifBusyness01 = UnityEngine.Mathf.Clamp01(
+        float noteBusyness01 = UnityEngine.Mathf.Clamp01(
             maxNotesPerBinPerVoice > minNotesPerBinPerVoice
                 ? UnityEngine.Mathf.InverseLerp(minNotesPerBinPerVoice, maxNotesPerBinPerVoice, motifMean)
                 : 0.5f);
+        snapshot.MotifBusyness01 = BlendBusyness01(noteBusyness01, motif, minBpmForDensity, maxBpmForDensity, noteDensityWeight, bpmDensityWeight);
 
         foreach (var kv in avgByVoice)
         {
@@ -94,6 +106,22 @@ public static class MotifNoteDensityAnalyzer
         }
 
         return snapshot;
+    }
+
+    // Blends melodic/harmonic note-density busyness with a drum-tempo (bpm) busyness proxy into
+    // the single scalar every downstream maze-density formula reads. bpmDensityWeight=0 (default)
+    // collapses this to noteBusyness01 exactly, reproducing pre-existing behavior.
+    private static float BlendBusyness01(
+        float noteBusyness01, MotifProfile motif,
+        float minBpmForDensity, float maxBpmForDensity,
+        float noteDensityWeight, float bpmDensityWeight)
+    {
+        float bpm = motif != null ? motif.bpm : 0f;
+        float bpmBusyness01 = (maxBpmForDensity > minBpmForDensity && bpm > 0f)
+            ? UnityEngine.Mathf.Clamp01(UnityEngine.Mathf.InverseLerp(minBpmForDensity, maxBpmForDensity, bpm))
+            : 0.5f;
+        float wSum = UnityEngine.Mathf.Max(0.0001f, noteDensityWeight + bpmDensityWeight);
+        return UnityEngine.Mathf.Clamp01((noteBusyness01 * noteDensityWeight + bpmBusyness01 * bpmDensityWeight) / wSum);
     }
 
     private static float AverageNoteCount(InstrumentTrack track)
