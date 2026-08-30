@@ -21,7 +21,12 @@ public partial class CosmicDustGenerator
             : null;
         _activePatternType = motif?.mazePattern?.patternType ?? MazePatternType.FullFill;
         _genericFillNeverRegrowRatio = motif != null ? Mathf.Clamp01(motif.genericFillNeverRegrowRatio) : 1f;
-        _genericFillRatio01 = motif != null ? Mathf.Clamp01(motif.genericFillRatio01) : 0f;
+        // Composed with the maze pattern's own floor (never below it, motif authoring can only add
+        // more gray) rather than read from _activeMazePattern — that field is set later in
+        // GenerateMazeForPhaseWithPaths, so reading motif.mazePattern directly here avoids any
+        // ordering dependency between the two independent call sites.
+        float patternFloor = motif?.mazePattern != null ? Mathf.Clamp01(motif.mazePattern.minGenericFillRatio01) : 0f;
+        _genericFillRatio01 = Mathf.Max(motif != null ? Mathf.Clamp01(motif.genericFillRatio01) : 0f, patternFloor);
         _genericFillRegrowSoftenMultiplier01 = motif != null ? Mathf.Clamp01(motif.genericFillRegrowSoftenMultiplier01) : 1f;
         _densitySnapshot = MotifNoteDensityAnalyzer.Analyze(
             motif,
@@ -58,7 +63,11 @@ public partial class CosmicDustGenerator
             MazePatternType.RingChokepoints => MazeGeoFeature.Rings,
             MazePatternType.DrunkenStrokes  => MazeGeoFeature.Archipelago,
             MazePatternType.DiagonalLanes   => MazeGeoFeature.Archipelago,
-            MazePatternType.ClearBoxes      => roleIndex == 0 ? MazeGeoFeature.Glade : DensityRankFeature(role),
+            // ClearBoxes deliberately has no roleIndex==0 special-case (unlike Tunnels below):
+            // Glade actively donates territory to whichever active role has the lowest carve
+            // resistance, so auto-selecting it for "whichever role happens to be listed first"
+            // silently starved that role regardless of its actual note density. Glade remains
+            // available, just opt-in only via an authored MazeRoleGeoConfig entry.
             MazePatternType.Tunnels         => roleIndex == 0 ? MazeGeoFeature.Ridge : DensityRankFeature(role),
             _                               => DensityRankFeature(role),
         };
@@ -250,8 +259,13 @@ public partial class CosmicDustGenerator
         }
 
         var occupied = BuildOccupiedCells(cells);
+        int reservedFloorCount = 0;
         if (_genericFillRatio01 > 0f && occupied.Count > 0)
+        {
+            int preReservationCount = occupied.Count;
             occupied = ReserveUniversalGenericFill(occupied);
+            reservedFloorCount = preReservationCount - occupied.Count;
+        }
 
         List<RoleVoiceKey> exactVoices = null;
         for (int i = 0; i < voicesList.Count; i++)
@@ -260,7 +274,7 @@ public partial class CosmicDustGenerator
 
         if (exactVoices != null && exactVoices.Count > 0)
         {
-            ClaimExactCountTerritoryAndFillGeneric(occupied, exactVoices, starCell);
+            ClaimExactCountTerritoryAndFillGeneric(occupied, exactVoices, starCell, reservedFloorCount);
             ApplyHiddenColorPreview(occupied);
             return;
         }
@@ -306,48 +320,43 @@ public partial class CosmicDustGenerator
     // cells nearest to a set of greedily-spread seed points, instead of Voronoi-partitioning the
     // whole maze. Every cell left over once all exact voices have claimed their share — including
     // whatever non-exact active roles would otherwise have taken — becomes generic None dust.
+    //
+    // Two passes, not one: if combined density-driven demand exceeds the shared pool, claiming
+    // strictly in exactVoices order would let a voice listed later come up short of even its own
+    // authored minCellCount floor. Pass 1 lets every voice claim its floor first, in list order,
+    // before any voice's (possibly much larger) multiplier-driven demand can exhaust the pool.
+    // Pass 2 then claims each voice's remaining demand from what's left, same as before.
     private void ClaimExactCountTerritoryAndFillGeneric(
         List<Vector2Int> occupied,
         List<RoleVoiceKey> exactVoices,
-        Vector2Int starCell)
+        Vector2Int starCell,
+        int reservedFloorCount = 0)
     {
         var unclaimed = new List<Vector2Int>(occupied);
         var counts = new Dictionary<RoleVoiceKey, int>();
         Vector2 gridCenter = ComputeBoundsCenter(occupied);
+
+        foreach (var voice in exactVoices) counts[voice] = 0;
+
+        foreach (var voice in exactVoices)
+        {
+            TryGetGeoConfig(voice.role, out var cfg);
+            int floorWant = cfg != null ? Mathf.Min(cfg.minCellCount, unclaimed.Count) : 0;
+            if (floorWant <= 0 || unclaimed.Count == 0) continue;
+
+            counts[voice] += ClaimNearestCells(voice, cfg, floorWant, unclaimed, gridCenter, starCell, occupied.Count);
+        }
 
         foreach (var voice in exactVoices)
         {
             TryGetGeoConfig(voice.role, out var cfg);
             float avgCount = _densitySnapshot?.GetAvgNoteCount(voice) ?? 0f;
             float multiplier = cfg != null ? cfg.notesToCellsMultiplier : 1f;
-            int targetCount = Mathf.Clamp(Mathf.RoundToInt(avgCount * multiplier), 0, unclaimed.Count);
-            counts[voice] = 0;
-            if (targetCount <= 0 || unclaimed.Count == 0) continue;
+            int targetCount = Mathf.Clamp(Mathf.RoundToInt(avgCount * multiplier), 0, occupied.Count);
+            int remaining = Mathf.Min(Mathf.Max(0, targetCount - counts[voice]), unclaimed.Count);
+            if (remaining <= 0 || unclaimed.Count == 0) continue;
 
-            int seedCount = (cfg != null && cfg.feature == MazeGeoFeature.Archipelago)
-                ? Mathf.Clamp(cfg.seedCount, 1, unclaimed.Count)
-                : 1;
-
-            var seedPool = unclaimed;
-            float density = occupied.Count > 0 ? (float)targetCount / occupied.Count : 0f;
-            if (cfg != null && cfg.centerBiasFraction01 > 0f && density >= cfg.centerBiasMinDensity01)
-            {
-                var byCenterDist = new List<Vector2Int>(unclaimed);
-                byCenterDist.Sort((a, b) =>
-                    ((Vector2)a - gridCenter).sqrMagnitude.CompareTo(((Vector2)b - gridCenter).sqrMagnitude));
-                int keep = Mathf.Clamp(Mathf.RoundToInt(unclaimed.Count * cfg.centerBiasFraction01), seedCount, unclaimed.Count);
-                seedPool = byCenterDist.GetRange(0, keep);
-            }
-
-            var seeds = PickFarthestSeeds(seedPool, starCell, seedCount);
-
-            unclaimed.Sort((a, b) => MinSqrDistToAny(a, seeds).CompareTo(MinSqrDistToAny(b, seeds)));
-
-            int claim = Mathf.Min(targetCount, unclaimed.Count);
-            for (int i = 0; i < claim; i++)
-                _imprints.SetHiddenRole(unclaimed[i], voice.role, voice.voiceIndex);
-            counts[voice] = claim;
-            unclaimed.RemoveRange(0, claim);
+            counts[voice] += ClaimNearestCells(voice, cfg, remaining, unclaimed, gridCenter, starCell, occupied.Count);
         }
 
         // Shuffle before splitting so the never-regrow/quick-regrow sub-types interleave
@@ -368,8 +377,54 @@ public partial class CosmicDustGenerator
         if (GameFlowManager.VerboseLogging)
         {
             string summary = string.Join(", ", counts.Select(kv => $"{kv.Key}={kv.Value}"));
-            Debug.Log($"[MAZE] BuildMazeRoleImprints: exact-count mode, cells={occupied.Count}, claimed=({summary}), generic(None)={unclaimed.Count} (neverRegrow={neverRegrowCount}, quickRegrow={unclaimed.Count - neverRegrowCount})");
+            int totalCells = occupied.Count + reservedFloorCount;
+            int totalGray = unclaimed.Count + reservedFloorCount;
+            float totalGrayFrac01 = totalCells > 0 ? (float)totalGray / totalCells : 0f;
+            Debug.Log($"[MAZE] BuildMazeRoleImprints: exact-count mode, cells={occupied.Count}, claimed=({summary}), " +
+                $"generic(None)={unclaimed.Count} (neverRegrow={neverRegrowCount}, quickRegrow={unclaimed.Count - neverRegrowCount}), " +
+                $"totalGray={totalGray}/{totalCells} ({totalGrayFrac01:P0}) [reservedFloor={reservedFloorCount}, leftover={unclaimed.Count}]");
         }
+    }
+
+    // Shared by both ClaimExactCountTerritoryAndFillGeneric passes: claims up to wantCount cells
+    // nearest a freshly-picked seed set for one voice, removes them from unclaimed, and writes
+    // their hidden-role imprint. totalOccupiedCount is the pre-claim pool size (not unclaimed.Count,
+    // which shrinks across calls) so centerBias density reads consistently in both passes.
+    private int ClaimNearestCells(
+        RoleVoiceKey voice,
+        MazeRoleGeoConfig cfg,
+        int wantCount,
+        List<Vector2Int> unclaimed,
+        Vector2 gridCenter,
+        Vector2Int starCell,
+        int totalOccupiedCount)
+    {
+        if (wantCount <= 0 || unclaimed.Count == 0) return 0;
+
+        int seedCount = (cfg != null && cfg.feature == MazeGeoFeature.Archipelago)
+            ? Mathf.Clamp(cfg.seedCount, 1, unclaimed.Count)
+            : 1;
+
+        var seedPool = unclaimed;
+        float density = totalOccupiedCount > 0 ? (float)wantCount / totalOccupiedCount : 0f;
+        if (cfg != null && cfg.centerBiasFraction01 > 0f && density >= cfg.centerBiasMinDensity01)
+        {
+            var byCenterDist = new List<Vector2Int>(unclaimed);
+            byCenterDist.Sort((a, b) =>
+                ((Vector2)a - gridCenter).sqrMagnitude.CompareTo(((Vector2)b - gridCenter).sqrMagnitude));
+            int keep = Mathf.Clamp(Mathf.RoundToInt(unclaimed.Count * cfg.centerBiasFraction01), seedCount, unclaimed.Count);
+            seedPool = byCenterDist.GetRange(0, keep);
+        }
+
+        var seeds = PickFarthestSeeds(seedPool, starCell, seedCount);
+
+        unclaimed.Sort((a, b) => MinSqrDistToAny(a, seeds).CompareTo(MinSqrDistToAny(b, seeds)));
+
+        int claim = Mathf.Min(wantCount, unclaimed.Count);
+        for (int i = 0; i < claim; i++)
+            _imprints.SetHiddenRole(unclaimed[i], voice.role, voice.voiceIndex);
+        unclaimed.RemoveRange(0, claim);
+        return claim;
     }
 
     // Universal filler pre-step: runs before role assignment in every mode (default Voronoi,
@@ -397,6 +452,15 @@ public partial class CosmicDustGenerator
 
         var remaining = new List<Vector2Int>(occupied.Count - fillCount);
         for (int i = fillCount; i < pool.Count; i++) remaining.Add(pool[i]);
+
+        if (GameFlowManager.VerboseLogging)
+        {
+            float fillFrac01 = occupied.Count > 0 ? (float)fillCount / occupied.Count : 0f;
+            Debug.Log($"[MAZE] ReserveUniversalGenericFill: reserved={fillCount}/{occupied.Count} ({fillFrac01:P0}) " +
+                $"(neverRegrow={neverRegrowCount}, quickRegrow={fillCount - neverRegrowCount}) before role claims, " +
+                $"ratio01={_genericFillRatio01:F2}");
+        }
+
         return remaining;
     }
 

@@ -204,7 +204,15 @@ public class MazePatternConfig : ScriptableObject
 
     [Header("Porous Border")]
     public PorousBorderParams porousBorder = new();
-    
+
+    [Header("Generic Fill Floor")]
+    [Range(0f, 1f), Tooltip("Minimum fraction of occupied maze cells guaranteed to be reserved as generic " +
+        "MusicalRole.None dust for ANY motif using this pattern, regardless of that motif's own " +
+        "genericFillRatio01 or how much territory its roles' exact-count multipliers demand. Composes as " +
+        "Max(motif.genericFillRatio01, this) in CosmicDustGenerator.ApplyMotifGeoConfig — a motif can " +
+        "always author more gray, never less than the pattern's own floor.")]
+    public float minGenericFillRatio01 = 0.10f;
+
     public void Validate()
     {
         dustTiming ??= new DustTimingParams();
@@ -224,6 +232,8 @@ public class MazePatternConfig : ScriptableObject
         diagonalLanes.Validate();
         tunnels.Validate();
         porousBorder.Validate();
+
+        minGenericFillRatio01 = Mathf.Clamp01(minGenericFillRatio01);
     }
 
     private void OnValidate() => Validate();

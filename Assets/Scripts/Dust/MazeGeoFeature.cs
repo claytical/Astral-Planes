@@ -34,6 +34,12 @@ public class MazeRoleGeoConfig
     [Min(0f), UnityEngine.Tooltip("Exact-count mode only: cellCount = round(avgNoteCount * this).")]
     public float notesToCellsMultiplier = 1f;
 
+    [Min(0), UnityEngine.Tooltip("Exact-count mode only: this role claims up to this many cells FIRST, before any " +
+        "exact-count role's density-driven notesToCellsMultiplier claim runs — guarantees a real minimum footprint " +
+        "regardless of claim order or how small this role's own note-density claim would otherwise be. 0 (default) " +
+        "disables the floor.")]
+    public int minCellCount = 0;
+
     [Range(0f, 1f), UnityEngine.Tooltip("Exact-count mode only: once this role's claimed territory covers at least " +
         "centerBiasMinDensity01 of the maze, seed placement is restricted to the innermost this-fraction " +
         "of unclaimed cells (by distance to the maze's bounding-box center) instead of the default farthest-" +

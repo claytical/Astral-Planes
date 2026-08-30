@@ -80,6 +80,7 @@ public partial class CosmicDust
         float bloom01 = hold01 * hold01;
         int durTicks = Mathf.RoundToInt(Mathf.Lerp(pluck.minDurationTicks, pluck.maxDurationTicks, bloom01));
         float vel127 = Mathf.Lerp(pluck.minVelocity127, pluck.maxVelocity127, bloom01);
+        if (HasBloomedFlower) vel127 = RegisterFlowerBumpVelocity(vel127);
         float cooldown = Mathf.Lerp(pluck.maxCooldownSeconds, pluck.minCooldownSeconds, bloom01);
 
         if (_gfm == null) _gfm = GameFlowManager.Instance;
