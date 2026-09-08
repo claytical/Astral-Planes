@@ -32,6 +32,8 @@ public sealed class DustTimingParams
     public float collectableDiscardRegrowDelay = -1f;
     [Tooltip("Delay applied to cells cleared by a time bomb collectable's detonation blast.")]
     public float collectableBombBlastRegrowDelay = -1f;
+    [Tooltip("Delay applied when a track-filled role sweep (SuperNode fill) releases its held cells.")]
+    public float trackFilledRegrowDelay = -1f;
 
     /// <summary>Per-source delay, or -1 to fall back to the base regrowDelay.</summary>
     public float GetDelayFor(DustClearSource source) => source switch
@@ -45,6 +47,7 @@ public sealed class DustTimingParams
         DustClearSource.SuperNode            => superNodeRegrowDelay,
         DustClearSource.CollectableDiscard   => collectableDiscardRegrowDelay,
         DustClearSource.CollectableBombBlast => collectableBombBlastRegrowDelay,
+        DustClearSource.TrackFilled          => trackFilledRegrowDelay,
         _                                    => -1f,
     };
 
@@ -60,6 +63,7 @@ public sealed class DustTimingParams
         starDrainReleaseDelay         = Mathf.Max(-1f, starDrainReleaseDelay);
         collectableDiscardRegrowDelay = Mathf.Max(-1f, collectableDiscardRegrowDelay);
         collectableBombBlastRegrowDelay = Mathf.Max(-1f, collectableBombBlastRegrowDelay);
+        trackFilledRegrowDelay        = Mathf.Max(-1f, trackFilledRegrowDelay);
     }
 }
 

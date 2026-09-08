@@ -57,7 +57,7 @@ public struct DustPluckSettings
     [Tooltip("Soft/loud pluck velocities used at low/high contact intensity.")]
     [Range(1f, 127f)] public float minVelocity127;
     [Range(1f, 127f)] public float maxVelocity127;
-    [Tooltip("Time between plucks. Max applies at first contact, min after sustained pressure.")]
+    [Tooltip("Time between plucks. Max applies at first contact, min after sustained pressure. minCooldownSeconds must exceed the longest quantization step (~1 sixteenth note) or a cell can re-arm before its previous pluck actually sounds.")]
     [Min(0.01f)] public float minCooldownSeconds;
     [Min(0.01f)] public float maxCooldownSeconds;
 }

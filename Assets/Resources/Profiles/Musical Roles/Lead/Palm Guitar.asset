@@ -38,10 +38,12 @@ MonoBehaviour:
   highestNote: 93
   outputMixerGroup: {fileID: 733832146008888724, guid: 07985bf4f6d469340930e958ef313c14,
     type: 2}
-  volumeMultiplier: 1
+  volumeMultiplier: 0.853
   minVelocity: 60
-  maxVelocity: 120
+  maxVelocity: 100
   regrowthDelay: 0.1
+  bombBlastRadiusMul: 1
+  bombPermanentClearRatio01: 0
   configSelectionMode: 0
   chordVoiceColors: []
   sameRootAcrossBins: 0

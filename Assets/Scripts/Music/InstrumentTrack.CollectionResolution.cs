@@ -53,7 +53,7 @@ public partial class InstrumentTrack
         int filledBin = state.wroteBin >= 0 ? state.wroteBin : targetBin;
         controller?.noteVisualizer?.TriggerPlayheadReleasePulse(assignedRole);
 
-        var rp = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+        var rp = _activeProfile ?? MusicalRoleProfileLibrary.GetProfile(assignedRole);
         if (rp == null || rp.configSelectionMode != RoleConfigSelectionMode.ByVoice)
             AdvanceBinCursor(1);
 
@@ -212,6 +212,7 @@ public partial class InstrumentTrack
         // Replace-or-add: enforce one persistent note per (track, stepAbs) for stability.
         persistentLoopNotes.RemoveAll(t => t.stepIndex == stepAbs);
         AddNoteToLoop(stepAbs, midiNote, durationTicks, velocity127, lightMarkerNow, authoredRootMidi, skipChordQuantize);
+        NotifyNoteCommittedForDust();
 
         int targetBin = BinIndexForStep(stepAbs);
         RegisterBurstStep(burstId, stepAbs);

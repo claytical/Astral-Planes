@@ -23,21 +23,21 @@ MonoBehaviour:
     breadth01: 0
     pressure01: 0
   - clip: {fileID: 8300000, guid: 4a85485e48c7a4c61ae85501bf08d36b, type: 3}
-    depth01: 0.25
-    breadth01: 0.25
-    pressure01: 0.25
+    depth01: 0.1
+    breadth01: 0.1
+    pressure01: 0.1
   - clip: {fileID: 8300000, guid: 20a81122eb435432cb1086a932a44d5c, type: 3}
+    depth01: 0.3
+    breadth01: 0.3
+    pressure01: 0.2
+  - clip: {fileID: 8300000, guid: b278c9e5108ad49279c6c2bdf1e1097f, type: 3}
     depth01: 0.5
+    breadth01: 0.4
+    pressure01: 0.2
+  - clip: {fileID: 8300000, guid: 068b2e5c637654f4b80c89b0e1eeaaf0, type: 3}
+    depth01: 0.4
     breadth01: 0.5
     pressure01: 0.5
-  - clip: {fileID: 8300000, guid: b278c9e5108ad49279c6c2bdf1e1097f, type: 3}
-    depth01: 0.75
-    breadth01: 0.75
-    pressure01: 0.75
-  - clip: {fileID: 8300000, guid: 068b2e5c637654f4b80c89b0e1eeaaf0, type: 3}
-    depth01: 1
-    breadth01: 1
-    pressure01: 1
   entryLoopCount: 16
   resetFirstCarryOnStart: 0
   bridgeSamples:
@@ -52,6 +52,8 @@ MonoBehaviour:
   mazePattern: {fileID: 11400000, guid: dc7bcb920eadd40139a254499c81741c, type: 2}
   roleGeoConfigs: []
   genericFillNeverRegrowRatio: 0.1
+  genericFillRatio01: 0
+  genericFillRegrowSoftenMultiplier01: 1
   chordProgression: {fileID: 11400000, guid: 874324c48423a4416a080b72af67574b, type: 2}
   alternateChordProgressionProfile: {fileID: 11400000, guid: 83ee4248a89074b5cbd9eb62015f0abf,
     type: 2}

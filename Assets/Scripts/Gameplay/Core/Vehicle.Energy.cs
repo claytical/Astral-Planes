@@ -18,6 +18,18 @@ public partial class Vehicle
         playerStats.RecordItemCollected();
 
     }
+    // Passive energy gain (e.g. lingering near a gravity void) that shouldn't count toward
+    // playerStats' "items collected" stat the way an actual pickup via CollectEnergy does.
+    public void RecoverEnergy(float amount)
+    {
+        if (amount <= 0f) return;
+        energyLevel = Mathf.Min(capacity, energyLevel + amount);
+        if (playerStatsUI != null)
+        {
+            playerStatsUI.UpdateFuel(energyLevel, capacity);
+        }
+    }
+
     public void DrainEnergy(float amount, string source = "Unknown")
 {
     if (amount <= 0f) return;

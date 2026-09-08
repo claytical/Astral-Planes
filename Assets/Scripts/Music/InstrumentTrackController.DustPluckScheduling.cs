@@ -16,17 +16,18 @@ public partial class InstrumentTrackController
         float phrase01 = 0f,
         int chordSize = 4,
         int durTicks = 180,
-        float vel127 = 24f)
+        float vel127 = 24f,
+        float minGapSeconds = 0f)
     {
         if (role == MusicalRole.None) return;
         if (_gfm == null) _gfm = GameFlowManager.Instance;
         var drum = _gfm?.activeDrumTrack;
         if (drum == null) return;
-        StartCoroutine(QuantizedDustPluckRoutine(vehicle, role, phrase01, chordSize, durTicks, vel127));
+        StartCoroutine(QuantizedDustPluckRoutine(vehicle, role, phrase01, chordSize, durTicks, vel127, minGapSeconds));
     }
 
     private IEnumerator QuantizedDustPluckRoutine(
-        Vehicle vehicle, MusicalRole role, float phrase01, int chordSize, int durTicks, float vel127)
+        Vehicle vehicle, MusicalRole role, float phrase01, int chordSize, int durTicks, float vel127, float minGapSeconds)
     {
         if (_gfm == null) _gfm = GameFlowManager.Instance;
         var drum = _gfm?.activeDrumTrack;
@@ -38,9 +39,14 @@ public partial class InstrumentTrackController
 
         if (vehicle != null)
         {
+            // minGapSeconds (the caller's actual computed cooldown) makes this per-vehicle gate
+            // authoritative over any one cell's own cooldown, closing the race where several
+            // adjacent cells touching the same vehicle independently re-arm on staggered clocks.
+            // Mathf.Max keeps the original same-step dedup behavior when minGapSeconds is 0.
+            float gapSec = Mathf.Max(stepSec, minGapSeconds);
             if (_lastVehicleDustPluckDsp.TryGetValue(vehicle, out double lastDsp) &&
-                AudioSettings.dspTime - lastDsp < stepSec)
-                yield break; // another cell already plucked for this vehicle this step
+                AudioSettings.dspTime - lastDsp < gapSec)
+                yield break; // another cell already plucked for this vehicle within its cooldown window
 
             _lastVehicleDustPluckDsp[vehicle] = AudioSettings.dspTime;
         }

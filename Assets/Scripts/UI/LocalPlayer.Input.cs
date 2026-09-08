@@ -173,7 +173,7 @@ public partial class LocalPlayer
     public void OnNext(InputValue value)
     {
         if (!value.isPressed) return;
-        GetComponent<AudioSource>().PlayOneShot(clickFx);
+        _sfxSource?.PlayOneShot(clickFx);
 
         if (_selection != null)
         {
@@ -187,7 +187,7 @@ public partial class LocalPlayer
     public void OnPrevious(InputValue value)
     {
         if (!value.isPressed) return;
-        GetComponent<AudioSource>().PlayOneShot(clickFx);
+        _sfxSource?.PlayOneShot(clickFx);
 
         if (_selection != null)
         {

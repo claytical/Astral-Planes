@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Audio;
 
 // =========================================================================
 //  MotifRingGlyphApplicator
@@ -49,6 +50,9 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
 
     [Tooltip("One-shot particle prefab instantiated at both ends of a broken tether (timeline marker and ring landing point). Must self-destroy (e.g. via Explosion.cs) and expose a ParticleSystem to receive the track color.")]
     [SerializeField] private GameObject tetherBreakEffectPrefab;
+
+    [Tooltip("Mixer group for launch/impact one-shot SFX (see PlayOneShotRouted in Animation.cs).")]
+    [SerializeField] private AudioMixerGroup effectsMixerGroup;
 
     private static readonly int BasePropId  = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorPropId = Shader.PropertyToID("_Color");

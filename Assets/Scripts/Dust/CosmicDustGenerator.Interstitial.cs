@@ -129,7 +129,13 @@ public partial class CosmicDustGenerator
         EnterRuntimeVoidOnlyDustCreationMode();
         _spawnRoutine = null;
 
-        const int vehicleHoleRadiusCells = 3;
+        // Corridor width is sized to the widest active ship (see PathChoiceCoordinator), so the
+        // exit-gap and connector carves below must scale with it too, or they become the new
+        // bottleneck once a ship-driven corridorWidth grows past the old fixed radius of 1.
+        int corridorWidth = Mathf.Max(1, interstitialPattern.tunnels.corridorWidth);
+        int passRadiusCells = Mathf.Max(1, Mathf.CeilToInt((corridorWidth - 1) / 2f));
+
+        int vehicleHoleRadiusCells = Mathf.Max(3, passRadiusCells);
         if (vehicleCells != null)
             foreach (var vehCell in vehicleCells)
                 CarvePermanentDisk(vehCell, vehicleHoleRadiusCells);
@@ -141,11 +147,11 @@ public partial class CosmicDustGenerator
 
             foreach (var gapCell in group)
             {
-                CarvePermanentDisk(gapCell, 1);
+                CarvePermanentDisk(gapCell, passRadiusCells);
                 _permanentClearCells.Add(gapCell);
             }
 
-            CarveConnectorToInterior(group[0], w, h);
+            CarveConnectorToInterior(group[0], w, h, passRadiusCells);
 
             var anchor = group[0];
             exits.Add(new PathExitInfo
@@ -182,7 +188,7 @@ public partial class CosmicDustGenerator
     // connected path to the interior at all. Walk inward through wall cells until the tunnel
     // network is reached and carve every step, so a real, navigable route always exists from the
     // gap to the interior. No-ops (0 iterations) when the gap already touches open interior.
-    private void CarveConnectorToInterior(Vector2Int gapCell, int w, int h)
+    private void CarveConnectorToInterior(Vector2Int gapCell, int w, int h, int radiusCells)
     {
         if (_mazePatternCells == null) return;
 
@@ -206,7 +212,7 @@ public partial class CosmicDustGenerator
                     var trace = cur;
                     while (trace != gapCell)
                     {
-                        CarvePermanentDisk(trace, 1);
+                        CarvePermanentDisk(trace, radiusCells);
                         _permanentClearCells.Add(trace);
                         trace = predecessor[trace];
                     }

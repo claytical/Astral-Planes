@@ -87,6 +87,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
     private int   _currentCol;
     private float _slotSpacing;
     private bool  _sliding;
+    private bool  _confirming;
     private float _nextInputTime;
     private Vector3[] _homePositions;
 
@@ -308,7 +309,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
             return;
         }
 
-        if (_sliding) return; // ignore all input mid-slide so Confirm() never reads stale row/col
+        if (_sliding || _confirming) return; // ignore all input mid-slide/confirm so Confirm() never reads stale row/col
 
         if (confirm) { Confirm(); return; }
 
@@ -394,13 +395,23 @@ public class PhaseLibraryCarousel : MonoBehaviour
 
     private void Confirm()
     {
+        if (_confirming) return;
+        _confirming = true;
+        StartCoroutine(ConfirmRoutine());
+    }
+
+    private IEnumerator ConfirmRoutine()
+    {
+        // Fades the preview's own AudioSource to silence (see RingPreviewPlayer.StopAndFadeRoutine)
+        // rather than guessing how long the synth's release tail needs — guarantees no residual
+        // amplitude by the time the scene unload below destroys its MidiStreamPlayer mid-buffer.
         if (previewPlayer != null)
-            previewPlayer.Stop();
+            yield return StartCoroutine(previewPlayer.StopAndFadeRoutine());
 
         if (_rows.Count == 0)
         {
             SceneManager.LoadScene(trackSelectionScene);
-            return;
+            yield break;
         }
 
         var entry = CurrentRow[_currentCol];

@@ -23,7 +23,7 @@ public sealed class BinFrontierAllocator
         if (track == null) return;
         // ByVoice chord groups advance together; NotifyBinFilled grants the token
         // to all sibling voices simultaneously when the last one fills the bin.
-        var roleProfile = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
+        var roleProfile = track.ActiveProfile ?? MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
         if (roleProfile != null && roleProfile.configSelectionMode == RoleConfigSelectionMode.ByVoice)
             return;
         _allowAdvanceNextBurst[track] = true;
@@ -47,7 +47,7 @@ public sealed class BinFrontierAllocator
         int trackMaxBinIndex = Mathf.Max(0, track.maxLoopMultiplier - 1);
 
         // ByVoice chord tracks advance only when the whole chord group fills a bin — use cursor directly.
-        var byVoiceCheck = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
+        var byVoiceCheck = track.ActiveProfile ?? MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
         if (byVoiceCheck != null && byVoiceCheck.configSelectionMode == RoleConfigSelectionMode.ByVoice)
         {
             int cursor = track.GetBinCursor();
@@ -151,7 +151,7 @@ public sealed class BinFrontierAllocator
     public void NotifyBinFilled(InstrumentTrack track, int binIndex)
     {
         if (track == null) return;
-        var roleProfile = MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
+        var roleProfile = track.ActiveProfile ?? MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
         if (roleProfile == null || roleProfile.configSelectionMode != RoleConfigSelectionMode.ByVoice) return;
         if (!IsChordGroupComplete(track.assignedRole, binIndex)) return;
 

@@ -1,12 +1,16 @@
 using UnityEngine;
+using UnityEngine.Audio;
 
 public class AudioManager : MonoBehaviour
 {
+    [SerializeField] private AudioMixerGroup effectsMixerGroup;
+
     private AudioSource audioSource;
 
     void Awake()
     {
         audioSource = GetComponent<AudioSource>();
+        if (audioSource != null) audioSource.outputAudioMixerGroup = effectsMixerGroup;
     }
 
     public void PlaySound(AudioClip clip)

@@ -42,6 +42,7 @@ public partial class Vehicle : MonoBehaviour
 
     private float _lastRecoverAt = -999f;
     private float _timeStuckInVoid = 0f;
+    private float _timeBelowMoveThreshold = 0f;
     private bool _movementLocked = false;
     private Coroutine _recoveryRoutine;
 
@@ -250,6 +251,8 @@ public partial class Vehicle : MonoBehaviour
 
         UpdatePressureInstability();
         UpdateMovementAndFuel(dt);
+        UpdateVoidEnergyRecovery(dt);
+        UpdateIdleTracking();
 
 // Stats + audio
 
@@ -485,4 +488,10 @@ public partial class Vehicle : MonoBehaviour
     }
 
     public Bounds GetVisualBounds() => baseSprite != null ? baseSprite.bounds : default;
+
+    public float GetColliderBoundingRadiusWorld()
+    {
+        var col = GetComponent<Collider2D>();
+        return col != null ? Mathf.Max(col.bounds.extents.x, col.bounds.extents.y) : 0.35f;
+    }
 }

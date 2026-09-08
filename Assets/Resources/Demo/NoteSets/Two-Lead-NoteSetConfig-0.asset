@@ -12,9 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f8571c45382984a839a6b50b6bbc8220, type: 3}
   m_Name: Two-Lead-NoteSetConfig-0
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
-  id: two-palm-0
-  roleProfile: {fileID: 11400000, guid: 88ba87390b412400b88142811cf0e3ba, type: 2}
-  riff: {fileID: 11400000, guid: 7b6d61473a7044ba8b33f86d3f8374e1, type: 2}
-  mineNodeTintBudget: 15
+  id: two-stillsky-0
+  roleProfile: {fileID: 11400000, guid: 01a0a46bc3bd3489eaa95bb2f1ec236b, type: 2}
+  riff: {fileID: 11400000, guid: 297b5a013a19b44f99c2052e32965a6a, type: 2}
   mineNodeExpireAfterLoops: 3
   ascendLoops: 4

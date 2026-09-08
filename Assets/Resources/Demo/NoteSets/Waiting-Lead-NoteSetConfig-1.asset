@@ -15,6 +15,5 @@ MonoBehaviour:
   id: waiting-palm-1
   roleProfile: {fileID: 11400000, guid: 88ba87390b412400b88142811cf0e3ba, type: 2}
   riff: {fileID: 11400000, guid: f43ea58062445418fba1133cbd056763, type: 2}
-  mineNodeTintBudget: 15
   mineNodeExpireAfterLoops: 4
-  ascendLoops: 4
+  ascendLoops: 2

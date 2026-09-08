@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Audio;
 using TMPro;
 
 public partial class ControlTutorialHighlight : MonoBehaviour
@@ -76,6 +77,7 @@ public partial class ControlTutorialHighlight : MonoBehaviour
     private bool _inputGatedActive;
     private Coroutine _inputGatedCo;
     private AudioSource _audioSource;
+    [SerializeField] private AudioMixerGroup effectsMixerGroup;
 
     // root fade + position animation
     private CanvasGroup   _rootCanvasGroup;
@@ -95,6 +97,7 @@ public partial class ControlTutorialHighlight : MonoBehaviour
     {
         _audioSource = GetComponent<AudioSource>();
         if (!_audioSource) _audioSource = gameObject.AddComponent<AudioSource>();
+        _audioSource.outputAudioMixerGroup = effectsMixerGroup;
         CacheBaseScale(stickImage, ref _stickBaseScale);
         CacheBaseScale(boostImage, ref _boostBaseScale);
 

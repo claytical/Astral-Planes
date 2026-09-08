@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Audio;
 using System.Collections.Generic;
 using System.Linq;
 using MidiPlayerTK;
@@ -32,6 +33,7 @@ public partial class InstrumentTrackController : MonoBehaviour
 // SFX: Collection "Pickup Tick" (A2)
 // ---------------------------------------------------------------------
     [SerializeField] private AudioSource pickupSfxSource;
+    [SerializeField] private AudioMixerGroup effectsMixerGroup;
 
     private double _lastTransportDsp;
 // ------------------------------------------------------------

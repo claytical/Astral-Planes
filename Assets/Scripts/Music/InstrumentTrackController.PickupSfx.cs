@@ -17,6 +17,7 @@ public partial class InstrumentTrackController
         pickupSfxSource.loop = false;
         pickupSfxSource.spatialBlend = 0f; // 2D
         pickupSfxSource.volume = 1f;       // volume scaled per PlayOneShot call
+        pickupSfxSource.outputAudioMixerGroup = effectsMixerGroup;
     }
 
     private AudioClip GetPickupTickClip(MusicalRole role)

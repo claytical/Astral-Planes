@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using MidiPlayerTK;
 using UnityEngine;
@@ -232,6 +233,35 @@ public class RingPreviewPlayer : MonoBehaviour
         _lastStep     = -1;
         _loopStartDsp = 0.0;
         _stepTable    = null;
+
+        // Send NoteOff for any still-sounding notes so the synth's authored release plays out
+        // rather than being left to ring indefinitely.
+        if (midiStreamPlayer != null)
+            midiStreamPlayer.MPTK_ClearAllSound();
+    }
+
+    // Release time for MPTK_ClearAllSound's NoteOff is unbounded (its own doc: "can take a few
+    // seconds") — waiting it out isn't reliable. Fading CoreAudioSource's own volume to zero
+    // guarantees no residual amplitude by the time the caller destroys this GameObject via a
+    // scene unload, regardless of how long the synth's release envelope actually takes.
+    private const float kStopFadeSec = 0.08f;
+
+    public IEnumerator StopAndFadeRoutine()
+    {
+        Stop();
+
+        var src = midiStreamPlayer != null ? midiStreamPlayer.CoreAudioSource : null;
+        if (src == null) yield break;
+
+        float startVol = src.volume;
+        float t = 0f;
+        while (t < kStopFadeSec)
+        {
+            t += Time.unscaledDeltaTime;
+            src.volume = Mathf.Lerp(startVol, 0f, Mathf.Clamp01(t / kStopFadeSec));
+            yield return null;
+        }
+        src.volume = 0f;
     }
 
     private void Update()

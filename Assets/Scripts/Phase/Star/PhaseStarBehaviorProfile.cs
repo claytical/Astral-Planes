@@ -50,4 +50,12 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     [Tooltip("Accumulator rotation speed multiplier when charge is ready.")]
     [Min(1f)] public float readyRotSpeedMul = 2.5f;
 
+    [Header("Spawn Reachability Bias (StarSpawnReachabilityWeighter)")]
+    [Tooltip("How strongly spawn selection favors dust-free cells reachable through the player's already-carved corridors, by hop distance from the nearest vehicle. Higher = stronger bias toward nearby/connected cells; 0 = no bias (uniform random).")]
+    [Min(0f)] public float spawnReachabilityFalloff = 0.35f;
+
+    [Range(0f, 1f)]
+    [Tooltip("Flat fallback weight given to candidate cells that aren't reachable through any carved path from a vehicle (walled off by solid dust). Never 0 — keeps rare 'lucky' spawns in disconnected pockets possible.")]
+    public float spawnUnreachableFloorWeight01 = 0.05f;
+
 }

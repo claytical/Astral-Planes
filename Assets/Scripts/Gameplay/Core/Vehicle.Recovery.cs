@@ -68,6 +68,22 @@ public partial class Vehicle
     }
 }
 
+    // General "am I moving" tracking, independent of gravity voids — consumed by CosmicDust to
+    // suppress dust-pluck triggering for a vehicle that's stuck or nearly idle, without CosmicDust
+    // needing to know about void state or duplicate its own velocity sampling.
+    private void UpdateIdleTracking()
+{
+    if (rb == null) { _timeBelowMoveThreshold = 0f; return; }
+    float speed = rb.linearVelocity.magnitude;
+    if (speed <= vehicleConfig.stuckSpeedThreshold)
+        _timeBelowMoveThreshold += Time.fixedDeltaTime;
+    else
+        _timeBelowMoveThreshold = 0f;
+}
+
+    public bool IsDustPluckIdleSuppressed =>
+        _timeBelowMoveThreshold >= vehicleConfig.dustPluckIdleSuppressSeconds;
+
     private bool IsFarOutsideViewport(float margin)
 {
     var cam = Camera.main;
@@ -113,6 +129,15 @@ public partial class Vehicle
 
     rb.position = targetWorld;
     rb.linearVelocity = away * Mathf.Max(rb.linearVelocity.magnitude, 1f);
+}
+
+    private void UpdateVoidEnergyRecovery(float dt)
+{
+    if (vehicleConfig.voidEnergyRecoveryPerSecond <= 0f) return;
+    if (energyLevel >= capacity) return;
+    if (!IsInsideGravityVoid(out _, out _)) return;
+
+    RecoverEnergy(vehicleConfig.voidEnergyRecoveryPerSecond * dt);
 }
 
     private bool IsInsideGravityVoid(out Vector2 center, out float radius)

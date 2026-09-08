@@ -72,6 +72,10 @@ public partial class DrumTrack : MonoBehaviour
     private List<AudioClip> _entryLoops;
     private List<IntensityClipTag> _intensityTags;
 
+    // Clips whose PCM has already been decoded via LoadAudioData(), so scheduled playback
+    // never has to decode a cold CompressedInMemory clip near its swap/arm time.
+    private readonly HashSet<AudioClip> _preloadedClips = new();
+
     private int _entryLoopsRemaining;
     private bool _carryLatched; // one-way: set once any vehicle carries a collectable
 

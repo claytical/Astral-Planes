@@ -557,7 +557,11 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
         if (RemainingActiveWindowSec() <= 0f)
             Debug.LogWarning($"[NOTE:ZERO_WINDOW] {name} note={note} dur={durationTicks} — window=0 at dsp={AudioSettings.dspTime:F3} leaderStart={drumTrack?.leaderStartDspTime:F3} clipLen={drumTrack?.GetClipLengthInSeconds():F3}");
-        midiVoice.PlayNoteTicks(note, durationTicks, velocity);
+
+        // Read volumeMultiplier live off the active role profile (not a cached channel-volume
+        // snapshot) so tuning it takes effect immediately without a motif re-trigger.
+        float scaledVelocity = velocity * (_activeProfile?.volumeMultiplier ?? 1f);
+        midiVoice.PlayNoteTicks(note, durationTicks, scaledVelocity);
     }
 
     private float TicksToSeconds(int durationTicks)
@@ -727,7 +731,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         isExpansionPending: () => IsExpansionPending,
         beginGravityVoidForPendingExpandIfEligible: voidPos =>
         {
-            var rpByVoice = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+            var rpByVoice = _activeProfile ?? MusicalRoleProfileLibrary.GetProfile(assignedRole);
             bool isByVoice = rpByVoice != null && rpByVoice.configSelectionMode == RoleConfigSelectionMode.ByVoice;
             if (!isByVoice && controller != null && drumTrack != null)
                 controller.BeginGravityVoidForPendingExpand(this, voidPos, drumTrack.WorldToGridPosition(voidPos));
@@ -765,7 +769,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
                         SetBinFilled(state.wroteBin, true);
                     if (controller != null) controller.AllowAdvanceNextBurst(this);
                     {
-                        var _rp = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+                        var _rp = _activeProfile ?? MusicalRoleProfileLibrary.GetProfile(assignedRole);
                         if (_rp == null || _rp.configSelectionMode != RoleConfigSelectionMode.ByVoice)
                             AdvanceBinCursor(1);
                     }
@@ -823,6 +827,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (GameFlowManager.VerboseLogging) Debug.Log($"[COLLECT:PITCH] track={name} step={stepIndex} raw={note} quantized={qNote} diff={qNote - note} authoredRoot={authoredRootMidi}");
         // Commit immediately (the loop evolves as notes are collected).
         AddNoteToLoop(stepIndex, note, durationTicks, force, false, authoredRootMidi);
+        NotifyNoteCommittedForDust();
 
         // Tactile confirmation, quantized + throttled per vehicle so clustered pickups don't stack.
         controller?.PlayQuantizedCollectConfirm(vehicle, this, note, force);

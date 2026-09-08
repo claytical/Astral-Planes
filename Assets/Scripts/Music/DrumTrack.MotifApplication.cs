@@ -3,6 +3,11 @@ using UnityEngine;
 
 public partial class DrumTrack
 {
+    // Floor for the incoming/outgoing deck crossfade window when ArmPendingDrumLoopForNextLeaderBoundary's
+    // fallback engages (see the crossStart collapse check below) — keeps the two decks from converging
+    // in near-zero time even under a stale-timing race.
+    private const double kMinFadeWindowSec = 0.025;
+
     private AudioClip ChooseEntryClip()
     {
         if (_entryLoops == null || _entryLoops.Count == 0) return null;
@@ -35,6 +40,30 @@ public partial class DrumTrack
             }
         }
         return best;
+    }
+
+    // Decodes this motif's drum clips up front (well ahead of ArmPendingDrumLoopForNextLeaderBoundary
+    // scheduling them), so the dual-deck crossfade never has to decode a cold CompressedInMemory
+    // clip in the ~50-150ms window between clip assignment and PlayScheduled.
+    private void PreloadMotifDrumClips()
+    {
+        if (_entryLoops != null)
+        {
+            for (int i = 0; i < _entryLoops.Count; i++)
+                PreloadClip(_entryLoops[i]);
+        }
+        if (_intensityTags != null)
+        {
+            for (int i = 0; i < _intensityTags.Count; i++)
+                PreloadClip(_intensityTags[i].clip);
+        }
+    }
+
+    private void PreloadClip(AudioClip clip)
+    {
+        if (clip == null || _preloadedClips.Contains(clip)) return;
+        clip.LoadAudioData();
+        _preloadedClips.Add(clip);
     }
 
     private void ApplyMotif(MotifProfile motif, bool armAtNextBoundary, string who, bool restartTransport = false)
@@ -78,6 +107,8 @@ public partial class DrumTrack
         _entryLoops          = _motif?.entryDrumLoops;
         _intensityTags       = _motif?.intensityClipTags;
         _driveFromDensity    = _motif != null && _motif.driveBeatsFromDensity;
+
+        PreloadMotifDrumClips();
 
         // Carry latch is one-way for the session: survives motif changes unless the incoming
         // motif opts into re-arming the intro hold. A hard transport restart always re-arms.
@@ -283,12 +314,13 @@ public partial class DrumTrack
         // FP drift between this method's barLen and EffectiveLoopLengthSec's independently-computed
         // step duration) — the near-instant fallback below can collapse the crossfade window to ~0
         // and race Unity's PlayScheduled/SetScheduledEndTime DSP-buffer latency, which is a
-        // suspected cause of an audible dropout at the swap. Always logged (not gated behind
-        // logBeatSeqGates) since this should be rare and is the thing to look for if drums cut out.
-        if (swapDsp <= dspNow + 0.01)
+        // suspected cause of an audible dropout at the swap. Gated behind VerboseLogging since the
+        // synchronous console write itself, firing right at the swap instant, was found to compound
+        // the audible hiccup — flip verboseLogging on if you need to look for this again.
+        if (swapDsp <= dspNow + 0.02)
         {
-            Debug.LogWarning($"[DRUM] ArmPendingDrumLoopForNextLeaderBoundary: bar-aligned swapDsp={swapDsp:F3} was <= dspNow={dspNow:F3}+0.01 — falling back to near-instant schedule. clip={_pendingDrumLoop?.name} leaderStartDspTime={leaderStartDspTime:F3}");
-            swapDsp = dspNow + 0.05;
+            if (GameFlowManager.VerboseLogging) Debug.LogWarning($"[DRUM] ArmPendingDrumLoopForNextLeaderBoundary: bar-aligned swapDsp={swapDsp:F3} was <= dspNow={dspNow:F3}+0.02 — falling back to near-instant schedule. clip={_pendingDrumLoop?.name} leaderStartDspTime={leaderStartDspTime:F3}");
+            swapDsp = dspNow + 0.08;
         }
 
         var newClip = _pendingDrumLoop;
@@ -308,8 +340,11 @@ public partial class DrumTrack
         double crossStart = swapDsp - fadeWin;
         if (crossStart <= dspNow + 0.01)
         {
-            double collapsed = System.Math.Max(dspNow + 0.01, swapDsp - 0.001);
-            Debug.LogWarning($"[DRUM] ArmPendingDrumLoopForNextLeaderBoundary: crossfade window collapsed (wanted crossStart={crossStart:F3}, using {collapsed:F3}, swapDsp={swapDsp:F3}) — incoming/outgoing decks converge in under 1ms instead of {fadeWin:F3}s.");
+            // Floor is no longer near-zero: PreloadMotifDrumClips() (DrumTrack.MotifApplication.cs)
+            // now decodes clips at motif-apply time, well before this method runs, so decode time
+            // is no longer part of this race — a real ~25ms fade window is safe to guarantee here.
+            double collapsed = System.Math.Max(dspNow + 0.01, swapDsp - kMinFadeWindowSec);
+            if (GameFlowManager.VerboseLogging) Debug.LogWarning($"[DRUM] ArmPendingDrumLoopForNextLeaderBoundary: crossfade window collapsed (wanted crossStart={crossStart:F3}, using {collapsed:F3}, swapDsp={swapDsp:F3}) — incoming/outgoing decks converge in {(swapDsp - collapsed):F3}s instead of {fadeWin:F3}s.");
             crossStart = collapsed;
             fadeWin = (float)System.Math.Max(0.0, swapDsp - crossStart);
         }
@@ -355,11 +390,12 @@ public partial class DrumTrack
         _pendingDrumLoop = null;
         _pendingSwapLoopsElapsed = 0;
 
-        // Temporary full-lifecycle trace (unconditional, not gated behind logBeatSeqGates) while
-        // chasing an audible-dropout report where the arm itself logged a correct clip but nothing
-        // was heard — captures the volume baseline this whole ramp is keyed off, since a wrong
-        // _crossfadeBaseVolume here would silently produce a silent ramp with no warning anywhere.
-        Debug.LogWarning($"[DRUM][TRACE] Armed swap: newClip={newClip.name} swapDsp={swapDsp:F3} crossStart={crossStart:F3} " +
+        // Full-lifecycle trace, gated behind VerboseLogging — captures the volume baseline this
+        // whole ramp is keyed off, useful when chasing an audible-dropout report where the arm
+        // itself logged a correct clip but nothing was heard. Previously unconditional; gated
+        // since firing this synchronous console write right at the arm instant was itself found
+        // to compound the audible hiccup being investigated.
+        if (GameFlowManager.VerboseLogging) Debug.LogWarning($"[DRUM][TRACE] Armed swap: newClip={newClip.name} swapDsp={swapDsp:F3} crossStart={crossStart:F3} " +
             $"_crossfadeBaseVolume={_crossfadeBaseVolume:F3} activeDrum={_activeDrum.name}(vol={_activeDrum.volume:F3},mute={_activeDrum.mute},clip={(_activeDrum.clip?_activeDrum.clip.name:"null")}) " +
             $"inactiveDrum={_inactiveDrum.name}(vol={_inactiveDrum.volume:F3},mute={_inactiveDrum.mute},clip={(_inactiveDrum.clip?_inactiveDrum.clip.name:"null")},isPlaying={_inactiveDrum.isPlaying})");
 

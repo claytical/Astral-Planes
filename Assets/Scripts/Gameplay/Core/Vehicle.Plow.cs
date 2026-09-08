@@ -84,12 +84,7 @@ public partial class Vehicle
         if (vehicleConfig.spawnRestPocketAutoRadius)
         {
             float cellWorld = Mathf.Max(0.01f, drumTrack.GetCellWorldSize());
-            float rWorld = 0.0f;
-            var col = GetComponent<Collider2D>();
-            if (col != null)
-                rWorld = Mathf.Max(col.bounds.extents.x, col.bounds.extents.y);
-            else
-                rWorld = 0.35f; // conservative fallback
+            float rWorld = GetColliderBoundingRadiusWorld();
 
             // Expand by a small margin so resting contacts don't continuously resolve.
             float rWithMargin = rWorld + (cellWorld * 0.15f);

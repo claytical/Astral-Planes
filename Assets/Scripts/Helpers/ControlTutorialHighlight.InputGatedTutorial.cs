@@ -50,7 +50,15 @@ public partial class ControlTutorialHighlight
             if (isLastStep)
             {
                 FadeRootOut();
-                yield return new WaitForSecondsRealtime(rootFadeOutSeconds + 0.05f);
+
+                // Must cover stepConfirmClip's full length, not just the root fade: this wait is
+                // what stands between the confirm ding and OnTutorialFinished -> the scene unload
+                // that destroys this AudioSource. Cutting it off mid-clip was an audible crackle
+                // right at "tutorial finishes / gameplay begins."
+                float settleSec = rootFadeOutSeconds + 0.05f;
+                if (stepConfirmClip != null) settleSec = Mathf.Max(settleSec, stepConfirmClip.length);
+
+                yield return new WaitForSecondsRealtime(settleSec);
                 if (!_inputGatedActive) break;
                 AdvanceTutorial(immediate: false);
                 break;

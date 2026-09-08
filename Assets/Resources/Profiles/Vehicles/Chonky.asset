@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e03bd7d4d4f1b4a41a62831d24c5f8bf, type: 3}
-  m_Name: Chonk
+  m_Name: Chonky
   m_EditorClassIdentifier: 
-  shipName: Chonk
+  shipName: Chonky
   description: Plow
   arcadeMaxSpeed: 11
   arcadeAccel: 5

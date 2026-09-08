@@ -115,7 +115,7 @@ public partial class DrumTrack
         if (!_traceCrossfadeStarted)
         {
             _traceCrossfadeStarted = true;
-            Debug.LogWarning($"[DRUM][TRACE] Crossfade ramp starting: dspNow={dspNow:F3} base={_crossfadeBaseVolume:F3} " +
+            if (GameFlowManager.VerboseLogging) Debug.LogWarning($"[DRUM][TRACE] Crossfade ramp starting: dspNow={dspNow:F3} base={_crossfadeBaseVolume:F3} " +
                 $"active={_activeDrum?.name}(playing={_activeDrum?.isPlaying}) inactive={_inactiveDrum?.name}(playing={_inactiveDrum?.isPlaying},clip={(_inactiveDrum!=null&&_inactiveDrum.clip?_inactiveDrum.clip.name:"null")})");
         }
 
@@ -129,7 +129,7 @@ public partial class DrumTrack
         {
             if (_activeDrum != null)   _activeDrum.volume   = 0f;
             if (_inactiveDrum != null) _inactiveDrum.volume  = _crossfadeBaseVolume;
-            Debug.LogWarning($"[DRUM][TRACE] Crossfade ramp complete: active(pre-swap)={_activeDrum?.name}(vol={_activeDrum?.volume:F3}) " +
+            if (GameFlowManager.VerboseLogging) Debug.LogWarning($"[DRUM][TRACE] Crossfade ramp complete: active(pre-swap)={_activeDrum?.name}(vol={_activeDrum?.volume:F3}) " +
                 $"inactive(pre-swap, about to become active)={_inactiveDrum?.name}(vol={_inactiveDrum?.volume:F3},playing={_inactiveDrum?.isPlaying},mute={_inactiveDrum?.mute})");
             _crossfadeStartDsp = -1.0;
             _traceCrossfadeStarted = false;
@@ -169,7 +169,7 @@ public partial class DrumTrack
             try { _inactiveDrum.Stop(); } catch { }
         }
 
-        Debug.LogWarning($"[DRUM][TRACE] Deck swap finalized: newActive={_activeDrum?.name}(vol={_activeDrum?.volume:F3},mute={_activeDrum?.mute},playing={_activeDrum?.isPlaying},clip={(_activeDrum!=null&&_activeDrum.clip?_activeDrum.clip.name:"null")}) " +
+        if (GameFlowManager.VerboseLogging) Debug.LogWarning($"[DRUM][TRACE] Deck swap finalized: newActive={_activeDrum?.name}(vol={_activeDrum?.volume:F3},mute={_activeDrum?.mute},playing={_activeDrum?.isPlaying},clip={(_activeDrum!=null&&_activeDrum.clip?_activeDrum.clip.name:"null")}) " +
             $"mixerGroup={(_activeDrum!=null?_activeDrum.outputAudioMixerGroup?.name:"null")} AudioListener.volume={AudioListener.volume}");
 
         StopAllOtherDrumSources(keepPlaying: _activeDrum);

@@ -147,13 +147,15 @@ public partial class CosmicDustGenerator
     /// <summary>
     /// Regrow-delay precedence:
     /// 1. Explicit per-call override (>= 0).
-    /// 2. The cell's prospective role's MusicalRoleProfile.regrowthDelay (>= 0), regardless of
-    ///    DustClearSource — a role's color now consistently predicts its regrow speed whether
-    ///    the cell was vehicle-plowed, star-drained, zapped, jailed, etc. Force-gray cells are
-    ///    excluded: they resolve to MusicalRole.None at commit time (see CommitRegrowCell's
-    ///    ZapForceGray handling), so honoring a hidden role's delay here would desync the delay
-    ///    from the color the player actually ends up seeing.
-    /// 3. Active maze pattern's per-source delay (>= 0) — reached for None-role/force-gray cells.
+    /// 2. The cell's prospective role's MusicalRoleProfile.regrowthDelay (>= 0) — consulted
+    ///    regardless of DustClearSource or ForceGrayRegrow/ZapForceGray. Those flags still force
+    ///    the cell's *color* back to MusicalRole.None on regrow (see ResolveRegrowVoice) so a
+    ///    player can never farm an untouched hidden role's tint or re-feed a star off dust they
+    ///    didn't carve — but pacing is a separate concern from identity: a role's authored regrow
+    ///    speed should hold whether the cell was vehicle-plowed, star-drained, jailed, or
+    ///    track-filled, even though it comes back gray in every non-plow case.
+    /// 3. Active maze pattern's per-source delay (>= 0) — reached for None-role cells, or a role
+    ///    whose regrowthDelay is -1 ("use maze pattern").
     /// 4. Active maze pattern's base regrowDelay.
     /// 5. Hard fallback 8s (no active pattern).
     /// </summary>
@@ -162,15 +164,12 @@ public partial class CosmicDustGenerator
         if (explicitOverride >= 0f)
             return explicitOverride;
 
-        if (!HasCellFlag(cell, CellFlags.ForceGrayRegrow) && !HasCellFlag(cell, CellFlags.ZapForceGray))
+        MusicalRole prospectiveRole = GetProspectiveRegrowRole(cell);
+        if (prospectiveRole != MusicalRole.None)
         {
-            MusicalRole prospectiveRole = GetProspectiveRegrowRole(cell);
-            if (prospectiveRole != MusicalRole.None)
-            {
-                var roleProfile = _roleDensity.GetResolvedRoleProfile(prospectiveRole);
-                if (roleProfile != null && roleProfile.regrowthDelay >= 0f)
-                    return ApplyDensityRegrowEasing(roleProfile.regrowthDelay);
-            }
+            var roleProfile = _roleDensity.GetResolvedRoleProfile(prospectiveRole);
+            if (roleProfile != null && roleProfile.regrowthDelay >= 0f)
+                return ApplyDensityRegrowEasing(roleProfile.regrowthDelay);
         }
 
         var timing = _activeMazePattern != null ? _activeMazePattern.dustTiming : null;

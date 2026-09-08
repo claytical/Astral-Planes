@@ -61,7 +61,12 @@ public partial class CosmicDust
 
     private void HandleNonBoostCollision(Vehicle vehicle, float dt)
     {
-        _nonBoostClearSeconds += dt;
+        // Pause (don't reset) swell accumulation while idle-suppressed: resetting would force a
+        // full swell rebuild on every twitch, while letting it keep accumulating unchecked would
+        // cause an immediate max-bloom spike the instant suppression lifts.
+        bool idleSuppressed = vehicle.IsDustPluckIdleSuppressed;
+        if (!idleSuppressed) _nonBoostClearSeconds += dt;
+
         if (_currentPluckVehicle != vehicle)
         {
             _currentPluckVehicle = vehicle;
@@ -71,6 +76,7 @@ public partial class CosmicDust
         }
 
         if (Role == MusicalRole.None || Time.time < _nextDustPluckTime) return;
+        if (idleSuppressed) return;
         PlayNonBoostDustPluck(vehicle);
     }
 
@@ -84,7 +90,10 @@ public partial class CosmicDust
         float cooldown = Mathf.Lerp(pluck.maxCooldownSeconds, pluck.minCooldownSeconds, bloom01);
 
         if (_gfm == null) _gfm = GameFlowManager.Instance;
-        _gfm?.controller?.PlayDustChordPluck(vehicle, Role, bloom01, 4, durTicks, vel127);
+        // Passing cooldown as minGapSeconds makes InstrumentTrackController's per-vehicle gate
+        // authoritative over this cell's own cooldown, closing the cross-cell race where several
+        // adjacent cells touching the same vehicle each independently re-arm on staggered clocks.
+        _gfm?.controller?.PlayDustChordPluck(vehicle, Role, bloom01, 4, durTicks, vel127, cooldown);
         // minCooldownSeconds must exceed the max single quantization step, or a cell could
         // re-arm and fire again before its first (now-delayed) pluck actually sounds.
         _nextDustPluckTime = Time.time + cooldown;

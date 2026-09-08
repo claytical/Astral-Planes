@@ -3,11 +3,16 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
+using UnityEngine.Audio;
 
 public partial class LocalPlayer : MonoBehaviour
 {
     [SerializeField] private GameObject playerVehicle;
+    [SerializeField] private AudioMixerGroup effectsMixerGroup;
     public Vehicle plane;
+
+    // Shared one-shot SFX source for confirm/nav-click sounds (routed to Effects bus).
+    private AudioSource _sfxSource;
 
     private bool _confirmEnabled, _launchStarted, _launched, _suppressChoose = true;
 
@@ -45,6 +50,9 @@ public partial class LocalPlayer : MonoBehaviour
 
     private void Awake()
     {
+        _sfxSource = GetComponent<AudioSource>();
+        if (_sfxSource != null) _sfxSource.outputAudioMixerGroup = effectsMixerGroup;
+
         _playerInput = GetComponent<PlayerInput>();
         if (_playerInput == null) return;
 

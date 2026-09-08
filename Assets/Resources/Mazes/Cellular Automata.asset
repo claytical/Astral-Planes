@@ -15,6 +15,16 @@ MonoBehaviour:
   patternType: 2
   dustTiming:
     regrowDelay: 4
+    vehiclePlowRegrowDelay: -1
+    collectableArrivalRegrowDelay: -1
+    collectablePlowRegrowDelay: -1
+    jailRegrowDelay: -1
+    superNodeRegrowDelay: -1
+    zapRegrowDelay: -1
+    starDrainReleaseDelay: 7
+    collectableDiscardRegrowDelay: -1
+    collectableBombBlastRegrowDelay: 8
+    trackFilledRegrowDelay: 7
   clearBoxes:
     clearBoxCount: 4
     clearBoxWidth: 5

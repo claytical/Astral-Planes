@@ -48,6 +48,8 @@ public class VehicleConfig : ScriptableObject
     public float stuckSpeedThreshold = 0.35f;
     [Tooltip("Seconds inside void while not moving before ejection.")]
     public float stuckSecondsInVoid = 0.60f;
+    [Tooltip("Seconds a vehicle must stay below stuckSpeedThreshold before dust-pluck triggering is suppressed (independent of gravity voids).")]
+    public float dustPluckIdleSuppressSeconds = 2.0f;
     [Tooltip("If true, recovery locks player movement input and glides the vehicle back to safety over recoveryReturnSeconds instead of an instant, silent teleport.")]
     public bool lockMovementDuringRecovery = true;
     [Tooltip("Seconds the animated return-to-safety glide takes.")]
@@ -57,6 +59,8 @@ public class VehicleConfig : ScriptableObject
 
     [Header("Gravity Void Detection")]
     public float voidProbeRadiusWorld = 0.6f;
+    [Tooltip("Energy recovered per second while a vehicle is near/inside a gravity void.")]
+    public float voidEnergyRecoveryPerSecond = 1f;
 
     [Header("Vehicle Resonance")]
     public bool useVehiclePlacementResonance = true;

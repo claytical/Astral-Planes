@@ -207,6 +207,26 @@ public partial class CosmicDustGenerator
         _regrow?.CancelRegrow(gridPos);
     }
 
+    private static readonly List<Vector2Int> _commitClearScratch = new List<Vector2Int>();
+
+    /// <summary>
+    /// Permanently clears one solid dust cell as a musical-progress reward for a note committed
+    /// to the timeline. Prefers <paramref name="role"/>'s own territory; falls back to any other
+    /// colored role if that territory is already exhausted. Never touches None/filler dust, so
+    /// the generic-fill ambient floor is preserved. Returns false if no eligible cell exists.
+    /// </summary>
+    public bool PermanentlyClearOneCellForRole(MusicalRole role)
+    {
+        _registry.GetCellsForRole(role, _commitClearScratch);
+        if (_commitClearScratch.Count == 0)
+            _registry.GetColoredDustCells(_commitClearScratch); // fallback: role territory exhausted
+        if (_commitClearScratch.Count == 0) return false;
+
+        var cell = _commitClearScratch[Random.Range(0, _commitClearScratch.Count)];
+        DespawnDustAtAndMarkPermanent(cell);
+        return true;
+    }
+
     private void RemoveActiveAt(Vector2Int grid, GameObject go) {
         // Logical authority: the moment a cell is cleared, it stops contributing to the maze.
         SetCellState(grid, DustCellState.Empty);
@@ -236,6 +256,7 @@ public partial class CosmicDustGenerator
         {
             SetDustCollision(dust, false);
             dust.regrowAlphaCapped = false;
+            dust.HideFlower();
             dust.HideVisualsInstant();
         }
     }
@@ -247,6 +268,7 @@ public partial class CosmicDustGenerator
         {
             SetDustCollision(dust, false);
             dust.regrowAlphaCapped = false;
+            dust.HideFlower();
             dust.DissipateAndHideVisualOnly(.5f);
         }
         else

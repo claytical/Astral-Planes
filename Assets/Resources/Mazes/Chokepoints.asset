@@ -21,8 +21,10 @@ MonoBehaviour:
     jailRegrowDelay: -1
     superNodeRegrowDelay: -1
     zapRegrowDelay: -1
-    starDrainReleaseDelay: -1
+    starDrainReleaseDelay: 5
     collectableDiscardRegrowDelay: -1
+    collectableBombBlastRegrowDelay: 6
+    trackFilledRegrowDelay: 5
   clearBoxes:
     clearBoxCount: 4
     clearBoxWidth: 5

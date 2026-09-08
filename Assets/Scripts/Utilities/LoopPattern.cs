@@ -98,8 +98,11 @@ public class LoopPattern : MonoBehaviour
             if (n.bin != bin) continue;
             if (n.localStep != localStep) continue;
 
-            // n.velocity is 0..127
-            float vel127 = Mathf.Clamp(n.velocity, minVel127, maxVel127) * Mathf.Clamp01(gain);
+            // n.velocity is 0..127. Remap (not just clamp) into the role's [minVel127, maxVel127]
+            // range so that range always shapes the audible dynamics, even when the source
+            // velocity (vehicle-pickup-speed-derived) rarely reaches the extremes of 1..127.
+            float t = Mathf.InverseLerp(1f, 127f, n.velocity);
+            float vel127 = Mathf.Lerp(minVel127, maxVel127, t) * Mathf.Clamp01(gain);
 
             outNotes.Add((n.note, n.duration, vel127));
         }

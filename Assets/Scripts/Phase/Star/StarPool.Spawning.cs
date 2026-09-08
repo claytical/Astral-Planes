@@ -79,6 +79,25 @@ public sealed partial class StarPool
             if (_drum.IsSpawnCellAvailable(x, y))
                 candidates.Add(new Vector2Int(x, y));
         if (candidates.Count == 0) return new Vector2Int(-1, -1);
+
+        // Bias toward cells reachable through the player's already-carved corridors, so
+        // deliberate carving pays off on average without ever guaranteeing a reachable spawn.
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var vehicles = _gfm?.GetVehicles();
+        if (vehicles != null && vehicles.Count > 0)
+        {
+            var vehicleCells = new List<Vector2Int>(vehicles.Count);
+            foreach (var v in vehicles)
+                if (v != null) vehicleCells.Add(_drum.WorldToGridPosition(v.transform.position));
+
+            if (vehicleCells.Count > 0)
+            {
+                float falloff = _behaviorProfile != null ? _behaviorProfile.spawnReachabilityFalloff : 0.35f;
+                float floor = _behaviorProfile != null ? _behaviorProfile.spawnUnreachableFloorWeight01 : 0.05f;
+                return StarSpawnReachabilityWeighter.PickWeighted(_drum, candidates, vehicleCells, falloff, floor);
+            }
+        }
+
         return candidates[UnityEngine.Random.Range(0, candidates.Count)];
     }
 

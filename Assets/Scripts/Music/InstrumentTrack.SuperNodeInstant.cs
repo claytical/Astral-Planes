@@ -89,9 +89,10 @@ public partial class InstrumentTrack
 
         if (toMaxCapacity && wasEmpty && toBin > fromBin && midiVoice != null)
         {
-            var rp = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+            // Fades the channel from a low fraction up to unity; volumeMultiplier itself is
+            // applied live per-note in PlayNote127, so this ramp targets 1f, not the profile value.
             const float kRampInSeconds = 1.5f;
-            midiVoice.RampInVolume(rp != null ? rp.volumeMultiplier : 1f, kRampInSeconds);
+            midiVoice.RampInVolume(1f, kRampInSeconds);
         }
 
         _loopCacheDirtyPending = true;

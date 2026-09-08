@@ -42,7 +42,7 @@ public partial class LocalPlayer
         switch (GameFlowManager.Instance.CurrentState)
         {
             case GameState.Selection:
-                GetComponent<AudioSource>().PlayOneShot(confirmFx);
+                _sfxSource?.PlayOneShot(confirmFx);
                 playerVehicle = _selection.GetChosenPlane();
                 _selection.Confirm();
                 SetColor();
@@ -83,7 +83,7 @@ public partial class LocalPlayer
                         break;
                     }
 
-                    GetComponent<AudioSource>().PlayOneShot(confirmFx);
+                    _sfxSource?.PlayOneShot(confirmFx);
                     _selection.Confirm();
                     SetColor();
                     _isRespawning = false;
@@ -93,7 +93,7 @@ public partial class LocalPlayer
                 break;
 
             case GameState.GameOver:
-                GetComponent<AudioSource>().PlayOneShot(confirmFx);
+                _sfxSource?.PlayOneShot(confirmFx);
                 Restart();
                 break;
         }

@@ -62,14 +62,34 @@ public sealed class PathChoiceCoordinator
         Boundaries.SetWrapEnabled(false); // no accidental screen-wrap through a tunnel mouth
 
         var vehicleCells = new List<Vector2Int>();
+        float widestVehicleRadiusWorld = 0f;
         foreach (var v in _gameFlow.GetVehicles())
-            if (v != null && v.isActiveAndEnabled)
-                vehicleCells.Add(drums.WorldToGridPosition(v.transform.position));
+        {
+            if (v == null || !v.isActiveAndEnabled) continue;
+            vehicleCells.Add(drums.WorldToGridPosition(v.transform.position));
+            widestVehicleRadiusWorld = Mathf.Max(widestVehicleRadiusWorld, v.GetColliderBoundingRadiusWorld());
+        }
+
+        // Corridor width is authored in grid cells, but a cell's world size is
+        // resolution-dependent (DrumTrackGridMapper.GetTileDiameterWorld()) while ship size is
+        // fixed in world units — so the width has to be derived from the widest active ship at
+        // generation time, not a flat cell count, or it can end up narrower than a ship's hull
+        // at some grid resolutions. See Vehicle.Plow.cs's identical collider-to-cells pattern.
+        float cellWorld = Mathf.Max(0.01f, drums.GetCellWorldSize());
+        float clearanceWorld = widestVehicleRadiusWorld * 2f + cellWorld * 0.3f; // ship diameter + margin
+        int minCorridorWidthCells = Mathf.Max(3, Mathf.CeilToInt(clearanceWorld / cellWorld));
+
+        // GenerateInterstitialMaze always modulates at a fixed busyness01=0.5 (see its
+        // busyness01Override below), so grow the authored width until the modulated result
+        // still clears the widest active ship, instead of assuming the ~0.95x factor away.
+        int corridorWidth = minCorridorWidthCells;
+        while (MazeDensityModulation.TunnelsCorridorWidth(corridorWidth, 0.5f) < minCorridorWidthCells)
+            corridorWidth++;
 
         var pattern = ScriptableObject.CreateInstance<MazePatternConfig>();
         pattern.patternType = MazePatternType.Tunnels;
-        pattern.tunnels.corridorWidth = 3;
-        pattern.tunnels.corridorStep = 6; // 3-cell-thick walls: "thick dust" around the vehicle
+        pattern.tunnels.corridorWidth = corridorWidth;
+        pattern.tunnels.corridorStep = corridorWidth + 3; // thick-dust walls around the vehicle
         pattern.porousBorder.exitCount = targets.Count;
 
         _allExits.Clear();

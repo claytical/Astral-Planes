@@ -10,6 +10,14 @@ public partial class InstrumentTrack
     private List<Vector2Int> _heldDustCellsFromFill;
     private bool _subscribedForDustRelease;
 
+    // Called once per genuine note commit (not from AddNoteToLoop itself, which chord retunes
+    // also call to re-quantize every already-committed note — hooking there would re-clear
+    // dust on every chord change instead of only on new commits).
+    private void NotifyNoteCommittedForDust()
+    {
+        GameFlowManager.Instance?.dustGenerator?.PermanentlyClearOneCellForRole(assignedRole);
+    }
+
     public void ClearRoleDustUntilAscension()
     {
         var dust = GameFlowManager.Instance?.dustGenerator;

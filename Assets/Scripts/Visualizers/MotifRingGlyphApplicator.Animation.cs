@@ -7,6 +7,24 @@ public partial class MotifRingGlyphApplicator
 {
     private Coroutine _shakeCoroutine;
 
+    /// <summary>Routed replacement for AudioSource.PlayClipAtPoint — sends the one-shot through
+    /// the Effects mixer group (for anti-click limiting) instead of the unmixed default output,
+    /// and uses one temp GameObject+AudioSource per call instead of Unity's internal pool.</summary>
+    private void PlayOneShotRouted(AudioClip clip, Vector3 pos, float volume)
+    {
+        if (clip == null) return;
+
+        var go = new GameObject("OneShotSfx");
+        go.transform.position = pos;
+
+        var src = go.AddComponent<AudioSource>();
+        src.spatialBlend = 0f; // 2D, matches prior PlayClipAtPoint usage at Camera.main
+        src.outputAudioMixerGroup = effectsMixerGroup;
+        src.PlayOneShot(clip, volume);
+
+        Destroy(go, clip.length);
+    }
+
     /// <summary>Larger, lower-frequency shake for a successful tether break — reads as a released spring.</summary>
     public void PlayBreakShake()
     {
@@ -236,7 +254,7 @@ public partial class MotifRingGlyphApplicator
         if (config?.launchSfx != null)
         {
             var cam = Camera.main;
-            AudioSource.PlayClipAtPoint(
+            PlayOneShotRouted(
                 config.launchSfx,
                 cam != null ? cam.transform.position : Vector3.zero,
                 config.launchSfxVolume);
@@ -354,7 +372,7 @@ public partial class MotifRingGlyphApplicator
         if (config?.impactSfx != null)
         {
             var cam = Camera.main;
-            AudioSource.PlayClipAtPoint(
+            PlayOneShotRouted(
                 config.impactSfx,
                 cam != null ? cam.transform.position : Vector3.zero,
                 config.impactSfxVolume);

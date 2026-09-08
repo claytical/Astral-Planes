@@ -112,7 +112,7 @@ public partial class InstrumentTrack
     // ByVoice tracks suppress cursor movement — their cursor advances via NotifyBinFilled.
     private void AdvanceCursorPastBin(int targetBin)
     {
-        var rp = MusicalRoleProfileLibrary.GetProfile(assignedRole);
+        var rp = _activeProfile ?? MusicalRoleProfileLibrary.GetProfile(assignedRole);
         if (rp != null && rp.configSelectionMode == RoleConfigSelectionMode.ByVoice) return;
         if (GetBinCursor() <= targetBin) SetBinCursor(targetBin + 1);
         if (loopMultiplier > 0 && GetBinCursor() > loopMultiplier) SetBinCursor(loopMultiplier);
