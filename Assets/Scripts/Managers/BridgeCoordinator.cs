@@ -103,8 +103,7 @@ public sealed class BridgeCoordinator
         snapshot.Color = _gameFlow.dustGenerator.MazeColor();
         snapshot.TotalSteps = (drum != null && drum.totalSteps > 0) ? drum.totalSteps : 16;
         snapshot.Bpm = (drum != null && drum.drumLoopBPM > 0f) ? drum.drumLoopBPM : 120f;
-        float clipLen = drum != null ? drum.GetClipLengthInSeconds() : 0f;
-        snapshot.StepDurationSec = (clipLen > 0f) ? clipLen / snapshot.TotalSteps : 0f; // 0 ⇒ preview falls back
+        snapshot.StepDurationSec = drum != null ? drum.GetAuthoredStepSeconds() : 0f; // 0 ⇒ preview falls back
         snapshot.MotifKeyRootMidi = (_gameFlow.phaseTransitionManager != null && _gameFlow.phaseTransitionManager.currentMotif != null)
             ? _gameFlow.phaseTransitionManager.currentMotif.keyRootMidi
             : 60;

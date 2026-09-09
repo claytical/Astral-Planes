@@ -13,20 +13,7 @@ MonoBehaviour:
   m_Name: lead-descent-alt
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: lead-descent-alt
-  roleProfile: {fileID: 11400000, guid: 88ba87390b412400b88142811cf0e3ba, type: 2}
+  roleProfile: {fileID: 11400000, guid: 01a0a46bc3bd3489eaa95bb2f1ec236b, type: 2}
   riff: {fileID: 11400000, guid: 8d501cc1baec94f3787289fd6ad497b0, type: 2}
-  useRiffAsAuthoritativeScore: 1
-  scales: []
-  patterns: []
-  rhythms: []
-  chordFunctions: []
-  chordsPerRegion: 2
-  behaviors: []
-  maxBehaviorsStack: 2
-  variation:
-    extensionBias: 0.35
-    octaveMoveProb: 0.1
-    restProb: 0.1
-    durJitter: 1
-  mineNodeTintBudget: 20
+  mineNodeExpireAfterLoops: 3
   ascendLoops: 4

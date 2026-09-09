@@ -15,22 +15,50 @@ MonoBehaviour:
   innerRadius: 0.1
   ringThickness: 0.15
   ringSpacing: 0.05
+  interBinSpacing: 0.1
+  segments: 256
   fitPaddingFraction: 0.05
   ringMeshMaterial: {fileID: 2100000, guid: db6f88bb6fd04da5bdaac2167f76440b, type: 2}
   ringAlpha: 0.166
+  contourAlpha: 1
   lineWidth: 0.01
-  segments: 256
+  recordLineWidth: 0.012
   tugDepthFraction: 0.25
   tugHalfWidthRad: 0.75
+  highlightScaleMultiplier: 1.15
+  highlightBrightness: 0.5
+  highlightPulseDuration: 0.15
+  nonHighlightedTransitionDuration: 0.15
+  nonHighlightedDarkenAmount: 0.6
+  nonHighlightedAlphaMultiplier: 0.35
+  remainingRingColor: {r: 0.6, g: 0.6, b: 0.6, a: 1}
+  remainingRingAlpha: 0.12
+  remainingContourAlpha: 0.25
+  nextUpColorCycleDuration: 1.5
   ringDrawInDuration: 0.5
   ringStaggerDelay: 0.08
   rotSpeedBase: 25
   rotSpeedMax: 100
-  fadeOutDuration: 1
+  directionMatchRatioThreshold: 0.5
   noteDotRadius: 0.02
   noteTravelDuration: 1
-  ringHoldScale: 0.25
-  bouncePressScale: 0.12
-  bouncePressDuration: 0.25
-  bounceSettleDuration: 0.35
+  launchSfx: {fileID: 0}
+  launchSfxVolume: 0.6
+  impactSfx: {fileID: 0}
+  impactSfxVolume: 0.6
+  noteTetherTransitionDuration: 0.25
+  backgroundDiscColor: {r: 0, g: 0, b: 0, a: 1}
+  placedBackgroundAlpha: 0.35
+  fullBackgroundAlpha: 0.15
+  spinOffDuration: 0.45
   rollOffDuration: 2
+  tiltXDegrees: 75
+  scaleDownDuration: 0.5
+  breakShakeDuration: 0.35
+  breakShakeAmplitude: 0.18
+  breakShakeFrequency: 18
+  denialShakeDuration: 0.14
+  denialShakeAmplitude: 0.07
+  denialShakeFrequency: 40
+  recordHoldDuration: 1.5
+  recordFadeOutDuration: 0.75

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e03bd7d4d4f1b4a41a62831d24c5f8bf, type: 3}
   m_Name: Squiggle
   m_EditorClassIdentifier: 
-  shipName: Wiggles
+  shipName: Squiggle
   description: The needle
   arcadeMaxSpeed: 20
   arcadeAccel: 14

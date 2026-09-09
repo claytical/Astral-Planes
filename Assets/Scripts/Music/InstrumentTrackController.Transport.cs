@@ -26,7 +26,7 @@ public partial class InstrumentTrackController
         double start = leaderDspNow;
         if (start <= 0.0) return default;
 
-        float clipLen = drum.GetClipLengthInSeconds();
+        float clipLen = drum.GetAuthoredBaseLoopSeconds();
         if (clipLen <= 0f) return default;
 
         // --- tolerate "start is slightly in the future" due to PlayScheduled lead time ---
@@ -90,7 +90,7 @@ public partial class InstrumentTrackController
         // If GetLoopLengthInSeconds() is a single bin/bar length (e.g., 16 steps), then
         // dividing it by leaderSteps (e.g., 64) makes stepDur 4x too small and rawAbsStep
         // advances 4x too fast, effectively shrinking your window.
-        double baseLoopLen = drum.GetClipLengthInSeconds();
+        double baseLoopLen = drum.GetAuthoredBaseLoopSeconds();
         if (baseLoopLen <= 0.0) return false;
 
         double dspNow = AudioSettings.dspTime;
@@ -159,18 +159,19 @@ public partial class InstrumentTrackController
         if (drum == null)
             return 0f;
 
-        // IMPORTANT: use the *clip* length, not DrumTrack.GetLoopLengthInSeconds()
-        float clipLen = drum.GetClipLengthInSeconds();
-        int   totalSteps = drum.totalSteps;
-        if (clipLen <= 0f || totalSteps <= 0)
-            return clipLen;
+        // BPM-derived, not clip-length-derived: GetAuthoredStepSeconds() reads drumLoopBPM
+        // directly (not through EffectiveLoopLengthSec/GetLoopLengthInSeconds(), which would
+        // recurse back into this method). A drum clip shorter than one totalSteps bar is
+        // expected to loop natively underneath this — see DrumTrack.GetAuthoredBaseLoopSeconds().
+        float stepDuration = drum.GetAuthoredStepSeconds();
+        if (stepDuration <= 0f)
+            return 0f;
 
         // LeaderSteps already looks at track loopMultipliers
         int leaderSteps = drum.GetLeaderSteps();
         if (leaderSteps <= 0)
-            return clipLen;
+            return 0f;
 
-        float stepDuration = clipLen / totalSteps;
         return stepDuration * leaderSteps;
     }
 }

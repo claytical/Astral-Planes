@@ -95,9 +95,20 @@ public partial class DrumTrack : MonoBehaviour
     // Min-dwell gate: last dsp time an intensity clip swap actually finalized (audible).
     private double _lastClipSwapFinalizedDsp = -1.0;
 
-    public float EffectiveLoopLengthSec => (_trackController != null) ? _trackController.GetEffectiveLoopLengthInSeconds() : _clipLengthSec;
+    public float EffectiveLoopLengthSec => (_trackController != null) ? _trackController.GetEffectiveLoopLengthInSeconds() : GetAuthoredBaseLoopSeconds();
     public float GetLoopLengthInSeconds() => EffectiveLoopLengthSec;
     public float GetClipLengthInSeconds() => _clipLengthSec; // new helper for audio-bound code
+
+    // BPM-derived seconds-per-step (16th-note grid, 4 steps/quarter) — the authored tempo,
+    // independent of whatever physical AudioClip is currently loaded. Reads drumLoopBPM (not
+    // _motif.bpm) since that field commits at the same points _clipLengthSec does today.
+    public float GetAuthoredStepSeconds() => (60f / Mathf.Max(1f, drumLoopBPM)) / 4f;
+
+    // BPM-derived duration of one totalSteps bar. Canonical bar unit for all step/note-timing
+    // consumers — replaces AudioClip.length, which only reflects the *physical* clip and may be
+    // a whole-number subdivision of this (a short clip is expected to loop natively multiple
+    // times underneath one bar, not redefine the bar's length).
+    public float GetAuthoredBaseLoopSeconds() => GetAuthoredStepSeconds() * Mathf.Max(1, totalSteps);
 
     public struct PlayArea
     {

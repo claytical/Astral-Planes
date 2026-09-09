@@ -60,7 +60,7 @@ MonoBehaviour:
   trackSelectionScene: TrackSelection
   inputCooldown: 0.2
   unselectedAlpha: 0.25
-  maxRecordRadius: 3
+  maxRecordRadius: 3.33
   pressToStartCue: {fileID: 0}
   previewPlayer: {fileID: 3751250523553378462}
   phaseLibrary: {fileID: 11400000, guid: 4660cb6f322234453bcc49b92f037354, type: 2}
@@ -126,9 +126,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MotifRingGlyphApplicator
   config: {fileID: 11400000, guid: 55c70b8124e5b4eca816e58b95a8f00a, type: 2}
-  lineMaterial: {fileID: 2100000, guid: 1912c3ee744c4e02937a03888f15925a, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee, type: 2}
   sphericalRotation: 1
-  maxDisplayRadius: 0
+  maxDisplayRadius: 3.33
+  minDisplayRadius: 0.5
+  minRingCountForSizing: 2
+  maxRingCountForSizing: 16
   noteVisualizer: {fileID: 0}
   noteTravelDotPrefab: {fileID: 0}
 --- !u!1 &6923712477886807996
@@ -176,9 +179,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MotifRingGlyphApplicator
   config: {fileID: 11400000, guid: 4293b72a96166429997d9cefa9464185, type: 2}
-  lineMaterial: {fileID: 2100000, guid: 1912c3ee744c4e02937a03888f15925a, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee, type: 2}
   sphericalRotation: 0
-  maxDisplayRadius: 0
+  maxDisplayRadius: 1
+  minDisplayRadius: 0.15
+  minRingCountForSizing: 2
+  maxRingCountForSizing: 16
   noteVisualizer: {fileID: 0}
   noteTravelDotPrefab: {fileID: 0}
 --- !u!1 &8905245117782567966
@@ -226,8 +232,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MotifRingGlyphApplicator
   config: {fileID: 11400000, guid: 4293b72a96166429997d9cefa9464185, type: 2}
-  lineMaterial: {fileID: 2100000, guid: 1912c3ee744c4e02937a03888f15925a, type: 2}
+  lineMaterial: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee, type: 2}
   sphericalRotation: 0
-  maxDisplayRadius: 0
+  maxDisplayRadius: 1
+  minDisplayRadius: 0.15
+  minRingCountForSizing: 2
+  maxRingCountForSizing: 16
   noteVisualizer: {fileID: 0}
   noteTravelDotPrefab: {fileID: 0}

@@ -112,20 +112,24 @@ public class MotifProfile : ScriptableObject
         ValidateTimingAgainstClips();
     }
 
-    // Warns when an authored clip's real length doesn't match what bpm/stepsPerLoop implies.
-    // A mismatch here means audio-bound timing (clip-length-derived) and note-duration timing
-    // (bpm-derived) will disagree, which surfaces as an audible/visual glitch at motif transitions.
+    // Warns when an authored clip's real length isn't a whole-number subdivision of what
+    // bpm/stepsPerLoop implies for the full phrase. A clip shorter than the phrase is expected
+    // to loop natively N times underneath it (see DrumTrack.GetAuthoredBaseLoopSeconds) — only
+    // a non-integer ratio means audio-bound and note-duration timing will actually disagree,
+    // which surfaces as an audible/visual glitch at motif transitions.
     private void ValidateTimingAgainstClips()
     {
         if (bpm <= 0f || stepsPerLoop <= 0) return;
         float impliedLoopSec = stepsPerLoop * (60f / bpm) / 4f; // 4 steps/quarter (16th-note grid)
-        float tol = Mathf.Max(0.02f, impliedLoopSec * 0.02f);
 
         void Check(AudioClip clip, string label)
         {
             if (clip == null || clip.length <= 0f) return;
-            if (Mathf.Abs(clip.length - impliedLoopSec) > tol)
-                Debug.LogWarning($"[MotifProfile:{name}] bpm={bpm} stepsPerLoop={stepsPerLoop} implies loop={impliedLoopSec:F3}s but '{label}' clip '{clip.name}' is {clip.length:F3}s.");
+            int n = Mathf.Max(1, Mathf.RoundToInt(impliedLoopSec / clip.length));
+            float expectedClipSec = impliedLoopSec / n;
+            float tol = Mathf.Max(0.02f, expectedClipSec * 0.02f);
+            if (Mathf.Abs(clip.length - expectedClipSec) > tol)
+                Debug.LogWarning($"[MotifProfile:{name}] bpm={bpm} stepsPerLoop={stepsPerLoop} implies phrase={impliedLoopSec:F3}s (nearest valid subdivision: {n}x{expectedClipSec:F3}s) but '{label}' clip '{clip.name}' is {clip.length:F3}s.");
         }
 
         foreach (var c in entryDrumLoops) Check(c, "entryDrumLoops");

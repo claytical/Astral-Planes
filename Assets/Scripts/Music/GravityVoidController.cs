@@ -99,7 +99,7 @@ public sealed class GravityVoidController
 
         if (start <= 0.0) return 0f;
 
-        float clipLen = drum.GetClipLengthInSeconds();
+        float clipLen = drum.GetAuthoredBaseLoopSeconds();
 
         if (clipLen <= 0f) return 0f;
 

@@ -10,23 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f8571c45382984a839a6b50b6bbc8220, type: 3}
-  m_Name: steeljazz-folding
+  m_Name: jazzbend-folding
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: jazz-folding
-  roleProfile: {fileID: 11400000, guid: b074910f739d0459f81d5e08e65047ab, type: 2}
+  roleProfile: {fileID: 11400000, guid: b3057cdc4b5d94cf09f4033758a96330, type: 2}
   riff: {fileID: 11400000, guid: 33d7f2ff226e34e239779337e24e4fd8, type: 2}
-  useRiffAsAuthoritativeScore: 1
-  scales: []
-  patterns: []
-  rhythms: []
-  chordFunctions: []
-  chordsPerRegion: 2
-  behaviors: []
-  maxBehaviorsStack: 2
-  variation:
-    extensionBias: 0.35
-    octaveMoveProb: 0.1
-    restProb: 0.1
-    durJitter: 1
-  mineNodeTintBudget: 20
+  mineNodeExpireAfterLoops: 3
   ascendLoops: 0

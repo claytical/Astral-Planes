@@ -47,11 +47,11 @@ public partial class MotifRingGlyphApplicator
         Vector3? markerPos = entry.Tether != null && entry.Tether.start != null ? entry.Tether.start.position : (Vector3?)null;
         Vector3? anchorPos = entry.Anchor != null ? entry.Anchor.transform.position : (Vector3?)null;
 
-        if (entry.Tether != null) entry.Tether.RetractAndDestroy(config.noteTetherGrowDuration);
+        if (entry.Tether != null) entry.Tether.RetractAndDestroy(config.noteTetherTransitionDuration);
         // Keep the anchor (the tether's 'end') alive through the retract animation — destroying
         // it now would null 'end' with no rebind info, tripping NoteTether's own "hopeless"
         // self-destruct on the next frame before the retract can play.
-        if (entry.Anchor != null) Destroy(entry.Anchor, config.noteTetherGrowDuration);
+        if (entry.Anchor != null) Destroy(entry.Anchor, config.noteTetherTransitionDuration);
 
         entry.Track?.RemovePersistentNoteAtStep(entry.Step);
         noteVisualizer?.RemoveCommittedMarkerAtStep(entry.Track, entry.Step);
@@ -143,12 +143,12 @@ public partial class MotifRingGlyphApplicator
 
         StartCoroutine(AnimateMeshFill(
             entry.Fill.GetComponent<MeshFilter>().sharedMesh,
-            entry.FullTris, segs, delay: 0f, config.ringAppearDuration));
+            entry.FullTris, segs, delay: 0f, config.ringDrawInDuration));
 
         // Draw in the flat circle contour, then rotate persistently.
         StartCoroutine(AnimateSingleRing(
             entry.Contour, entry.ContourPoints,
-            0f, config.ringAppearDuration,
+            0f, config.ringDrawInDuration,
             entry.Root.transform, rotDeg,
             new List<NoteAnimInfo>(), null,
             shouldStop: () => _gameplayFadingOut));
@@ -277,7 +277,7 @@ public partial class MotifRingGlyphApplicator
                 // it indefinitely (see NoteTether.Update()), so a lagging marker never silently
                 // drops the preview the way a fixed-timeout wait here would.
                 tether.BindStartByStep(track, note.Step, noteVisualizer);
-                tether.GrowIn(config.noteTetherGrowDuration);
+                tether.GrowIn(config.noteTetherTransitionDuration);
             }
 
             var capturedNote = note;
@@ -424,11 +424,11 @@ public partial class MotifRingGlyphApplicator
 
             StartCoroutine(AnimateMeshFill(
                 entry.Fill.GetComponent<MeshFilter>().sharedMesh,
-                entry.FullTris, segs, delay: i * config.ringStaggerDelay, config.ringAppearDuration));
+                entry.FullTris, segs, delay: i * config.ringStaggerDelay, config.ringDrawInDuration));
 
             StartCoroutine(AnimateSingleRing(
                 entry.Contour, entry.ContourPoints,
-                i * config.ringStaggerDelay, config.ringAppearDuration,
+                i * config.ringStaggerDelay, config.ringDrawInDuration,
                 entry.Root.transform, 0f,
                 new List<NoteAnimInfo>(), null,
                 shouldStop: () => _gameplayFadingOut));

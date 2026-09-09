@@ -6,23 +6,6 @@ using UnityEngine;
 public partial class MotifRingGlyphApplicator
 {
     /// <summary>
-    /// Spin the whole record 360° clockwise over <paramref name="spinDuration"/>, then
-    /// slide it off the left edge over <paramref name="rollDuration"/>.
-    /// </summary>
-    public IEnumerator SpinAndRollOffRecordRings(float spinDuration, float rollDuration)
-    {
-        _recordFadingOut = true;  // stop per-ring rotation coroutines
-        Vector3 originalScale = transform.localScale;
-
-        yield return RunSpinRollScale(_recordRings.ToArray(), spinDuration, rollDuration);
-
-        DestroyList(_recordRings);
-        _recordFadingOut = false;
-        transform.localScale = originalScale;
-        transform.rotation = Quaternion.identity;
-    }
-
-    /// <summary>
     /// Spin-and-roll-off the accumulated gameplay rings (used at bridge time).
     /// Restores visibility first if the record was hidden after the last deformation.
     /// </summary>
@@ -71,7 +54,7 @@ public partial class MotifRingGlyphApplicator
         // Restore to full scale — handles both "hidden after deformation" and "mid-fade interrupted".
         transform.localScale = _fitScale.sqrMagnitude > 0.0001f ? _fitScale : Vector3.one;
 
-        DetachPendingRingTethers(config != null ? config.noteTetherGrowDuration : 0.25f);
+        DetachPendingRingTethers(config != null ? config.noteTetherTransitionDuration : 0.25f);
 
         yield return RunSpinRollScale(
             _gameplayRings.Concat(_remainingRings).ToArray(), spinDuration, rollDuration);

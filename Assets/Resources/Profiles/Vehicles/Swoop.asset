@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e03bd7d4d4f1b4a41a62831d24c5f8bf, type: 3}
   m_Name: Swoop
   m_EditorClassIdentifier: 
-  shipName: Swoop
+  shipName: sWoop
   description: Alien and forceful. Pulses with deep bass and strange percussive tones.
   arcadeMaxSpeed: 8
   arcadeAccel: 6

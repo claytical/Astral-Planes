@@ -264,17 +264,23 @@ public partial class DrumTrack
         return config != null ? Mathf.Max(1, config.defaultTransitionPhraseLengthLoops) : 1;
     }
 
-    // Warns when a chosen clip's real length doesn't match motif.bpm/stepsPerLoop. Runtime
-    // counterpart to MotifProfile.ValidateTimingAgainstClips — needed because intensityClipTags
-    // are chosen dynamically (ResolveNearestIntensityClip) and won't re-trigger OnValidate.
+    // Warns when a chosen clip's real length isn't a whole-number subdivision of
+    // motif.bpm/stepsPerLoop's authored phrase length. Runtime counterpart to
+    // MotifProfile.ValidateTimingAgainstClips — needed because intensityClipTags are chosen
+    // dynamically (ResolveNearestIntensityClip) and won't re-trigger OnValidate.
+    //
+    // A clip shorter than the authored phrase is expected to loop natively N times underneath
+    // it (see DrumTrack.GetAuthoredBaseLoopSeconds) — only a non-integer ratio is a real mismatch.
     private void WarnIfClipTimingMismatch(MotifProfile motif, AudioClip clip)
     {
         if (motif == null || clip == null || clip.length <= 0f || motif.bpm <= 0f || motif.stepsPerLoop <= 0) return;
         float impliedLoopSec = motif.stepsPerLoop * (60f / motif.bpm) / 4f;
-        float delta = Mathf.Abs(clip.length - impliedLoopSec);
-        float tol = Mathf.Max(0.02f, impliedLoopSec * 0.02f);
+        int n = Mathf.Max(1, Mathf.RoundToInt(impliedLoopSec / clip.length));
+        float expectedClipSec = impliedLoopSec / n;
+        float delta = Mathf.Abs(clip.length - expectedClipSec);
+        float tol = Mathf.Max(0.02f, expectedClipSec * 0.02f);
         if (delta > tol)
-            Debug.LogWarning($"[DRUM][MOTIF][TIMING] motif={motif.motifId} bpm={motif.bpm} stepsPerLoop={motif.stepsPerLoop} implies loop={impliedLoopSec:F3}s but clip '{clip.name}' is {clip.length:F3}s (Δ={delta:F3}s).");
+            Debug.LogWarning($"[DRUM][MOTIF][TIMING] motif={motif.motifId} bpm={motif.bpm} stepsPerLoop={motif.stepsPerLoop} implies phrase={impliedLoopSec:F3}s (nearest valid subdivision: {n}x{expectedClipSec:F3}s) but clip '{clip.name}' is {clip.length:F3}s (Δ={delta:F3}s).");
     }
 
     public void SetMotifBeatSequence(MotifProfile motif, bool armAtNextBoundary, string who, bool restartTransport = false) {

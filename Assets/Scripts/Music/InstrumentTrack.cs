@@ -566,16 +566,13 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
     private float TicksToSeconds(int durationTicks)
     {
-        // Derive from the actual clip-length-based step duration (same basis
-        // InstrumentTrackController.GetEffectiveLoopLengthInSeconds uses), not drumLoopBPM —
-        // the two can diverge if a motif's authored bpm doesn't match its clip's real length,
-        // which otherwise shows up as a note-tint duration mismatch right at motif transitions.
+        // Same basis InstrumentTrackController.GetEffectiveLoopLengthInSeconds uses:
+        // BPM-derived step duration, not clip.length/totalSteps — a drum clip shorter than
+        // one totalSteps bar is expected to loop natively underneath it, not redefine step duration.
         if (drumTrack == null) return 0f;
-        float clipLen = drumTrack.GetClipLengthInSeconds();
-        int steps = drumTrack.totalSteps;
-        if (clipLen <= 0f || steps <= 0) return 0f;
+        float secondsPerStep = drumTrack.GetAuthoredStepSeconds();
+        if (secondsPerStep <= 0f) return 0f;
 
-        float secondsPerStep = clipLen / steps;
         const int ticksPerStep = 120; // 480 ticks/quarter ÷ 4 steps/quarter (16th-note grid)
         return durationTicks * (secondsPerStep / ticksPerStep);
     }

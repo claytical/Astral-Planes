@@ -1,26 +1,55 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
+// Each ring built by MotifRingGlyphApplicator has two visual layers: a "Guide Circle" (the
+// filled annulus, "Fill" in code) and a "Notation Line" (the LineRenderer contour that dips
+// inward at each note, "Contour" in code). Headers below group fields by which layer they
+// affect — Fill-only, Contour-only, or Shared (both layers, or the whole ring as a unit) —
+// plus a few headers for visual elements that are neither layer (background discs, the note
+// travel dot, the tether).
 [CreateAssetMenu(fileName = "RingGlyphConfig", menuName = "Astral Planes/Ring Glyph Config")]
 public class RingGlyphConfig : ScriptableObject
 {
-    [Header("Layout")]
-    [Tooltip("Inner edge radius of the innermost ring in local units (parent-relative).")]
+    [Header("Layout (Shared)")]
+    [Tooltip("Inner edge radius of the innermost ring in local units (parent-relative) — just the " +
+             "starting offset for ring 0, NOT the dominant factor in overall stack size once there " +
+             "are more than a couple of rings. RingInnerRadius(n) = innerRadius + n*(ringThickness+" +
+             "ringSpacing) — for a multi-ring stack that per-ring term dominates the total, so " +
+             "ringThickness/ringSpacing are the more effective knobs for changing overall size.")]
     public float innerRadius = 0.08f;
 
     [Tooltip("Radial thickness of each filled ring in local units.")]
     public float ringThickness = 0.04f;
 
-    [Tooltip("Gap between the outer edge of one ring and the inner edge of the next.")]
+    [Tooltip("Gap between the outer edge of one ring and the inner edge of the next. For gameplay and " +
+             "locked-preview rings this is the uniform gap everywhere. For record/carousel rings " +
+             "(AnimateApply/ApplyStatic/ApplyVinyl) it means something narrower: the gap WITHIN a bin's " +
+             "band, between rings that share the same BinIndex — keep it small. See interBinSpacing " +
+             "below for the gap BETWEEN one bin's band and the next.")]
     public float ringSpacing = 0.02f;
+
+    [Tooltip("Record/carousel rings only (AnimateApply/ApplyStatic/ApplyVinyl) — gap between one bin's " +
+             "ring band and the next, distinct from ringSpacing's now-narrower within-band meaning. " +
+             "Should be noticeably larger than ringSpacing, and tuned large enough relative to " +
+             "tugDepthFraction that one band's note dips don't visually reach into the next band. " +
+             "Gameplay and locked-preview rings ignore this entirely — they still use ringSpacing " +
+             "uniformly via RingInnerRadius.")]
+    public float interBinSpacing = 0.1f;
+
+    [Range(64, 512)]
+    [Tooltip("Number of vertices per ring. Higher values = smoother sine dips. Feeds the Fill mesh's " +
+             "triangle count, the Contour's point count, and the background discs' mesh resolution.")]
+    public int segments = 256;
 
     [Range(0f, 0.4f)]
     [Tooltip("Fraction of the play area height reserved as padding on each side. " +
              "0.05 = 5% padding, so the outermost ring fills 90% of the play area height.")]
     public float fitPaddingFraction = 0.05f;
 
-    [Header("Filled Ring Appearance")]
+    [Header("Guide Circle — Fill")]
     [Tooltip("Material for filled annulus rings. Must support alpha blending. " +
-             "Assign a URP Unlit/Transparent or Sprites/Default material.")]
+             "Assign a URP Unlit/Transparent or Sprites/Default material. Also applied to the two " +
+             "background backdrop discs (CreateBackgroundDisc) — not just the ring fills.")]
     public Material ringMeshMaterial;
 
     [Range(0f, 1f)]
@@ -28,11 +57,50 @@ public class RingGlyphConfig : ScriptableObject
              "on top of each other without fully obscuring what is behind.")]
     public float ringAlpha = 0.45f;
 
+    [Header("Notation Line — Contour")]
     [Range(0f, 1f)]
     [Tooltip("Alpha for the contour LineRenderer. 1 = fully opaque track color.")]
     public float contourAlpha = 1f;
 
-    [Header("Remaining Progress Ring Appearance")]
+    [Tooltip("LineRenderer width in local units.")]
+    public float lineWidth = 0.003f;
+
+    [Tooltip("Contour width for record/carousel rings (AnimateApply/ApplyStatic/ApplyVinyl) only — wider than lineWidth so the ethereal edge-softness gradient (RingLineEthereal.mat) is actually visible instead of collapsing into a few pixels. Gameplay and locked-preview rings still use lineWidth.")]
+    public float recordLineWidth = 0.012f;
+
+    [Range(0f, 1f)]
+    [Tooltip("Inward dip depth as a fraction of the ring radius. 0.65 gives a pronounced pac-man dip; tune in Inspector (0.4 = subtle, 0.85 = very deep).")]
+    public float tugDepthFraction = 0.65f;
+
+    [Tooltip("Angular half-width of each tug bell in radians (0.8 ≈ 46°, giving ~92° total mouth width per note).")]
+    public float tugHalfWidthRad = 0.8f;
+
+    [Header("Playback Highlight (Fill + Contour)")]
+    [Tooltip("Scale multiplier applied to a ring while its bin is the one currently playing in RingPreviewPlayer.")]
+    public float highlightScaleMultiplier = 1.15f;
+
+    [Range(0f, 1f)]
+    [Tooltip("How far to lerp a highlighted ring's Fill/Contour color toward white. 0 = no brightening, 1 = fully white.")]
+    public float highlightBrightness = 0.5f;
+
+    [Tooltip("Seconds to lerp a ring's scale and color in when its playing-bin highlight turns on.")]
+    public float highlightPulseDuration = 0.15f;
+
+    [Tooltip("Seconds to lerp a ring's scale and color back down when its playing-bin highlight turns " +
+             "off. Kept separate from highlightPulseDuration so the outgoing ring can be made to clear " +
+             "away faster than the incoming one brightens — set low (or 0 for an instant snap) if " +
+             "overlapping fade windows are reading as a lingering 'other bin' ring during playback.")]
+    public float nonHighlightedTransitionDuration = 0.15f;
+
+    [Range(0f, 1f)]
+    [Tooltip("How far to darken a NON-highlighted ring's Fill/Contour color toward black while another bin is playing. 0 = no darkening, 1 = fully black.")]
+    public float nonHighlightedDarkenAmount = 0.6f;
+
+    [Range(0f, 1f)]
+    [Tooltip("Multiplier on a NON-highlighted ring's normal alpha (ringAlpha/contourAlpha) while another bin is playing — lower = more transparent.")]
+    public float nonHighlightedAlphaMultiplier = 0.35f;
+
+    [Header("Remaining / Locked Placeholder Rings")]
     [Tooltip("Fill/contour color for gray placeholder rings representing motif progress not yet completed.")]
     public Color remainingRingColor = new Color(0.6f, 0.6f, 0.6f, 1f);
 
@@ -47,74 +115,37 @@ public class RingGlyphConfig : ScriptableObject
     [Tooltip("Seconds to lerp from one active role color to the next on the next-up placeholder ring.")]
     public float nextUpColorCycleDuration = 1.5f;
 
-    [Header("Record Fade Out")]
-    [Tooltip("Seconds the completed record stays fully visible (100% opacity) before it starts " +
-             "fading out, once shown at the start of a new motif.")]
-    public float recordHoldDuration = 1.5f;
-
-    [Tooltip("Default seconds for the initial record to fade out when not synced to maze generation " +
-             "(ordinary/path-choice motif transitions, where the new maze is already fully generated " +
-             "by the time the record reappears).")]
-    public float recordFadeOutDuration = 0.75f;
-
-    [Header("Background Discs")]
-    [Tooltip("Color for the two solid backdrop discs behind the ring stack (alpha is set separately per disc).")]
-    public Color backgroundDiscColor = Color.black;
-
-    [Range(0f, 1f)]
-    [Tooltip("Alpha for the inner backdrop disc, sized to rings already placed. More opaque than the full-record disc.")]
-    public float placedBackgroundAlpha = 0.35f;
-
-    [Range(0f, 1f)]
-    [Tooltip("Alpha for the outer backdrop disc, sized to the entire record (placed + remaining). Fainter than the placed disc.")]
-    public float fullBackgroundAlpha = 0.15f;
-
-    [Header("Line")]
-    [Tooltip("LineRenderer width in local units.")]
-    public float lineWidth = 0.003f;
-
-    [Range(64, 512)]
-    [Tooltip("Number of vertices per ring. Higher values = smoother sine dips.")]
-    public int segments = 256;
-
-    [Header("Tug (inward dip per note)")]
-    [Range(0f, 1f)]
-    [Tooltip("Inward dip depth as a fraction of the ring radius. 0.65 gives a pronounced pac-man dip; tune in Inspector (0.4 = subtle, 0.85 = very deep).")]
-    public float tugDepthFraction = 0.65f;
-
-    [Tooltip("Angular half-width of each tug bell in radians (0.8 ≈ 46°, giving ~92° total mouth width per note).")]
-    public float tugHalfWidthRad = 0.8f;
-
-    [Header("Animation")]
-    [Tooltip("Seconds for each ring to trace itself in.")]
+    [Header("Draw-In / Reveal Animation (Shared)")]
+    [Tooltip("Seconds for each ring to trace itself in — both the Fill mesh's triangle reveal and the " +
+             "Contour's point-count reveal, in lockstep. Used everywhere a ring draws itself in: the " +
+             "main record's rings, locked-preview placeholders, freshly-spawned gameplay bin rings, " +
+             "and remaining-progress placeholders.")]
     public float ringDrawInDuration = 0.5f;
 
     [Tooltip("Seconds between the start of successive ring draw-ins.")]
     public float ringStaggerDelay = 0.08f;
 
+    [Header("Rotation (Shared)")]
     [Tooltip("Rotation base value. " +
              "Gameplay rings: degrees/beat × bpm/60 = deg/sec (scales with active BPM). " +
-             "Record rings: degrees/sec × bin fill duration in seconds.")]
+             "Record rings: speed at a 0 density+match-ratio score (see rotSpeedMax for the score-1 end).")]
     public float rotSpeedBase = 20f;
 
     [Tooltip("Maximum rotation speed cap in degrees/sec.")]
     public float rotSpeedMax = 300f;
 
+    [Range(0f, 1f)]
+    [Tooltip("Record/carousel rings only — a ring's MatchRatio must meet this to spin in the " +
+             "default (positive) direction; below it, the ring spins reversed. Distinguishes " +
+             "clean/matched bins from improvised/unmatched-heavy ones.")]
+    public float directionMatchRatioThreshold = 0.5f;
+
+    [Header("Note Travel Dot & SFX")]
     [Tooltip("Radius of the mini-ring dot that travels from note marker to tug point (in ring-local units).")]
     public float noteDotRadius = 0.02f;
 
     [Tooltip("Duration in seconds for each note-to-tug travel animation.")]
     public float noteTravelDuration = 0.35f;
-
-    [Header("Note Tether")]
-    [Tooltip("Seconds for a note's preview tether to grow in from the timeline marker to its ring landing spot.")]
-    public float noteTetherGrowDuration = 0.25f;
-
-    [Tooltip("Seconds for the ring to slide from center to off the left edge at the second loop boundary.")]
-    public float rollOffDuration = 1.5f;
-
-    [Tooltip("Duration for the quick ring appear animation (dipped contour drawn in fast).")]
-    public float ringAppearDuration = 0.1f;
 
     [Tooltip("Percussive AudioClip played when a note travel dot launches.")]
     public AudioClip launchSfx;
@@ -130,14 +161,41 @@ public class RingGlyphConfig : ScriptableObject
     [Tooltip("Volume for the impact SFX.")]
     public float impactSfxVolume = 0.6f;
 
-    [Tooltip("Duration of the spin-off exit in seconds (replaces rollOffDuration for gameplay rings).")]
+    [Header("Note Tether")]
+    [FormerlySerializedAs("noteTetherGrowDuration")]
+    [Tooltip("Seconds for a note's preview tether to animate — both growing in from the timeline marker " +
+             "to its ring landing spot, and retracting/detaching when broken or departing.")]
+    public float noteTetherTransitionDuration = 0.25f;
+
+    [Header("Background Discs")]
+    [Tooltip("Color for the two solid backdrop discs behind the ring stack (alpha is set separately per disc).")]
+    public Color backgroundDiscColor = Color.black;
+
+    [Range(0f, 1f)]
+    [Tooltip("Alpha for the inner backdrop disc, sized to rings already placed. More opaque than the full-record disc.")]
+    public float placedBackgroundAlpha = 0.35f;
+
+    [Range(0f, 1f)]
+    [Tooltip("Alpha for the outer backdrop disc, sized to the entire record (placed + remaining). Fainter than the placed disc.")]
+    public float fullBackgroundAlpha = 0.15f;
+
+    // Three sequential phases of one gameplay-ring exit sequence: spin, then tilt, then scale to
+    // zero. Read only externally, via BridgeCoordinator.cs → SpinAndRollOffActiveRings (SpinOff.cs)
+    // — nothing in this file's own consumers (the MotifRingGlyphApplicator partials) reads these
+    // four fields directly.
+    [Header("Gameplay Ring Exit (Spin → Tilt → Scale)")]
+    [Tooltip("Phase 1 (360° spin) duration of the gameplay ring exit sequence, immediately followed by " +
+             "rollOffDuration's tilt phase — the two run back-to-back, not as alternatives.")]
     public float spinOffDuration = 0.45f;
 
-    [Header("Tilt Exit")]
+    [Tooltip("Phase 2 (tilt) duration of the gameplay ring exit sequence — lerps the ring to tiltXDegrees " +
+             "before it scales to zero.")]
+    public float rollOffDuration = 1.5f;
+
     [Tooltip("Target X-axis rotation (degrees) for the tilt-exit phase.")]
     public float tiltXDegrees = 75f;
 
-    [Tooltip("Duration (seconds) for the ring to scale from its current size to zero after the tilt.")]
+    [Tooltip("Phase 3: duration (seconds) for the ring to scale from its current size to zero after the tilt.")]
     public float scaleDownDuration = 0.5f;
 
     [Header("Ring Collision Feedback")]
@@ -158,4 +216,17 @@ public class RingGlyphConfig : ScriptableObject
 
     [Tooltip("Perlin-noise sample frequency for the denial shake — higher reads as a stiff, clipped jitter.")]
     public float denialShakeFrequency = 40f;
+
+    // Both fields here are consumed externally, one layer removed from this file's own code:
+    // recordHoldDuration only via BinRingController.GetRecordHoldDuration() → SceneFlowCoordinator;
+    // recordFadeOutDuration via FadeRecordOut (GameplayRings.cs).
+    [Header("Record Hold / Fade Out")]
+    [Tooltip("Seconds the completed record stays fully visible (100% opacity) before it starts " +
+             "fading out, once shown at the start of a new motif.")]
+    public float recordHoldDuration = 1.5f;
+
+    [Tooltip("Default seconds for the initial record to fade out when not synced to maze generation " +
+             "(ordinary/path-choice motif transitions, where the new maze is already fully generated " +
+             "by the time the record reappears).")]
+    public float recordFadeOutDuration = 0.75f;
 }

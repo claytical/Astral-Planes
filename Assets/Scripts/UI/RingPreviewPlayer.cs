@@ -14,7 +14,7 @@ public class RingPreviewPlayer : MonoBehaviour
     [SerializeField] private MidiStreamPlayer midiStreamPlayer;
     [SerializeField] private PhaseLibrary phaseLibrary;
 
-    // Bass=0, Harmony=1, Lead=2, Groove=3, None=4
+    // Bass=0, Harmony=1, Lead=2, Groove=3, None=4, Rhythm=5
     private static readonly Dictionary<MusicalRole, int> RoleChannel = new()
     {
         { MusicalRole.Bass,    0 },
@@ -22,6 +22,7 @@ public class RingPreviewPlayer : MonoBehaviour
         { MusicalRole.Lead,    2 },
         { MusicalRole.Groove,  3 },
         { MusicalRole.None,    4 },
+        { MusicalRole.Rhythm,  5 },
     };
 
     private bool   _playing;
@@ -30,9 +31,19 @@ public class RingPreviewPlayer : MonoBehaviour
     private float  _loopLengthSec;
     private float  _stepDurationSec;
     private int    _lastStep = -1;
+    private int    _stepsPerLoop;
+    private int    _currentBinIndex = -1;
 
-    // [step] → list of (midiNote, midiChannel, vel127, durationMs)
-    private List<List<(int note, int channel, int vel127, int durationMs)>> _stepTable;
+    /// <summary>Fired when playback crosses into a new bin (or when playback stops, with -1).</summary>
+    public event System.Action<int> OnBinIndexChanged;
+
+    /// <summary>Fired at most once per role per step that has a note, giving the ring-local angle
+    /// (radians, same convention as the note-dip placement in MotifRingGlyphApplicator) where that
+    /// role's ring should show it — used to spawn a positional VFX on the matching ring.</summary>
+    public event System.Action<MusicalRole, int, float> OnNoteFired;
+
+    // [step] → list of (midiNote, midiChannel, vel127, durationMs, role)
+    private List<List<(int note, int channel, int vel127, int durationMs, MusicalRole role)>> _stepTable;
 
     // Preset per channel, cached so FireStep can re-assert without a library call each frame.
     private int[] _channelPresets;
@@ -98,18 +109,6 @@ public class RingPreviewPlayer : MonoBehaviour
                 : 60f / bpm * 4f / stepsPerLoop;
         }
 
-        // Build (binIndex, trackColor) → role lookup from TrackBins.
-        var roleByBinColor = new Dictionary<(int, Color), MusicalRole>();
-        if (snap.TrackBins != null)
-        {
-            foreach (var tb in snap.TrackBins)
-            {
-                var key = (tb.BinIndex, tb.TrackColor);
-                if (!roleByBinColor.ContainsKey(key))
-                    roleByBinColor[key] = tb.Role;
-            }
-        }
-
         // Loop length = leader loop width at capture time; legacy rings infer it from
         // the max allocated bin count across roles, capped at 5 (4 primary + 1 alternate).
         int leaderBins = snap.LeaderBins;
@@ -133,6 +132,7 @@ public class RingPreviewPlayer : MonoBehaviour
 
         _totalSteps    = leaderBins * stepsPerLoop;
         _loopLengthSec = _totalSteps * _stepDurationSec;
+        _stepsPerLoop  = stepsPerLoop;
 
         // Cache presets per channel — use the motif's own roleProfile, fall back to library.
         _channelPresets = new int[16];
@@ -155,15 +155,15 @@ public class RingPreviewPlayer : MonoBehaviour
         // Build step table: place notes at their absolute session step (silent regions
         // where a track hadn't expanded stay silent, matching the live loop structure)
         // and retune to the per-bin chord.
-        _stepTable = new List<List<(int, int, int, int)>>(_totalSteps);
+        _stepTable = new List<List<(int, int, int, int, MusicalRole)>>(_totalSteps);
         for (int i = 0; i < _totalSteps; i++)
-            _stepTable.Add(new List<(int, int, int, int)>());
+            _stepTable.Add(new List<(int, int, int, int, MusicalRole)>());
 
         foreach (var entry in snap.CollectedNotes)
         {
             if (entry.Step < 0 || entry.Step >= _totalSteps) continue;
 
-            roleByBinColor.TryGetValue((entry.BinIndex, entry.TrackColor), out var role);
+            var role = ResolveRoleForNote(snap.TrackBins, entry.BinIndex, entry.TrackColor);
 
             Chord chord       = GetChordForBin(entry.BinIndex, motif.chordProgression, motif.alternateChordProgressionProfile);
             int   retunedNote = SnapNoteToChord(entry.Note, chord);
@@ -179,7 +179,7 @@ public class RingPreviewPlayer : MonoBehaviour
                 ? Mathf.Max(10, Mathf.RoundToInt(entry.DurationTicks * (60000f / (bpm * 480f))))
                 : 0;
 
-            _stepTable[entry.Step].Add((Mathf.Clamp(retunedNote, 0, 127), ch, vel127, dMs));
+            _stepTable[entry.Step].Add((Mathf.Clamp(retunedNote, 0, 127), ch, vel127, dMs, role));
         }
 
         // Legacy fallback: notes without a stored duration get distance to next onset
@@ -215,16 +215,17 @@ public class RingPreviewPlayer : MonoBehaviour
                 {
                     var n = row[j];
                     if (n.channel == ch && n.durationMs == 0)
-                        row[j] = (n.note, n.channel, n.vel127, dMs);
+                        row[j] = (n.note, n.channel, n.vel127, dMs, n.role);
                 }
             }
         }
 
         PrimeChannels();
 
-        _loopStartDsp = AudioSettings.dspTime;
-        _lastStep     = -1;
-        _playing      = true;
+        _loopStartDsp    = AudioSettings.dspTime;
+        _lastStep        = -1;
+        _currentBinIndex = -1;
+        _playing         = true;
     }
 
     public void Stop()
@@ -238,6 +239,9 @@ public class RingPreviewPlayer : MonoBehaviour
         // rather than being left to ring indefinitely.
         if (midiStreamPlayer != null)
             midiStreamPlayer.MPTK_ClearAllSound();
+
+        _currentBinIndex = -1;
+        OnBinIndexChanged?.Invoke(-1);
     }
 
     // Release time for MPTK_ClearAllSound's NoteOff is unbounded (its own doc: "can take a few
@@ -290,6 +294,13 @@ public class RingPreviewPlayer : MonoBehaviour
         }
 
         _lastStep = target;
+
+        int bin = target / _stepsPerLoop;
+        if (bin != _currentBinIndex)
+        {
+            _currentBinIndex = bin;
+            OnBinIndexChanged?.Invoke(bin);
+        }
     }
 
     private void FireStep(int step)
@@ -299,7 +310,11 @@ public class RingPreviewPlayer : MonoBehaviour
 
         PrimeChannels();
 
-        foreach (var (note, ch, vel127, durationMs) in notes)
+        // Multiple notes (a chord) can share a role at this step — they'd all land at the same
+        // ring angle, so only spawn one firework per role per step rather than one per note.
+        HashSet<MusicalRole> firedRoles = null;
+
+        foreach (var (note, ch, vel127, durationMs, role) in notes)
         {
             midiStreamPlayer.MPTK_PlayEvent(new MPTKEvent
             {
@@ -309,7 +324,35 @@ public class RingPreviewPlayer : MonoBehaviour
                 Duration = durationMs,
                 Velocity = vel127,
             });
+
+            if (OnNoteFired == null) continue;
+            firedRoles ??= new HashSet<MusicalRole>();
+            if (!firedRoles.Add(role)) continue;
+
+            int   localStep = step % _stepsPerLoop;
+            float angleRad  = localStep / (float)_stepsPerLoop * Mathf.PI * 2f;
+            OnNoteFired.Invoke(role, step / _stepsPerLoop, angleRad);
         }
+    }
+
+    // Same tolerant, alpha-blind per-channel comparison MotifRingGlyphApplicator.RecordRings.cs
+    // uses to assign a note to its ring (AnimateApply/ApplyStatic/ApplyVinyl) — previously this
+    // used an exact Dictionary<(int,Color),MusicalRole> key (bitwise equality, alpha included),
+    // which could silently miss and fall back to default(MusicalRole) (== Bass), desyncing which
+    // ring's firework a note triggered from which ring its dip actually rendered on.
+    private static MusicalRole ResolveRoleForNote(
+        List<MotifSnapshot.TrackBinData> trackBins, int binIndex, Color noteColor)
+    {
+        if (trackBins == null) return default;
+        foreach (var tb in trackBins)
+        {
+            if (tb.BinIndex != binIndex) continue;
+            if (Mathf.Approximately(tb.TrackColor.r, noteColor.r) &&
+                Mathf.Approximately(tb.TrackColor.g, noteColor.g) &&
+                Mathf.Approximately(tb.TrackColor.b, noteColor.b))
+                return tb.Role;
+        }
+        return default;
     }
 
     private static Chord GetChordForBin(int bin,

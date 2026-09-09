@@ -125,13 +125,8 @@ public partial class InstrumentTrack
         double dspNow = AudioSettings.dspTime;
 
         float clipLen;
-        try { clipLen = drumTrack.GetClipLengthInSeconds(); }
-        catch
-        {
-            clipLen = (drumTrack.drumAudioSource != null && drumTrack.drumAudioSource.clip != null)
-                ? drumTrack.drumAudioSource.clip.length
-                : 0f;
-        }
+        try { clipLen = drumTrack.GetAuthoredBaseLoopSeconds(); }
+        catch { clipLen = 0f; }
         if (clipLen <= 0f) return;
 
         int drumSteps = Mathf.Max(1, drumTrack.totalSteps);

@@ -75,7 +75,7 @@ public partial class DiscoveryTrackNode
         if (_drumTrack != null && _drumTrack.leaderStartDspTime > 0)
         {
             double dspNow     = AudioSettings.dspTime;
-            double loopLen    = _drumTrack.GetClipLengthInSeconds();
+            double loopLen    = _drumTrack.GetAuthoredBaseLoopSeconds();
             double stepDur    = _stepsPerLoop > 0 ? loopLen / _stepsPerLoop : 0.1;
             double timeInStep = (dspNow - _drumTrack.leaderStartDspTime) % stepDur;
             _burstPauseSnapAt = Time.time + (float)(stepDur - timeInStep);

@@ -11341,6 +11341,7 @@ MonoBehaviour:
     type: 3}
   gravityVoidParent: {fileID: 1354683683}
   pickupSfxSource: {fileID: 0}
+  effectsMixerGroup: {fileID: 0}
 --- !u!82 &1354683685
 AudioSource:
   m_ObjectHideFlags: 0
@@ -11464,19 +11465,19 @@ AudioReverbFilter:
   m_Enabled: 1
   m_DryLevel: 0
   m_Room: -1000
-  m_RoomHF: -476
-  m_DecayTime: 4.32
-  m_DecayHFRatio: 0.59
-  m_ReflectionsLevel: -789
-  m_ReverbLevel: -289
-  m_ReverbDelay: 0.03
+  m_RoomHF: -6000
+  m_DecayTime: 0.17
+  m_DecayHFRatio: 0.1
+  m_ReflectionsLevel: -1204
+  m_ReverbLevel: 207
+  m_ReverbDelay: 0.002
   m_Diffusion: 100
   m_Density: 100
   m_HFReference: 5000
   m_RoomLF: 0
   m_LFReference: 250
   m_ReflectionsDelay: 0
-  m_ReverbPreset: 7
+  m_ReverbPreset: 2
 --- !u!114 &1354683694
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11546,11 +11547,16 @@ MonoBehaviour:
   lineMaterial: {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
   sphericalRotation: 0
   maxDisplayRadius: 0
+  minDisplayRadius: 0.5
+  minRingCountForSizing: 2
+  maxRingCountForSizing: 16
   noteVisualizer: {fileID: 45202786}
   noteTravelDotPrefab: {fileID: 8455937364993888704, guid: 89c7f4bb7ac2442f4985c3faadfde648,
     type: 3}
   tetherBreakEffectPrefab: {fileID: 2567590292593330884, guid: 95e71e582f0ce4b44959d703d22207e9,
     type: 3}
+  notePlaybackFireworkPrefab: {fileID: 0}
+  effectsMixerGroup: {fileID: 0}
 --- !u!120 &1355805402
 LineRenderer:
   serializedVersion: 3

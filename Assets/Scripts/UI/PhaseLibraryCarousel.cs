@@ -46,9 +46,6 @@ public class PhaseLibraryCarousel : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float unselectedAlpha = 0.25f;
 
-    [Tooltip("Caps each slot so no ring exceeds this world-space radius. Matches SolarSystemRecordDisplay.")]
-    [SerializeField] private float maxRecordRadius = 0.5f;
-
     [Tooltip("Shown when no ring records exist yet. Hide when rings are present.")]
     [SerializeField] private GameObject pressToStartCue;
 
@@ -148,6 +145,41 @@ public class PhaseLibraryCarousel : MonoBehaviour
         {
             foreach (var s in slots) s.gameObject.SetActive(false);
         }
+
+        if (previewPlayer != null)
+        {
+            previewPlayer.OnBinIndexChanged += HandlePreviewBinChanged;
+            previewPlayer.OnNoteFired       += HandleNoteFired;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (previewPlayer != null)
+        {
+            previewPlayer.OnBinIndexChanged -= HandlePreviewBinChanged;
+            previewPlayer.OnNoteFired       -= HandleNoteFired;
+        }
+    }
+
+    // Highlights the centered slot's ring(s) matching the bin RingPreviewPlayer is currently
+    // sounding; -1 (playback stopped) clears any highlight instead. Only the centered slot ever
+    // plays audio, so this is the only slot that ever receives highlight calls.
+    private void HandlePreviewBinChanged(int binIndex)
+    {
+        int center = slots.Length / 2;
+        if (center < 0 || center >= slots.Length || slots[center] == null) return;
+
+        if (binIndex < 0) slots[center].ClearPlayingBinHighlight();
+        else               slots[center].SetPlayingBin(binIndex);
+    }
+
+    // Spawns the note-position firework on the centered slot only, matching HandlePreviewBinChanged.
+    private void HandleNoteFired(MusicalRole role, int binIndex, float angleRad)
+    {
+        int center = slots.Length / 2;
+        if (center < 0 || center >= slots.Length || slots[center] == null) return;
+        slots[center].SpawnNoteFirework(role, binIndex, angleRad);
     }
 
     // Scans the authored PhaseLibrary in (phaseIndex, motifIndex) order and returns the first
@@ -256,7 +288,12 @@ public class PhaseLibraryCarousel : MonoBehaviour
             slots[i].gameObject.SetActive(inBounds);
             if (!inBounds) continue;
 
-            slots[i].maxDisplayRadius = maxRecordRadius;
+            // Each slot's own MotifRingGlyphApplicator fields (maxDisplayRadius, minDisplayRadius,
+            // min/maxRingCountForSizing) are configured per-slot in the prefab — the Selected slot
+            // is sized for the screen-relative "hero record" role, Previous/Next for the smaller
+            // thumbnail role. Deliberately not overwritten here uniformly (as it used to be via a
+            // shared maxRecordRadius field) — under the count-driven sizing model that would scale
+            // the thumbnails up to match the Selected slot's target instead of staying small.
             var entry = row[dataIdx];
             bool isCenter = i == center;
 

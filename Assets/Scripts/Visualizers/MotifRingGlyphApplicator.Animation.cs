@@ -91,7 +91,8 @@ public partial class MotifRingGlyphApplicator
         Transform ringTransform, float rotDegPerSec,
         List<NoteAnimInfo> noteInfos, NoteVisualizer noteViz,
         System.Func<bool> shouldStop,
-        bool spherical = false)
+        bool spherical = false,
+        System.Func<bool> isHighlighted = null)
     {
         if (delay > 0f) yield return new WaitForSeconds(delay);
 
@@ -134,10 +135,13 @@ public partial class MotifRingGlyphApplicator
         while (!shouldStop())
         {
             if (ringTransform == null) yield break;
-            if (spherical)
-                ringTransform.Rotate(0f, rotDegPerSec * Time.deltaTime, 0f);
-            else
-                ringTransform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
+            if (isHighlighted == null || isHighlighted())
+            {
+                if (spherical)
+                    ringTransform.Rotate(0f, rotDegPerSec * Time.deltaTime, 0f);
+                else
+                    ringTransform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
+            }
             yield return null;
         }
     }
@@ -152,7 +156,8 @@ public partial class MotifRingGlyphApplicator
         List<NoteAnimInfo> noteInfos, NoteVisualizer noteViz,
         MusicalRole role, int binIndex, Color color, int binSteps, float outerR,
         System.Func<bool> shouldStop,
-        bool spherical = false)
+        bool spherical = false,
+        System.Func<bool> isHighlighted = null)
     {
         if (delay > 0f) yield return new WaitForSeconds(delay);
         if (shouldStop()) yield break;
@@ -203,10 +208,13 @@ public partial class MotifRingGlyphApplicator
         while (!shouldStop())
         {
             if (ringTransform == null) yield break;
-            if (spherical)
-                ringTransform.Rotate(0f, rotDegPerSec * Time.deltaTime, 0f);
-            else
-                ringTransform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
+            if (isHighlighted == null || isHighlighted())
+            {
+                if (spherical)
+                    ringTransform.Rotate(0f, rotDegPerSec * Time.deltaTime, 0f);
+                else
+                    ringTransform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
+            }
             yield return null;
         }
     }

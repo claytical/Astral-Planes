@@ -219,16 +219,31 @@ public class PhaseTransitionManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Like JumpToMotifIndex, but resolves the target by stable motifId first (if the
-    /// current phase's motif list has been reordered since motifId/fallbackIndex were
-    /// recorded, e.g. a PhaseLibrary asset edit). Falls back to the raw fallbackIndex
-    /// when motifId is null/empty or isn't found in the current phase.
+    /// Like JumpToMotifIndex, but treats (phaseId, fallbackIndex) as authoritative — that
+    /// pair is the ring's actual on-disk identity (RingSessionStore keys ring files by
+    /// phaseIndex_motifIndex) — and uses motifId only as a consistency check, never as a
+    /// silent override. If fallbackIndex resolves to a motif whose motifId doesn't match
+    /// the stored motifId, that's data drift/corruption: log it loudly and still trust the
+    /// index. motifId is only used to resolve the target when fallbackIndex is genuinely
+    /// out of range for the current phase (e.g. the phase's motif list has actually
+    /// shrunk since this ring was saved) — the one case where the stored index truly
+    /// can't be trusted.
     /// </summary>
     public void JumpToMotif(string motifId, int fallbackIndex, string who)
     {
         int resolvedIndex = fallbackIndex;
 
-        if (!string.IsNullOrEmpty(motifId) && _chapterMotifs != null)
+        if (_chapterMotifs != null && fallbackIndex >= 0 && fallbackIndex < _chapterMotifs.Count)
+        {
+            var atIndex = _chapterMotifs[fallbackIndex];
+            if (!string.IsNullOrEmpty(motifId) && atIndex != null && atIndex.motifId != motifId)
+            {
+                Debug.LogWarning($"[MOTIF] JumpToMotif: stored index {fallbackIndex} resolves to motifId " +
+                                  $"'{atIndex.motifId}', but ring's stored MotifId is '{motifId}' — using the " +
+                                  $"stored index (ring data may be stale/corrupted) by {who}");
+            }
+        }
+        else if (!string.IsNullOrEmpty(motifId) && _chapterMotifs != null)
         {
             int matchCount = 0;
             for (int i = 0; i < _chapterMotifs.Count; i++)
@@ -239,20 +254,22 @@ public class PhaseTransitionManager : MonoBehaviour
 
             if (matchCount > 1)
             {
-                Debug.LogWarning($"[MOTIF] JumpToMotif: motifId '{motifId}' is ambiguous " +
-                                  $"({matchCount} matches) in current phase; trusting stored index {fallbackIndex} by {who}");
+                Debug.LogWarning($"[MOTIF] JumpToMotif: stored index {fallbackIndex} out of range and motifId " +
+                                  $"'{motifId}' is ambiguous ({matchCount} matches) in current phase by {who}");
             }
             else
             {
                 int idx = _chapterMotifs.FindIndex(m => m != null && m.motifId == motifId);
                 if (idx >= 0)
                 {
+                    Debug.LogWarning($"[MOTIF] JumpToMotif: stored index {fallbackIndex} out of range " +
+                                      $"(count={_chapterMotifs.Count}); recovered motif '{motifId}' at index {idx} by {who}");
                     resolvedIndex = idx;
                 }
                 else
                 {
-                    Debug.LogWarning($"[MOTIF] JumpToMotif: motifId '{motifId}' not found in current phase " +
-                                      $"(count={_chapterMotifs.Count}); falling back to stored index {fallbackIndex} by {who}");
+                    Debug.LogWarning($"[MOTIF] JumpToMotif: stored index {fallbackIndex} out of range and motifId " +
+                                      $"'{motifId}' not found in current phase (count={_chapterMotifs.Count}) by {who}");
                 }
             }
         }

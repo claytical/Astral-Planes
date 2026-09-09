@@ -12,36 +12,53 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dd00e28313c0446baaeebe34dc651322, type: 3}
   m_Name: RingGlyph Canvas
   m_EditorClassIdentifier: Assembly-CSharp::RingGlyphConfig
-  innerRadius: 0.1
-  ringThickness: 0.15
-  ringSpacing: 0.025
-  fitPaddingFraction: 0.05
-  ringMeshMaterial: {fileID: 2100000, guid: db6f88bb6fd04da5bdaac2167f76440b, type: 2}
-  ringAlpha: 0.145
-  lineWidth: 0.03
+  innerRadius: 1
+  ringThickness: 0.05
+  ringSpacing: 1
+  interBinSpacing: 0.1
   segments: 256
+  fitPaddingFraction: 0.043
+  ringMeshMaterial: {fileID: 2100000, guid: db6f88bb6fd04da5bdaac2167f76440b, type: 2}
+  ringAlpha: 0.1
+  contourAlpha: 0.973
+  lineWidth: 0.9
+  recordLineWidth: 0.05
   tugDepthFraction: 0.192
-  tugHalfWidthRad: 0.75
+  tugHalfWidthRad: 0.5
+  highlightScaleMultiplier: 1.15
+  highlightBrightness: 0.533
+  highlightPulseDuration: 0.15
+  nonHighlightedTransitionDuration: 0
+  nonHighlightedDarkenAmount: 0
+  nonHighlightedAlphaMultiplier: 0
+  remainingRingColor: {r: 0.6320754, g: 0.6320754, b: 0.6320754, a: 1}
+  remainingRingAlpha: 0
+  remainingContourAlpha: 0.25
+  nextUpColorCycleDuration: 1.5
   ringDrawInDuration: 0
-  ringStaggerDelay: 0.08
+  ringStaggerDelay: 0
   rotSpeedBase: 25
   rotSpeedMax: 100
-  fadeOutDuration: 1
-  noteDotRadius: 0.02
+  directionMatchRatioThreshold: 0.5
+  noteDotRadius: 0
   noteTravelDuration: 1
-  ringHoldScale: 0.25
-  bouncePressScale: 0.12
-  bouncePressDuration: 0.25
-  bounceSettleDuration: 0.35
-  rollOffDuration: 2
-  ringAppearDuration: 0.1
-  noteLaunchLeadSteps: 2
   launchSfx: {fileID: 0}
   launchSfxVolume: 0.6
   impactSfx: {fileID: 0}
   impactSfxVolume: 0.6
-  spinOffExtraDegPerSec: 720
+  noteTetherTransitionDuration: 0.25
+  backgroundDiscColor: {r: 1, g: 1, b: 1, a: 0}
+  placedBackgroundAlpha: 0.124
+  fullBackgroundAlpha: 0.008
   spinOffDuration: 0.45
+  rollOffDuration: 2
   tiltXDegrees: 75
-  tiltXDuration: 1
   scaleDownDuration: 0.5
+  breakShakeDuration: 0.35
+  breakShakeAmplitude: 0.18
+  breakShakeFrequency: 18
+  denialShakeDuration: 0.14
+  denialShakeAmplitude: 0.07
+  denialShakeFrequency: 40
+  recordHoldDuration: 1.5
+  recordFadeOutDuration: 0.75

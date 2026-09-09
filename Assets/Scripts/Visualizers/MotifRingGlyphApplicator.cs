@@ -38,9 +38,21 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
              "by ring index rather than by fill duration. Use on library cards for a spherical look.")]
     public bool sphericalRotation = false;
 
-    [Tooltip("When GameFlowManager is unavailable (carousel, solar system), cap the display so no ring " +
-             "exceeds this world-space radius. 0 = no cap.")]
+    [Tooltip("When GameFlowManager is unavailable (carousel, solar system), the ring-stack outer radius " +
+             "(world units) TARGETED when ring count is at or above maxRingCountForSizing — not a hard " +
+             "ceiling. The stack is always rescaled to interpolate between minDisplayRadius (at " +
+             "minRingCountForSizing) and this value, so ring count directly drives overall size instead " +
+             "of a cap that only ever shrinks (or never engages at all). 0 = no fit (raw, unscaled size).")]
     public float maxDisplayRadius = 0f;
+
+    [Tooltip("Ring-stack outer radius (world units) when ring count is at or below minRingCountForSizing.")]
+    public float minDisplayRadius = 0.5f;
+
+    [Tooltip("Ring count corresponding to minDisplayRadius.")]
+    public int minRingCountForSizing = 2;
+
+    [Tooltip("Ring count corresponding to maxDisplayRadius.")]
+    public int maxRingCountForSizing = 16;
 
     [Tooltip("NoteVisualizer whose noteMarkers provide travel-dot start positions for gameplay rings.")]
     [SerializeField] private NoteVisualizer noteVisualizer;
@@ -50,6 +62,9 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
 
     [Tooltip("One-shot particle prefab instantiated at both ends of a broken tether (timeline marker and ring landing point). Must self-destroy (e.g. via Explosion.cs) and expose a ParticleSystem to receive the track color.")]
     [SerializeField] private GameObject tetherBreakEffectPrefab;
+
+    [Tooltip("One-shot particle prefab spawned at a note's position on its ring while RingPreviewPlayer plays it back (PhaseLibrary carousel preview only). Must self-destroy (e.g. via Explosion.cs) and expose a ParticleSystem to receive the ring's role color.")]
+    [SerializeField] private GameObject notePlaybackFireworkPrefab;
 
     [Tooltip("Mixer group for launch/impact one-shot SFX (see PlayOneShotRouted in Animation.cs).")]
     [SerializeField] private AudioMixerGroup effectsMixerGroup;
@@ -70,11 +85,16 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
         public List<Vector2> ContourPoints;
         public int           BinIndex;
         public MusicalRole   Role;
+        public float         OuterRadius;
     }
 
     private readonly List<RingEntry> _gameplayRings  = new();
     private readonly List<RingEntry> _recordRings    = new();
     private readonly List<RingEntry> _remainingRings = new(); // gray placeholders for motif progress not yet completed
+
+    // Currently-playing-bin highlight (RecordRings.cs) — indices into _recordRings.
+    private readonly HashSet<int> _highlightedRingIndices = new();
+    private readonly Dictionary<int, Coroutine> _ringPulseCoroutines = new();
 
     private bool    _recordFadingOut;
     private bool    _gameplayFadingOut;    // stops rotation coroutines; set when spin animation begins
@@ -140,6 +160,17 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
         _remainingRings.Clear();
         _placedBgDisc = null;
         _fullBgDisc   = null;
+        ResetHighlightState();
+    }
+
+    // Stops any in-flight playing-bin pulse coroutines and clears their bookkeeping. Must run
+    // whenever _recordRings is rebuilt (indices into it would otherwise go stale) or destroyed.
+    private void ResetHighlightState()
+    {
+        foreach (var co in _ringPulseCoroutines.Values)
+            if (co != null) StopCoroutine(co);
+        _ringPulseCoroutines.Clear();
+        _highlightedRingIndices.Clear();
     }
 
     public void FitToPlayArea(float width, float height, float cx, float cy)
@@ -176,14 +207,14 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
         _ringCollider.radius = RingInnerRadius(ringCount - 1) + config.ringThickness;
     }
 
-    private void RefreshPlayAreaFit(int ringCount)
+    private void RefreshPlayAreaFit(int ringCount, float? actualOuterRadiusOverride = null)
     {
         if (config == null || ringCount == 0) return;
 
         var gfm = GameFlowManager.Instance;
         if (gfm?.activeDrumTrack != null && gfm.activeDrumTrack.TryGetPlayAreaWorld(out var area))
         {
-            float outerRadius = RingInnerRadius(ringCount - 1) + config.ringThickness;
+            float outerRadius = actualOuterRadiusOverride ?? (RingInnerRadius(ringCount - 1) + config.ringThickness);
             if (outerRadius <= 0f) return;
 
             float targetRadius = area.height * (0.5f - config.fitPaddingFraction);
@@ -201,9 +232,18 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
 
         if (maxDisplayRadius > 0f)
         {
-            float outerRadius = RingInnerRadius(ringCount - 1) + config.ringThickness;
+            float outerRadius = actualOuterRadiusOverride ?? (RingInnerRadius(ringCount - 1) + config.ringThickness);
             if (outerRadius <= 0f) return;
-            float scale      = Mathf.Min(1f, maxDisplayRadius / outerRadius);
+
+            // Interpolate between min/max targets by ring count so overall size is driven directly
+            // by how many rings there are, rather than a cap that only ever shrinks an oversized
+            // stack (or never engages at all when the config's natural size is already small).
+            int minCount = Mathf.Max(1, minRingCountForSizing);
+            int maxCount = Mathf.Max(minCount + 1, maxRingCountForSizing);
+            float t            = Mathf.InverseLerp(minCount, maxCount, ringCount);
+            float targetRadius = Mathf.Lerp(minDisplayRadius, maxDisplayRadius, t);
+
+            float scale = targetRadius / outerRadius;
             transform.localScale = Vector3.one * scale;
             _fitScale            = transform.localScale;
         }

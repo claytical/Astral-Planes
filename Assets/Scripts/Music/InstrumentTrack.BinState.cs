@@ -172,7 +172,7 @@ public partial class InstrumentTrack
     // 3-bin leader, BaseLoopSeconds returned 3×clipLen and LeaderMultiplier
     // returned 3 again, giving a 9-bar "leader" period — notes on a 1-bin track
     // were trimmed to 10 ms for 2 of every 3 leader loops (inaudible).
-    private float BaseLoopSeconds() => drumTrack != null ? drumTrack.GetClipLengthInSeconds() : 0f;
+    private float BaseLoopSeconds() => drumTrack != null ? drumTrack.GetAuthoredBaseLoopSeconds() : 0f;
     private int   LeaderMultiplier() => Mathf.Max(1, controller?.GetMaxLoopMultiplier() ?? 1);
     private int   MyMultiplier()     => Mathf.Max(1, loopMultiplier);
     private float TimeSinceStart() =>

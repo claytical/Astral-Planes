@@ -24,10 +24,10 @@ MonoBehaviour:
     type: 2}
   movementArchetype: {fileID: 11400000, guid: 2cfc3a43efbf4cf6803ddd656ff58f9b, type: 2}
   evasionCells: 6
-  collectableSpeed: 1.6
+  collectableSpeed: 1.55
   collectableAccelSeconds: 0.4
   collectableBounceRecoverSeconds: 0.45
-  collectableHomeRadiusCells: 5
+  collectableHomeRadiusCells: 3
   collectableHomePullPerUnit: 2
   collectableFleeRadiusCells: 2
   collectableFleeSpeedMul: 1.3
@@ -38,7 +38,7 @@ MonoBehaviour:
   highestNote: 93
   outputMixerGroup: {fileID: 733832146008888724, guid: 07985bf4f6d469340930e958ef313c14,
     type: 2}
-  volumeMultiplier: 0.853
+  volumeMultiplier: 0.825
   minVelocity: 60
   maxVelocity: 100
   regrowthDelay: 0.1

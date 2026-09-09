@@ -8,7 +8,9 @@ public partial class MotifRingGlyphApplicator
         string goName, float innerR, float outerR, int segs,
         Color color, MusicalRole role, int binIndex,
         List<MotifSnapshot.NoteEntry> notes, int totalSteps,
-        float? fillAlphaOverride = null, float? contourAlphaOverride = null)
+        float? fillAlphaOverride = null, float? contourAlphaOverride = null,
+        int? fillSortingOrderOverride = null, int? contourSortingOrderOverride = null,
+        float? contourWidthOverride = null)
     {
         var root = new GameObject(goName);
         root.transform.SetParent(transform, worldPositionStays: false);
@@ -30,8 +32,10 @@ public partial class MotifRingGlyphApplicator
         mr.receiveShadows    = false;
         // Above the backdrop discs (see CreateBackgroundDisc) so the record reads as a solid
         // black backing with the ring lines on top of it, not a see-through wireframe with the
-        // background (e.g. CosmicDust) showing through.
-        mr.sortingOrder      = FillSortingOrder;
+        // background (e.g. CosmicDust) showing through. Callers building a stacked record (older
+        // bins innermost) pass a higher override here for older rings so their deep note dips —
+        // which visually intrude outward past their own band — still read as on top.
+        mr.sortingOrder      = fillSortingOrderOverride ?? FillSortingOrder;
 
         var mpb = new MaterialPropertyBlock();
         SetFillColor(mr, new Color(color.r, color.g, color.b, fillAlphaOverride ?? config.ringAlpha), mpb);
@@ -48,7 +52,13 @@ public partial class MotifRingGlyphApplicator
         if (lineMaterial != null) lr.material = lineMaterial;
         lr.useWorldSpace     = false;
         lr.loop              = false;
-        lr.widthMultiplier   = config.lineWidth;
+        lr.widthMultiplier   = contourWidthOverride ?? config.lineWidth;
+        // Rounds joints along the polyline (softens the sharp inward "V" at each note's tug-dip),
+        // same technique as PhaseStarDustAffect.CreateTentacleLine. numCapVertices is deliberately
+        // left at 0: the contour's point list already closes itself (BuildRingPoints duplicates
+        // the first point at the end), so with loop=false those two coincident "end" points would
+        // each draw a rounded cap, stacking into a stray dot at the seam.
+        lr.numCornerVertices = 4;
         var contourColor     = new Color(color.r, color.g, color.b, contourAlphaOverride ?? config.contourAlpha);
         lr.startColor        = contourColor;
         lr.endColor          = contourColor;
@@ -56,7 +66,7 @@ public partial class MotifRingGlyphApplicator
         lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         lr.receiveShadows    = false;
         // Topmost — the visible "groove" lines sit above the Fill and the backdrop discs.
-        lr.sortingOrder      = ContourSortingOrder;
+        lr.sortingOrder      = contourSortingOrderOverride ?? ContourSortingOrder;
 
         return new RingEntry
         {
@@ -68,6 +78,7 @@ public partial class MotifRingGlyphApplicator
             ContourPoints = pts,
             BinIndex      = binIndex,
             Role          = role,
+            OuterRadius   = outerR,
         };
     }
 
@@ -80,11 +91,18 @@ public partial class MotifRingGlyphApplicator
     // CosmicDust maze — the discs must sit above dust's sortingOrder (0) or the record reads as
     // a see-through wireframe with dust showing through it instead of a solid backing; Fill and
     // Contour then sit above the discs so the ring lines stay visible on top of that backing.
+    //
+    // FillSortingOrder/ContourSortingOrder are also the base pair for a *stacked* multi-ring
+    // record (see AnimateApply/ApplyStatic/ApplyVinyl in RecordRings.cs): each older ring gets a
+    // fill/contour pair 2 higher than the next-newer ring, so an older (innermost) ring's note
+    // dips — which visually intrude outward past its own band — still render on top of a newer
+    // (outer) ring rather than being covered by it. TravelDotSortingOrder is set far above any
+    // realistic stack depth so travel dots stay visible over every ring regardless of ring count.
     private const int FullBgDiscSortingOrder   = 1;
     private const int PlacedBgDiscSortingOrder = 2;
     private const int FillSortingOrder         = 3;
     private const int ContourSortingOrder      = 4;
-    private const int TravelDotSortingOrder    = 5;
+    private const int TravelDotSortingOrder    = 10000;
 
     private void EnsureBackgroundDiscs()
     {

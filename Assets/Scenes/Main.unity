@@ -1317,7 +1317,7 @@ MonoBehaviour:
   wispPrefab: {fileID: 2567590292593330884, guid: 6120d0fb3b6a8405abb162fc41452f69,
     type: 3}
   demoMode: 0
-  verboseLogging: 0
+  verboseLogging: 1
   harmony: {fileID: 1151719980}
   controller: {fileID: 0}
   activeDrumTrack: {fileID: 0}
@@ -1938,6 +1938,17 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 205164797312018208, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: maxDisplayRadius
+      value: 3.33
+      objectReference: {fileID: 0}
+    - target: {fileID: 205164797312018208, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: notePlaybackFireworkPrefab
+      value: 
+      objectReference: {fileID: 1113209529470810508, guid: e563eb7a83fde45d6bb2664a054d9041,
+        type: 3}
     - target: {fileID: 2018841000974329430, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
       propertyPath: m_Name
