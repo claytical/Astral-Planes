@@ -490,6 +490,29 @@ There are **two distinct consumers**, and they use different methods — this is
 
 ---
 
+## Telemetry
+
+### MazeTelemetryRecorder — Greater Maze Telemetry
+`Assets/Scripts/Telemetry/MazeTelemetryRecorder.cs`, `TelemetryModels.cs`, `MazeTelemetryStore.cs`
+
+A passive, fully decoupled observer — not referenced by `GameFlowManager` or any gameplay system (absent from the Layer Map above for that reason, same treatment as Glyph & Ring Systems), and it never mutates state anywhere else. Deployed as a third `MonoBehaviour` on the `SteamManager.prefab` GameObject, piggybacking on its existing `DontDestroyOnLoad`. It captures, per run, the player's ordered path through Phase → Motif → Motif and the exact committed musical solution for each completed motif — the data set behind a future public "greater maze" visualization (motifs as graph nodes weighted by visitation, transitions as edges weighted by frequency, and per-motif solution distributions). Complementary to, and shares no code with, the Steam Stats funnel (`SteamStatsManager`) — Steam Stats answers "how far did players get," this answers "where did they go, and what did they make there."
+
+**Wiring** (lazily polled in `Update()`, same pattern `SteamStatsManager.Hooks.cs` uses, since `GameFlowManager.Instance`/`SessionState`/`phaseTransitionManager` aren't guaranteed non-null at `Awake()`):
+
+| Event | Fired by | Recorder does |
+|-------|----------|----------------|
+| `SessionStateCoordinator.GameStateChanged` | `SessionStateCoordinator.SetCurrentState` | `Playing` → starts a new `MazeRunRecord` (fresh GUID, UTC start time); `GameOver` → finalizes + writes (`EndReason="Completed"`); any other transition while a run is active — i.e. an early quit via `SceneFlowCoordinator.QuitToSelection` — finalizes + writes (`EndReason="QuitEarly"`) |
+| `PhaseTransitionManager.OnMotifChanged(oldMotif, newMotif)` | `ApplyMotifToAudioAndTracks`, on every genuine `StartChapter`/`AdvanceMotif`/`JumpToMotif` transition — including the run's very first motif, where `oldMotif` is null | Appends a `MotifVisit` (`PhaseId`, `MotifId`, `VisitOrder`) for `newMotif`; if a prior visit already exists this run, also appends a `MotifTransition` edge from it |
+| `GameFlowManager.OnMotifCompleted` | `BeginMotifBridge`, fired synchronously before the bridge coroutine starts (see Flow C) — `phaseTransitionManager.currentMotif` still refers to the motif that just finished at this instant | Walks `InstrumentTrackController.tracks`, builds a `MotifSolution` from each track's `GetPersistentLoopNotes()` + `IsBinFilled()`, tagged to the current `VisitOrder` |
+
+Because `phaseTransitionManager` is a fresh instance every run (nulled by `QuitToSelection`, reassigned on the next `GeneratedTrack` scene load), the recorder resets its wiring flag on every `Playing` transition so it re-subscribes against the new instance — unlike `SteamStatsManager`'s once-per-process wiring, which only needs first-time milestones and never faces this. This lazy-poll wiring has one known edge case: `StartChapter` can fire the run's first `OnMotifChanged` before the recorder's next `Update()` has subscribed, so `HandleMotifCompleted` self-heals by backfilling the missing first `MotifVisit` from `phaseTransitionManager.currentMotif` if `Path` is still empty when a motif completes — real gameplay pacing gives every later transition enough time for the poll to catch up, so this only ever applies to motif one.
+
+**Solution capture is deliberately narrow** — only gameplay state that materially determines the resulting composition. Per track: `MusicalRole`, `VoiceIndex`, committed notes (`StepIndex`, `MidiNote`, `DurationTicks`, `Velocity` — sourced from `InstrumentTrack.GetPersistentLoopNotes()`, the same quantized-step data `BridgeCoordinator.BuildPhaseSnapshotForBridge()` reads for `MotifSnapshot`) and per-bin fill state. Voices the player never touched are skipped entirely. Explicitly excluded: vehicle movement, carving history, failed placements, elapsed time, remaining energy, collisions — none of it is read. Voices are sorted by `(Role, VoiceIndex)` and notes by `(StepIndex, MidiNote)` before serializing, so two runs that commit the same notes always serialize identically regardless of real-time collection order — this determinism is what lets a future aggregation layer treat two solutions as equal by exact comparison, without any similarity heuristics baked into capture itself.
+
+**Storage:** one JSON file per run — `MazeTelemetryStore.SaveRun()` → `Application.persistentDataPath/GreaterMazeTelemetry/run_{runId}_{timestamp}.json` — never overwritten (unlike `RingSessionStore`'s per-`(phase,motif)`-slot overwrite pattern; this is an append-only history, not a "latest state" cache). No backend/upload path exists yet — capture and local persistence only, in a format sized for easy later batch ingestion.
+
+---
+
 ## Removed / Dormant Systems
 
 - **Coral** — fully removed (`MotifCoralVisualizer`, `MotifCoralAnimationController`, and related files deleted in commit `c3315424`). `GameFlowManager.SetBridgeCinematicMode()` no longer exists anywhere in the codebase. The only surviving artifact was an orphaned, unreferenced `Coral Base Segment.prefab`, since deleted. Do not treat coral as "in transition" — there's nothing left to finish.
@@ -532,6 +555,8 @@ InstrumentTrack.IsSaturatedForRepeatingNoteSet() → true
 ```
 StarPool.CheckBridgeGate() passes (budget spent, no live stars) + no collectables in flight
   → GameFlowManager.BeginMotifBridge() (11-line dispatcher)
+      fires OnMotifCompleted synchronously, before the coroutine below starts
+        ← MazeTelemetryRecorder snapshots the finishing motif's solution here (see Telemetry)
   → BridgeCoordinator.PlayMotifBridgeAndRestart():
       SessionState.SetGhostCycleInProgress(true) / SetBridgePending(true)
       FreezeGameplayForBridge() — clears tethers, pending notes, live Collectables/DiscoveryTrackNodes, destroys the StarPool
@@ -540,7 +565,9 @@ StarPool.CheckBridgeGate() passes (budget spent, no live stars) + no collectable
       RingSessionStore.SaveRingToDisk(motifSnap)          ← persistence, not ConstellationMemoryStore
       MotifRingGlyphApplicator.SpinAndRollOffActiveRings() ← live ring exit, not AnimateApply/FadeOutAndClear
       wait for loop boundary
-      SceneFlowCoordinator.StartNextMotifInPhase():
+      SceneFlowCoordinator.StartNextMotifInPhase() → PhaseTransitionManager.AdvanceMotif()/AdvancePhase()
+          fires OnMotifChanged(oldMotif, newMotif)
+            ← MazeTelemetryRecorder appends the path visit + transition edge here (see Telemetry)
           DrumTrack.ApplyMotif(newMotif)
           InstrumentTrackController full reset (clears loop notes, bin state, burst state)
           NoteVisualizer.BeginNewMotif_ClearAll()

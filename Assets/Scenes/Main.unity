@@ -747,6 +747,24 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &840572585 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6371894677720242641, guid: bbb346428e15b432c9f1273a6d13eab2,
+    type: 3}
+  m_PrefabInstance: {fileID: 3032964157223298668}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &840572589
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 840572585}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3564b68f657147848c130f768aff0ec, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MazeTelemetryRecorder
 --- !u!1001 &921184573
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2156,7 +2174,11 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 6371894677720242641, guid: bbb346428e15b432c9f1273a6d13eab2,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 840572589}
   m_SourcePrefab: {fileID: 100100000, guid: bbb346428e15b432c9f1273a6d13eab2, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
