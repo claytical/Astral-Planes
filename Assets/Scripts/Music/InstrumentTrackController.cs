@@ -17,6 +17,8 @@ public partial class InstrumentTrackController : MonoBehaviour
     [SerializeField] public InstrumentTrackControllerConfig config;
     public InstrumentTrack[] tracks;
     public NoteVisualizer noteVisualizer;
+    /// <summary>Fired whenever RebuildTracksForMotif replaces the tracks array (every motif change, not just session start).</summary>
+    public event System.Action<InstrumentTrack[]> OnTracksRebuilt;
     [Header("Dynamic Track Spawning")]
     [Tooltip("Instantiated once per active voice (RoleVoiceKey) in the current motif by RebuildTracksForMotif.")]
     [SerializeField] private InstrumentTrack trackPrefab;
@@ -151,6 +153,7 @@ public partial class InstrumentTrackController : MonoBehaviour
         if (voices == null || voices.Count == 0)
         {
             tracks = System.Array.Empty<InstrumentTrack>();
+            OnTracksRebuilt?.Invoke(tracks);
             return;
         }
 
@@ -158,6 +161,7 @@ public partial class InstrumentTrackController : MonoBehaviour
         {
             Debug.LogError("[ITC] RebuildTracksForMotif: trackPrefab not assigned; no tracks created.");
             tracks = System.Array.Empty<InstrumentTrack>();
+            OnTracksRebuilt?.Invoke(tracks);
             return;
         }
 
@@ -189,6 +193,7 @@ public partial class InstrumentTrackController : MonoBehaviour
         noteVisualizer?.Initialize();
         UpdateVisualizer();
         _gfm?.SetupBinRingController();
+        OnTracksRebuilt?.Invoke(tracks);
     }
 
     void Start()

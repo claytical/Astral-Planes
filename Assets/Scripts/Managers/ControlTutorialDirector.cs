@@ -407,8 +407,12 @@ public partial class ControlTutorialDirector : MonoBehaviour
         if (primaryInstance) primaryInstance.HideAndClear(immediate: true);
     }
 
+    /// <summary>Fired once the primary tutorial reaches its actual completed state (not on abort/skip).</summary>
+    public event Action OnTutorialCompleted;
+
     private void HandlePrimaryTutorialFinished()
     {
+        OnTutorialCompleted?.Invoke();
         _primaryTutorialRunning = false;
 
         // Hide primary and proceed
