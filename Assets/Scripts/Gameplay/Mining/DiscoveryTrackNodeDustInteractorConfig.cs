@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "DiscoveryTrackNodeDustInteractorConfig", menuName = "Astral Planes/Discovery Track Node Dust Interactor Config")]
+[CreateAssetMenu(fileName = "DiscoveryTrackNodeDustInteractorConfig", menuName = "Astral Planes/Gameplay/Mining/Discovery Track Node Dust Interactor Config")]
 public class DiscoveryTrackNodeDustInteractorConfig : ScriptableObject
 {
     [Header("Multipliers while in dust (node-specific)")]

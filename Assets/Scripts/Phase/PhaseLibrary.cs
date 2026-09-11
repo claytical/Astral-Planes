@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-[CreateAssetMenu(menuName="Astral/Phase Chapter Library")]
+[CreateAssetMenu(menuName = "Astral Planes/Phase/Phase Chapter Library", fileName = "PhaseLibrary")]
 public class PhaseLibrary : ScriptableObject
 {
     [Serializable]

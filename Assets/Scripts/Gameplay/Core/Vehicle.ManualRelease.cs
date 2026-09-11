@@ -170,6 +170,7 @@ public partial class Vehicle
         );
 
         p.track.PlayOneShotMidi(chosenMidi, commitVel, resolvedDurationTicks);
+        GrantPostCommitRingCollisionImmunity();
 
         if (viz != null)
         {

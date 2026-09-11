@@ -20,6 +20,7 @@ public partial class LocalPlayer : MonoBehaviour
     private PlayerStats _ui;
     private PlayerInput _playerInput;
     private InputAction _confirmAction;
+    private InputAction _playConfirmAction;
     private InputAction _leaveAction;
     private InputAction _playLeaveAction;
     private InputAction _releaseAction;
@@ -78,19 +79,30 @@ public partial class LocalPlayer : MonoBehaviour
             CreatePlayerSelect();
         }
 
-        _confirmAction = _playerInput.actions["Choose"]; // use your actual action name
+        // "Choose" exists in both Selection and Play maps, same as "Leave" below — a bare-name
+        // lookup resolves to whichever map happens to be enabled the instant this runs (Selection,
+        // since players spawn into TrackSelection) and stays locked onto that one action instance
+        // for the object's lifetime. Once SelectionLaunch switches to the Play map, Selection's
+        // Choose is disabled for good — silently breaking South confirm for every later
+        // GameState.Playing/GameOver use (e.g. LivingScorePanel) despite HandleConfirm looking
+        // correct. Qualify both lookups so South drives HandleConfirm regardless of which map is
+        // currently active.
+        _confirmAction = _playerInput.actions["Selection/Choose"];
+        _playConfirmAction = _playerInput.actions["Play/Choose"];
         _onConfirmStarted = ctx =>
         {
             if (!_confirmEnabled) return;
             HandleConfirm();
         };
         _confirmAction.started += _onConfirmStarted;
+        _playConfirmAction.started += _onConfirmStarted;
 
         _onConfirmCanceled = ctx =>
         {
             _confirmEnabled = true;
         };
         _confirmAction.canceled += _onConfirmCanceled;
+        _playConfirmAction.canceled += _onConfirmCanceled;
         // Arm confirm only if no bound button is currently held.
         // If the join button is still down, we wait for its release (canceled above).
         // If it was already released before we got here, the first real press will confirm.
@@ -153,6 +165,11 @@ public partial class LocalPlayer : MonoBehaviour
         {
             _confirmAction.started -= _onConfirmStarted;
             _confirmAction.canceled -= _onConfirmCanceled;
+        }
+        if (_playConfirmAction != null)
+        {
+            _playConfirmAction.started -= _onConfirmStarted;
+            _playConfirmAction.canceled -= _onConfirmCanceled;
         }
         if (_leaveAction != null)
         {

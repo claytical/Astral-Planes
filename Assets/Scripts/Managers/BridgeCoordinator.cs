@@ -91,6 +91,11 @@ public sealed class BridgeCoordinator
         yield return _gameFlow.StartCoroutine(_gameFlow.PathChoice.RunPathChoiceAndAdvance());
         _session.SetGhostCycleInProgress(false);
         _session.SetBridgePending(false);
+
+        // If every player ran out of energy inside the interstitial maze, the game-over check
+        // fired from Vehicle.ConsumeEnergy was swallowed while GhostCycleInProgress was true —
+        // re-run it now that the flag is clear.
+        _gameFlow.CheckAllPlayersOutOfEnergy();
     }
 
     private MotifSnapshot BuildPhaseSnapshotForBridge(List<InstrumentTrack> retained, DrumTrack drum)

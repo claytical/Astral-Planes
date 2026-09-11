@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Astral Planes/Musical Role Movement Profile", fileName = "NewMusicalRoleMovementProfile")]
+[CreateAssetMenu(menuName = "Astral Planes/Music/Role/Musical Role Movement Profile", fileName = "NewMusicalRoleMovementProfile")]
 public class MusicalRoleMovementProfile : ScriptableObject
 {
     [Header("Orbital (Harmony)")]

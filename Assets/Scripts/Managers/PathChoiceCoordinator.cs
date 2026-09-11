@@ -125,7 +125,19 @@ public sealed class PathChoiceCoordinator
         foreach (var e in _allExits) exitAnchors.Add(e.AnchorCell);
         dust.SetTravelCorridors(vehicleCells, exitAnchors, radiusCells: 1);
 
-        yield return new WaitUntil(() => _winnerExit != null);
+        yield return new WaitUntil(() => _winnerExit != null || _session.AllPlayersOutOfEnergy());
+
+        if (_winnerExit == null)
+        {
+            // Every player ran out of energy before reaching an exit — bail out of the path
+            // choice instead of hanging forever, so the deferred game-over check (suppressed
+            // while GhostCycleInProgress is true) can fire once BridgeCoordinator clears it.
+            foreach (var exit in _allExits)
+                if (exit != null) Object.Destroy(exit.gameObject);
+            _allExits.Clear();
+            Boundaries.SetWrapEnabled(prevWrap);
+            yield break;
+        }
 
         yield return _gameFlow.StartCoroutine(RedirectLosersAndAdvance(vehicleCells, dust, drums));
 

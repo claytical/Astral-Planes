@@ -168,7 +168,7 @@ public partial class PhaseStar
         // track is cached yet (e.g. before this star has attuned), resolve directly from the
         // assigned motif instead of jumping straight to the library's arbitrary same-role profile.
         var roleProfile = fallbackTrack?.ActiveProfile
-            ?? _assignedMotif?.GetConfigForRoleAtBin(role, 0, 1, fallbackTrack?.voiceIndex ?? 0)?.roleProfile
+            ?? _assignedMotif?.GetInstrumentProfileForVoice(role, fallbackTrack?.voiceIndex ?? 0)
             ?? MusicalRoleProfileLibrary.GetProfile(role);
         if (roleProfile != null)
         {

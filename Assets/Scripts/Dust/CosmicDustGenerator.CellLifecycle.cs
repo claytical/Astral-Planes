@@ -148,12 +148,16 @@ public partial class CosmicDustGenerator
     /// Regrow-delay precedence:
     /// 1. Explicit per-call override (>= 0).
     /// 2. The cell's prospective role's MusicalRoleProfile.regrowthDelay (>= 0) — consulted
-    ///    regardless of DustClearSource or ForceGrayRegrow/ZapForceGray. Those flags still force
-    ///    the cell's *color* back to MusicalRole.None on regrow (see ResolveRegrowVoice) so a
-    ///    player can never farm an untouched hidden role's tint or re-feed a star off dust they
-    ///    didn't carve — but pacing is a separate concern from identity: a role's authored regrow
-    ///    speed should hold whether the cell was vehicle-plowed, star-drained, jailed, or
-    ///    track-filled, even though it comes back gray in every non-plow case.
+    ///    regardless of DustClearSource or ForceGrayRegrow. Pacing is a separate concern from
+    ///    identity: a role's authored regrow speed holds whether the cell was vehicle-plowed,
+    ///    star-drained, jailed, or track-filled. ForceGrayRegrow (single-role-motif temporary
+    ///    collectable-plow corridors) still forces the cell's *color* back to MusicalRole.None on
+    ///    regrow (see ResolveRegrowVoice). ZapForceGray (star-drain harvest) no longer hides
+    ///    color — a zapped cell regrows showing its true role tint immediately, since the anti-farm
+    ///    invariant ("can't feed a star off dust you didn't carve") is fully enforced independently
+    ///    by the flower/bloom gate (CosmicDust.HasBloomedFlower / IsVisuallyPresentForTargeting),
+    ///    which only a vehicle plow or bomb blast can grant — a zap-regrown cell is visible but not
+    ///    zap-eligible again until the player physically re-carves it.
     /// 3. Active maze pattern's per-source delay (>= 0) — reached for None-role cells, or a role
     ///    whose regrowthDelay is -1 ("use maze pattern").
     /// 4. Active maze pattern's base regrowDelay.

@@ -386,8 +386,8 @@ public class PhaseTransitionManager : MonoBehaviour
             // Set the motif's intended profile BEFORE generating NoteSets so that
             // NoteSet generation and commit-time ShiftByOctavesIntoTrackRange both
             // use the same highestAllowedNote (avoids octave-note collapse at commit).
+            track.RefreshRoleColorsFromProfile(currentMotif.GetInstrumentProfileForVoice(track.assignedRole, track.voiceIndex));
             var cfg = currentMotif.GetConfigForRoleAtBin(track.assignedRole, 0, track.maxLoopMultiplier, track.voiceIndex);
-            track.RefreshRoleColorsFromProfile(cfg?.roleProfile);
 
             NoteSet bin0NoteSet = null;
             for (int b = 0; b < track.maxLoopMultiplier; b++)

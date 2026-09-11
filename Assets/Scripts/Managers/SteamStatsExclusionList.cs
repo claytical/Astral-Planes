@@ -6,7 +6,7 @@ using UnityEngine;
 /// developer/test accounts whose playtime would otherwise distort the funnel. Extend by
 /// adding entries to the asset; no code changes needed.
 /// </summary>
-[CreateAssetMenu(fileName = "SteamStatsExclusionList", menuName = "Astral Planes/Steam Stats Exclusion List")]
+[CreateAssetMenu(fileName = "SteamStatsExclusionList", menuName = "Astral Planes/Platform/Steam Stats Exclusion List")]
 public class SteamStatsExclusionList : ScriptableObject
 {
     public List<string> excludedSteamId64s = new();

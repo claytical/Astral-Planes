@@ -34,6 +34,9 @@ public class SolarSystemRecordDisplay : MonoBehaviour
     [Tooltip("Line material for ring contours — Sprites/Default or the project's standard line material.")]
     [SerializeField] Material lineMaterial;
 
+    [Tooltip("Living Score publish-consent panel — shown once, until the player has decided.")]
+    [SerializeField] GameObject livingScorePanel;
+
     [Header("Record Tilt Wobble")]
     [Tooltip("Minimum X-axis tilt of each record disc (degrees). ~60 reads like a vinyl record.")]
     [SerializeField] float wobbleTiltMin = 60f;
@@ -63,6 +66,9 @@ public class SolarSystemRecordDisplay : MonoBehaviour
             ?? new List<MotifSnapshot>();
 
         if (rings.Count == 0) return;
+
+        if (livingScorePanel != null && !TelemetryConsent.HasDecided)
+            livingScorePanel.SetActive(true);
 
         for (int i = 0; i < rings.Count; i++)
         {

@@ -51,18 +51,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1eaacfeda51b74f0cbfbedcd115b6bac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  tentacleActivationDelay: 0.5
   behaviorProfile: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
   superNodePrefab: {fileID: 8730078499695705973, guid: c5258c4bcb110474b86f088239f5a013,
     type: 3}
-  soloVoice: {fileID: 0}
-  readyRotSpeedMul: 1.2
   visuals: {fileID: 6754461597857711404}
   motion: {fileID: 6224665215610089654}
   dust: {fileID: 4631393831486629443}
   cravingNavigator: {fileID: 4892159809986813886}
   disarmedPushScale: 0.1
   _tracePhaseStar: 1
-  allowConcurrentDormantCharging: 1
   shardMinAlpha: 0.5
   accumulatorRotSpeed: 90
   drainTiltDeg: 5
@@ -85,7 +83,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   diamond: {fileID: -7233868419342923855, guid: 77d43200dcc0742699b7b608603f6ac0,
     type: 3}
-  activeDiamond: {fileID: -7233868419342923855, guid: 77d43200dcc0742699b7b608603f6ac0,
+  activeDiamond: {fileID: 1211849485947851915, guid: 2567647a21ff74869b8d376521716000,
+    type: 3}
+  activeDiamondRhythm: {fileID: -2473249655151002397, guid: 999ccfb33204c4ac3a8058191b131873,
     type: 3}
   diamondAngleSmoothTime: 0.06
   dimRgbMul: 0.08
@@ -111,6 +111,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarDustAffect
   minContactTime: 1
   colorTransitionTime: 0.75
+  drainBuildupSeconds: 0.35
+  siphonTravelSeconds: 0.5
+  siphonBrightness: 0.85
   tentacleGrowSpeed: 1
   tentacleRetractSpeed: 4
   tentacleFlowSpeed: 0.2
@@ -5048,7 +5051,7 @@ ParticleSystemRenderer:
   m_LightmapParameters: {fileID: 0}
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: -98977089
-  m_SortingLayer: -1
+  m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_RenderMode: 0

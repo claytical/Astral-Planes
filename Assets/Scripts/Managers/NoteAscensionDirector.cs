@@ -47,7 +47,9 @@ public sealed partial class NoteAscensionDirector : MonoBehaviour
     /// <summary>
     /// Fired at the loop boundary when a marker reaches the ascent line (loopsRemaining == 0).
     /// Payload: (InstrumentTrack track, int step, Vector3 worldPosition).
-    /// MotifRingGlyphApplicator subscribes per-ring to trigger note-contour dots.
+    /// Consumed by InstrumentTrack.DustCoupling's HandleNoteAscendedForDustRelease, which
+    /// releases dust cells held since a SuperNode/shard-catch instant-fill once this track's
+    /// notes start ascending again.
     /// </summary>
     public static event System.Action<InstrumentTrack, int, Vector3> OnNoteReachedAscent;
 

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "CosmicDustGeneratorConfig", menuName = "Astral Planes/Cosmic Dust Generator Config")]
+[CreateAssetMenu(fileName = "CosmicDustGeneratorConfig", menuName = "Astral Planes/Dust/Cosmic Dust Generator Config")]
 public class CosmicDustGeneratorConfig : ScriptableObject
 {
     [Header("Grid & Collision")]

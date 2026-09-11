@@ -7,7 +7,7 @@ using UnityEngine.Serialization;
 // affect — Fill-only, Contour-only, or Shared (both layers, or the whole ring as a unit) —
 // plus a few headers for visual elements that are neither layer (background discs, the note
 // travel dot, the tether).
-[CreateAssetMenu(fileName = "RingGlyphConfig", menuName = "Astral Planes/Ring Glyph Config")]
+[CreateAssetMenu(fileName = "RingGlyphConfig", menuName = "Astral Planes/Visualizers/Ring Glyph Config")]
 public class RingGlyphConfig : ScriptableObject
 {
     [Header("Layout (Shared)")]

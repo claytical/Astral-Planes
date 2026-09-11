@@ -112,13 +112,20 @@ public partial class NoteVisualizer
     /// currently in the persistent loop and is not mid-ascension. Used after a discard to
     /// ensure the authored step's marker is gone even if isPlaceholder or burstId was altered.
     /// </summary>
-    public void RemoveOrphanMarkerAtStep(InstrumentTrack track, int stepAbs)
+    public void RemoveOrphanMarkerAtStep(InstrumentTrack track, int stepAbs, int burstId)
     {
         var key = (track, stepAbs);
         if (!noteMarkers.TryGetValue(key, out var tr) || tr == null) return;
 
         var tag = tr.GetComponent<MarkerTag>();
         if (tag != null && tag.isAscending) return; // leave ascending markers alone
+
+        // The marker at this step may have already been reused/re-tagged by a newer burst
+        // (e.g. a discard-then-retry that targets the same authored step) between when this
+        // cleanup was scheduled and when it runs a frame later. Only remove it if it still
+        // belongs to the burst that scheduled the removal, so we don't destroy a live marker
+        // out from under a burst that has nothing to do with the discard.
+        if (tag != null && tag.burstId != burstId) return;
 
         // Only remove if the step is not in the persistent loop (it was discarded, not committed).
         if (track != null && track.IsPersistentStepOccupied(stepAbs)) return;

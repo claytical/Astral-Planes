@@ -59,8 +59,7 @@ public partial class InstrumentTrackController : MonoBehaviour
     {
         if (_gfm == null) _gfm = GameFlowManager.Instance;
         var motif = _gfm?.phaseTransitionManager?.currentMotif;
-        var cfg = motif?.GetConfigForRoleAtBin(t.assignedRole, 0, t.maxLoopMultiplier, t.voiceIndex);
-        return cfg?.roleProfile;
+        return motif?.GetInstrumentProfileForVoice(t.assignedRole, t.voiceIndex);
     }
 
     private void EnsureGravityVoid()
@@ -125,8 +124,6 @@ public partial class InstrumentTrackController : MonoBehaviour
     private void WireTrack(InstrumentTrack t)
     {
         t.RefreshRoleColorsFromProfile(ResolveMotifRoleProfile(t));
-        t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted; // avoid dupes
-        t.OnAscensionCohortCompleted += HandleAscensionCohortCompleted;
     }
 
     // Tears down every existing InstrumentTrack (and its dedicated MidiStreamPlayer) and spawns
@@ -240,9 +237,6 @@ public partial class InstrumentTrackController : MonoBehaviour
         if (_gfm == null) _gfm = GameFlowManager.Instance;
         var drum = _gfm ? _gfm.activeDrumTrack : null;
         if (drum != null) drum.OnLoopBoundary -= ArmCohortsOnLoopBoundary;
-        foreach (var t in tracks)
-            if (t != null)
-                t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted;
     }
     private void TrySubscribeChordEvents()
     {
@@ -262,8 +256,6 @@ public partial class InstrumentTrackController : MonoBehaviour
         {
             if (!t) continue;
             // De-dupe to avoid multiple adds if TrySubscribe runs more than once
-            t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted;
-            t.OnAscensionCohortCompleted += HandleAscensionCohortCompleted;
             t.OnCollectableBurstCleared -= HandleCollectableBurstCleared;
             t.OnCollectableBurstCleared += HandleCollectableBurstCleared;
 
@@ -286,7 +278,6 @@ public partial class InstrumentTrackController : MonoBehaviour
         foreach (var t in tracks)
         {
             if (!t) continue;
-            t.OnAscensionCohortCompleted -= HandleAscensionCohortCompleted;
             t.OnCollectableBurstCleared -= HandleCollectableBurstCleared;
         }
         _chordEventsSubscribed = false;

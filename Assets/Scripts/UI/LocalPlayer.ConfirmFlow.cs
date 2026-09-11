@@ -93,6 +93,17 @@ public partial class LocalPlayer
                 break;
 
             case GameState.GameOver:
+                // While the Living Score publish-consent prompt is open, this same raw
+                // Choose/South press is the one reliable, controller-agnostic "confirm" in the
+                // game (the EventSystem's own Submit routing doesn't reach it — see
+                // LivingScorePanel.ConfirmCurrentSelection) — so drive the prompt's currently
+                // selected button from it directly instead of restarting the run out from under it.
+                if (LivingScorePanel.IsAwaitingChoice)
+                {
+                    LivingScorePanel.ConfirmCurrentSelection();
+                    break;
+                }
+                if (LivingScorePanel.ShouldSuppressConfirm) break;
                 _sfxSource?.PlayOneShot(confirmFx);
                 Restart();
                 break;

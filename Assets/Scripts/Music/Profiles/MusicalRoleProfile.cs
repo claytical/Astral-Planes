@@ -20,7 +20,7 @@ public struct DustColorSet
     public Color shadowColor;  // regrowth / memory / deny feedback
 }
 
-[CreateAssetMenu(menuName = "Astral Planes/Musical Role Profile", fileName = "NewMusicalRoleProfile")]
+[CreateAssetMenu(menuName = "Astral Planes/Music/Role/Musical Role Profile", fileName = "NewMusicalRoleProfile")]
 public class MusicalRoleProfile : ScriptableObject
 {
     public MusicalRole role;

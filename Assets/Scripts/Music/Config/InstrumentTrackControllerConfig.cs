@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "InstrumentTrackControllerConfig", menuName = "Astral Planes/Instrument Track Controller Config")]
+[CreateAssetMenu(fileName = "InstrumentTrackControllerConfig", menuName = "Astral Planes/Music/Track/Instrument Track Controller Config")]
 public class InstrumentTrackControllerConfig : ScriptableObject
 {
     [Header("SFX: Collection")]

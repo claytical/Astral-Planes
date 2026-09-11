@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Astral Planes/Discovery Track Node Locomotion Profile", fileName = "DiscoveryTrackNodeLocomotionProfile")]
+[CreateAssetMenu(menuName = "Astral Planes/Gameplay/Mining/Discovery Track Node Locomotion Profile", fileName = "DiscoveryTrackNodeLocomotionProfile")]
 public class DiscoveryTrackNodeLocomotionProfile : ScriptableObject
 {
     [Header("Linear Motion")]

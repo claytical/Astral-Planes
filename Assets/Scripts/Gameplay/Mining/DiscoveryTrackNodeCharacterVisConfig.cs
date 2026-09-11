@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "DiscoveryTrackNodeCharacterVisConfig", menuName = "Astral Planes/Discovery Track Node Character Vis Config")]
+[CreateAssetMenu(fileName = "DiscoveryTrackNodeCharacterVisConfig", menuName = "Astral Planes/Gameplay/Mining/Discovery Track Node Character Vis Config")]
 public class DiscoveryTrackNodeCharacterVisConfig : ScriptableObject
 {
     [Header("Locomotion Intent Animation")]

@@ -9,6 +9,8 @@ using UnityEngine;
 // semantics, and shares no code with the Steam stats funnel.
 public class MazeTelemetryRecorder : MonoBehaviour
 {
+    [SerializeField] private MazeTelemetryUploader uploader;
+
     private bool _sessionWired;
     private bool _motifHooksWired;
     private bool _runActive;
@@ -76,7 +78,8 @@ public class MazeTelemetryRecorder : MonoBehaviour
 
         _current.EndedAtUtc = DateTime.UtcNow.ToString("o");
         _current.EndReason = endReason;
-        MazeTelemetryStore.SaveRun(_current);
+        string path = MazeTelemetryStore.SaveRun(_current);
+        if (path != null) uploader?.UploadRun(_current, path);
 
         _runActive = false;
         _current = null;

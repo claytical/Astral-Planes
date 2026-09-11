@@ -22,7 +22,7 @@ public sealed class RoleRegrowDelayMultipliers
     };
 }
 
-[CreateAssetMenu(fileName = "ShipMusicalProfile", menuName = "Astral Planes/Ship Musical Profile")]
+[CreateAssetMenu(fileName = "ShipMusicalProfile", menuName = "Astral Planes/Music/Role/Ship Musical Profile")]
 public class ShipMusicalProfile : ScriptableObject
 {
     [Header("Identity & Music")]

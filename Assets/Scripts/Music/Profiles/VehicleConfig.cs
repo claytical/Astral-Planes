@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "VehicleConfig", menuName = "Astral Planes/Vehicle Config")]
+[CreateAssetMenu(fileName = "VehicleConfig", menuName = "Astral Planes/Music/Role/Vehicle Config")]
 public class VehicleConfig : ScriptableObject
 {
     [Header("Physics Safety")]
@@ -27,6 +27,9 @@ public class VehicleConfig : ScriptableObject
     [Range(0f, 2f)]
     [Tooltip("Grace period (in steps) after a commit window closes for retroactive acceptance.")]
     public float manualReleaseGracePeriodSteps = 0.5f;
+    [Range(0f, 2f)]
+    [Tooltip("After committing a note, briefly ignore collision with the motif ring's collider so depositing a note doesn't immediately break it via the vehicle's own follow-through collision (Vehicle.Damage.cs's TryBreakNextPendingTether hazard).")]
+    public float postCommitRingCollisionImmunitySeconds = 0.5f;
 
     [Header("Plow")]
     [Tooltip("Fade duration when a cell is carved. Also controls how long cells stay in Clearing state, which sustains velocity drain on the vehicle.")]

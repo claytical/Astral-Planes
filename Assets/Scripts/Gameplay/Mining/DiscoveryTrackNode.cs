@@ -160,6 +160,8 @@ public partial class DiscoveryTrackNode : TrackNode
             Color outlineTint = tint;
             outlineTint.a = 1f;
             outlineSprite.color = outlineTint;
+            if (_role == MusicalRole.Rhythm && config != null && config.outlineSpriteRhythm != null)
+                outlineSprite.sprite = config.outlineSpriteRhythm;
         }
         CacheAuthoredStepsFromNoteSet();
         // Register after all fields are initialized so any subscriber that queries this node

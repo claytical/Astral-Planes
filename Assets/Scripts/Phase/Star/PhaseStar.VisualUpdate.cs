@@ -106,6 +106,7 @@ public partial class PhaseStar
                 rotA, aLocked,
                 rotB, bLocked,
                 dominantReady,
+                _previewRole,
                 ReadyRotSpeedMul);
         }
 

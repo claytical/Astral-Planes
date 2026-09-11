@@ -139,9 +139,9 @@ public class RingPreviewPlayer : MonoBehaviour
         foreach (var kvp in RoleChannel)
         {
             MusicalRoleProfile roleProf = null;
-            var cfg = motif.GetConfigForRoleAtBin(kvp.Key, 0, 1);
-            if (cfg?.roleProfile != null)
-                roleProf = cfg.roleProfile;
+            var voiceProfile = motif.GetInstrumentProfileForVoice(kvp.Key, 0);
+            if (voiceProfile != null)
+                roleProf = voiceProfile;
             else
                 roleProf = MusicalRoleProfileLibrary.GetProfile(kvp.Key);
 

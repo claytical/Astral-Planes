@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: LesPaul-D3-2bars-32Step-2-NoteSetConfig
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: LesPaul-D3-2bars-32Step-2
-  roleProfile: {fileID: 11400000, guid: 08f54dbe5ed9a4468b3d4e6c38641bc0, type: 2}
+  roleProfile: {fileID: 11400000, guid: d8626576df6c7407aa19ec493aa9b10e, type: 2}
   riff: {fileID: 11400000, guid: e2a3bda5d00544de4a021548e06e6020, type: 2}
   mineNodeExpireAfterLoops: 3
   ascendLoops: 0

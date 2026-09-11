@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "DrumTrackConfig", menuName = "Astral Planes/Drum Track Config")]
+[CreateAssetMenu(fileName = "DrumTrackConfig", menuName = "Astral Planes/Music/Track/Drum Track Config")]
 public class DrumTrackConfig : ScriptableObject
 {
     [Header("Grid Sizing")]

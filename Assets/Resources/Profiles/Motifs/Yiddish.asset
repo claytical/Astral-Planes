@@ -75,6 +75,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 06a9d6e4711944f3cbadfb80ad57785f, type: 2}
   - {fileID: 11400000, guid: b5c4598d22f794ee0b49f5c146c61005, type: 2}
   - {fileID: 11400000, guid: 2224cdccffe22446e93fd71aba82c740, type: 2}
+  - {fileID: 11400000, guid: 2224cdccffe22446e93fd71aba82c740, type: 2}
   selectionWeight: 1
   beatIntroCount: 0
   driveBeatsFromDensity: 1

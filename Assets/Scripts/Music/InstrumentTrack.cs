@@ -136,7 +136,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     public  int  GetBinCursor()              => Mathf.Max(0, _binCursor);
     public  void AdvanceBinCursor(int by=1)  => _binCursor = Mathf.Max(0, _binCursor + Mathf.Max(1,by));
     private void ResetBinCursor()            => _binCursor = 0;
-    public event Action<InstrumentTrack,int,int> OnAscensionCohortCompleted; // (track, start, end)
     public event Action<InstrumentTrack, int, bool> OnCollectableBurstCleared; // (track, burstId, hadNotes)
     public event Action<InstrumentTrack, int> OnBinFilled; // (track, binIndex)
 

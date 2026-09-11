@@ -14,3 +14,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DiscoveryTrackNodeConfig
   expireBlastRadiusCells: 10
   driveCarvingMotionFromNoteSet: 1
+  outlineSpriteRhythm: {fileID: -2473249655151002397, guid: 999ccfb33204c4ac3a8058191b131873,
+    type: 3}

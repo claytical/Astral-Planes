@@ -2,8 +2,8 @@ using System.Collections;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-// Chord-advance triggers: "all tracks maxed" (SuperNode completion, alt-chord staging) and
-// per-cohort ascension completion, both of which end in HarmonyDirector advancing the chord.
+// Chord-advance trigger: "all tracks maxed" (SuperNode completion, alt-chord staging), which
+// ends in HarmonyDirector advancing the chord.
 public partial class InstrumentTrackController
 {
     // Counts SuperNodeCompletionCoroutine instances currently mid-flight. While any are
@@ -133,18 +133,5 @@ public partial class InstrumentTrackController
         drum.OnLoopBoundary += onBoundary;
         yield return new WaitUntil(() => fired);
         drum.OnLoopBoundary -= onBoundary;
-    }
-
-    private void HandleAscensionCohortCompleted(InstrumentTrack track, int start, int end)
-    {
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var h = _gfm ? _gfm.harmony : null;
-        if (h == null) { Debug.LogWarning("[CHORD][CTRLR] HarmonyDirector is NULL"); return; }
-
-        // This is your “tick”: the armed cohort finished ascending on 'track'
-        // 1) Optionally: small flourish / feedback hook could go here
-
-        // 2) Ask HarmonyDirector to advance one chord and retune everyone
-        _gfm?.harmony?.AdvanceChordAndRetuneAll(1);
     }
 }

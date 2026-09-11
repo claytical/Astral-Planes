@@ -747,6 +747,19 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &832010566
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 840572585}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a2af667fee1141a7b2b93cbe69047fec, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MazeTelemetryUploader
+  config: {fileID: 11400000, guid: f53b5e9a69f5c4871921af02bdb3ca19, type: 2}
 --- !u!1 &840572585 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 6371894677720242641, guid: bbb346428e15b432c9f1273a6d13eab2,
@@ -765,6 +778,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c3564b68f657147848c130f768aff0ec, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MazeTelemetryRecorder
+  uploader: {fileID: 832010566}
 --- !u!1001 &921184573
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1335,7 +1349,7 @@ MonoBehaviour:
   wispPrefab: {fileID: 2567590292593330884, guid: 6120d0fb3b6a8405abb162fc41452f69,
     type: 3}
   demoMode: 0
-  verboseLogging: 1
+  verboseLogging: 0
   harmony: {fileID: 1151719980}
   controller: {fileID: 0}
   activeDrumTrack: {fileID: 0}
@@ -2179,6 +2193,10 @@ PrefabInstance:
         type: 3}
       insertIndex: -1
       addedObject: {fileID: 840572589}
+    - targetCorrespondingSourceObject: {fileID: 6371894677720242641, guid: bbb346428e15b432c9f1273a6d13eab2,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 832010566}
   m_SourcePrefab: {fileID: 100100000, guid: bbb346428e15b432c9f1273a6d13eab2, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

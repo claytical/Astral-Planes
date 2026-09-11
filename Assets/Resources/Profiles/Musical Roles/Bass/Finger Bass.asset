@@ -41,7 +41,7 @@ MonoBehaviour:
   volumeMultiplier: 0.9
   minVelocity: 60
   maxVelocity: 116
-  regrowthDelay: 16
+  regrowthDelay: 2.5
   bombBlastRadiusMul: 3
   bombPermanentClearRatio01: 0.399
   configSelectionMode: 2

@@ -287,7 +287,7 @@ public sealed class GravityVoidController
             int outerR        = innerR + W;
             var ringRole      = activeRoles[globalRingIdx % N];
             var motif         = _getGfm()?.phaseTransitionManager?.currentMotif;
-            var roleProfile   = motif?.GetConfigForRoleAtBin(ringRole, 0, 1, 0)?.roleProfile
+            var roleProfile   = motif?.GetInstrumentProfileForVoice(ringRole, 0)
                 ?? MusicalRoleProfileLibrary.GetProfile(ringRole);
 
             dustGen.GrowVoidDustDiskFromGrid(

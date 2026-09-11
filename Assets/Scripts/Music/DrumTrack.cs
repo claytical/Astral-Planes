@@ -128,7 +128,6 @@ public partial class DrumTrack : MonoBehaviour
     private double _crossfadeStartDsp = -1.0;
     private double _crossfadeEndDsp = -1.0;
     private float _crossfadeBaseVolume = 1f;
-    private bool _traceCrossfadeStarted; // temporary: gates the one-shot "ramp starting" trace log
 
     // Owns world↔grid coordinate mapping and spawn-grid delegation; fully decoupled from
     // DSP/motif state, mirroring how CosmicDustGenerator owns CosmicDustCellRegistry.

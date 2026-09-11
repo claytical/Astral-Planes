@@ -11,7 +11,7 @@ public enum TrapShape { Circle, Box }
 /// </summary>
 [CreateAssetMenu(
     fileName = "MotifProfile",
-    menuName = "Astral Planes/Motif/Motif Profile")]
+    menuName = "Astral Planes/Music/Motif/Motif Profile")]
 public class MotifProfile : ScriptableObject
 {
     [Header("Identity")]
@@ -137,7 +137,10 @@ public class MotifProfile : ScriptableObject
     }
 
     /// <summary>
-    /// Returns the config to use for a given role and bin index.
+    /// Returns the config to use for a given role and bin index. Governs note/riff CONTENT only —
+    /// for the track's frozen instrument identity (soundfont, color, register), use
+    /// GetInstrumentProfileForVoice instead, which pins one profile for the whole motif even when
+    /// this method pools content from several competing profiles bin to bin.
     ///
     /// One config  → same config for every bin (only harmonic shift varies between bins).
     /// N configs, ByBin        → configs[binIndex % N] so each bin gets a distinct variation in round-robin order.
@@ -146,25 +149,12 @@ public class MotifProfile : ScriptableObject
     ///                           but varies across separate playthroughs.
     ///
     /// Both modes are deterministic given (session, role, binIndex, voiceIndex): repeated calls with
-    /// the same arguments always return the same config, which is essential for saturation detection,
-    /// for DiscoveryTrackNode re-spawns being consistent with what was originally placed, and for the
-    /// several independent bin-0 lookups elsewhere (track color, zap-count, density/void coloring)
-    /// agreeing with each other and with the actual generated NoteSet.
+    /// the same arguments always return the same config, which is essential for saturation detection
+    /// and for DiscoveryTrackNode re-spawns being consistent with what was originally placed.
     /// </summary>
     public RoleMotifNoteSetConfig GetConfigForRoleAtBin(MusicalRole role, int binIndex, int totalBins, int voiceIndex = 0)
     {
-        if (roleNoteConfigs == null || roleNoteConfigs.Count == 0)
-            return null;
-        List<RoleMotifNoteSetConfig> matches = null;
-        for (int i = 0; i < roleNoteConfigs.Count; i++)        {
-            var cfg = roleNoteConfigs[i];
-            if (cfg != null && cfg.role == role)
-            {
-                matches ??= new List<RoleMotifNoteSetConfig>();
-                matches.Add(cfg);
-            }
-        }
-
+        var matches = GatherMatches(role);
         if (matches == null || matches.Count == 0) return null;
 
         // Single config: same pattern every bin and every voice.
@@ -192,6 +182,65 @@ public class MotifProfile : ScriptableObject
         // Default ByBin: deterministic round-robin so bin 0 → cfg[0], bin 1 → cfg[1], etc.
         int binIdx = Mathf.Abs(binIndex) % matches.Count;
         return matches[binIdx];
+    }
+
+    private List<RoleMotifNoteSetConfig> GatherMatches(MusicalRole role)
+    {
+        if (roleNoteConfigs == null || roleNoteConfigs.Count == 0) return null;
+        List<RoleMotifNoteSetConfig> matches = null;
+        for (int i = 0; i < roleNoteConfigs.Count; i++)
+        {
+            var cfg = roleNoteConfigs[i];
+            if (cfg != null && cfg.role == role)
+            {
+                matches ??= new List<RoleMotifNoteSetConfig>();
+                matches.Add(cfg);
+            }
+        }
+        return matches;
+    }
+
+    /// <summary>
+    /// Returns the single MusicalRoleProfile that plays this (role, voiceIndex) for the whole
+    /// motif — the track's frozen instrument identity (soundfont, mixer routing, register,
+    /// dust/visual color). Deliberately independent of GetConfigForRoleAtBin, which keeps
+    /// pooling and drawing note/riff CONTENT from every competing config every bin regardless
+    /// of which profile wins here.
+    ///
+    /// - Single distinct profile backing this (role, voiceIndex): returned directly, no randomness.
+    /// - ByVoice mode: unaffected by winner selection — voice index maps 1:1 to its own config's
+    ///   profile, same as GetConfigForRoleAtBin.
+    /// - Multiple DISTINCT MusicalRoleProfile assets competing under ByBin/RandomPerBin: one is
+    ///   picked ONCE per motif with EQUAL weight per distinct profile (not weighted by how many
+    ///   configs/riffs a profile happens to author), via SessionGenome scoped WITHOUT binIndex so
+    ///   the pick is stable for the motif's duration but varies session-to-session.
+    /// </summary>
+    public MusicalRoleProfile GetInstrumentProfileForVoice(MusicalRole role, int voiceIndex = 0)
+    {
+        var matches = GatherMatches(role);
+        if (matches == null || matches.Count == 0) return null;
+        if (matches.Count == 1) return matches[0].roleProfile;
+
+        if (matches[0].roleProfile != null && matches[0].roleProfile.configSelectionMode == RoleConfigSelectionMode.ByVoice)
+        {
+            int idx = Mathf.Abs(voiceIndex) % matches.Count;
+            return matches[idx].roleProfile;
+        }
+
+        // Dedup by distinct profile IDENTITY (not by config count) so authoring more riffs under
+        // one profile doesn't skew its odds of winning the instrument slot.
+        var distinctProfiles = new List<MusicalRoleProfile>();
+        foreach (var cfg in matches)
+        {
+            if (cfg.roleProfile != null && !distinctProfiles.Contains(cfg.roleProfile))
+                distinctProfiles.Add(cfg.roleProfile);
+        }
+        if (distinctProfiles.Count <= 1)
+            return distinctProfiles.Count == 1 ? distinctProfiles[0] : matches[0].roleProfile;
+
+        // Scope excludes binIndex on purpose: one stable answer for the whole motif.
+        var rng = SessionGenome.For($"{name}-{role}-voice{voiceIndex}-instrument");
+        return distinctProfiles[rng.Next(distinctProfiles.Count)];
     }
 
     /// <summary>

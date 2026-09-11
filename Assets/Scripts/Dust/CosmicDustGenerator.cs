@@ -456,7 +456,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
             dust.InitializeVisuals(DustTimings);
             dust.SetGrowInDuration(DustTimings.regrowParticleGrowInSeconds);
 
-            regrowRole = ClearCellFlag(gp, CellFlags.ZapForceGray) ? MusicalRole.None : _roleDensity.ResolveRegrowRole(gp);
+            ClearCellFlag(gp, CellFlags.ZapForceGray);
+            regrowRole = _roleDensity.ResolveRegrowRole(gp);
             ClearCellFlag(gp, CellFlags.ForceGrayRegrow);
             // TEMP DIAGNOSTIC: pin down the dust-color-drift-on-regrow report.
             if (GameFlowManager.VerboseLogging)

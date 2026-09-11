@@ -12,6 +12,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     [Header("Sprite pivots")]
     public Sprite diamond;
     public Sprite activeDiamond;
+    public Sprite activeDiamondRhythm;
 
     [Tooltip("Seconds for the applied visual angle to settle to a new target angle.")]
     [SerializeField, Min(0.01f)] private float diamondAngleSmoothTime = 0.06f;
@@ -115,6 +116,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         float rotDegB,
         bool bLocked,
         bool isReady,
+        MusicalRole role,
         float readyRotMul = 2.5f)
     {
         if (_diamondASprite == null || _diamondBSprite == null)
@@ -153,7 +155,11 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
                 diamondAngleSmoothTime);
         }
 
-        Sprite shardSprite = (charge01 > 0.001f && activeDiamond != null) ? activeDiamond : diamond;
+        Sprite shardSprite = charge01 <= 0.001f
+            ? diamond
+            : (role == MusicalRole.Rhythm && activeDiamondRhythm != null)
+                ? activeDiamondRhythm
+                : (activeDiamond != null ? activeDiamond : diamond);
 
         if (_diamondASprite != null)
         {

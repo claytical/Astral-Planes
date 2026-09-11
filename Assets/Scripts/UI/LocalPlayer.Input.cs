@@ -163,6 +163,13 @@ public partial class LocalPlayer
 
     public void OnQuit(InputValue value)
     {
+        // In the "Play" action map, Quit shares its binding with Choose (both on
+        // <Gamepad>/buttonSouth, and Quit also on the generic */{Submit} composite that a UI
+        // Button click routes through) — so a single press/click fires this in parallel with
+        // HandleConfirm. Guard it the same way so it doesn't quit out from under the Living
+        // Score publish-consent prompt on the same press that answers it.
+        if (LivingScorePanel.ShouldSuppressConfirm) return;
+
         if (GameFlowManager.Instance.CurrentState == GameState.GameOver)
         {
             GameFlowManager.Instance.QuitToSelection();

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "InstrumentTrackConfig", menuName = "Astral Planes/Instrument Track Config")]
+[CreateAssetMenu(fileName = "InstrumentTrackConfig", menuName = "Astral Planes/Music/Track/Instrument Track Config")]
 public class InstrumentTrackConfig : ScriptableObject
 {
     [Header("Ascension")]

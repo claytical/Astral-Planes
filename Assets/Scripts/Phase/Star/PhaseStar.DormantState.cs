@@ -169,6 +169,9 @@ public partial class PhaseStar
 
     private bool HasColoredDustAvailable()
     {
-        return TryResolveContext(out _, out var dustGen) && dustGen.HasAnyDustWithRole();
+        if (!TryResolveContext(out _, out var dustGen)) return false;
+        return _attunedRole != MusicalRole.None
+            ? dustGen.HasAnyDustWithRole(_attunedRole)
+            : dustGen.HasAnyDustWithRole();
     }
 }

@@ -135,7 +135,6 @@ Per-role MIDI loop state. The **bin** is the expansion unit — each bin adds on
 | Event | Consumer |
 |-------|----------|
 | `OnCollectableBurstCleared(burstId, hadNotes)` | `StarPool` — clears the ejection gate; `PhaseStar` — triggers re-arm |
-| `OnAscensionCohortCompleted(startStep, endStep)` | `NoteVisualizer` — ascension animation |
 
 **Receives:**
 - `OnCollectableCollected(note, step)` — auto-deposit path; writes note to loop grid
@@ -543,7 +542,7 @@ StarPool spawns PhaseStar for role → tentacles drain role-carved dust cells (1
 InstrumentTrack.IsSaturatedForRepeatingNoteSet() → true
   → InstrumentTrackController.BeginGravityVoidForPendingExpand()
       → CosmicDustGenerator.GrowVoidDustDiskFromGrid() (visual signal to player)
-  → burst cleared + ascension cohort complete
+  → burst cleared
   → InstrumentTrackController.CommitBinExpansion()
       → InstrumentTrack.TryExpandNextBin() → CommitBinExpansion()
       → DrumTrack.SetBinCount(n)

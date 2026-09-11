@@ -9,9 +9,9 @@ public static class MazeTelemetryStore
 {
     private static string SaveDirectory => Application.persistentDataPath + "/GreaterMazeTelemetry/";
 
-    public static void SaveRun(MazeRunRecord record)
+    public static string SaveRun(MazeRunRecord record)
     {
-        if (record == null) return;
+        if (record == null) return null;
 
         try
         {
@@ -20,10 +20,12 @@ public static class MazeTelemetryStore
             string path = Path.Combine(SaveDirectory, $"run_{record.RunId}_{ts}.json");
             File.WriteAllText(path, JsonUtility.ToJson(record, true));
             if (GameFlowManager.VerboseLogging) Debug.Log($"[MazeTelemetryStore] Saved run → {path}");
+            return path;
         }
         catch (Exception e)
         {
             Debug.LogWarning($"[MazeTelemetryStore] Failed to save run {record.RunId}: {e.Message}");
+            return null;
         }
     }
 }

@@ -78,8 +78,8 @@ public sealed class DustRoleDensityTracker
         for (int i = 0; i < _activeVoices.Count; i++)
         {
             var v = _activeVoices[i];
-            var cfg = motif.GetConfigForRoleAtBin(v.role, 0, 1, v.voiceIndex);
-            if (cfg?.roleProfile != null) _roleProfileByVoice[v] = cfg.roleProfile;
+            var profile = motif.GetInstrumentProfileForVoice(v.role, v.voiceIndex);
+            if (profile != null) _roleProfileByVoice[v] = profile;
         }
     }
 

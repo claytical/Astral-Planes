@@ -112,13 +112,6 @@ public partial class DrumTrack
         double dspNow = AudioSettings.dspTime;
         if (dspNow < _crossfadeStartDsp) return;
 
-        if (!_traceCrossfadeStarted)
-        {
-            _traceCrossfadeStarted = true;
-            if (GameFlowManager.VerboseLogging) Debug.LogWarning($"[DRUM][TRACE] Crossfade ramp starting: dspNow={dspNow:F3} base={_crossfadeBaseVolume:F3} " +
-                $"active={_activeDrum?.name}(playing={_activeDrum?.isPlaying}) inactive={_inactiveDrum?.name}(playing={_inactiveDrum?.isPlaying},clip={(_inactiveDrum!=null&&_inactiveDrum.clip?_inactiveDrum.clip.name:"null")})");
-        }
-
         double span = _crossfadeEndDsp - _crossfadeStartDsp;
         float t = span > 0.0001 ? Mathf.Clamp01((float)((dspNow - _crossfadeStartDsp) / span)) : 1f;
 
@@ -132,7 +125,6 @@ public partial class DrumTrack
             if (GameFlowManager.VerboseLogging) Debug.LogWarning($"[DRUM][TRACE] Crossfade ramp complete: active(pre-swap)={_activeDrum?.name}(vol={_activeDrum?.volume:F3}) " +
                 $"inactive(pre-swap, about to become active)={_inactiveDrum?.name}(vol={_inactiveDrum?.volume:F3},playing={_inactiveDrum?.isPlaying},mute={_inactiveDrum?.mute})");
             _crossfadeStartDsp = -1.0;
-            _traceCrossfadeStarted = false;
         }
     }
 
@@ -157,7 +149,6 @@ public partial class DrumTrack
             if (_activeDrum != null)   _activeDrum.volume   = 0f;
             if (_inactiveDrum != null) _inactiveDrum.volume  = _crossfadeBaseVolume;
             _crossfadeStartDsp = -1.0;
-            _traceCrossfadeStarted = false;
         }
 
         var prevActive = _activeDrum;

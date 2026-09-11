@@ -490,7 +490,7 @@
                     "path": "<Gamepad>/buttonSouth",
                     "interactions": "",
                     "processors": "",
-                    "groups": ";Generic Gamepad;Xbox;Playstation",
+                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
                     "action": "Choose",
                     "isComposite": false,
                     "isPartOfComposite": false

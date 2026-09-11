@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Astral Planes/PhaseStar Behavior Profile")]
+[CreateAssetMenu(menuName = "Astral Planes/Phase/PhaseStar Behavior Profile", fileName = "PhaseStarBehaviorProfile")]
 public class PhaseStarBehaviorProfile : ScriptableObject
 {
 

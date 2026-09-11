@@ -242,10 +242,11 @@ public partial class InstrumentTrack
         if (state.remaining > 0) return;
 
         int capturedDiscardedStep = authoredAbsStep;
+        int capturedBurstId = burstId;
         EnqueueNextFrame(() =>
         {
             if (controller?.noteVisualizer != null && capturedDiscardedStep >= 0)
-                controller.noteVisualizer.RemoveOrphanMarkerAtStep(this, capturedDiscardedStep);
+                controller.noteVisualizer.RemoveOrphanMarkerAtStep(this, capturedDiscardedStep, capturedBurstId);
         });
 
         bool hadNotes = state.wroteBin >= 0;

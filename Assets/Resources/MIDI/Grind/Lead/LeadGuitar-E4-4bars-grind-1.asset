@@ -1,0 +1,74 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 38900ff6f42443408966805961f41bc7, type: 3}
+  m_Name: LeadGuitar-E4-4bars-grind-1
+  m_EditorClassIdentifier: Assembly-CSharp::RiffAsset
+  riff:
+    id: LeadGuitar-E4-4bars-grind-1
+    authoredRootMidi: 64
+    loopSteps: 64
+    events:
+    - step: 0
+      midiNote: 64
+      durSteps: 16
+      velocity01: 0.78740156
+    - step: 4
+      midiNote: 69
+      durSteps: 12
+      velocity01: 0.8976378
+    - step: 8
+      midiNote: 79
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 12
+      midiNote: 74
+      durSteps: 20
+      velocity01: 1
+    - step: 16
+      midiNote: 76
+      durSteps: 16
+      velocity01: 0.78740156
+    - step: 24
+      midiNote: 71
+      durSteps: 8
+      velocity01: 0.78740156
+    - step: 32
+      midiNote: 74
+      durSteps: 1
+      velocity01: 1
+    - step: 48
+      midiNote: 76
+      durSteps: 2
+      velocity01: 0.78740156
+    - step: 50
+      midiNote: 76
+      durSteps: 1
+      velocity01: 1
+    - step: 52
+      midiNote: 76
+      durSteps: 2
+      velocity01: 0.78740156
+    - step: 54
+      midiNote: 76
+      durSteps: 2
+      velocity01: 1
+    - step: 56
+      midiNote: 76
+      durSteps: 4
+      velocity01: 0.78740156
+    - step: 60
+      midiNote: 76
+      durSteps: 4
+      velocity01: 1
+    overlapPolicy: 1
+    octaveShift: 0
+    stepsPerBar: 16

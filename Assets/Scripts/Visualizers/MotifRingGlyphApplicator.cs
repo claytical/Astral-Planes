@@ -119,6 +119,12 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
     // (RecordRings) instances, since only SpawnBinRing lazily creates it.
     private CircleCollider2D _ringCollider;
 
+    // Exposed so Vehicle can grant itself brief collision immunity right after depositing a
+    // note — depositing leaves the vehicle sitting at the ring, and OnCollisionEnter2D would
+    // otherwise treat that near-guaranteed self-collision as a TryBreakNextPendingTether hit
+    // on the note it just committed. Null until SpawnBinRing lazily creates the collider.
+    public CircleCollider2D RingCollider => _ringCollider;
+
     // A note whose preview tether is still live (created, not yet departed toward the ring).
     // Populated/retired by DeformBinRingCoroutine; consumed by TryBreakNextPendingTether when
     // the vehicle collides with _ringCollider (see MotifRingGlyphApplicator.GameplayRings.cs).

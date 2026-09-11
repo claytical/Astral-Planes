@@ -2,7 +2,7 @@ using UnityEngine;
 
 [CreateAssetMenu(
     fileName = "RoleMotifNoteSetConfig",
-    menuName = "Astral Planes/Motif/Role Motif NoteSet Config")]
+    menuName = "Astral Planes/Music/Motif/Role Motif NoteSet Config")]
 public class RoleMotifNoteSetConfig : ScriptableObject
 {
     [Header("Identity")]

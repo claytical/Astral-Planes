@@ -83,6 +83,36 @@ public partial class Vehicle
         }
 }
 
+    // Called right after this vehicle commits a manually-released note (Vehicle.ManualRelease.cs).
+    // Depositing a note leaves the vehicle sitting at the ring, so the very next physics tick's
+    // OnCollisionEnter2D above would otherwise almost always fire on the ring the vehicle just
+    // fed — breaking the note it just committed via TryBreakNextPendingTether. A brief, one-shot
+    // collision-ignore between this vehicle and the ring collider avoids that guaranteed self-hit
+    // without touching the break-on-collision hazard for any other collision.
+    private void GrantPostCommitRingCollisionImmunity()
+    {
+        if (gfm == null) gfm = GameFlowManager.Instance;
+        var ringApplicator = gfm?.GetMotifRingGlyphApplicator();
+        var ringCollider = ringApplicator != null ? ringApplicator.RingCollider : null;
+        if (ringCollider == null) return;
+
+        var vehicleCollider = GetComponent<Collider2D>();
+        if (vehicleCollider == null) return;
+
+        float duration = vehicleConfig.postCommitRingCollisionImmunitySeconds;
+        if (duration <= 0f) return;
+
+        Physics2D.IgnoreCollision(vehicleCollider, ringCollider, true);
+        StartCoroutine(RestoreRingCollisionAfterDelay(vehicleCollider, ringCollider, duration));
+    }
+
+    private System.Collections.IEnumerator RestoreRingCollisionAfterDelay(Collider2D vehicleCollider, Collider2D ringCollider, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (vehicleCollider != null && ringCollider != null)
+            Physics2D.IgnoreCollision(vehicleCollider, ringCollider, false);
+    }
+
     private void TriggerThud(Vector2 collisionPoint)
         {
             if (baseSprite == null || isFlickering) return;

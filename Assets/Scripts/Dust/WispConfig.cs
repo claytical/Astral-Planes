@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "WispConfig", menuName = "Astral Planes/Wisp Config")]
+[CreateAssetMenu(fileName = "WispConfig", menuName = "Astral Planes/Dust/Wisp Config")]
 public class WispConfig : ScriptableObject
 {
     [Header("Approach")]

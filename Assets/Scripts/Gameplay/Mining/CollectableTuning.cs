@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "CollectableTuning", menuName = "Astral Planes/Collectable Tuning")]
+[CreateAssetMenu(fileName = "CollectableTuning", menuName = "Astral Planes/Gameplay/Mining/Collectable Tuning")]
 public class CollectableTuning : ScriptableObject
 {
     [Header("Base Motion")]

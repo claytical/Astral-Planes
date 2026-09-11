@@ -90,11 +90,14 @@ public sealed class SessionStateCoordinator
         if (GameFlowManager.VerboseLogging) Debug.Log("✅ Ship selection phase started. Waiting for players to join.");
     }
 
+    public bool AllPlayersOutOfEnergy() =>
+        _players.Where(p => p != null).All(p => !p.IsReady && !p.IsInContinueWindow && !p.IsRespawning);
+
     public bool CheckAllPlayersOutOfEnergy()
     {
         if (_hasGameOverStarted || _ghostCycleInProgress) return false;
 
-        if (_players.Where(p => p != null).All(p => !p.IsReady && !p.IsInContinueWindow && !p.IsRespawning))
+        if (AllPlayersOutOfEnergy())
         {
             _hasGameOverStarted = true;
             return true;
