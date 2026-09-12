@@ -705,6 +705,54 @@
                     "isPartOfComposite": false
                 }
             ]
+        },
+        {
+            "name": "Global",
+            "id": "4e090006-f30e-444a-9d8c-a4f759718f6e",
+            "actions": [
+                {
+                    "name": "OpenSettings",
+                    "type": "Button",
+                    "id": "bf40b808-f4da-40f4-a8f7-091c8585b2ec",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "Press",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Confirm",
+                    "type": "Button",
+                    "id": "53bdad2a-d5e6-42bb-b7eb-99b37352c500",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "Press",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "37ba0c8c-ff19-4850-87f0-032d394668b8",
+                    "path": "<Gamepad>/select",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
+                    "action": "OpenSettings",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "fa356a97-d179-46ca-9d3d-20fbc106f78e",
+                    "path": "<Gamepad>/buttonSouth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
+                    "action": "Confirm",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
         }
     ],
     "controlSchemes": [

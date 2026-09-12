@@ -318,6 +318,15 @@ public class PhaseLibraryCarousel : MonoBehaviour
 
     private void Update()
     {
+        // This polls raw device state directly (no Input Action / EventSystem involved), so it
+        // has no built-in awareness of modal UI on top of it. The settings panel's own Confirm
+        // press must not also be read here as "confirm the carousel and load TrackSelection" —
+        // same guard role as the one in IntroInputHandler.OnAnyInput / LocalPlayer.HandleConfirm.
+        // ShouldSuppressInput (not just IsOpen) also covers the same frame the panel just closed
+        // on this exact press — Close() runs synchronously inside the Confirm callback, earlier
+        // in this same frame, which would otherwise clear IsOpen before this Update() runs.
+        if (SettingsPanelController.ShouldSuppressInput) return;
+
         bool next = false, prev = false, up = false, down = false, confirm = false;
 
         var gp = Gamepad.current;

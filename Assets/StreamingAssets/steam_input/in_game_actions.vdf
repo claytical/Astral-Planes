@@ -1,0 +1,76 @@
+"In Game Actions"
+{
+	"actions"
+	{
+		"Play"
+		{
+			"title"			"#Set_Play"
+
+			"StickPadGyro"
+			{
+				"Move"
+				{
+					"title"			"#Action_Move"
+					"input_mode"	"joystick_move"
+				}
+			}
+
+			"AnalogTrigger"
+			{
+				"Thrust"
+				{
+					"title"	"#Action_Thrust"
+				}
+			}
+
+			"Button"
+			{
+				"Choose"
+				{
+					"title"	"#Action_Choose"
+				}
+				"West"
+				{
+					"title"	"#Action_West"
+				}
+				"North"
+				{
+					"title"	"#Action_North"
+				}
+				"South"
+				{
+					"title"	"#Action_South"
+				}
+				"LeftShoulder"
+				{
+					"title"	"#Action_LeftShoulder"
+				}
+				"RightShoulder"
+				{
+					"title"	"#Action_RightShoulder"
+				}
+				"OpenSettings"
+				{
+					"title"	"#Action_OpenSettings"
+				}
+			}
+		}
+	}
+
+	"localization"
+	{
+		"english"
+		{
+			"Set_Play"				"Play"
+			"Action_Move"			"Move"
+			"Action_Thrust"			"Thrust"
+			"Action_Choose"			"Choose"
+			"Action_West"			"West Action"
+			"Action_North"			"North Action"
+			"Action_South"			"South Action"
+			"Action_LeftShoulder"	"Left Shoulder"
+			"Action_RightShoulder"	"Right Shoulder"
+			"Action_OpenSettings"	"Open Settings"
+		}
+	}
+}

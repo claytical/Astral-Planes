@@ -19,6 +19,12 @@ public class IntroInputHandler : MonoBehaviour
         // filtered here rather than relying on the binding itself.
         if (context.control != null && context.control.name == "buttonEast") return;
 
+        // The settings panel (Select/View button) can be open over this same title screen —
+        // a Choose/South press meant to confirm a button in that panel must not also register
+        // here as "any input" and skip straight to ship selection. ShouldSuppressInput (not just
+        // IsOpen) also covers the same frame the panel just closed on this exact press.
+        if (SettingsPanelController.ShouldSuppressInput) return;
+
         inputReceived = true;
         if (ControlTutorialDirector.Instance != null)
             ControlTutorialDirector.Instance.HidePrimary();

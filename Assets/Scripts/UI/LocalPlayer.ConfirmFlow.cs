@@ -25,6 +25,16 @@ public partial class LocalPlayer
 
     private void HandleConfirm()
     {
+        // Selection/Choose and Play/Choose are both hard-bound to raw buttonSouth for every
+        // controller brand (see AstralPlanes.inputactions) — unlike Unity's semantic UI
+        // Submit/Cancel, which the settings panel's buttons actually respond to and which can
+        // resolve to a different physical button per brand. A South press meant only to confirm
+        // that panel must not also fall through to whatever this raw action drives here (menu
+        // confirm, ship-select, restart, etc.) — same guard role as LivingScorePanel.ShouldSuppressConfirm.
+        // ShouldSuppressInput (not just IsOpen) also covers the same frame the panel just closed
+        // on this exact press.
+        if (SettingsPanelController.ShouldSuppressInput) return;
+
         if (_isReady &&
             GameFlowManager.Instance != null &&
             GameFlowManager.Instance.CurrentState == GameState.Selection &&

@@ -11,6 +11,8 @@ GameObject:
   - component: {fileID: 843980262099424911}
   - component: {fileID: 1376641457825561279}
   - component: {fileID: 1373133427043904857}
+  - component: {fileID: 20769327883173963}
+  - component: {fileID: 1479241644495446003}
   m_Layer: 0
   m_Name: SteamManager
   m_TagString: Untagged
@@ -58,3 +60,32 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   exclusionList: {fileID: 0}
+--- !u!114 &20769327883173963
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6371894677720242641}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c004262b080d4758839b996dd1ca8b1f, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  manifestRelativePath: steam_input/in_game_actions.vdf
+  actionSetName: Play
+--- !u!114 &1479241644495446003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6371894677720242641}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: efeb54c51bf684725bb9c89e34b334ae, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  fallbackGlyphsByBrand: []
+  defaultFallback: {fileID: 4148023920394844618, guid: 35ed7992f575b469abdfc2b7652d0855,
+    type: 3}
