@@ -41,6 +41,19 @@ public class RingGlyphConfig : ScriptableObject
              "triangle count, the Contour's point count, and the background discs' mesh resolution.")]
     public int segments = 256;
 
+    [Tooltip("Radians added to every ring-angle calculation (contour points, note dips, travel-dot/" +
+             "tether landing spots, the note-fired firework, and the draw-in sweep's progress angle), " +
+             "rotating where angle=0 sits for the WHOLE stack — purely cosmetic (which point the " +
+             "draw-in sweep visibly starts from; 0 is 3 o'clock, Mathf.PI/2 the default is 12 " +
+             "o'clock). Every angle formula in the ring-glyph pipeline adds this same base offset, " +
+             "so changing it rotates the whole system together. Each ring ALSO gets its own extra " +
+             "stagger on top of this shared base — see MotifRingGlyphGenerator.RingOrdinalAngleJitter " +
+             "— since the Contour's coincident start/end point (BuildRingPoints duplicates the first " +
+             "point to close the ring; see MotifRingGlyphApplicator.RingBuilder.cs for why loop=true " +
+             "isn't used instead) leaves a faint per-ring seam kink, and every ring in a stack sharing " +
+             "this one base offset would otherwise line their kinks up into one visible radial line.")]
+    public float ringStartAngleOffset = Mathf.PI / 2f;
+
     [Range(0f, 0.4f)]
     [Tooltip("Fraction of the play area height reserved as padding on each side. " +
              "0.05 = 5% padding, so the outermost ring fills 90% of the play area height.")]
@@ -105,11 +118,17 @@ public class RingGlyphConfig : ScriptableObject
     public Color remainingRingColor = new Color(0.6f, 0.6f, 0.6f, 1f);
 
     [Range(0f, 1f)]
-    [Tooltip("Fill alpha for remaining-progress placeholder rings. Kept low so they read as diminished/incomplete.")]
-    public float remainingRingAlpha = 0.12f;
+    [Tooltip("Fill alpha for remaining-progress placeholder rings. These rings never draw a Contour " +
+             "(see RecordRings.cs's ApplyLockedPreview / GameplayRings.cs's SetRemainingProgressRings — " +
+             "a placeholder never has notes, so there's nothing for the Contour to trace, and skipping " +
+             "it avoids a fragile LineRenderer closure entirely), so this Fill alpha is what the whole " +
+             "ring's visibility depends on — keep it clearly visible, not just a faint wash.")]
+    public float remainingRingAlpha = 0.4f;
 
     [Range(0f, 1f)]
-    [Tooltip("Contour alpha for remaining-progress placeholder rings.")]
+    [Tooltip("Unused — remaining-progress placeholder rings no longer draw a Contour (see " +
+             "remainingRingAlpha's tooltip), so this has no visible effect. Left in place only " +
+             "because ApplyNextUpColor (GameplayRings.cs) still writes it to an undrawn LineRenderer.")]
     public float remainingContourAlpha = 0.25f;
 
     [Tooltip("Seconds to lerp from one active role color to the next on the next-up placeholder ring.")]

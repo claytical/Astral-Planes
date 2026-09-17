@@ -17,10 +17,14 @@ using UnityEngine.SceneManagement;
 /// Slots are fixed world-space positions sorted left-to-right; only the active row is
 /// displayed at a time, reusing the same slot objects. Centre index = slots.Length / 2.
 ///
-/// Entries are either a played motif (has a saved MotifSnapshot — audible, full ring detail)
-/// or the single "next up" locked preview: the first not-yet-completed motif in PhaseLibrary
-/// order, rendered as gray/unlit rings (count = nodesPerStar) via ApplyLockedPreview. It's
-/// selectable — confirming it jumps straight into that motif — but never previewed with audio.
+/// Only "reached" phases get a row: phase 0, plus each subsequent phase whose predecessor
+/// has every motif recorded. A reached phase's row holds one entry per authored motif in
+/// that phase — a played motif (has a saved MotifSnapshot — audible, full ring detail), or
+/// an unplayed one rendered as a locked preview (gray/unlit rings, count = nodesPerStar) via
+/// ApplyLockedPreview. Locked entries are selectable — confirming one jumps straight into
+/// that motif — but never previewed with audio. This is what keeps the player from moving
+/// down to the next phase until the current one is fully recorded: there's simply no row
+/// for it yet.
 ///
 /// Bounded (no wrapping):
 ///   - Horizontally, slots whose data index falls outside [0, row.Count-1] are deactivated;
@@ -77,8 +81,8 @@ public class PhaseLibraryCarousel : MonoBehaviour
         public bool   IsLocked => Snapshot == null;
     }
 
-    /// <summary>Rows are phases; each row is that phase's motifs (played snapshots plus, on the
-    /// frontier phase only, the single locked "next up" preview), in motif order.</summary>
+    /// <summary>Rows are reached phases; each row is that phase's full authored motif list
+    /// (played snapshots plus a locked entry for every not-yet-recorded motif), in motif order.</summary>
     private List<List<CarouselEntry>> _rows = new();
     private int   _currentRow;
     private int   _currentCol;
@@ -105,17 +109,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
         else
 #endif
         {
-            entries = rings.Select(r => new CarouselEntry
-            {
-                Snapshot   = r,
-                PhaseId    = r.PhaseId,
-                PhaseIndex = r.PhaseIndex,
-                MotifIndex = r.MotifIndex,
-                MotifId    = r.MotifId,
-            }).ToList();
-
-            if (entries.Count > 0 && TryFindNextUnplayedMotif(rings, out var lockedEntry))
-                entries.Add(lockedEntry);
+            entries = rings.Count > 0 ? BuildReachedPhaseEntries(rings) : new List<CarouselEntry>();
         }
 
         entries.Sort((a, b) => a.PhaseIndex != b.PhaseIndex
@@ -182,37 +176,58 @@ public class PhaseLibraryCarousel : MonoBehaviour
         slots[center].SpawnNoteFirework(role, binIndex, angleRad);
     }
 
-    // Scans the authored PhaseLibrary in (phaseIndex, motifIndex) order and returns the first
-    // motif with no matching saved snapshot — i.e. the next one the player hasn't completed yet.
-    private bool TryFindNextUnplayedMotif(List<MotifSnapshot> rings, out CarouselEntry entry)
+    // Walks the authored PhaseLibrary from phase 0, emitting one entry per motif (recorded or
+    // locked) for each phase the player has reached. A phase counts as reached once its
+    // predecessor has every motif recorded; the walk stops after the first phase that isn't
+    // itself fully recorded, so no row is built for phases beyond that frontier. Snapshots are
+    // matched by stable PhaseId/MotifId rather than raw index — safe against PhaseLibrary
+    // reordering, same convention as PhaseTransitionManager.JumpToMotif.
+    private List<CarouselEntry> BuildReachedPhaseEntries(List<MotifSnapshot> rings)
     {
-        entry = default;
-        if (phaseLibrary == null || phaseLibrary.phases == null) return false;
+        var result = new List<CarouselEntry>();
+        if (phaseLibrary == null || phaseLibrary.phases == null) return result;
 
         for (int p = 0; p < phaseLibrary.phases.Count; p++)
         {
             var phase = phaseLibrary.phases[p];
             if (phase?.motifs == null) continue;
+
+            bool phaseFullyRecorded = true;
             for (int m = 0; m < phase.motifs.Count; m++)
             {
                 var motif = phase.motifs[m];
                 if (motif == null) continue;
-                bool played = rings.Exists(r => r.PhaseIndex == p && r.MotifIndex == m);
-                if (played) continue;
 
-                entry = new CarouselEntry
+                var snap = rings.Find(r => r.PhaseId == phase.phaseId && r.MotifId == motif.motifId);
+                if (snap != null)
                 {
-                    Snapshot   = null,
-                    Profile    = motif,
-                    PhaseId    = phase.phaseId,
-                    PhaseIndex = p,
-                    MotifIndex = m,
-                    MotifId    = motif.motifId,
-                };
-                return true;
+                    result.Add(new CarouselEntry
+                    {
+                        Snapshot   = snap,
+                        PhaseId    = phase.phaseId,
+                        PhaseIndex = p,
+                        MotifIndex = m,
+                        MotifId    = motif.motifId,
+                    });
+                }
+                else
+                {
+                    phaseFullyRecorded = false;
+                    result.Add(new CarouselEntry
+                    {
+                        Snapshot   = null,
+                        Profile    = motif,
+                        PhaseId    = phase.phaseId,
+                        PhaseIndex = p,
+                        MotifIndex = m,
+                        MotifId    = motif.motifId,
+                    });
+                }
             }
+
+            if (!phaseFullyRecorded) break;
         }
-        return false;
+        return result;
     }
 
 #if UNITY_EDITOR

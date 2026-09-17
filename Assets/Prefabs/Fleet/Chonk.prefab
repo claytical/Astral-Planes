@@ -153,7 +153,7 @@ MonoBehaviour:
   soulSprite: {fileID: 1648933793061100700}
   gravityVoidMask:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 512
   energyLevel: 90
   boosting: 0
   trail: {fileID: 5973205746167519599, guid: 070d68466c77cc24185568fa6b7bc036, type: 3}

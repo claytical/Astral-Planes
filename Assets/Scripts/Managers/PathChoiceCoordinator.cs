@@ -199,16 +199,24 @@ public sealed class PathChoiceCoordinator
         Vector2 triggerCenter = SnapToPhysicalBoundary((min + max) * 0.5f, info.Side);
         go.transform.position = triggerCenter;
 
-        // Only the boundary-normal axis gets the extra cellSize of depth (so a vehicle passing
-        // straight through registers reliably). Padding the tangential axis too would reach past
-        // the actual gap cells into the solid wall on either side of the opening, where the
-        // particle visual isn't shown — letting a vehicle sliding along the wall trip the trigger.
+        // Only the boundary-normal axis gets the extra depth (so the capture zone reaches back
+        // into the corridor — see PathExitCaptureDepthCells below). Padding the tangential axis
+        // too would reach past the actual gap cells into the solid wall on either side of the
+        // opening, where the particle visual isn't shown — letting a vehicle sliding along the
+        // wall trip the trigger.
         bool horizontalWall = info.Side == BoundaryWrap.BoundarySide.Top || info.Side == BoundaryWrap.BoundarySide.Bottom;
+        float captureDepthWorld = Mathf.Max(cellSize, _gameFlow.PathExitCaptureDepthCells * cellSize);
+        Vector2 inward = InwardDirection(info.Side);
+
         var col = go.AddComponent<BoxCollider2D>();
         col.isTrigger = true;
         col.size = new Vector2(
-            horizontalWall ? Mathf.Max(cellSize, max.x - min.x) : cellSize,
-            horizontalWall ? cellSize : Mathf.Max(cellSize, max.y - min.y));
+            horizontalWall ? Mathf.Max(cellSize, max.x - min.x) : captureDepthWorld,
+            horizontalWall ? captureDepthWorld : Mathf.Max(cellSize, max.y - min.y));
+        // Grow the capture zone inward from the wall face rather than centering it on the wall,
+        // so detection starts well before the vehicle reaches the edge instead of only once it's
+        // already touching the wall — see PathExitCaptureDepthCells.
+        col.offset = inward * (captureDepthWorld * 0.5f);
 
         GameObject visualInstance = null;
         if (_gameFlow.PathExitVisualPrefab != null)
@@ -291,6 +299,28 @@ public sealed class PathChoiceCoordinator
         return triggerCenter;
     }
 
+    // The direction from a boundary side's wall toward the maze interior — e.g. a Right exit
+    // needs negative X to point inward, a Left exit needs positive X for the same visual intent.
+    // Shared by the capture trigger's inward-growing collider and the particle flow direction.
+    private static Vector2 InwardDirection(BoundaryWrap.BoundarySide side) => side switch
+    {
+        BoundaryWrap.BoundarySide.Left  => Vector2.right,
+        BoundaryWrap.BoundarySide.Right => Vector2.left,
+        BoundaryWrap.BoundarySide.Top   => Vector2.down,
+        _ /* Bottom */                  => Vector2.up,
+    };
+
+    // The axis a vehicle straightens along before being carried out through a Left/Right/Top
+    // exit — perpendicular to InwardDirection/OutwardDirection. A Left or Right wall's opening
+    // runs vertically, so the vehicle aligns its world Y to the exit anchor's; a Top wall's
+    // opening runs horizontally, so it aligns X instead. (Bottom exits don't currently occur —
+    // GenerateInterstitialMaze's porous border only ever opens Top/Left/Right — but Vector2.right
+    // is the correct tangential axis for one if that ever changes.)
+    private static Vector2 TangentialAxis(BoundaryWrap.BoundarySide side) =>
+        side == BoundaryWrap.BoundarySide.Left || side == BoundaryWrap.BoundarySide.Right
+            ? Vector2.up
+            : Vector2.right;
+
     // Points the particle effect's Velocity Over Lifetime module inward from whichever border
     // side the exit sits on — toward wherever the player currently is — instead of a single
     // baked-in direction that only reads correctly for one side (e.g. a Right exit needs
@@ -299,13 +329,7 @@ public sealed class PathChoiceCoordinator
     {
         if (visualInstance == null) return;
 
-        Vector2 inward = side switch
-        {
-            BoundaryWrap.BoundarySide.Left  => Vector2.right,
-            BoundaryWrap.BoundarySide.Right => Vector2.left,
-            BoundaryWrap.BoundarySide.Top   => Vector2.down,
-            _ /* Bottom */                  => Vector2.up,
-        };
+        Vector2 inward = InwardDirection(side);
         float speed = _gameFlow.PathExitParticleSpeed;
 
         // The prefab's Shape module is authored so its "front" sits centered on a Right-edge
@@ -399,20 +423,22 @@ public sealed class PathChoiceCoordinator
         Vector2 targetWorld = drums.GridToWorldPosition(winnerExit.AnchorCell);
         var side = winnerExit.Side;
         Vector2 outward = SceneFlowCoordinator.OutwardDirection(side);
+        Vector2 tangentialAxis = TangentialAxis(side);
         float offscreenMargin = _gameFlow.PathTransitionOffscreenMargin;
 
-        // Two stages, driven in the same loop: every vehicle (winner included) first converges
-        // on the winner's exit anchor, then gets carried outward through the boundary until it
-        // clears the true screen edge — so the maze swap never fires while a vehicle is still
-        // visibly mid-tunnel. The winner isn't skipped straight to the carry-out stage: the exit
-        // trigger is deliberately wider than the corridor's visual opening (a forgiving capture
-        // zone), so the winner may have touched it off-center or from an angle. Routing it
-        // through the same converge-then-carry motion pulls it onto the corridor's center line
-        // and squares its heading to the outward direction before it ever crosses the threshold,
-        // instead of carrying it out from wherever it happened to collide. All vehicles get
-        // input locked, including the winner, so the carry-through reads as a scripted exit
-        // rather than fighting player input.
-        var converging = new List<Vehicle>();
+        // Two stages, driven in the same loop: every vehicle (winner included) first aligns
+        // itself to the winner exit's tangential coordinate (straightens onto the corridor's
+        // center line — vertically for a Left/Right exit, horizontally for a Top exit) without
+        // yet moving toward the wall, then gets carried straight outward through the boundary
+        // until it clears the true screen edge — so it reads as being drawn into the center of
+        // the particle aisle rather than cutting a diagonal line toward a point. The winner isn't
+        // skipped straight to the carry-out stage: the capture trigger is deliberately wider than
+        // the corridor's visual opening (a forgiving capture zone, and now several cells deep —
+        // see PathExitCaptureDepthCells — so capture fires well before the vehicle is near the
+        // edge), so the winner may have touched it off-center or from an angle and still needs to
+        // straighten out first. All vehicles get input locked, including the winner, so the
+        // pull-in reads as a scripted exit rather than fighting player input.
+        var aligning = new List<Vehicle>();
         var carrying = new List<Vehicle>();
         var lockedOwners = new List<LocalPlayer>();
         foreach (var v in _gameFlow.GetVehicles())
@@ -429,35 +455,36 @@ public sealed class PathChoiceCoordinator
                 }
             }
 
-            // The winner has already touched the (wide) trigger, so it's already at/against the
-            // solid boundary wall — make it non-solid right away rather than waiting for
-            // "arrival" like losers, or the wall would bounce it back onto screen while it's
-            // still being pulled toward the anchor.
+            // Capture now fires several cells before the wall (PathExitCaptureDepthCells), so the
+            // winner is no longer necessarily right up against the solid boundary — but going
+            // non-solid immediately still only helps: it lets the vehicle glide freely through
+            // corridor-side wall cells while straightening out, instead of waiting for "arrival"
+            // like losers converging in from elsewhere in the maze.
             if (v == winnerVehicle)
                 SceneFlowCoordinator.SetVehicleSolid(v, false);
 
-            converging.Add(v);
+            aligning.Add(v);
         }
 
         float timeout = _gameFlow.PathTransitionTravelTimeout;
-        const float arriveDistanceSq = 0.75f * 0.75f;
+        const float arriveTangentialOffset = 0.75f;
         float elapsed = 0f;
-        while (elapsed < timeout && (converging.Count > 0 || carrying.Count > 0))
+        while (elapsed < timeout && (aligning.Count > 0 || carrying.Count > 0))
         {
-            for (int i = converging.Count - 1; i >= 0; i--)
+            for (int i = aligning.Count - 1; i >= 0; i--)
             {
-                var v = converging[i];
-                if (v == null) { converging.RemoveAt(i); continue; }
+                var v = aligning[i];
+                if (v == null) { aligning.RemoveAt(i); continue; }
 
-                Vector2 toTarget = targetWorld - (Vector2)v.transform.position;
-                if (toTarget.sqrMagnitude <= arriveDistanceSq)
+                float tangentialOffset = Vector2.Dot(targetWorld - (Vector2)v.transform.position, tangentialAxis);
+                if (Mathf.Abs(tangentialOffset) <= arriveTangentialOffset)
                 {
-                    converging.RemoveAt(i);
+                    aligning.RemoveAt(i);
                     carrying.Add(v);
                     SceneFlowCoordinator.SetVehicleSolid(v, false);
                     continue;
                 }
-                v.Move(toTarget.normalized);
+                v.Move(tangentialAxis * Mathf.Sign(tangentialOffset));
             }
 
             for (int i = carrying.Count - 1; i >= 0; i--)

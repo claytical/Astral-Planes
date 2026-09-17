@@ -138,7 +138,15 @@ public partial class CosmicDustGenerator
         int vehicleHoleRadiusCells = Mathf.Max(3, passRadiusCells);
         if (vehicleCells != null)
             foreach (var vehCell in vehicleCells)
+            {
                 CarvePermanentDisk(vehCell, vehicleHoleRadiusCells);
+                // The vehicle's carved hole has no guarantee of being reached by
+                // BuildPacManTunnels' DFS network — unlike exit gaps below, which always get this
+                // same connector walk. Without it, a vehicle spawned inside what would otherwise
+                // have been a solid wall block can end up sealed off from every exit by
+                // bypass-proof Solid dust. No-ops when the hole already touches open interior.
+                CarveConnectorToInterior(vehCell, w, h, passRadiusCells);
+            }
 
         var exits = new List<PathExitInfo>(gapGroups.Count);
         foreach (var group in gapGroups)

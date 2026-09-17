@@ -129,7 +129,7 @@ public partial class MotifRingGlyphApplicator
 
         var entry = BuildRingEntry($"GameplayRing_Bin{binIndex}_{role}",
             innerR, outerR, segs, color, role, binIndex,
-            new List<MotifSnapshot.NoteEntry>(), totalSteps);
+            new List<MotifSnapshot.NoteEntry>(), totalSteps, ringOrdinal: idx);
         if (existingIdx >= 0) _gameplayRings[existingIdx] = entry;
         else _gameplayRings.Add(entry);
 
@@ -249,7 +249,8 @@ public partial class MotifRingGlyphApplicator
             if (shouldStop()) break;
 
             int   localStep      = note.Step % binSteps;
-            float angle          = localStep / (float)binSteps * Mathf.PI * 2f;
+            float angle          = localStep / (float)binSteps * Mathf.PI * 2f
+                + config.ringStartAngleOffset + MotifRingGlyphGenerator.RingOrdinalAngleJitter(ring.RingOrdinal);
             var   tugLocal       = new Vector3(Mathf.Cos(angle) * tugR, Mathf.Sin(angle) * tugR, 0f);
 
             Transform markerTr = null;
@@ -316,7 +317,7 @@ public partial class MotifRingGlyphApplicator
                 {
                     revealedNotes.Add(capturedNote);
                     var targetPoly = MotifRingGlyphGenerator.GenerateSingleRingAtRadius(
-                        role, ring.BinIndex, color, revealedNotes, binSteps, outerR, config);
+                        role, ring.BinIndex, color, revealedNotes, binSteps, outerR, config, ring.RingOrdinal);
                     var targetPts = targetPoly?.Points;
                     if (targetPts != null)
                     {
@@ -419,19 +420,17 @@ public partial class MotifRingGlyphApplicator
             var entry = BuildRingEntry($"RemainingRing_{i}", innerR, outerR, segs,
                 config.remainingRingColor, default, -1,
                 new List<MotifSnapshot.NoteEntry>(), 0,
-                config.remainingRingAlpha, config.remainingContourAlpha);
+                config.remainingRingAlpha, config.remainingContourAlpha, ringOrdinal: idx);
             _remainingRings.Add(entry);
 
             StartCoroutine(AnimateMeshFill(
                 entry.Fill.GetComponent<MeshFilter>().sharedMesh,
                 entry.FullTris, segs, delay: i * config.ringStaggerDelay, config.ringDrawInDuration));
 
-            StartCoroutine(AnimateSingleRing(
-                entry.Contour, entry.ContourPoints,
-                i * config.ringStaggerDelay, config.ringDrawInDuration,
-                entry.Root.transform, 0f,
-                new List<NoteAnimInfo>(), null,
-                shouldStop: () => _gameplayFadingOut));
+            // No Contour draw-in — see the matching comment in RecordRings.cs's ApplyLockedPreview.
+            // A remaining-progress placeholder never has notes either, so the filled annulus mesh
+            // above is the whole visual; ApplyNextUpColor below still colors entry.Contour, it just
+            // has nothing drawn to show that color on.
         }
 
         int totalRingCount = _gameplayRings.Count + _remainingRings.Count;

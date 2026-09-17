@@ -17,6 +17,7 @@ public partial class GameFlowManager
             PathChoice = new PathChoiceCoordinator(this, SessionState, SceneFlow);
             localPlayers = SessionState.MutablePlayers;
             SceneManager.sceneLoaded += OnSceneLoaded;
+            SetupQuitConfirmation();
             return;
         }
 

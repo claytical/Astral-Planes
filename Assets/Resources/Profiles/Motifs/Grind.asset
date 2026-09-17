@@ -44,7 +44,7 @@ MonoBehaviour:
   phraseLengthLoopsOverride: 0
   nodesPerStar: 4
   starBehavior: {fileID: 11400000, guid: 9dd08ed983d384107aaff4f28fa8803d, type: 2}
-  mazePattern: {fileID: 11400000, guid: 050d70a4230ab433db3d2c8c77d7b9e3, type: 2}
+  mazePattern: {fileID: 11400000, guid: 999c48ef70f2445fe894a6e34f85d509, type: 2}
   roleGeoConfigs:
   - role: 0
     feature: 2

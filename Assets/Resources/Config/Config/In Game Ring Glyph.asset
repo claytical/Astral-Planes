@@ -20,7 +20,7 @@ MonoBehaviour:
   ringAlpha: 0.339
   contourAlpha: 1
   remainingRingColor: {r: 0.6, g: 0.6, b: 0.6, a: 1}
-  remainingRingAlpha: 0.12
+  remainingRingAlpha: 0.4
   remainingContourAlpha: 0.25
   nextUpColorCycleDuration: 0.5
   recordHoldDuration: 5

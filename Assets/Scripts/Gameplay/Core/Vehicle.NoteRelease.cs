@@ -42,11 +42,17 @@ public partial class Vehicle
     private void DiscardCarriedCollectables()
     {
         foreach (var armed in _armedReleases)
+        {
             armed.note.collectable?.OnManualReleaseDiscarded(armed.note.authoredAbsStep);
+            armed.note.track?.NotifyNoteDiscarded(armed.note.burstId, armed.note.authoredAbsStep);
+        }
         _armedReleases.Clear();
 
         foreach (var pending in _pendingNotes)
+        {
             pending.collectable?.OnManualReleaseDiscarded(pending.authoredAbsStep);
+            pending.track?.NotifyNoteDiscarded(pending.burstId, pending.authoredAbsStep);
+        }
         _pendingNotes.Clear();
 
         _releaseButtonHeld = false;
@@ -81,6 +87,13 @@ public partial class Vehicle
         _pendingNotes.Dequeue();
         if (p.collectable != null) p.collectable.OnManualReleaseDiscarded(p.authoredAbsStep);
         p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
+
+        // Tear the tether down synchronously here rather than waiting on the next
+        // TickNoteTrail() tick — Vehicle and InstrumentTrack have no declared execution
+        // order, so leaving this to "notice nothing's left next Update" races against
+        // InstrumentTrack's own EnqueueNextFrame-deferred placeholder-marker removal.
+        if (_pendingNotes.Count == 0 && _armedReleases.Count == 0)
+            DestroyVehicleTether();
     }
 
     // Enqueue a collected note for manual release. Returns true if queued.
@@ -131,9 +144,7 @@ public partial class Vehicle
 
     if (!p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbs, out int floorAbs, out int totalSteps))
     {
-        _pendingNotes.Dequeue();
-        if (p.collectable != null) p.collectable.OnManualReleaseDiscarded(p.authoredAbsStep);
-        p.track.NotifyNoteDiscarded(p.burstId, p.authoredAbsStep);
+        DiscardPendingNote(p);
         CollectEnergy(p.collectable.amount * .25f);
 //sacrifice note to gain small amount of energy instead of specific failure
         //        viz?.BlastManualReleaseCueFailure(transform, p.track, p.authoredAbsStep);

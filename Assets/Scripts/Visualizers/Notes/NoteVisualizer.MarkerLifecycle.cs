@@ -149,6 +149,13 @@ public partial class NoteVisualizer
 
         ascensionDirector?.CancelAscension(track, tr.gameObject);
 
+        var explode = tr.GetComponent<Explode>();
+        if (explode != null)
+        {
+            explode.SetTint(track.DisplayColor);
+            explode.Permanent(false);
+        }
+
         noteMarkers.Remove(key);
         Destroy(tr.gameObject);
     }

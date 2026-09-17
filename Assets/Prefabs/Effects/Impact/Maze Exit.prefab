@@ -42,7 +42,7 @@ ParticleSystem:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2567590292593330884}
   serializedVersion: 8
-  lengthInSec: 2
+  lengthInSec: 1
   simulationSpeed: 0.5
   stopAction: 0
   cullingMode: 0
@@ -170,7 +170,7 @@ ParticleSystem:
     startSpeed:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 5
+      scalar: 10
       minScalar: 5
       maxCurve:
         serializedVersion: 2
@@ -288,7 +288,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 2.5
+      scalar: 1
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -1318,10 +1318,10 @@ ParticleSystem:
       maxColor: {r: 1, g: 1, b: 1, a: 1}
       maxGradient:
         serializedVersion: 2
-        key0: {r: 0.07357097, g: 1, b: 0, a: 0.08627451}
-        key1: {r: 0.36320752, g: 0.5148248, b: 1, a: 0.49019608}
-        key2: {r: 1, g: 0.36320752, b: 0.8351832, a: 0.7294118}
-        key3: {r: 0.57535505, g: 0, b: 0.9811321, a: 1}
+        key0: {r: 0.07357097, g: 1, b: 0, a: 0.42352942}
+        key1: {r: 0.36320752, g: 0.5148248, b: 1, a: 0}
+        key2: {r: 1, g: 0.36320752, b: 0.8351832, a: 0}
+        key3: {r: 0.57535505, g: 0, b: 0.9811321, a: 0}
         key4: {r: 1, g: 0.2688679, b: 0.3290789, a: 0}
         key5: {r: 1, g: 0.67352945, b: 0.25, a: 0}
         key6: {r: 1, g: 0.9349057, b: 0.2783019, a: 0}
@@ -1334,10 +1334,10 @@ ParticleSystem:
         ctime5: 43578
         ctime6: 52797
         ctime7: 49947
-        atime0: 3017
-        atime1: 15755
-        atime2: 39723
-        atime3: 42237
+        atime0: 0
+        atime1: 65535
+        atime2: 65367
+        atime3: 65367
         atime4: 65367
         atime5: 0
         atime6: 0
@@ -1345,7 +1345,7 @@ ParticleSystem:
         m_Mode: 2
         m_ColorSpace: 0
         m_NumColorKeys: 7
-        m_NumAlphaKeys: 5
+        m_NumAlphaKeys: 2
       minGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -1505,7 +1505,7 @@ ParticleSystem:
     x:
       serializedVersion: 2
       minMaxState: 0
-      scalar: -2.5
+      scalar: -2
       minScalar: 0
       maxCurve:
         serializedVersion: 2

@@ -49,7 +49,7 @@ MonoBehaviour:
   phraseLengthLoopsOverride: 0
   nodesPerStar: 5
   starBehavior: {fileID: 11400000, guid: 8a258771ba6214752b716ed2a737f120, type: 2}
-  mazePattern: {fileID: 11400000, guid: c90fade64b1a04f608cacc42c162a9a6, type: 2}
+  mazePattern: {fileID: 11400000, guid: 65599f23595554225bbb2b843d75e903, type: 2}
   roleGeoConfigs:
   - role: 0
     feature: 0
@@ -127,11 +127,10 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 89668f35d0c524e079d9ea68d30a9f03, type: 2}
   - {fileID: 11400000, guid: 8f952da3e41f041f9923f89dd4ecefac, type: 2}
   - {fileID: 11400000, guid: c821a29b265174ef6b0b2ed0da95787e, type: 2}
-  - {fileID: 11400000, guid: 5fc805f8693f4407b80f74fe95ad91b3, type: 2}
-  - {fileID: 11400000, guid: 32fadec6465d64a78ae8d9d2c5d82d9d, type: 2}
   - {fileID: 11400000, guid: 405be191b25c74b588add5f070723187, type: 2}
   - {fileID: 11400000, guid: 5915d8e97b8ed4a8c8951a507761de5b, type: 2}
   - {fileID: 11400000, guid: 4f1867e74c16449b4a60d5f4b0d0fc54, type: 2}
+  - {fileID: 11400000, guid: 32fadec6465d64a78ae8d9d2c5d82d9d, type: 2}
   selectionWeight: 1
   beatIntroCount: 0
   driveBeatsFromDensity: 1

@@ -68,7 +68,7 @@ public partial class MotifRingGlyphApplicator
                 isLastRing ? new List<MotifSnapshot.NoteEntry>() : ringNotes,
                 snapshot.TotalSteps,
                 fillSortingOrderOverride: fillOrder, contourSortingOrderOverride: contourOrder,
-                contourWidthOverride: config.recordLineWidth);
+                contourWidthOverride: config.recordLineWidth, ringOrdinal: i);
             _recordRings.Add(entry);
             ApplyInitialNonHighlightedLook(entry);
 
@@ -89,7 +89,8 @@ public partial class MotifRingGlyphApplicator
                 Color32 q = n.TrackColor;
                 if (!trackByQColor.TryGetValue(q, out var track)) continue;
                 int   localStep = n.Step % binSize;
-                float angle     = localStep / (float)binSize * Mathf.PI * 2f;
+                float angle     = localStep / (float)binSize * Mathf.PI * 2f
+                    + config.ringStartAngleOffset + MotifRingGlyphGenerator.RingOrdinalAngleJitter(i);
                 noteInfos.Add(new NoteAnimInfo
                 {
                     Track        = track,
@@ -117,6 +118,7 @@ public partial class MotifRingGlyphApplicator
                     noteInfos, noteViz,
                     role, binIndex, color, binSize, outerR,
                     shouldStop: () => _recordFadingOut,
+                    ringOrdinal: i,
                     spherical: sphericalRotation,
                     isHighlighted: () => _highlightedRingIndices.Contains(ringIndex)));
             }
@@ -176,7 +178,7 @@ public partial class MotifRingGlyphApplicator
             var entry = BuildRingEntry($"StaticRing_Bin{binIndex}_{role}",
                 innerR, outerR, segs, color, role, binIndex, ringNotes, snapshot.TotalSteps,
                 fillSortingOrderOverride: fillOrder, contourSortingOrderOverride: contourOrder,
-                contourWidthOverride: config.recordLineWidth);
+                contourWidthOverride: config.recordLineWidth, ringOrdinal: i);
             _recordRings.Add(entry);
 
             // Render mesh and contour immediately — no coroutines.
@@ -238,7 +240,7 @@ public partial class MotifRingGlyphApplicator
             var entry = BuildRingEntry($"VinylRing_Bin{binIndex}_{role}",
                 innerR, outerR, segs, color, role, binIndex, ringNotes, snapshot.TotalSteps,
                 fillSortingOrderOverride: fillOrder, contourSortingOrderOverride: contourOrder,
-                contourWidthOverride: config.recordLineWidth);
+                contourWidthOverride: config.recordLineWidth, ringOrdinal: i);
             _recordRings.Add(entry);
 
             var mesh = entry.Fill.GetComponent<MeshFilter>().sharedMesh;
@@ -293,19 +295,21 @@ public partial class MotifRingGlyphApplicator
             var entry = BuildRingEntry($"LockedRing_{i}", innerR, outerR, segs,
                 config.remainingRingColor, default, -1,
                 new List<MotifSnapshot.NoteEntry>(), 0,
-                config.remainingRingAlpha * alphaScale, config.remainingContourAlpha * alphaScale);
+                config.remainingRingAlpha * alphaScale, config.remainingContourAlpha * alphaScale,
+                ringOrdinal: i);
             _recordRings.Add(entry);
 
             StartCoroutine(AnimateMeshFill(
                 entry.Fill.GetComponent<MeshFilter>().sharedMesh,
                 entry.FullTris, segs, delay: i * config.ringStaggerDelay, config.ringDrawInDuration));
 
-            StartCoroutine(AnimateSingleRing(
-                entry.Contour, entry.ContourPoints,
-                i * config.ringStaggerDelay, config.ringDrawInDuration,
-                entry.Root.transform, 0f,
-                new List<NoteAnimInfo>(), null,
-                shouldStop: () => _recordFadingOut));
+            // No Contour draw-in here: a locked-preview ring never has notes (see the empty note
+            // list passed to BuildRingEntry above), so there are no dips to trace — it's just a
+            // plain circle. The filled annulus mesh above already IS that plain circle (a solid,
+            // seam-free mesh, unlike the Contour's LineRenderer — see MotifRingGlyphGenerator.cs's
+            // class-level remarks for why that LineRenderer's closure is fragile), so it alone is
+            // "the ring." entry.Contour still exists (BuildRingEntry always creates it) but is left
+            // at its construction default of positionCount = 0 — present, but drawing nothing.
         }
 
         RefreshPlayAreaFit(_recordRings.Count);
@@ -357,8 +361,12 @@ public partial class MotifRingGlyphApplicator
             // noteInfos built in AnimateApply) rather than the ring's plain, undipped radius —
             // otherwise the firework sits on the circle the ring would be at with no notes,
             // not the pulled-in position the note's dip is actually drawn at.
-            float tugR     = ring.OuterRadius * (1f - config.tugDepthFraction);
-            var localPos = new Vector3(Mathf.Cos(angleRad) * tugR, Mathf.Sin(angleRad) * tugR, 0f);
+            float tugR = ring.OuterRadius * (1f - config.tugDepthFraction);
+            // angleRad (from RingPreviewPlayer) already carries the global ringStartAngleOffset,
+            // but not this specific ring's ordinal jitter — add it here where ring.RingOrdinal is
+            // actually resolved, so the firework lands on the same dip the contour drew.
+            float jitteredAngle = angleRad + MotifRingGlyphGenerator.RingOrdinalAngleJitter(ring.RingOrdinal);
+            var localPos = new Vector3(Mathf.Cos(jitteredAngle) * tugR, Mathf.Sin(jitteredAngle) * tugR, 0f);
             var worldPos = ring.Root.transform.TransformPoint(localPos);
 
             // Parented to the ring (unlike SpawnBreakEffect in GameplayRings.cs, which stays

@@ -32,7 +32,7 @@ MonoBehaviour:
   nonHighlightedDarkenAmount: 0
   nonHighlightedAlphaMultiplier: 0
   remainingRingColor: {r: 0.6320754, g: 0.6320754, b: 0.6320754, a: 1}
-  remainingRingAlpha: 0
+  remainingRingAlpha: 0.4
   remainingContourAlpha: 0.25
   nextUpColorCycleDuration: 1.5
   ringDrawInDuration: 0

@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4684fad16b34b4da9af4a44a83716dcf, type: 3}
   m_Name: WispConfig
   m_EditorClassIdentifier: Assembly-CSharp::WispConfig
-  approachRadius: 7
+  approachRadius: 5
   recheckPeriod: 0.2
-  seekSpeed: 1
+  seekSpeed: 2
   waypointArriveDistance: 0.3
   steerAcceleration: 6
   travelDriftAmplitude: 0.6

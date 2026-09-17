@@ -54,31 +54,39 @@ public class PhaseTransitionManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Phase indices after currentPhaseIndex. Mirrors AdvancePhase's wrap semantics: if
-    /// loopChapters is true and we're on the last phase, "remaining" is every phase except
-    /// the current one (so a choice is still offered on the loop-around); if loopChapters is
-    /// false and we're on the last phase, returns empty (nothing left to choose between).
+    /// Single next phase index, respecting loopChapters/holdOnLastChapter — the one source of
+    /// truth for "what phase comes after this one," shared by AdvancePhase and
+    /// GetRemainingPhaseIndices so they can't disagree. -1 = nothing next (last phase,
+    /// loopChapters=false, holdOnLastChapter=false).
+    /// </summary>
+    private int ComputeNextPhaseIndex()
+    {
+        if (chapterLibrary == null || chapterLibrary.phases == null || chapterLibrary.phases.Count == 0)
+            return -1;
+
+        int count = chapterLibrary.phases.Count;
+        int next  = currentPhaseIndex + 1;
+
+        if (next >= count)
+        {
+            if (loopChapters) next = 0;
+            else if (holdOnLastChapter) next = count - 1;
+            else return -1;
+        }
+
+        return next;
+    }
+
+    /// <summary>
+    /// The single next phase index, as a list of at most one element — a maze exit should
+    /// only ever lead to the immediate next phase's motif 0, never skip ahead or offer a
+    /// menu of other phases. Empty when there is no next phase (see ComputeNextPhaseIndex).
     /// </summary>
     public IReadOnlyList<int> GetRemainingPhaseIndices()
     {
         var result = new List<int>();
-        if (chapterLibrary == null || chapterLibrary.phases == null) return result;
-
-        int count = chapterLibrary.phases.Count;
-        int next = currentPhaseIndex + 1;
-
-        if (next < count)
-        {
-            for (int i = next; i < count; i++) result.Add(i);
-            return result;
-        }
-
-        if (loopChapters)
-        {
-            for (int i = 0; i < count; i++)
-                if (i != currentPhaseIndex) result.Add(i);
-        }
-
+        int next = ComputeNextPhaseIndex();
+        if (next >= 0) result.Add(next);
         return result;
     }
 
@@ -96,23 +104,11 @@ public class PhaseTransitionManager : MonoBehaviour
             return;
         }
 
-        int count = chapterLibrary.phases.Count;
-        int next  = currentPhaseIndex + 1;
-
-        if (next >= count)
+        int next = ComputeNextPhaseIndex();
+        if (next < 0)
         {
-            if (loopChapters)
-            {
-                next = 0;
-            }
-            else
-            {
-                if (GameFlowManager.VerboseLogging) Debug.Log($"[CHAPTER] All phases exhausted (loopChapters=false holdOnLast={holdOnLastChapter}); by {who}");
-                if (holdOnLastChapter)
-                    next = count - 1; // restart last phase's motifs from top
-                else
-                    return;           // no-op: stay on final motif
-            }
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[CHAPTER] All phases exhausted (loopChapters=false holdOnLast={holdOnLastChapter}); by {who}");
+            return; // no-op: stay on final motif
         }
 
         StartChapter(next, who);

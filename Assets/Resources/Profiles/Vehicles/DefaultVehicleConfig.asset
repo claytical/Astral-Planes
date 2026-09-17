@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e263e1a76fbdd46d6ae4bdda8c952692, type: 3}
   m_Name: DefaultVehicleConfig
   m_EditorClassIdentifier: Assembly-CSharp::VehicleConfig
+  maxAngularVelocityDegPerSec: 540
   manualReleaseQueueCapacity: 9
   occupiedStepVelocityMultiplier: 1.25
   occupiedStepOctaveAccent: 1
@@ -20,19 +21,28 @@ MonoBehaviour:
   manualReleaseArmAheadMinSeconds: 0.5
   manualReleaseAutoCommitEpsSteps: 0.35
   manualReleaseGracePeriodSteps: 1
+  postCommitRingCollisionImmunitySeconds: 0.5
   plowFadeSeconds: 0.04
   inputTimeout: 0.15
   enableRecovery: 1
   viewportOobMargin: 0.1
+  playAreaOobMargin: 0.5
   minSecondsBetweenRecoveries: 0.75
   respawnSearchRadiusCells: 8
   stuckSpeedThreshold: 0.35
   stuckSecondsInVoid: 0.6
+  dustPluckIdleSuppressSeconds: 2
+  lockMovementDuringRecovery: 1
+  recoveryReturnSeconds: 0.6
+  voidEjectExitSpeedMultiplier: 0.35
   voidProbeRadiusWorld: 0.6
-  vehicleKeepClearRefreshSeconds: 0.1
+  voidEnergyRecoveryPerSecond: 1
   useVehiclePlacementResonance: 1
   vehiclePlacementColorLerpSpeed: 10
   vehiclePlacementMinTint: 0.08
+  vehicleKeepClearRefreshSeconds: 0.1
+  trailDecaySeconds: 3
+  trailLength: 6
   carveSpawnRestPocket: 1
   spawnRestPocketAutoRadius: 1
   spawnRestPocketRadiusCells: 1
@@ -41,3 +51,5 @@ MonoBehaviour:
   trailSlotSpacing: 0.1
   trailFirstSlotOffset: 0.3
   trailHistoryCapacity: 48
+  drainFeedbackShrinkScale: 0.7
+  drainFeedbackDuration: 0.25

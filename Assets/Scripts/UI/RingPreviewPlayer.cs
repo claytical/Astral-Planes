@@ -13,6 +13,10 @@ public class RingPreviewPlayer : MonoBehaviour
 {
     [SerializeField] private MidiStreamPlayer midiStreamPlayer;
     [SerializeField] private PhaseLibrary phaseLibrary;
+    [Tooltip("Same RingGlyphConfig asset the carousel slots' MotifRingGlyphApplicator use — keeps " +
+             "OnNoteFired's angle in sync with ringStartAngleOffset so the firework lands on the " +
+             "ring's actual (rotated) rim position instead of the un-rotated default.")]
+    [SerializeField] private RingGlyphConfig ringGlyphConfig;
 
     // Bass=0, Harmony=1, Lead=2, Groove=3, None=4, Rhythm=5
     private static readonly Dictionary<MusicalRole, int> RoleChannel = new()
@@ -330,7 +334,8 @@ public class RingPreviewPlayer : MonoBehaviour
             if (!firedRoles.Add(role)) continue;
 
             int   localStep = step % _stepsPerLoop;
-            float angleRad  = localStep / (float)_stepsPerLoop * Mathf.PI * 2f;
+            float angleRad  = localStep / (float)_stepsPerLoop * Mathf.PI * 2f
+                + (ringGlyphConfig != null ? ringGlyphConfig.ringStartAngleOffset : 0f);
             OnNoteFired.Invoke(role, step / _stepsPerLoop, angleRad);
         }
     }

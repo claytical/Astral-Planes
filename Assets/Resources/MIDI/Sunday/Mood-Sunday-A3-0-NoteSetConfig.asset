@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Mood-Sunday-A3-0-NoteSetConfig
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: Mood-Sunday-A3-0
-  roleProfile: {fileID: 11400000, guid: 9e13574901ad94a5592003796a2a5d61, type: 2}
+  roleProfile: {fileID: 11400000, guid: c60ad5188374b45a48d932dc43b2a997, type: 2}
   riff: {fileID: 11400000, guid: a3c3d4d44d08643d1a3bc568870c7217, type: 2}
   mineNodeExpireAfterLoops: 3
   ascendLoops: 0

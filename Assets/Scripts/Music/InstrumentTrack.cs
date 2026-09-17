@@ -582,6 +582,15 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (GameFlowManager.VerboseLogging) Debug.Log($"[COMMIT] track={name} stepAbs={stepIndex} rawNote={note} qNote={qNote} skipQuantize={skipChordQuantize} nowDsp={AudioSettings.dspTime:F6} leaderStart={drumTrack.leaderStartDspTime:F6}");
         if (qNote < lowestAllowedNote || qNote > highestAllowedNote)
             Debug.LogError($"[TRK:COMMIT_OOB] track={name} step={stepIndex} rawNote={note} qNote={qNote} range=[{lowestAllowedNote},{highestAllowedNote}] skipQuantize={skipChordQuantize} authoredRoot={authoredRootMidi}\n{System.Environment.StackTrace}");
+
+        // Replace-or-add: enforce one persistent note per (track, stepIndex), same invariant
+        // CommitManualReleasedNote already keeps for the manual-release path. Without this,
+        // a re-spawn that targets an already-filled step (e.g. GetNextBinForSpawn's
+        // wrap-to-zero density reuse when a track's loopMultiplier hasn't yet expanded past
+        // its one filled bin) commits a second overlapping note instead of replacing the
+        // first — both then play back simultaneously via loopPattern.GetNotesAt, an audible
+        // doubled/unison note.
+        persistentLoopNotes.RemoveAll(t => t.stepIndex == stepIndex);
         persistentLoopNotes.Add((stepIndex, qNote, durationTicks, force, authoredRootMidi));
         _noteCommitTimes[stepIndex] = Time.time;
 

@@ -10,7 +10,7 @@ public partial class MotifRingGlyphApplicator
         List<MotifSnapshot.NoteEntry> notes, int totalSteps,
         float? fillAlphaOverride = null, float? contourAlphaOverride = null,
         int? fillSortingOrderOverride = null, int? contourSortingOrderOverride = null,
-        float? contourWidthOverride = null)
+        float? contourWidthOverride = null, int ringOrdinal = 0)
     {
         var root = new GameObject(goName);
         root.transform.SetParent(transform, worldPositionStays: false);
@@ -45,7 +45,7 @@ public partial class MotifRingGlyphApplicator
         contourGo.transform.SetParent(root.transform, worldPositionStays: false);
 
         var poly = MotifRingGlyphGenerator.GenerateSingleRingAtRadius(
-            role, binIndex, color, notes, totalSteps, outerR, config);
+            role, binIndex, color, notes, totalSteps, outerR, config, ringOrdinal);
         var pts = poly?.Points ?? new List<Vector2>();
 
         var lr = contourGo.AddComponent<LineRenderer>();
@@ -57,7 +57,11 @@ public partial class MotifRingGlyphApplicator
         // same technique as PhaseStarDustAffect.CreateTentacleLine. numCapVertices is deliberately
         // left at 0: the contour's point list already closes itself (BuildRingPoints duplicates
         // the first point at the end), so with loop=false those two coincident "end" points would
-        // each draw a rounded cap, stacking into a stray dot at the seam.
+        // each draw a rounded cap, stacking into a stray dot at the seam. See
+        // MotifRingGlyphGenerator.cs's class-level remarks for why this (imperfect but least-bad)
+        // closure is used instead of LineRenderer.loop=true or a deliberate 1-segment gap — both
+        // were tried and both looked worse. RingOrdinal/RingOrdinalAngleJitter below is what keeps
+        // this seam's minor kink from lining up across a whole ring stack into something visible.
         lr.numCornerVertices = 4;
         var contourColor     = new Color(color.r, color.g, color.b, contourAlphaOverride ?? config.contourAlpha);
         lr.startColor        = contourColor;
@@ -79,6 +83,7 @@ public partial class MotifRingGlyphApplicator
             BinIndex      = binIndex,
             Role          = role,
             OuterRadius   = outerR,
+            RingOrdinal   = ringOrdinal,
         };
     }
 

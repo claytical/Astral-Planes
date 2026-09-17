@@ -65,6 +65,10 @@ MonoBehaviour:
   flowerSwayAmplitudeWorld: 0.1
   flowerSwayFrequency: 0.22
   flowerSpinDegPerSec: 45
+  flowerVelocitySoftenPerBump: 0.15
+  flowerVelocityFloor127: 20
+  flowerBudDarkenPerBump: 0.1
+  flowerBudMaxDarken01: 0.65
   revealedEmissionMultiplier: 1.1
   _chargeColor: {r: 1, g: 1, b: 1, a: 0.23529412}
   _denyColor: {r: 0.8156863, g: 0.1254902, b: 0.5647059, a: 1}
@@ -407,7 +411,7 @@ ParticleSystem:
     startLifetime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 1
+      scalar: 2
       minScalar: 5
       maxCurve:
         serializedVersion: 2
@@ -460,7 +464,7 @@ ParticleSystem:
     startSpeed:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.05
+      scalar: 0.1
       minScalar: 5
       maxCurve:
         serializedVersion: 2
@@ -514,7 +518,7 @@ ParticleSystem:
       serializedVersion: 2
       minMaxState: 0
       minColor: {r: 1, g: 1, b: 1, a: 1}
-      maxColor: {r: 1, g: 1, b: 1, a: 1}
+      maxColor: {r: 1, g: 1, b: 1, a: 0.5019608}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -1161,7 +1165,7 @@ ParticleSystem:
     rateOverTime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 150
+      scalar: 100
       minScalar: 10
       maxCurve:
         serializedVersion: 2
@@ -1617,7 +1621,7 @@ ParticleSystem:
         ctime7: 0
         atime0: 0
         atime1: 4023
-        atime2: 42908
+        atime2: 24806
         atime3: 65535
         atime4: 65535
         atime5: 0
@@ -3145,7 +3149,7 @@ ParticleSystem:
     quality: 1
     scrollSpeed:
       serializedVersion: 2
-      minMaxState: 0
+      minMaxState: 1
       scalar: 0.1
       minScalar: 0
       maxCurve:
@@ -4231,7 +4235,7 @@ ParticleSystem:
     lifetime:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 1
+      scalar: 0.75
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -4281,7 +4285,7 @@ ParticleSystem:
         m_PreInfinity: 2
         m_PostInfinity: 2
         m_RotationOrder: 4
-    minVertexDistance: 0.2
+    minVertexDistance: 0
     textureMode: 0
     textureScale: {x: 1, y: 1}
     ribbonCount: 1

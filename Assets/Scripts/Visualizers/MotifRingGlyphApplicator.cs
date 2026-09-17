@@ -86,6 +86,11 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
         public int           BinIndex;
         public MusicalRole   Role;
         public float         OuterRadius;
+        // This ring's position in its own stack (0 = innermost), NOT BinIndex — multiple rings
+        // can share (or lack) a meaningful BinIndex (e.g. every locked-preview/remaining-progress
+        // placeholder ring uses -1), so this is what BuildRingEntry uses to stagger each ring's
+        // contour seam angle — see RingOrdinalAngleJitter in MotifRingGlyphGenerator.cs.
+        public int           RingOrdinal;
     }
 
     private readonly List<RingEntry> _gameplayRings  = new();

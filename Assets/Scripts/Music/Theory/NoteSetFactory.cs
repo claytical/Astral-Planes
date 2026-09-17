@@ -169,30 +169,34 @@ public class NoteSetFactory : MonoBehaviour
         chordToneOffset = targetChord.intervals[track.voiceIndex % targetChord.intervals.Count];
     int targetRoot = targetChord.rootNote + chordToneOffset;
 
-    // Exact-register transposition: the chord root's octave is authoritative.
-    // No nearest-register normalization — a ♭III authored an octave below I
-    // must pull the riff down with it.
-    int delta = targetRoot - authoredAnchor + riff.octaveShift * 12;
+    // Register-preserving transposition: each riff is authored at a deliberate register for
+    // its role (e.g. bass low, harmony high), while every ChordProgressionProfile asset is
+    // authored with its own roots clustered near a single arbitrary octave. Jumping straight
+    // to targetRoot's absolute octave would drag every role toward that one octave regardless
+    // of its authored register. Instead, only nudge by the minimal signed pitch-class distance
+    // (-5..+6 semitones) needed to align with the target chord tone, keeping the riff in its
+    // own authored octave. riff.octaveShift is then a genuine, additive full-octave move on
+    // top of that — meant for compensating register after an instrument voice/preset change.
+    int rawPitchDelta = ((targetRoot - authoredAnchor) % 12 + 12) % 12;
+    int pitchClassDelta = rawPitchDelta > 6 ? rawPitchDelta - 12 : rawPitchDelta;
+    int delta = pitchClassDelta + riff.octaveShift * 12;
 
-    // Fold the WHOLE riff by one consistent number of octaves, chosen to best center the
-    // riff's own transposed span inside the track's playable range, instead of letting each
-    // note independently decide its own fold amount. Per-note folding silently discarded
-    // octaveShift whenever a given note already landed in-range on its own, and scrambled the
-    // composed line's intervals whenever some notes needed an extra fold and others didn't.
-    // Anchoring the fold on the riff's own root alone isn't enough either: a riff whose notes
-    // span well below (or above) that root — like a bass line dipping a tenth under the tonic —
-    // can still leave its far end clamped hard against the range boundary depending on which
-    // chord it lands on, flattening exactly the notes furthest from the root. Centering on the
-    // riff's full authored span (not just its root) keeps that from depending on which chord
-    // this bin happens to land on. Only a riff wider than the track's own range still needs the
-    // final per-note clamp below, and only at its extremes.
+    // Fold the WHOLE riff by one consistent number of octaves — never per-note, which would
+    // scramble the composed line's intervals — but only as a safety net when the transposed
+    // span genuinely doesn't fit the track's playable range at all. A span that already fits
+    // is left alone, so the minimal pitch-class nudge above and any manual octaveShift survive
+    // into the final pitch instead of being folded back out.
     int riffMinNote = riff.events.Min(e => e.midiNote);
     int riffMaxNote = riff.events.Max(e => e.midiNote);
     int spanLo = riffMinNote + delta;
     int spanHi = riffMaxNote + delta;
-    int spanMid = (spanLo + spanHi) / 2;
-    int rangeMid = (track.lowestAllowedNote + track.highestAllowedNote) / 2;
-    int groupFoldOffset = Mathf.RoundToInt((rangeMid - spanMid) / 12f) * 12;
+    int groupFoldOffset = 0;
+    if (spanLo < track.lowestAllowedNote || spanHi > track.highestAllowedNote)
+    {
+        int rangeMid = (track.lowestAllowedNote + track.highestAllowedNote) / 2;
+        int spanMid = (spanLo + spanHi) / 2;
+        groupFoldOffset = Mathf.RoundToInt((rangeMid - spanMid) / 12f) * 12;
+    }
 
     if (GameFlowManager.VerboseLogging) Debug.Log(
         $"[NoteSetFactory] RIFF TRANSPOSE bin={binIndex} voiceIndex={track.voiceIndex} authoredAnchor={authoredAnchor} " +

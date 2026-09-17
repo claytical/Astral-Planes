@@ -107,6 +107,12 @@ public partial class InstrumentTrackController : MonoBehaviour
         return _binAllocator.GetBinForNextSpawn(track);
     }
 
+    public int PeekBinForNextSpawn(InstrumentTrack track)
+    {
+        EnsureBinAllocator();
+        return _binAllocator.PeekBinForNextSpawn(track);
+    }
+
     public bool IsChordGroupComplete(MusicalRole role, int binIndex)
     {
         EnsureBinAllocator();

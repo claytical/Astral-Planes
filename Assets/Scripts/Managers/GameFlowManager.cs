@@ -57,6 +57,13 @@ public partial class GameFlowManager : MonoBehaviour
     [SerializeField, Min(0f)] private float pathTransitionTravelTimeout = 3f;
     public float PathTransitionTravelTimeout => pathTransitionTravelTimeout;
 
+    [Tooltip("How many cells deep (along the boundary-normal axis, inward from the wall) an " +
+             "exit's capture trigger reaches. Deeper means a vehicle gets pulled in and starts " +
+             "aligning to the aisle well before it's near the screen edge, instead of only once " +
+             "it's already touching the wall.")]
+    [SerializeField, Min(1)] private int pathExitCaptureDepthCells = 4;
+    public int PathExitCaptureDepthCells => pathExitCaptureDepthCells;
+
     [Tooltip("Wisp prefab spawned once per multi-exit path-choice interstitial maze — leads " +
              "the vehicle toward a randomly chosen exit and plays a one-shot bridging sample " +
              "on contact. Leave unassigned to disable the feature.")]
@@ -140,7 +147,25 @@ public partial class GameFlowManager : MonoBehaviour
         // Primary path: return the pre-generated NoteSet for the bin this track is
         // about to fill. This is deterministic and consistent with what
         // ConfigureTracksForCurrentPhaseAndMotif already authored.
-        int targetBin = track.GetBinCursor();
+        //
+        // Resolve the bin via a non-consuming preview of the same logic SpawnCollectableBurst
+        // will use (BinFrontierAllocator.PeekBinForNextSpawn), rather than reading the raw
+        // cursor directly. A raw cursor read can be stale relative to where the collectable
+        // actually lands: AdvanceOtherTrackCursors bumps a track's cursor when a sibling track
+        // extends the leader bin count, even though this track hasn't itself advanced. If that
+        // track's earlier bin later ascends and gets refilled, the allocator correctly redirects
+        // back to the emptied bin (GetFirstEmptyAllocatedBin) while a raw cursor read would
+        // still point past it — baking the wrong bin's chord into the refill.
+        //
+        // Deliberately uses the "Peek" variant, not GetBinForNextSpawn itself: that method
+        // consumes a one-shot "allow advance" token (ConsumeAllowAdvanceNextBurst) meant to be
+        // read exactly once, at the real spawn decision in
+        // InstrumentTrackCompositionSpawner.SpawnBurst. Calling it here too would silently
+        // swallow that token before the real spawn sees it, blocking the track from ever
+        // advancing to its next bin.
+        int targetBin = track.controller != null
+            ? track.controller.PeekBinForNextSpawn(track)
+            : track.GetBinCursor();
         // Clamp to valid range defensively.
         targetBin = Mathf.Clamp(targetBin, 0, track.maxLoopMultiplier - 1);
 

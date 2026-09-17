@@ -154,6 +154,44 @@ public partial class Collectable
 
         PickIntent();
         _intentTimer = _intentInterval;
+
+        if (_pulseRoutine != null) { StopCoroutine(_pulseRoutine); _pulseRoutine = null; }
+        if (_notePlayPulseRoutine != null) StopCoroutine(_notePlayPulseRoutine);
+        _notePlayPulseRoutine = StartCoroutine(NotePlayPulseRoutine(_intentInterval));
+    }
+
+    /// <summary>
+    /// Grows the collectable from its current (resting) scale to a peak and back down to that
+    /// same resting scale over exactly the note's duration (_intentInterval) — a clear visual
+    /// tie between "this note is sounding now" and the drifting collectable, since position
+    /// alone reads poorly once several notes have wandered away from their spawn points. The
+    /// pickup collider grows in lockstep for free: it's a CircleCollider2D on this same
+    /// transform, so its world radius already scales with transform.localScale.
+    /// </summary>
+    private IEnumerator NotePlayPulseRoutine(float duration)
+    {
+        Vector3 restScale = transform.localScale;
+        Vector3 peakScale = restScale * notePlayPeakScaleMul;
+        duration = Mathf.Max(0.01f, duration);
+
+        var particles = new ParticleScaleLockstep();
+        particles.Capture(this);
+
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            float envelope = Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / duration)); // 0 -> 1 -> 0
+            transform.localScale = Vector3.Lerp(restScale, peakScale, envelope);
+            particles.Apply(Mathf.Lerp(1f, notePlayPeakScaleMul, envelope));
+            yield return null;
+        }
+
+        transform.localScale = restScale;
+        particles.Apply(1f);
+        _notePlayPulseRoutine = null;
+        if (energySprite != null)
+            _pulseRoutine = StartCoroutine(PulseEnergySprite());
     }
 
     private void UnbindTimelineStep()

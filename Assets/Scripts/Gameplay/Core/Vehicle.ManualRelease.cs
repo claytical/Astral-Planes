@@ -140,6 +140,8 @@ public partial class Vehicle
                 $"collectedMidi={preSwapMidi} -> authoredNote={chosenMidi}");
         }
 
+        chosenMidi = p.track.AvoidClashAtStep(targetAbsStep, chosenMidi);
+
         bool occupied = p.track.IsPersistentStepOccupied(targetAbsStep);
         float commitVel = releaseVelocity >= 0f ? releaseVelocity : p.velocity127;
         if (occupied)

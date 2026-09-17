@@ -99,6 +99,33 @@ public sealed class BinFrontierAllocator
         return proposed;
     }
 
+    // Non-consuming preview of the bin a freshly-baked NoteSet should target — mirrors the
+    // early, side-effect-free branches of GetBinForNextSpawn (ByVoice cursor, expansion-pending
+    // density bin, ascension-emptied refill) but never calls ConsumeAllowAdvanceNextBurst, so
+    // it's safe to call ahead of (and independently from) the real spawn decision without
+    // stealing the one-shot advance token that decision depends on.
+    public int PeekBinForNextSpawn(InstrumentTrack track)
+    {
+        if (track == null) return 0;
+        int trackMaxBinIndex = Mathf.Max(0, track.maxLoopMultiplier - 1);
+
+        var byVoiceCheck = track.ActiveProfile ?? MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
+        if (byVoiceCheck != null && byVoiceCheck.configSelectionMode == RoleConfigSelectionMode.ByVoice)
+        {
+            int cursor = track.GetBinCursor();
+            if (track.maxLoopMultiplier > 0) cursor %= track.maxLoopMultiplier;
+            return Mathf.Clamp(cursor, 0, trackMaxBinIndex);
+        }
+
+        if (track.IsExpansionPending)
+            return Mathf.Clamp(track.GetNextFilledBinForDensity(), 0, trackMaxBinIndex);
+
+        int emptied = track.GetFirstEmptyAllocatedBin();
+        if (emptied >= 0) return emptied;
+
+        return Mathf.Clamp(track.GetBinCursor(), 0, trackMaxBinIndex);
+    }
+
     // Frontier = furthest bin that is allocated OR filled, cross-checked with cursor estimate.
     private int FrontierForTrack(InstrumentTrack t)
     {

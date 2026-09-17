@@ -42,4 +42,5 @@ MonoBehaviour:
       durSteps: 4
       velocity01: 1
     overlapPolicy: 1
-    octaveShift: -1
+    octaveShift: 0
+    stepsPerBar: 0

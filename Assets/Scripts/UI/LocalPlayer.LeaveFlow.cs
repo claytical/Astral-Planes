@@ -7,6 +7,14 @@ public partial class LocalPlayer
     private Coroutine _leaveHoldCo;
     private const float HoldToLeaveSeconds = 3f;
 
+    // GlobalEscapeQuitListener needs to know, at the moment a physical Escape release would
+    // otherwise open the quit-confirmation modal, whether this same press already fired the
+    // instant (no-hold) leave below — so it doesn't pop the quit modal on top of a leave that
+    // already happened. Only set here, never for starting a hold timer, so an early-released
+    // hold (which today does nothing) still correctly falls through to the quit modal.
+    private static int _instantLeaveFrame = -1;
+    public static bool JustLeftShipSelectInstantly => Time.frameCount == _instantLeaveFrame;
+
     // Same "Leave" action (East on gamepad) means two different things depending on context:
     // instant leave during plain ship select, or a hold-to-confirm session abort mid-tutorial.
     private void HandleLeavePressed()
@@ -54,6 +62,8 @@ public partial class LocalPlayer
         // has already confirmed and left the TrackSelection scene behind.
         if (SceneManager.GetActiveScene().name != "TrackSelection") return;
         if (GameFlowManager.Instance == null || GameFlowManager.Instance.CurrentState != GameState.Selection) return;
+
+        _instantLeaveFrame = Time.frameCount;
 
         ControlTutorialDirector.Instance?.UnregisterMini(this);
 

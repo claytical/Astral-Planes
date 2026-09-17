@@ -135,6 +135,83 @@ public partial class InstrumentTrack
         return best;
     }
 
+    // Circular pitch-class distance. Clash = minor 2nd/major 7th (dist 1) or tritone (dist 6).
+    private static bool IsClashingInterval(int noteA, int noteB)
+    {
+        int diff = Mathf.Abs(noteA - noteB) % 12;
+        int pcDist = Mathf.Min(diff, 12 - diff);
+        return pcDist == 1 || pcDist == 6;
+    }
+
+    // MIDI notes already committed by OTHER tracks at the same absolute step, any role.
+    private List<int> GetSoundingNotesFromSiblings(int stepIndex)
+    {
+        var result = new List<int>();
+        if (controller?.tracks == null) return result;
+        foreach (var t in controller.tracks)
+        {
+            if (t == null || t == this) continue;
+            foreach (var entry in t.GetPersistentLoopNotes())
+                if (entry.stepIndex == stepIndex)
+                    result.Add(entry.note);
+        }
+        return result;
+    }
+
+    // Nearest chord tone to `shifted` that doesn't clash with any sibling note at this step.
+    // Falls back to the plain nearest tone if there are no siblings, or if every candidate clashes.
+    private static int SelectChordToneAvoidingClashes(int shifted, List<int> allowedSorted, List<int> soundingNotes)
+    {
+        if (soundingNotes == null || soundingNotes.Count == 0)
+            return SnapToNearestChordTone(shifted, allowedSorted);
+
+        int best = -1, bestDist = int.MaxValue;
+        foreach (var candidate in allowedSorted)
+        {
+            bool clashes = false;
+            foreach (var sounding in soundingNotes)
+                if (IsClashingInterval(candidate, sounding)) { clashes = true; break; }
+            if (clashes) continue;
+
+            int d = Mathf.Abs(candidate - shifted);
+            if (d < bestDist) { best = candidate; bestDist = d; }
+        }
+
+        return best != -1 ? best : SnapToNearestChordTone(shifted, allowedSorted);
+    }
+
+    // Adjusts an already-correctly-pitched note (same register, same chord) to avoid a clashing
+    // interval against sibling tracks' notes already committed at the same absolute step. For use
+    // on the manual-release commit path, which must NOT be re-transposed via rootDelta.
+    public int AvoidClashAtStep(int stepIndex, int midiNote)
+    {
+        var soundingAtStep = GetSoundingNotesFromSiblings(stepIndex);
+        if (soundingAtStep.Count == 0) return midiNote;
+
+        int bin = BinIndexForStep(stepIndex);
+        var ns = GetNoteSetForBin(bin);
+        var region = ns?.chordRegion;
+        Chord chord;
+        if (region != null && region.Count > 0)
+        {
+            chord = region[ResolveChordRegionIndex(bin, region.Count)];
+        }
+        else
+        {
+            int chordIdx = Harmony_GetChordIndexForBin(bin);
+            if (chordIdx < 0) return midiNote;
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            var hd = _gfm?.harmony;
+            if (hd == null || !hd.TryGetChordAt(chordIdx, out chord)) return midiNote;
+        }
+
+        var allowed = BuildChordTones(chord, lowestAllowedNote, highestAllowedNote);
+        if (allowed.Count == 0) return midiNote;
+        allowed.Sort();
+
+        return ShiftByOctavesIntoTrackRange(SelectChordToneAvoidingClashes(midiNote, allowed, soundingAtStep));
+    }
+
     private int QuantizeNoteToBinChord(int stepIndex, int midiNote, int authoredRootMidi = int.MinValue) {
     // Resolve which bin this step belongs to
     int bin = BinIndexForStep(stepIndex);
@@ -180,7 +257,8 @@ public partial class InstrumentTrack
         if (allowed.Count == 0) return shifted;
         allowed.Sort();
 
-        int snapped = ShiftByOctavesIntoTrackRange(SnapToNearestChordTone(shifted, allowed));
+        var soundingAtStep = GetSoundingNotesFromSiblings(stepIndex);
+        int snapped = ShiftByOctavesIntoTrackRange(SelectChordToneAvoidingClashes(shifted, allowed, soundingAtStep));
 
         if (GameFlowManager.VerboseLogging) Debug.Log(
             $"[QUANTIZE] track={name} step={stepIndex} bin={bin} in={midiNote} authoredRoot={authoredRootMidi} " +

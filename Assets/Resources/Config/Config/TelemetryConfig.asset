@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b09244c9e0294dc5a16b0a3e3666df29, type: 3}
   m_Name: TelemetryConfig
   m_EditorClassIdentifier: Assembly-CSharp::TelemetryConfig
-  baseUrl: http://astralplanes.claytical.com/api/publish.php
+  baseUrl: https://astralplanes.claytical.com/api/publish.php
   enabled: 1
   sendInEditor: 1
   requestTimeoutSeconds: 10
   maxRetryAttemptsPerLaunch: 3
   bypassConsentForTesting: 0
-  allowInsecureHttpForTesting: 1
+  allowInsecureHttpForTesting: 0
   phaseIdMapping:
   - phaseId: 2cfde5cf3d2048b8910ab984b7267338
     phaseNumber: 1

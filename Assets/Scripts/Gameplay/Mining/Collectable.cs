@@ -108,6 +108,8 @@ public partial class Collectable : MonoBehaviour
     private float maxAlpha => tuning.idlePulse.maxAlpha;
     private float pulseScale => tuning.idlePulse.pulseScale;
     private Coroutine _pulseRoutine;
+    private float notePlayPeakScaleMul => tuning.notePlayPulse.peakScaleMultiplier;
+    private Coroutine _notePlayPulseRoutine;
     // Collectable.cs (top-level in class)
     static readonly Dictionary<Vector2Int, Collectable> _occupantByCell = new();
     static readonly object _lock = new object(); // optional; Unity main thread makes this mostly unnecessary
@@ -150,6 +152,43 @@ public partial class Collectable : MonoBehaviour
     private float trailDriftRadius => tuning.noteTrail.trailDriftRadius;
     private float trailDriftSpeed => tuning.noteTrail.trailDriftSpeed;
     private float trailDriftFocusMul => tuning.noteTrail.trailDriftFocusMul;
+
+    /// <summary>
+    /// The prefab's particle systems all use Scaling Mode = Local (each reads only its own
+    /// transform.localScale, ignoring ancestor scale) — animating a parent transform alone is
+    /// invisible on them. This caches each attached particle system's base local scale once,
+    /// then re-applies it times a ratio every frame a caller's own transform scale changes, to
+    /// keep the particles visually in lockstep with whatever scale pulse is driving them.
+    /// </summary>
+    private struct ParticleScaleLockstep
+    {
+        private ParticleSystem[] _systems;
+        private Vector3[] _baseScales;
+
+        public void Capture(Component owner)
+        {
+            _systems = owner.GetComponentsInChildren<ParticleSystem>();
+            _baseScales = new Vector3[_systems.Length];
+            for (int i = 0; i < _systems.Length; i++)
+                _baseScales[i] = _systems[i].transform.localScale;
+        }
+
+        public void Apply(float ratio)
+        {
+            if (_systems == null) return;
+            for (int i = 0; i < _systems.Length; i++)
+                if (_systems[i] != null)
+                    _systems[i].transform.localScale = _baseScales[i] * ratio;
+        }
+
+        public void StopEmission()
+        {
+            if (_systems == null) return;
+            for (int i = 0; i < _systems.Length; i++)
+                if (_systems[i] != null)
+                    _systems[i].Stop(false, ParticleSystemStopBehavior.StopEmitting);
+        }
+    }
 
     private Vector3 _trailWorldTarget;
     private bool _trailFollowActive;
@@ -237,6 +276,7 @@ public partial class Collectable : MonoBehaviour
             energySprite.color = c;
 
             if (_pulseRoutine != null) StopCoroutine(_pulseRoutine);
+            if (_notePlayPulseRoutine != null) { StopCoroutine(_notePlayPulseRoutine); _notePlayPulseRoutine = null; }
             _pulseRoutine = StartCoroutine(PulseEnergySprite());
         }
 

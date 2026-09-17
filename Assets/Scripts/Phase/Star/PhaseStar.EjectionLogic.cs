@@ -49,7 +49,8 @@ public partial class PhaseStar
         }
         if (!IsEjectionReady())
         {
-            if (_attunedRole != MusicalRole.None)
+            if (_attunedRole != MusicalRole.None
+                && (!_plannedEjectionDescriptor.IsValid || !_requiredZapNoteSetAvailable))
             {
                 var attunedTrack = FindTrackByRole(_attunedRole);
                 if (attunedTrack != null)

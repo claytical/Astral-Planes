@@ -21,8 +21,7 @@ public partial class Collectable
     private float _bombBlastRadiusCells;
     private ParticleSystem _bombCoreParticles;
     private Color _bombCoreBaseColor;
-    private ParticleSystem[] _bombParticleSystems;
-    private Vector3[] _bombParticleBaseScales;
+    private ParticleScaleLockstep _bombParticles;
 
     private Transform BombVisualRoot => bombVisualRoot != null ? bombVisualRoot : transform;
 
@@ -39,6 +38,7 @@ public partial class Collectable
         EnsureTuning();
 
         if (_pulseRoutine != null) { StopCoroutine(_pulseRoutine); _pulseRoutine = null; }
+        if (_notePlayPulseRoutine != null) { StopCoroutine(_notePlayPulseRoutine); _notePlayPulseRoutine = null; }
 
         _isBomb = true;
 
@@ -85,11 +85,8 @@ public partial class Collectable
         // Particle systems on this prefab use Scaling Mode = Local (each reads only its own
         // transform.localScale, ignoring the root) — scaling the root alone is invisible on
         // them. Drive every attached particle system's own local scale in lockstep with the
-        // root's swell/implosion, the same pattern AbsorbIntoVehicleRoutine already uses.
-        _bombParticleSystems = GetComponentsInChildren<ParticleSystem>();
-        _bombParticleBaseScales = new Vector3[_bombParticleSystems.Length];
-        for (int i = 0; i < _bombParticleSystems.Length; i++)
-            _bombParticleBaseScales[i] = _bombParticleSystems[i].transform.localScale;
+        // root's swell/implosion.
+        _bombParticles.Capture(this);
 
         double dspNow = AudioSettings.dspTime;
         int fuseStep = authoredAbsStep >= 0 ? authoredAbsStep : intendedStep;
@@ -120,13 +117,6 @@ public partial class Collectable
         float roleMul = _roleProfile != null ? Mathf.Max(0.1f, _roleProfile.bombBlastRadiusMul) : 1f;
         _bombBlastRadiusCells = (tuning.bomb.blastRadius * roleMul) / cellSize;
         _bombEffectiveBlastRadius = _bombBlastRadiusCells * cellSize;
-    }
-
-    private void ApplyParticleScaleLockstep(float ratio)
-    {
-        for (int i = 0; i < _bombParticleSystems.Length; i++)
-            if (_bombParticleSystems[i] != null)
-                _bombParticleSystems[i].transform.localScale = _bombParticleBaseScales[i] * ratio;
     }
 
     /// <summary>
@@ -175,7 +165,7 @@ public partial class Collectable
             // effects.
             float scaleMul = Mathf.Lerp(1f, tuning.bomb.maxPulseScale, t * pulse);
             BombVisualRoot.localScale = _bombBaseScale * scaleMul;
-            ApplyParticleScaleLockstep(scaleMul);
+            _bombParticles.Apply(scaleMul);
             UpdateBombTelegraphRing(urgency01);
             UpdateBombBlastOverlay(urgency01);
 
@@ -297,9 +287,7 @@ public partial class Collectable
             }
 
             // No new particles mid-flash/collapse — only what's already alive rides along with it.
-            for (int i = 0; i < _bombParticleSystems.Length; i++)
-                if (_bombParticleSystems[i] != null)
-                    _bombParticleSystems[i].Stop(false, ParticleSystemStopBehavior.StopEmitting);
+            _bombParticles.StopEmission();
         }
         catch (Exception ex)
         {
@@ -307,9 +295,7 @@ public partial class Collectable
         }
 
         Vector3 flashStartRootScale = BombVisualRoot.localScale;
-        var flashStartParticleScales = new Vector3[_bombParticleSystems.Length];
-        for (int i = 0; i < _bombParticleSystems.Length; i++)
-            flashStartParticleScales[i] = _bombParticleSystems[i] != null ? _bombParticleSystems[i].transform.localScale : Vector3.zero;
+        float flashStartRatio = Mathf.Abs(_bombBaseScale.x) > 0.0001f ? flashStartRootScale.x / _bombBaseScale.x : 1f;
 
         float blastRatio = _bombBaseVisualRadius > 0.0001f
             ? _bombEffectiveBlastRadius / _bombBaseVisualRadius
@@ -324,18 +310,12 @@ public partial class Collectable
             float u = Mathf.Clamp01(flashElapsed / flashDuration);
 
             BombVisualRoot.localScale = Vector3.Lerp(flashStartRootScale, flashTargetRootScale, u);
-            for (int i = 0; i < _bombParticleSystems.Length; i++)
-                if (_bombParticleSystems[i] != null)
-                    _bombParticleSystems[i].transform.localScale =
-                        Vector3.Lerp(flashStartParticleScales[i], _bombParticleBaseScales[i] * blastRatio, u);
+            _bombParticles.Apply(Mathf.Lerp(flashStartRatio, blastRatio, u));
 
             yield return null;
         }
 
         Vector3 peakRootScale = BombVisualRoot.localScale;
-        var peakParticleScales = new Vector3[_bombParticleSystems.Length];
-        for (int i = 0; i < _bombParticleSystems.Length; i++)
-            peakParticleScales[i] = _bombParticleSystems[i] != null ? _bombParticleSystems[i].transform.localScale : Vector3.zero;
 
         float duration = Mathf.Max(0.01f, tuning.bomb.implosionSeconds);
         float elapsed = 0f;
@@ -346,9 +326,7 @@ public partial class Collectable
             float remainingFrac = 1f - (u * u); // accelerating collapse, not linear
 
             BombVisualRoot.localScale = peakRootScale * remainingFrac;
-            for (int i = 0; i < _bombParticleSystems.Length; i++)
-                if (_bombParticleSystems[i] != null)
-                    _bombParticleSystems[i].transform.localScale = peakParticleScales[i] * remainingFrac;
+            _bombParticles.Apply(blastRatio * remainingFrac);
 
             yield return null;
         }

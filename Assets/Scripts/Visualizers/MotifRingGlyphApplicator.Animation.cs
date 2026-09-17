@@ -105,7 +105,7 @@ public partial class MotifRingGlyphApplicator
         {
             elapsed += Time.deltaTime;
             float progress   = Mathf.Clamp01(elapsed / drawDuration);
-            float drawnAngle = progress * Mathf.PI * 2f;
+            float drawnAngle = progress * Mathf.PI * 2f + config.ringStartAngleOffset;
 
             while (nextNote < noteInfos.Count && drawnAngle >= noteInfos[nextNote].NoteAngle)
             {
@@ -156,6 +156,7 @@ public partial class MotifRingGlyphApplicator
         List<NoteAnimInfo> noteInfos, NoteVisualizer noteViz,
         MusicalRole role, int binIndex, Color color, int binSteps, float outerR,
         System.Func<bool> shouldStop,
+        int ringOrdinal = 0,
         bool spherical = false,
         System.Func<bool> isHighlighted = null)
     {
@@ -194,7 +195,7 @@ public partial class MotifRingGlyphApplicator
                     if (capturedInfo.SourceNote == null) return;
                     revealedNotes.Add(capturedInfo.SourceNote);
                     var targetPoly = MotifRingGlyphGenerator.GenerateSingleRingAtRadius(
-                        role, binIndex, color, revealedNotes, binSteps, outerR, config);
+                        role, binIndex, color, revealedNotes, binSteps, outerR, config, ringOrdinal);
                     var targetPts = targetPoly?.Points;
                     if (targetPts != null)
                     {

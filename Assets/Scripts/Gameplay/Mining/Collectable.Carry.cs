@@ -14,6 +14,9 @@ public partial class Collectable
 
     private IEnumerator TrailFollowRoutine()
     {
+        var particles = new ParticleScaleLockstep();
+        particles.Capture(this);
+
         while (_trailFollowActive)
         {
             float dt = Time.deltaTime;
@@ -39,6 +42,7 @@ public partial class Collectable
                 float breathe = Mathf.Sin(Time.time * trailReadyPulseSpeed * (1f + pulse * 2f)) * 0.5f + 0.5f;
                 float scaleTarget = Mathf.Lerp(trailIdleScaleMin, trailReadyScaleMax, pulse * breathe);
                 transform.localScale = _trailBaseScale * scaleTarget;
+                particles.Apply(scaleTarget);
 
                 var col = energySprite.color;
                 col.a = Mathf.Lerp(col.a, Mathf.Lerp(0.45f, 0.95f, pulse), 0.15f);
@@ -58,10 +62,12 @@ public partial class Collectable
     /// </summary>
     private IEnumerator AbsorbIntoVehicleRoutine(Vehicle vehicle, Func<Vector3> getDestinationWorldPos)
     {
-        // PulseEnergySprite runs for the collectable's whole life and also drives
-        // transform.localScale every frame; pause it so it can't fight the much
-        // larger absorb scale, then hand scale ownership back once we're done.
+        // PulseEnergySprite (and the note-play pulse, if one is mid-swell) runs for the
+        // collectable's whole life and also drives transform.localScale every frame; pause
+        // it so it can't fight the much larger absorb scale, then hand scale ownership back
+        // once we're done.
         if (_pulseRoutine != null) { StopCoroutine(_pulseRoutine); _pulseRoutine = null; }
+        if (_notePlayPulseRoutine != null) { StopCoroutine(_notePlayPulseRoutine); _notePlayPulseRoutine = null; }
 
         Vector3 startScale = transform.localScale;
         Vector3 startWorldPos = transform.position;
@@ -89,19 +95,10 @@ public partial class Collectable
         // The prefab's particle systems all use Scaling Mode = Local, which reads only each
         // system's OWN transform.localScale and ignores ancestor scale — animating the root
         // alone is invisible on them. Drive each particle child's local scale in lockstep.
-        var particleSystems = GetComponentsInChildren<ParticleSystem>();
-        var particleBaseScales = new Vector3[particleSystems.Length];
-        for (int i = 0; i < particleSystems.Length; i++)
-            particleBaseScales[i] = particleSystems[i].transform.localScale;
+        var particles = new ParticleScaleLockstep();
+        particles.Capture(this);
 
         float peakRatio = Mathf.Abs(startScale.x) > 0.0001f ? peakScale.x / startScale.x : 1f;
-
-        void ApplyParticleScale(float ratio)
-        {
-            for (int i = 0; i < particleSystems.Length; i++)
-                if (particleSystems[i] != null)
-                    particleSystems[i].transform.localScale = particleBaseScales[i] * ratio;
-        }
 
         // Grow + move toward the vehicle's (live, moving) center — the "passing through" beat.
         float t = 0f;
@@ -111,12 +108,12 @@ public partial class Collectable
             float u = Mathf.SmoothStep(0f, 1f, t / absorbGrowSeconds);
             transform.localScale = Vector3.Lerp(startScale, peakScale, u);
             transform.position = Vector3.Lerp(startWorldPos, vehicleTransform.position, u);
-            ApplyParticleScale(Mathf.Lerp(1f, peakRatio, u));
+            particles.Apply(Mathf.Lerp(1f, peakRatio, u));
             yield return null;
         }
         transform.localScale = peakScale;
         if (vehicleTransform != null) transform.position = vehicleTransform.position;
-        ApplyParticleScale(peakRatio);
+        particles.Apply(peakRatio);
 
         // Hold at peak (the "shield flash" beat), staying glued to the vehicle if it's still moving.
         // The sprite snaps to lockFlashColor at the instant of capture, then settles into a
@@ -152,12 +149,12 @@ public partial class Collectable
             float u = Mathf.SmoothStep(0f, 1f, t / absorbShrinkSeconds);
             transform.localScale = Vector3.Lerp(peakScale, startScale, u);
             transform.position = Vector3.Lerp(shrinkStartPos, getDestinationWorldPos(), u);
-            ApplyParticleScale(Mathf.Lerp(peakRatio, 1f, u));
+            particles.Apply(Mathf.Lerp(peakRatio, 1f, u));
             yield return null;
         }
         transform.localScale = startScale;
         transform.position = getDestinationWorldPos();
-        ApplyParticleScale(1f);
+        particles.Apply(1f);
 
         StopCollectableParticles();
         if (energySprite != null) _pulseRoutine = StartCoroutine(PulseEnergySprite());
@@ -231,6 +228,10 @@ public partial class Collectable
             if (ribbonMarker) transform.position = ribbonMarker.position;
             onArrived?.Invoke();
             _inCarry = false;
+
+            ReportedCollected = true;
+            NotifyDestroyedOnce();
+            Destroy(gameObject);
             yield break;
         }
 
@@ -271,6 +272,10 @@ public partial class Collectable
             if (ribbonMarker) transform.position = ribbonMarker.position;
             onArrived?.Invoke();
             _inCarry = false;
+
+            ReportedCollected = true;
+            NotifyDestroyedOnce();
+            Destroy(gameObject);
             yield break;
         }
 
@@ -293,6 +298,9 @@ public partial class Collectable
     private IEnumerator PulseEnergySprite()
     {
         Vector3 startScale = transform.localScale;
+        var particles = new ParticleScaleLockstep();
+        particles.Capture(this);
+
         while (true)
         {
             float t = (Mathf.Sin(Time.time * pulseSpeed) * 0.5f) + 0.5f;
@@ -301,7 +309,9 @@ public partial class Collectable
             {
                 var col = energySprite.color; col.a = a; energySprite.color = col;
             }
-            transform.localScale = startScale * Mathf.Lerp(1f, pulseScale, t);
+            float ratio = Mathf.Lerp(1f, pulseScale, t);
+            transform.localScale = startScale * ratio;
+            particles.Apply(ratio);
             yield return null;
         }
     }

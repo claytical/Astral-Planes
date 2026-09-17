@@ -16,6 +16,9 @@ public class CollectableTuning : ScriptableObject
     [Header("Idle Pulse")]
     public IdlePulseParams idlePulse = new();
 
+    [Header("Note Play Pulse")]
+    public NotePlayPulseParams notePlayPulse = new();
+
     [Header("Note Trail (Manual Release + Drift)")]
     public NoteTrailParams noteTrail = new();
 
@@ -30,6 +33,7 @@ public class CollectableTuning : ScriptableObject
         depositTiming ??= new DepositTimingParams();
         absorbVfx ??= new AbsorbVfxParams();
         idlePulse ??= new IdlePulseParams();
+        notePlayPulse ??= new NotePlayPulseParams();
         noteTrail ??= new NoteTrailParams();
         dustCollision ??= new DustCollisionParams();
         baseMotion ??= new BaseMotionParams();
@@ -39,6 +43,7 @@ public class CollectableTuning : ScriptableObject
         absorbVfx.Validate();
         dustCollision.Validate();
         bomb.Validate();
+        notePlayPulse.Validate();
     }
 
     private void OnValidate() => Validate();
@@ -124,6 +129,15 @@ public sealed class IdlePulseParams
     public float minAlpha = 0.25f;
     public float maxAlpha = 0.65f;
     public float pulseScale = 1.1f;
+}
+
+[Serializable]
+public sealed class NotePlayPulseParams
+{
+    [Tooltip("Peak scale multiplier the collectable swells to at the midpoint of the note's duration while it plays, before shrinking back to its resting size. The pickup collider grows proportionally since it shares the same transform.")]
+    public float peakScaleMultiplier = 1.6f;
+
+    public void Validate() => peakScaleMultiplier = Mathf.Max(1f, peakScaleMultiplier);
 }
 
 [Serializable]
