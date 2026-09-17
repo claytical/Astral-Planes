@@ -83,6 +83,13 @@ public partial class CosmicDustGenerator : MonoBehaviour
         gp => TryGetCellState(gp, out var st) && st == DustCellState.Solid,
         cell => { TryGetDustAt(cell, out var d); return d; });
 
+    // Cached once (method-group-to-delegate conversion isn't cached automatically by C#) so
+    // passing this to ApplyHiddenHintToDust at per-cell spawn/regrow sites doesn't allocate a
+    // fresh delegate every call — those sites fire for the majority of cells in a fresh maze.
+    private Func<MusicalRole, MusicalRoleProfile> _resolveRoleProfileDelegateBacking;
+    private Func<MusicalRole, MusicalRoleProfile> _resolveRoleProfileDelegate =>
+        _resolveRoleProfileDelegateBacking ??= _roleDensity.GetResolvedRoleProfile;
+
     [Header("Dust Visual Timings")]
     [SerializeField] private DustVisualTimingSettings dustVisualTimingSettings;
     private DustVisualTimings DustTimings => dustVisualTimingSettings != null
@@ -520,7 +527,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 dust.BloomFlower(regrowTint);
 
             if (regrowRole == MusicalRole.None)
-                _imprints.ApplyHiddenHintToDust(gp, dust, _roleDensity.GetResolvedRoleProfile);
+                _imprints.ApplyHiddenHintToDust(gp, dust, _resolveRoleProfileDelegate);
 
             Color denyColor = Color.darkGray;
             if (roleProfile != null)

@@ -99,7 +99,7 @@ public partial class CosmicDustGenerator
                             // inert gray cells and the star cannot drain them while dormant.
                             // Full charge (1f) — plow energy system requires non-zero units to chip.
                             dust.ApplyRoleAndCharge(MusicalRole.None, cellColor, 1f);
-                            _imprints.ApplyHiddenHintToDust(grid, dust, _roleDensity.GetResolvedRoleProfile);
+                            _imprints.ApplyHiddenHintToDust(grid, dust, _resolveRoleProfileDelegate);
 
                             // TEMP DIAGNOSTIC — see note above.
                             if (ColorsApproxEqual(cellColor, config.genericFillTint)) diagGenericFillTintCount++;
@@ -139,12 +139,20 @@ public partial class CosmicDustGenerator
                     RegisterHex(grid, hex);
                 }
 
-                // Pacing
+                // Pacing — polls Time.realtimeSinceStartup directly instead of allocating a
+                // new WaitForSeconds every pass (the wait duration varies call to call, so
+                // Unity can't pool it); reproduces the exact same realtime-based pacing.
                 float elapsedSinceLast = Time.realtimeSinceStartup - lastPacedAt;
                 if (elapsedSinceLast < deadlineStep)
-                    yield return new WaitForSeconds(deadlineStep - elapsedSinceLast);
+                {
+                    float waitUntil = Time.realtimeSinceStartup + (deadlineStep - elapsedSinceLast);
+                    while (Time.realtimeSinceStartup < waitUntil)
+                        yield return null;
+                }
                 else
+                {
                     yield return null;
+                }
 
                 lastPacedAt = Time.realtimeSinceStartup;
             }
