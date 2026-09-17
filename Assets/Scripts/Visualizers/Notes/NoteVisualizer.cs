@@ -29,7 +29,7 @@ public partial class NoteVisualizer : MonoBehaviour
     [SerializeField] private Color failureColor = new Color(1f, 0.12f, 0.05f, 1f);
     [Header("Track Rows (one per InstrumentTrack in controller order)")]
     public List<RectTransform> trackRows;
-    public Dictionary<(InstrumentTrack, int), Transform> noteMarkers = new();
+    public NoteMarkerRegistry noteMarkers = new();
     [Header("First-Play Confirm FX")]
     [SerializeField] private ParticleSystem firstPlayConfirmOrbPrefab;
     [Header("Ambient Line Tint")]

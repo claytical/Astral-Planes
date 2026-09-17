@@ -12,6 +12,19 @@ public class MarkerTag : MonoBehaviour
     public bool isPlaceholder = false;
     public bool isAscending = false;
 
+    private MarkerLight _cachedMarkerLight;
+
+    // Lazily resolved and cached: this marker's GameObject lifetime matches the tag's,
+    // so a MarkerLight found once never needs re-querying via GetComponent.
+    public MarkerLight CachedMarkerLight
+    {
+        get
+        {
+            if (_cachedMarkerLight == null) _cachedMarkerLight = GetComponent<MarkerLight>();
+            return _cachedMarkerLight;
+        }
+    }
+
     private void Reset()
     {
         step = -1;

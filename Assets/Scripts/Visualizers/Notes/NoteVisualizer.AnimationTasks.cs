@@ -2,6 +2,9 @@ using UnityEngine;
 
 public partial class NoteVisualizer
 {
+    private Gradient _ambientTintGradient;
+    private Color _lastAppliedAmbientTintColor = new Color(-1f, -1f, -1f, -1f);
+
     public void ScheduleFirstPlayConfirm(Transform source, InstrumentTrack track, int step, double dspTime, Color color, float noteDuration)
     {
         if (track == null || source == null) return;
@@ -109,12 +112,19 @@ public partial class NoteVisualizer
 
         var col = firstPlayConfirmOrbPrefab.colorOverLifetime;
         col.enabled = true;
-        var g = new Gradient();
-        g.SetKeys(
-            new[] { new GradientColorKey(_ambientTintColor, 0f), new GradientColorKey(_ambientTintColor, 1f) },
-            new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) }
-        );
-        col.color = g;
+        if (_ambientTintGradient == null)
+        {
+            _ambientTintGradient = new Gradient();
+        }
+        if (_ambientTintColor != _lastAppliedAmbientTintColor)
+        {
+            _ambientTintGradient.SetKeys(
+                new[] { new GradientColorKey(_ambientTintColor, 0f), new GradientColorKey(_ambientTintColor, 1f) },
+                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) }
+            );
+            _lastAppliedAmbientTintColor = _ambientTintColor;
+        }
+        col.color = _ambientTintGradient;
     }
 
 }

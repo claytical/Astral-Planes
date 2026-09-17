@@ -3,6 +3,9 @@ using UnityEngine;
 
 public partial class NoteVisualizer
 {
+    private Gradient _playheadEmissionGradient;
+    private Color _lastPlayheadEmissionColor = new Color(-1f, -1f, -1f, -1f);
+
     private void UpdatePlayheadParticleTrailWorld()
     {
         if (playheadParticles == null || playheadLine == null) return;
@@ -147,12 +150,19 @@ public partial class NoteVisualizer
 
         var col = playheadParticles.colorOverLifetime;
         col.enabled = true;
-        Gradient g = new Gradient();
-        g.SetKeys(
-            new[] { new GradientColorKey(stepColor, 0f), new GradientColorKey(stepColor, 1f) },
-            new[] { new GradientAlphaKey(0.85f, 0f), new GradientAlphaKey(0.0f, 1f) }
-        );
-        col.color = g;
+        if (_playheadEmissionGradient == null)
+        {
+            _playheadEmissionGradient = new Gradient();
+        }
+        if (stepColor != _lastPlayheadEmissionColor)
+        {
+            _playheadEmissionGradient.SetKeys(
+                new[] { new GradientColorKey(stepColor, 0f), new GradientColorKey(stepColor, 1f) },
+                new[] { new GradientAlphaKey(0.85f, 0f), new GradientAlphaKey(0.0f, 1f) }
+            );
+            _lastPlayheadEmissionColor = stepColor;
+        }
+        col.color = _playheadEmissionGradient;
 
         if (_pendingReleasePulse)
         {

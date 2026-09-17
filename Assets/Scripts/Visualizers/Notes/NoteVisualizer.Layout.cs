@@ -5,6 +5,13 @@ using UnityEngine;
 
 public partial class NoteVisualizer
 {
+    // Grow-only scratch buffers reused by RepositionAndPruneMarkers/UpdateNoteMarkerPositions
+    // so snapshotting noteMarkers before mutating doesn't allocate a fresh array every call.
+    private KeyValuePair<(InstrumentTrack, int), Transform>[] _repositionScratch =
+        Array.Empty<KeyValuePair<(InstrumentTrack, int), Transform>>();
+    private KeyValuePair<(InstrumentTrack, int), Transform>[] _positionUpdateScratch =
+        Array.Empty<KeyValuePair<(InstrumentTrack, int), Transform>>();
+
     public void RecomputeTrackLayout(InstrumentTrack track)
     {
         try
@@ -107,9 +114,12 @@ public partial class NoteVisualizer
         int binSize, int leaderBinsForPlacement, float bottomLocalY,
         Dictionary<int, Transform> chosenByStep)
     {
-        var kvs = noteMarkers.ToArray();
-        foreach (var kv in kvs)
+        var kvs = _repositionScratch;
+        int kvsCount = noteMarkers.CopyToScratch(ref kvs);
+        _repositionScratch = kvs;
+        for (int i = 0; i < kvsCount; i++)
         {
+            var kv = kvs[i];
             var key = kv.Key;
             var tf = kv.Value;
             if (key.Item1 != track || !tf) continue;
@@ -151,13 +161,15 @@ public partial class NoteVisualizer
     private void UpdateNoteMarkerPositions()
     {
         // Snapshot to avoid "collection modified" issues if other code mutates noteMarkers this frame.
-        var kvs = noteMarkers.ToArray();
+        var kvs = _positionUpdateScratch;
+        int kvsCount = noteMarkers.CopyToScratch(ref kvs);
+        _positionUpdateScratch = kvs;
 
-        // Reuse a list if you can; shown inline for clarity.
-       deadKeys.Clear();
+        deadKeys.Clear();
 
-        foreach (var kvp in kvs)
+        for (int i = 0; i < kvsCount; i++)
         {
+            var kvp = kvs[i];
             var track  = kvp.Key.Item1;
             var step   = kvp.Key.Item2;
             var marker = kvp.Value;

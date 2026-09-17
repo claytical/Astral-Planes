@@ -10,20 +10,28 @@ using UnityEngine;
 /// </summary>
 public partial class NoteVisualizer
 {
-    // Iterates noteMarkers for a specific track, skipping null transforms and null/missing tags.
-    // Optional filter predicate applied to MarkerTag before yielding.
+    // Tracks scanned by the previous UpdateCarryHighlights call, so a call with an
+    // unchanged carried set only has to revisit tracks that could plausibly need a
+    // re-highlight (see UpdateCarryHighlights).
+    private readonly HashSet<InstrumentTrack> _lastCarriedScratch = new();
+    private readonly List<InstrumentTrack> _carryHighlightScanScratch = new();
+
+    // Iterates noteMarkers for a specific track only (via the per-track index), skipping
+    // null transforms and null/missing tags. Optional filter predicate applied to MarkerTag
+    // before yielding.
     private IEnumerable<(int step, Transform tr, MarkerTag tag)> IterateMarkersForTrack(
         InstrumentTrack track, Func<MarkerTag, bool> filter = null)
     {
-        foreach (var kv in noteMarkers)
+        if (!noteMarkers.TryGetTrackMap(track, out var map) || map == null) yield break;
+
+        foreach (var kv in map)
         {
-            if (kv.Key.Item1 != track) continue;
             var tr = kv.Value;
             if (!tr) continue;
             var tag = tr.GetComponent<MarkerTag>();
             if (tag == null) continue;
             if (filter != null && !filter(tag)) continue;
-            yield return (kv.Key.Item2, tr, tag);
+            yield return (kv.Key, tr, tag);
         }
     }
 
@@ -52,13 +60,22 @@ public partial class NoteVisualizer
         int bestStep = -1;
         double bestForward = double.MaxValue;
 
-        foreach (var (step, _, _) in IterateMarkersForTrack(track, t => t.isPlaceholder))
+        if (noteMarkers.TryGetTrackMap(track, out var map) && map != null)
         {
-            if (step < 0 || step >= effectiveTotal) continue;
-            if (excludedSteps != null && excludedSteps.Contains(step)) continue;
+            foreach (var kv in map)
+            {
+                int step = kv.Key;
+                if (step < 0 || step >= effectiveTotal) continue;
+                if (excludedSteps != null && excludedSteps.Contains(step)) continue;
 
-            double fwd = (step - from + effectiveTotal) % effectiveTotal;
-            if (fwd < bestForward) { bestForward = fwd; bestStep = step; }
+                var tr = kv.Value;
+                if (!tr) continue;
+                var tag = tr.GetComponent<MarkerTag>();
+                if (tag == null || !tag.isPlaceholder) continue;
+
+                double fwd = (step - from + effectiveTotal) % effectiveTotal;
+                if (fwd < bestForward) { bestForward = fwd; bestStep = step; }
+            }
         }
 
         if (bestStep < 0) return false;
@@ -80,20 +97,29 @@ public partial class NoteVisualizer
         double bestDistance = double.MaxValue;
         double bestForward = double.MaxValue;
 
-        foreach (var (step, _, _) in IterateMarkersForTrack(track, t => t.isPlaceholder))
+        if (noteMarkers.TryGetTrackMap(track, out var map) && map != null)
         {
-            if (step < 0 || step >= effectiveTotal) continue;
-            if (excludedSteps != null && excludedSteps.Contains(step)) continue;
-
-            double fwd = (step - from + effectiveTotal) % effectiveTotal;
-            double back = (from - step + effectiveTotal) % effectiveTotal;
-            double dist = Math.Min(fwd, back);
-
-            if (dist < bestDistance || (Math.Abs(dist - bestDistance) < 0.0001 && fwd < bestForward))
+            foreach (var kv in map)
             {
-                bestDistance = dist;
-                bestForward = fwd;
-                bestStep = step;
+                int step = kv.Key;
+                if (step < 0 || step >= effectiveTotal) continue;
+                if (excludedSteps != null && excludedSteps.Contains(step)) continue;
+
+                var tr = kv.Value;
+                if (!tr) continue;
+                var tag = tr.GetComponent<MarkerTag>();
+                if (tag == null || !tag.isPlaceholder) continue;
+
+                double fwd = (step - from + effectiveTotal) % effectiveTotal;
+                double back = (from - step + effectiveTotal) % effectiveTotal;
+                double dist = Math.Min(fwd, back);
+
+                if (dist < bestDistance || (Math.Abs(dist - bestDistance) < 0.0001 && fwd < bestForward))
+                {
+                    bestDistance = dist;
+                    bestForward = fwd;
+                    bestStep = step;
+                }
             }
         }
 
@@ -129,33 +155,70 @@ public partial class NoteVisualizer
         if (sr != null) sr.enabled = visible;
     }
 
+    /// <summary>
+    /// Grey-vs-available tint for placeholder markers, reflecting which tracks the calling
+    /// vehicle currently carries. Called once per vehicle per frame, so with N vehicles this
+    /// runs N times against the same shared marker set every frame — instead of rescanning
+    /// every marker on every active track each time, only tracks that are currently carried
+    /// (may have gained a fresh placeholder marker that still needs highlighting) or that were
+    /// carried last call but no longer are (need resetting to grey) are visited. A track that's
+    /// consistently not carried is left alone, since its placeholder markers are already grey
+    /// by default at creation time.
+    /// </summary>
     public void UpdateCarryHighlights(HashSet<InstrumentTrack> carried)
     {
         if (noteMarkers == null) return;
-        foreach (var kv in noteMarkers)
+
+        _carryHighlightScanScratch.Clear();
+        if (carried != null)
         {
-            if (kv.Value == null) continue;
-            var tag = kv.Value.GetComponent<MarkerTag>();
-            if (tag == null || !tag.isPlaceholder) continue;
-            var ml = kv.Value.GetComponent<MarkerLight>();
-            if (ml == null) continue;
-            var track = kv.Key.Item1;
-            if (carried != null && carried.Contains(track))
-                ml.SetAvailable(track.DisplayColor);
-            else
-                ml.SetGrey(track.DisplayColor);
+            foreach (var t in carried)
+                _carryHighlightScanScratch.Add(t);
         }
+        foreach (var t in _lastCarriedScratch)
+        {
+            if (carried == null || !carried.Contains(t))
+                _carryHighlightScanScratch.Add(t);
+        }
+
+        for (int i = 0; i < _carryHighlightScanScratch.Count; i++)
+        {
+            var track = _carryHighlightScanScratch[i];
+            if (track == null) continue;
+            if (!noteMarkers.TryGetTrackMap(track, out var map) || map == null) continue;
+
+            bool isCarried = carried != null && carried.Contains(track);
+
+            foreach (var kv in map)
+            {
+                var tr = kv.Value;
+                if (tr == null) continue;
+                var tag = tr.GetComponent<MarkerTag>();
+                if (tag == null || !tag.isPlaceholder) continue;
+                var ml = tag.CachedMarkerLight;
+                if (ml == null) continue;
+
+                if (isCarried) ml.SetAvailable(track.DisplayColor);
+                else ml.SetGrey(track.DisplayColor);
+            }
+        }
+
+        _lastCarriedScratch.Clear();
+        if (carried != null)
+            foreach (var t in carried) _lastCarriedScratch.Add(t);
     }
 
     private IEnumerable<GameObject> GetMarkersForTrackAndBurst(InstrumentTrack track, int burstId)
     {
-        foreach (var kv in noteMarkers)
+        if (!noteMarkers.TryGetTrackMap(track, out var map) || map == null) yield break;
+
+        foreach (var kv in map)
         {
-            if (kv.Key.Item1 != track) continue;
-            if (kv.Value == null) continue;
-            var tag = kv.Value.GetComponent<MarkerTag>();
+            var tr = kv.Value;
+            if (tr == null) continue;
+            var tag = tr.GetComponent<MarkerTag>();
             if (tag != null && tag.burstId != burstId) continue;
-            yield return kv.Value.gameObject;
+            yield return tr.gameObject;
         }
     }
 
@@ -165,11 +228,12 @@ public partial class NoteVisualizer
     private int GetCommittedStepForMarker(InstrumentTrack track, GameObject go)
     {
         if (noteMarkers == null || go == null) return -1;
-        foreach (var kv in noteMarkers)
+        if (!noteMarkers.TryGetTrackMap(track, out var map) || map == null) return -1;
+
+        foreach (var kv in map)
         {
-            if (kv.Key.Item1 != track) continue;
             if (kv.Value != null && kv.Value.gameObject == go)
-                return kv.Key.Item2;
+                return kv.Key;
         }
         return -1;
     }
