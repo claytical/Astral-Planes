@@ -70,6 +70,7 @@ public class SuperNodeTrackNode : TrackNode
     private Rigidbody2D         _rb;
     private DrumTrack           _drum;
     private CosmicDustGenerator _dustGen;
+    private GameFlowManager     _gfm;
 
     private bool  _isInBurst;
     private float _burstTimer;
@@ -84,7 +85,6 @@ public class SuperNodeTrackNode : TrackNode
     private float _wobblePhase;
 
     private static readonly RaycastHit2D[] _lookaheadBuffer = new RaycastHit2D[8];
-    private static readonly Collider2D[]   _fleeBuffer      = new Collider2D[16];
 
     private void Reset()
     {
@@ -345,12 +345,19 @@ public class SuperNodeTrackNode : TrackNode
 
     private Vehicle GetNearestVehicleWithin(Vector2 pos, float radius)
     {
-        int count = Physics2D.OverlapCircle(pos, radius, ContactFilter2D.noFilter, _fleeBuffer);
-        Vehicle nearest  = null;
+        // Vehicle count is always small (<=4), so a direct scan is strictly cheaper than a
+        // Physics2D.OverlapCircle query plus a GetComponentInParent walk per hit — same
+        // idiom as Collectable.Movement.cs TryGetFleeThreat. Runs every FixedUpdate per
+        // active SuperNodeTrackNode (up to one per role).
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var vehicles = _gfm != null ? _gfm.GetVehicles() : null;
+        if (vehicles == null || vehicles.Count == 0) return null;
+
+        Vehicle nearest   = null;
         float   nearestSq = radius * radius;
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < vehicles.Count; i++)
         {
-            var v = _fleeBuffer[i]?.GetComponentInParent<Vehicle>();
+            var v = vehicles[i];
             if (v == null) continue;
             float dsq = ((Vector2)v.transform.position - pos).sqrMagnitude;
             if (dsq < nearestSq) { nearestSq = dsq; nearest = v; }

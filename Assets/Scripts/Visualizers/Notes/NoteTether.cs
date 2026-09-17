@@ -52,6 +52,28 @@ public class NoteTether : MonoBehaviour
     private Vector3 _startWorldOverride;
     private bool    _hasStartOverride;
 
+    // Camera.main lookup does an internal tag search; cache it instead of re-resolving
+    // every frame in RebuildCurve/ResolveEndWorldPosition (this runs once per active
+    // tether per frame, and several can be alive across simultaneous track releases).
+    private Camera _cam;
+
+    // Canvas/RectTransform resolved from 'end' rarely change (only when 'end' itself
+    // rebinds to a different marker) — cache them instead of walking the hierarchy
+    // (GetComponentInParent<Canvas>) every frame in ResolveEndWorldPosition.
+    private Transform _endResolveCacheFor;
+    private RectTransform _endRectCache;
+    private Canvas _endCanvasCache;
+
+    // Ping-pongs with _points in ApplyVisibleRangeTrim so trimming doesn't allocate a
+    // fresh array every frame once both buffers have settled to `segments` length.
+    private Vector3[] _trimmedPointsScratch;
+
+    private Camera ResolveCachedMainCamera()
+    {
+        if (_cam == null) _cam = Camera.main;
+        return _cam;
+    }
+
     // --- Arc-length cache (add these fields somewhere in the same class) ---
 private float[] _cumDist;   // cumulative distance at each point
 private float   _totalLen;  // total curve length
@@ -181,10 +203,16 @@ private int     _cachedHash  = 0;
     if (end == null) return _lastEndWorld;
 
     // If this is a RectTransform, it *might* be UI — but it also might be World Space canvas.
-    RectTransform rt = end as RectTransform ?? end.GetComponent<RectTransform>();
+    if (_endResolveCacheFor != end)
+    {
+        _endResolveCacheFor = end;
+        _endRectCache = end as RectTransform ?? end.GetComponent<RectTransform>();
+        _endCanvasCache = _endRectCache != null ? _endRectCache.GetComponentInParent<Canvas>() : null;
+    }
+    RectTransform rt = _endRectCache;
     if (rt != null)
     {
-        var canvas = rt.GetComponentInParent<Canvas>();
+        var canvas = _endCanvasCache;
 
         // ✅ World Space canvas: RectTransform positions are already world-space.
         if (canvas != null && canvas.renderMode == RenderMode.WorldSpace)
@@ -199,7 +227,7 @@ private int     _cachedHash  = 0;
         var uiCam = this.uiCamera != null ? this.uiCamera : (canvas ? canvas.worldCamera : null);
         Vector2 screen = RectTransformUtility.WorldToScreenPoint(uiCam, rt.position);
 
-        var wcam = this.worldCamera != null ? this.worldCamera : Camera.main;
+        var wcam = this.worldCamera != null ? this.worldCamera : ResolveCachedMainCamera();
         if (wcam == null) return _lastEndWorld;
 
         float depth;
@@ -574,7 +602,7 @@ private int     _cachedHash  = 0;
     Vector3 aW = _hasStartOverride ? _startWorldOverride : (start != null ? start.position : transform.position);
     Vector3 dW = ResolveEndWorldPosition();
 
-    var cam = worldCamera != null ? worldCamera : Camera.main;
+    var cam = worldCamera != null ? worldCamera : ResolveCachedMainCamera();
     if (cam == null)
     {
         // Fallback: straight line if no camera
@@ -692,15 +720,20 @@ private int     _cachedHash  = 0;
     {
         if (visibleStart01 <= 0f && visibleEnd01 >= 1f) return;
 
-        var trimmed = new Vector3[_points.Length];
-        int count = trimmed.Length;
+        int count = _points.Length;
+        if (_trimmedPointsScratch == null || _trimmedPointsScratch.Length != count)
+            _trimmedPointsScratch = new Vector3[count];
+
         for (int i = 0; i < count; i++)
         {
             float u = (count <= 1) ? 0f : i / (float)(count - 1);
             float uu = Mathf.Lerp(visibleStart01, visibleEnd01, u);
-            trimmed[i] = EvaluatePosition01(uu);
+            _trimmedPointsScratch[i] = EvaluatePosition01(uu);
         }
-        _points = trimmed;
+
+        // Ping-pong the two buffers instead of allocating a fresh array every call —
+        // both are the same fixed `segments` length once this has run once.
+        (_points, _trimmedPointsScratch) = (_trimmedPointsScratch, _points);
     }
 
 }
