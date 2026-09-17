@@ -24,6 +24,12 @@ public partial class PhaseStarDustAffect
     {
         if (!_acquisitionEnabled || _navigator == null || _attunedRole == MusicalRole.None)
             return;
+
+        // Perf-only throttle: skip the idle-tentacle/grid-scan work entirely if we just
+        // did it. Independent of interTentacleStartInterval (a player-visible pacing knob).
+        if (Time.time < _nextAcquisitionScanAt)
+            return;
+
         if (_gfm == null) _gfm = GameFlowManager.Instance;
         var drum = _gfm?.activeDrumTrack;
         if (drum == null) return;
@@ -39,7 +45,10 @@ public partial class PhaseStarDustAffect
         if (interTentacleStartInterval > 0f && Time.time - _lastTentacleStartTime < interTentacleStartInterval)
             return;
 
-        var idleTentacles = new List<Tentacle>();
+        _nextAcquisitionScanAt = Time.time + kAcquisitionScanCooldown;
+
+        var idleTentacles = _idleTentaclesScratch;
+        idleTentacles.Clear();
         foreach (var tentacle in _tentacles)
         {
             if (tentacle.state == TentacleState.Idle && tentacle.role == _attunedRole)
@@ -48,7 +57,8 @@ public partial class PhaseStarDustAffect
         if (idleTentacles.Count == 0) return;
 
         var excluded = BuildExcludedCells(requester: null);
-        var seededTargets = new List<Vector2Int>(budget);
+        var seededTargets = _seededTargetsScratch;
+        seededTargets.Clear();
         if (_navigator.TryGetTargetsForRole(_attunedRole, budget, excluded, out var targetCells) && targetCells != null)
             seededTargets.AddRange(targetCells);
 
@@ -190,7 +200,8 @@ public partial class PhaseStarDustAffect
 
     private HashSet<Vector2Int> BuildExcludedCells(Tentacle requester)
     {
-        var excluded = new HashSet<Vector2Int>();
+        var excluded = _excludedCellsScratch;
+        excluded.Clear();
         foreach (var kv in _reservedCells)
         {
             if (requester == null || (kv.Value != null && kv.Value != requester))

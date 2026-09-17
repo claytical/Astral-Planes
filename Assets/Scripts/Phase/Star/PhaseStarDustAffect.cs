@@ -82,6 +82,12 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
         public float flowOffset;
         public Vector3[] linePts;
         public Gradient gradient;
+
+        // Last inputs BuildGrowingGradient rebuilt its keys from — lets it skip the
+        // SetKeys allocation on frames where nothing that gradient depends on changed.
+        public Color lastGrowingGradientRoleColor = new Color(-1f, -1f, -1f, -1f);
+        public float lastGrowingGradientAlphaScale = float.NaN;
+
         public float growProgress;
         public float contactTimer;
         public float dissolveTimer;
@@ -109,6 +115,7 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
     private PhaseStar _star;
     private PhaseStarCravingNavigator _navigator;
     private MusicalRole _attunedRole = MusicalRole.None;
+    private Camera _cam;
 
     [Header("Zap Stagger")]
     [Tooltip("Optional pacing between successive tentacle activations. 0 (default) = every available carved cell grows a tentacle immediately, up to the node payload; > 0 = one activation per interval.")]
@@ -123,6 +130,19 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
     private float _keepClearTimer;
     private readonly Dictionary<Vector2Int, Tentacle> _reservedCells = new();
     private readonly HashSet<Vector2Int> _zappedThisCycle = new();
+
+    // Perf-only throttle on AssignIdleTentacleTargets' "is anything idle and worth
+    // scanning for" check — distinct from interTentacleStartInterval (a player-visible
+    // pacing knob). Tentacle growth itself ramps over real time, so a ~0.06s delay here
+    // before a target is even considered is not perceptible.
+    private const float kAcquisitionScanCooldown = 0.06f;
+    private float _nextAcquisitionScanAt;
+
+    // Reused across AssignIdleTentacleTargets calls instead of allocating fresh
+    // collections every frame while any tentacle needs a target.
+    private readonly List<Tentacle> _idleTentaclesScratch = new();
+    private readonly List<Vector2Int> _seededTargetsScratch = new();
+    private readonly HashSet<Vector2Int> _excludedCellsScratch = new();
 
     public void Initialize(PhaseStarBehaviorProfile profile, PhaseStar star)
     {

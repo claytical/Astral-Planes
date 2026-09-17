@@ -93,6 +93,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     private Camera _cam;
 
     private PhaseStarCravingNavigator _navigator;
+    private readonly List<Vector2> _vehiclePositionsScratch = new();
 
     private void Awake()
     {
@@ -133,25 +134,30 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         _star = star;
 
 
-        VehiclePositionsProvider ??= () =>
-        {
-            if (_gfm == null) _gfm = GameFlowManager.Instance;
-            if (_gfm == null || _gfm.localPlayers == null) return Array.Empty<Vector2>();
-
-            var list = new List<Vector2>(_gfm.localPlayers.Count);
-            for (int i = 0; i < _gfm.localPlayers.Count; i++)
-            {
-                var lp = _gfm.localPlayers[i];
-                if (lp == null) continue;
-                var v = lp.plane;
-                if (v == null) continue;
-                list.Add((Vector2)v.transform.position);
-            }
-            return list;
-        };
+        VehiclePositionsProvider ??= DefaultVehiclePositionsProvider;
 
         ApplyBodyType();
         Enable(true);
+    }
+
+    // Reuses _vehiclePositionsScratch instead of allocating a new List every call — this
+    // runs every FixedUpdate via ComputeVehicleAvoidance, once per active star (up to 4
+    // with all roles active).
+    private IReadOnlyList<Vector2> DefaultVehiclePositionsProvider()
+    {
+        _vehiclePositionsScratch.Clear();
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        if (_gfm == null || _gfm.localPlayers == null) return _vehiclePositionsScratch;
+
+        for (int i = 0; i < _gfm.localPlayers.Count; i++)
+        {
+            var lp = _gfm.localPlayers[i];
+            if (lp == null) continue;
+            var v = lp.plane;
+            if (v == null) continue;
+            _vehiclePositionsScratch.Add((Vector2)v.transform.position);
+        }
+        return _vehiclePositionsScratch;
     }
 
     public void Enable(bool on)

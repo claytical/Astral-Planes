@@ -8,7 +8,8 @@ public partial class PhaseStarDustAffect
 
     private void RebuildNoteTetherCurve(Tentacle tentacle, Vector2 starPos)
     {
-        var cam = Camera.main;
+        if (_cam == null) _cam = Camera.main;
+        var cam = _cam;
         Vector3 aW = new Vector3(starPos.x, starPos.y, transform.position.z);
         Vector3 dW = new Vector3(tentacle.targetWorldPos.x, tentacle.targetWorldPos.y, transform.position.z);
 

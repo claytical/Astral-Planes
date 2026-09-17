@@ -34,6 +34,13 @@ public sealed class CosmicDustCellRegistry
     private readonly Dictionary<GameObject, Vector2Int> _goToCell = new Dictionary<GameObject, Vector2Int>(1024);
     private readonly Dictionary<Vector2Int, CellFlags> _cellFlags = new();
 
+    // Up to one PhaseStarCravingNavigator per active role can call GetColoredDustCells
+    // several times per frame (hunt/sniffer ticks, tentacle target acquisition); with 4
+    // roles active that's a full grid scan repeated ~16x/frame for identical results.
+    // Cache the scan once per frame and hand every caller this frame a copy of it.
+    private int _coloredCellsCacheFrame = -1;
+    private readonly List<Vector2Int> _coloredCellsCache = new(512);
+
     public CosmicDustCellRegistry(
         DustGridState gridState,
         Func<bool> toroidal,
@@ -105,16 +112,25 @@ public sealed class CosmicDustCellRegistry
     /// </summary>
     public void GetColoredDustCells(List<Vector2Int> results)
     {
-        results.Clear();
-        if (_gridState.CellState == null || _gridState.CellDust == null) return;
-        for (int y = 0; y < _gridState.Height; y++)
-        for (int x = 0; x < _gridState.Width; x++)
+        if (_coloredCellsCacheFrame != Time.frameCount)
         {
-            if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
-            var dust = _gridState.CellDust[x, y];
-            if (dust != null && dust.Role != MusicalRole.None && dust.currentEnergyUnits > 0 && dust.IsVisuallyPresentForTargeting())
-                results.Add(new Vector2Int(x, y));
+            _coloredCellsCacheFrame = Time.frameCount;
+            _coloredCellsCache.Clear();
+            if (_gridState.CellState != null && _gridState.CellDust != null)
+            {
+                for (int y = 0; y < _gridState.Height; y++)
+                for (int x = 0; x < _gridState.Width; x++)
+                {
+                    if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
+                    var dust = _gridState.CellDust[x, y];
+                    if (dust != null && dust.Role != MusicalRole.None && dust.currentEnergyUnits > 0 && dust.IsVisuallyPresentForTargeting())
+                        _coloredCellsCache.Add(new Vector2Int(x, y));
+                }
+            }
         }
+
+        results.Clear();
+        results.AddRange(_coloredCellsCache);
     }
 
     /// <summary>

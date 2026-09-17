@@ -6,6 +6,15 @@ public partial class PhaseStarDustAffect
     {
         float alpha = tentacle.alphaScale;
 
+        // Growing-state keys only depend on roleColor/alphaScale, which are stable for
+        // the whole growth animation (unlike the drain-pulse gradient, which is
+        // deliberately re-derived from Time.time every call) — skip the SetKeys
+        // allocation when nothing here has actually changed.
+        if (roleColor == tentacle.lastGrowingGradientRoleColor && alpha == tentacle.lastGrowingGradientAlphaScale)
+            return;
+        tentacle.lastGrowingGradientRoleColor = roleColor;
+        tentacle.lastGrowingGradientAlphaScale = alpha;
+
         tentacle.gradient.SetKeys(
             new[]
             {
