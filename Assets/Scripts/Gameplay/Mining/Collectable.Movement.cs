@@ -3,6 +3,8 @@ using UnityEngine;
 
 public partial class Collectable
 {
+    private static readonly WaitForFixedUpdate kWaitForFixedUpdate = new();
+
     private static readonly Vector2Int[] kDirs8 =
     {
         new Vector2Int( 1, 0),
@@ -39,7 +41,7 @@ public partial class Collectable
 
         while (true)
         {
-            yield return new WaitForFixedUpdate();
+            yield return kWaitForFixedUpdate;
             if (_rb == null || !_rb.simulated) continue;
             if (_inCarry) continue;
             // Spawn arrival (Kinematic) and deposit/carry paths own the body.

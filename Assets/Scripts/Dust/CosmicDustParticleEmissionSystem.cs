@@ -11,6 +11,9 @@ public sealed class CosmicDustParticleEmissionSystem
 {
     private readonly Func<ParticleSystem> _root;
 
+    private ParticleSystem[] _cachedSystems;
+    private ParticleSystem _cachedSystemsRoot;
+
     private ParticleSystem.MinMaxCurve[] _baseRateOverTime;
     private bool[] _baseEmissionEnabled;
     private bool _baseParticleEmissionCaptured;
@@ -37,7 +40,16 @@ public sealed class CosmicDustParticleEmissionSystem
     {
         var rootPs = _root();
         if (rootPs == null) return null;
-        return rootPs.GetComponentsInChildren<ParticleSystem>(true);
+
+        // Dust cell GameObjects are created once and reused via SetActive (never
+        // re-Instantiated), so the child particle-system hierarchy is static for the
+        // lifetime of a given root — safe to cache keyed on root identity.
+        if (_cachedSystems != null && _cachedSystemsRoot == rootPs)
+            return _cachedSystems;
+
+        _cachedSystems = rootPs.GetComponentsInChildren<ParticleSystem>(true);
+        _cachedSystemsRoot = rootPs;
+        return _cachedSystems;
     }
 
     public void EnsureBaseParticleEmissionCaptured()

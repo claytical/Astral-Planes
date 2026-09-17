@@ -34,6 +34,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     private readonly List<Vector2Int> _coloredCellsScratch = new(512);
     private readonly HashSet<Vector2Int> _zappedThisCycle = new();
     private readonly HashSet<Vector2Int> _reservedCells = new();
+    private readonly Dictionary<MusicalRole, float> _nearestSqDistPerRoleScratch = new(4);
 
     public void Initialize(
         PhaseStar star,
@@ -286,7 +287,8 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         float nearestSqDist = float.MaxValue;
         Vector2Int nearestCell = default;
 
-        var nearestSqDistPerRole = new Dictionary<MusicalRole, float>(4);
+        var nearestSqDistPerRole = _nearestSqDistPerRoleScratch;
+        nearestSqDistPerRole.Clear();
 
         for (int i = 0; i < _coloredCellsScratch.Count; i++)
         {
