@@ -139,10 +139,21 @@ private void ClearRainbowParticleDirtyIfNeeded()
         ps.SetParticles(_colorParticleBuffer, actual);
     }
 
+    // Cap on how many already-alive particles a single SetRainbowParticleColor call
+    // rewrites. A maze-wide rainbow pulse runs this on every solid cell every frame for
+    // ~1-2s, so this is O(solid cells x rewritten-particles-per-cell) each frame — solid
+    // cell count scales directly with active MusicalRoleProfile count. Particles beyond
+    // the cap simply keep whatever color they already had for the remainder of their
+    // (short) lifetime instead of snapping instantly; newly emitted particles already
+    // pick up `target` via main.startColor below, so the visible difference is limited to
+    // a few older particles per cell, not a frame-rate or timing change.
+    private const int kRainbowParticleRewriteCap = 48;
+
     // Isolated particle recolor used only by the rainbow pulse — never routed through by
     // any other caller (see SetDustColorAllParticles above), so it can't affect ordinary
     // cell spawn/reuse or other pulses. Sets startColor for future emissions and rewrites
-    // every currently-live particle so the change reads immediately.
+    // up to kRainbowParticleRewriteCap currently-live particles so the change reads
+    // immediately.
     private void SetRainbowParticleColor(Color target)
     {
         if (visual.particleSystem == null) return;
@@ -158,9 +169,12 @@ private void ClearRainbowParticleDirtyIfNeeded()
             _colorParticleBuffer = new ParticleSystem.Particle[Mathf.Max(count, 32)];
 
         int actual = ps.GetParticles(_colorParticleBuffer);
-        for (int i = 0; i < actual; i++)
+        int rewriteCount = Mathf.Min(actual, kRainbowParticleRewriteCap);
+        for (int i = 0; i < rewriteCount; i++)
             _colorParticleBuffer[i].startColor = target;
-        ps.SetParticles(_colorParticleBuffer, actual);
+        // Only write back the particles we touched — writing `rewriteCount` (not `actual`)
+        // leaves any remaining particles fully untouched in the live system.
+        ps.SetParticles(_colorParticleBuffer, rewriteCount);
     }
     internal void ApplyTintVisual(Color tint)
     {
