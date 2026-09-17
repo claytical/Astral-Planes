@@ -221,12 +221,12 @@ public partial class CosmicDustGenerator
         return filtered;
     }
 
-    private void BuildMazeRoleImprints(
+    private IEnumerator BuildMazeRoleImprintsRoutine(
         Vector2Int starCell,
         List<(Vector2Int cell, Vector3 world)> cells)
     {
-        if (cells == null || cells.Count == 0) return;
-        if (drums == null) return;
+        if (cells == null || cells.Count == 0) yield break;
+        if (drums == null) yield break;
 
         _imprints.EnsureAllocated(cells.Count * 2);
 
@@ -243,7 +243,7 @@ public partial class CosmicDustGenerator
 
         var voicesList = voices is List<RoleVoiceKey> vl ? vl : new List<RoleVoiceKey>(voices);
         if (voicesList.Count == 0)
-            return;
+            yield break;
 
         foreach (var (gp, _) in cells)
         {
@@ -276,7 +276,7 @@ public partial class CosmicDustGenerator
         {
             ClaimExactCountTerritoryAndFillGeneric(occupied, exactVoices, starCell, reservedFloorCount);
             ApplyHiddenColorPreview(occupied);
-            return;
+            yield break;
         }
 
         if (voicesList.Count == 1)
@@ -288,12 +288,12 @@ public partial class CosmicDustGenerator
             ApplyHiddenColorPreview(occupied);
 
             if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] BuildMazeRoleImprints: gray start, cells={cells.Count}, hidden single voice={onlyVoice}");
-            return;
+            yield break;
         }
 
         var (seedCells, seedVoices, actualSeedCount) = SelectRoleSeedsWithGeo(occupied, voicesList, starCell);
 
-        AssignHiddenImprintsByNearestSeed(occupied, seedCells, seedVoices, actualSeedCount);
+        yield return AssignHiddenImprintsByNearestSeedRoutine(occupied, seedCells, seedVoices, actualSeedCount);
         PostProcessGeoImprints(occupied, seedCells, seedVoices, actualSeedCount, voicesList);
         ApplyHiddenColorPreview(occupied);
 
@@ -561,12 +561,23 @@ public partial class CosmicDustGenerator
         return occupied;
     }
 
-    private void AssignHiddenImprintsByNearestSeed(
+    // Cells-per-frame budget for the O(occupied cells x seed count) nearest-seed scan below.
+    // Seed count scales with active-role count (2-8 seeds per Archipelago role), so with
+    // several roles active this loop can be large enough to cause a visible hitch if run
+    // as one uninterrupted block — spreading it across frames keeps each frame's slice
+    // bounded. Safe to do here specifically because the only caller
+    // (BuildMazeRoleImprintsRoutine) awaits this via `yield return` before anything reads
+    // the imprints it writes or before the staggered growth reveal coroutine is started —
+    // no cell can visually reveal with an unassigned/wrong hidden role as a result.
+    private const int kHiddenImprintCellsPerFrame = 400;
+
+    private IEnumerator AssignHiddenImprintsByNearestSeedRoutine(
         List<Vector2Int> occupied,
         Vector2Int[] seedCells,
         RoleVoiceKey[] seedVoices,
         int actualSeedCount)
     {
+        int sinceYield = 0;
         for (int i = 0; i < occupied.Count; i++)
         {
             Vector2Int gp = occupied[i];
@@ -585,6 +596,12 @@ public partial class CosmicDustGenerator
             }
 
             _imprints.SetHiddenRole(gp, seedVoices[bestSeed].role, seedVoices[bestSeed].voiceIndex);
+
+            if (++sinceYield >= kHiddenImprintCellsPerFrame)
+            {
+                sinceYield = 0;
+                yield return null;
+            }
         }
     }
 
@@ -971,7 +988,7 @@ public partial class CosmicDustGenerator
         foreach (var (cell, _) in mazeResult)
             _mazePatternCells.Add(cell);
 
-        BuildMazeRoleImprints(starCell, mazeResult);
+        yield return BuildMazeRoleImprintsRoutine(starCell, mazeResult);
 
         cellsToFill.AddRange(mazeResult);
 
