@@ -252,6 +252,13 @@ public partial class Collectable : MonoBehaviour
     private Vector3 _baseVisualScale;
     private bool _baseSizeCaptured;
 
+    // The root transform's true resting scale, captured once before any pulse coroutine
+    // ever touches transform.localScale. Every pulse routine (idle breathe, note-play
+    // swell, capture absorb) reads this instead of transform.localScale at start-up,
+    // since StopCoroutine leaves scale mid-Lerp with no cleanup, and trusting the live
+    // value would let each handoff freeze on (and compound) a wrong "base".
+    private Vector3 _baseRootScale;
+
     private void CaptureBaseSizeIfNeeded()
     {
         if (_baseSizeCaptured) return;
@@ -266,6 +273,7 @@ public partial class Collectable : MonoBehaviour
     public void ApplyTrackVisuals(InstrumentTrack track)
     {
         if (track == null) return;
+        _baseRootScale = transform.localScale;
         if (TryGetComponent(out CollectableParticles particleScript))
             particleScript.ConfigureByDuration(noteDurationTicks, track);
 

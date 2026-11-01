@@ -19,7 +19,9 @@ public partial class DrumTrack
     // is closest to the live-computed axis point. Squared distance avoids a sqrt per
     // candidate since only comparisons are needed. Ties resolve to the first-in-list entry,
     // matching the determinism guarantee this pool needs (same as GetConfigForRoleAtBin).
-    private AudioClip ResolveNearestIntensityClip(float depth01, float breadth01, float pressure01)
+    // excludeClip lets a caller drop the currently-overstaying clip (see IntensityClipTag.
+    // maxConsecutiveLoopSeconds) out of the search so a different tag can take over.
+    private AudioClip ResolveNearestIntensityClip(float depth01, float breadth01, float pressure01, AudioClip excludeClip = null)
     {
         if (_intensityTags == null || _intensityTags.Count == 0) return null;
 
@@ -29,6 +31,7 @@ public partial class DrumTrack
         {
             var t = _intensityTags[i];
             if (t.clip == null) continue;
+            if (excludeClip != null && t.clip == excludeClip) continue;
             float dd = depth01 - t.depth01;
             float db = breadth01 - t.breadth01;
             float dp = pressure01 - t.pressure01;
@@ -40,6 +43,16 @@ public partial class DrumTrack
             }
         }
         return best;
+    }
+
+    // Looks up the authored max-consecutive-loop cap for a given clip (0 = no cap). If
+    // multiple tags reference the same physical clip, only the first match is consulted.
+    private float GetMaxConsecutiveLoopSeconds(AudioClip clip)
+    {
+        if (_intensityTags == null || clip == null) return 0f;
+        for (int i = 0; i < _intensityTags.Count; i++)
+            if (_intensityTags[i].clip == clip) return _intensityTags[i].maxConsecutiveLoopSeconds;
+        return 0f;
     }
 
     // Decodes this motif's drum clips up front (well ahead of ArmPendingDrumLoopForNextLeaderBoundary

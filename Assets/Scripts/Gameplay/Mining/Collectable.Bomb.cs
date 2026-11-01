@@ -63,7 +63,10 @@ public partial class Collectable
         // setup) so the bomb physically sits in the world like a live collectable.
         SetSpawnArrivalProtection(false);
 
-        _bombBaseScale = BombVisualRoot.localScale;
+        // BombVisualRoot falls back to the root transform when no dedicated child is
+        // assigned; in that case its scale was just left mid-pulse by the StopCoroutine
+        // calls above, so use the persistent base rather than trusting the live value.
+        _bombBaseScale = bombVisualRoot != null ? bombVisualRoot.localScale : _baseRootScale;
         _bombBaseColor = energySprite != null ? energySprite.color : Color.white;
         // World-space visual radius at the current (base, pre-swell) scale, so Detonate() can
         // compute exactly what scale multiplier makes the rendered size equal blastRadius.

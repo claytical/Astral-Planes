@@ -71,6 +71,7 @@ public partial class CosmicDust
     {
         // The clear owns the visuals from here: a still-running drain buildup would
         // stomp the scale-out through SetBaseSpriteScale. Stop it without restoring.
+        HideFlower();
         if (_drainBuildupRoutine != null) { StopCoroutine(_drainBuildupRoutine); _drainBuildupRoutine = null; }
         SetTerrainColliderEnabled(false);
         AnimateSpriteScale(1f, 0f, fadeSeconds);
@@ -102,6 +103,7 @@ public partial class CosmicDust
         if (_drainBuildupRoutine != null) { StopCoroutine(_drainBuildupRoutine); _drainBuildupRoutine = null; }
         if (_retintOverRoutine  != null) { StopCoroutine(_retintOverRoutine);  _retintOverRoutine  = null; }
         if (_tintFadeInRoutine  != null) { StopCoroutine(_tintFadeInRoutine);  _tintFadeInRoutine  = null; }
+        if (_flowerGrowInRoutine != null) { StopCoroutine(_flowerGrowInRoutine); _flowerGrowInRoutine = null; }
         CancelTintPulse(restoreToBase: false);
     }
     public void PrepareForReuse()
@@ -186,6 +188,7 @@ public partial class CosmicDust
         // Jiggle resumes after bridge root-reactivation and overwrites the zero scale set below.
         // Must be stopped here (not just in PrepareForReuse) because HideVisualsInstant is called
         // for solid cells that may never go through PrepareForReuse if they aren't in the new maze.
+        HideFlower();
         StopAllVisualCoroutines();
 
         // Disable collisions immediately.

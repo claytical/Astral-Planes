@@ -695,19 +695,31 @@ public partial class CosmicDustGenerator
                 ringVoices.Add(voicesList[vi]);
 
         int filled = 0;
-        if (ringVoices.Count > 0 && maxDistFromStar > 0f)
+        if (ringVoices.Count > 0 && occupied.Count > 0)
         {
-            for (int k = 0; k < ringVoices.Count && filled < totalSlots; k++)
+            // Rings-pattern mazes don't reliably carve one distinct radius band per active role —
+            // on this project's compact grid, cell population collapses into far fewer real bands
+            // than there are roles (see CosmicDustMazePatterns.BuildRingChokepoints), so dividing
+            // by radius (continuous or by population quantile) has no way to keep roles apart
+            // within a shared band: the sort/scan key carries no angular information, and an
+            // unstable sort can hand two roles angularly-adjacent cells there. The Euclidean
+            // nearest-seed Voronoi then starves whichever one loses that shared sliver. Placing
+            // seeds by target ANGLE around the star instead guarantees N roles get N genuinely
+            // separated directions, which is what actually drives a fair Voronoi split on a
+            // compact map — regardless of how the radial bands happen to fall.
+            int ringCount = ringVoices.Count;
+            for (int k = 0; k < ringCount && filled < totalSlots; k++)
             {
-                float targetRadius = (k + 0.5f) * (maxDistFromStar / ringVoices.Count);
+                float targetAngle = (k + 0.5f) * (Mathf.PI * 2f / ringCount);
+                Vector2 targetDir = new Vector2(Mathf.Cos(targetAngle), Mathf.Sin(targetAngle));
                 int bestIdx = -1;
-                float bestDelta = float.MaxValue;
+                float bestScore = float.NegativeInfinity;
                 for (int i = 0; i < occupied.Count; i++)
                 {
                     if (chosen.Contains(occupied[i])) continue;
-                    float dist = Mathf.Sqrt((occupied[i] - starCell).sqrMagnitude);
-                    float delta = Mathf.Abs(dist - targetRadius);
-                    if (delta < bestDelta) { bestDelta = delta; bestIdx = i; }
+                    Vector2 offset = occupied[i] - starCell;
+                    float score = Vector2.Dot(offset, targetDir);
+                    if (score > bestScore) { bestScore = score; bestIdx = i; }
                 }
                 if (bestIdx < 0) continue;
                 seedCells[filled] = occupied[bestIdx];

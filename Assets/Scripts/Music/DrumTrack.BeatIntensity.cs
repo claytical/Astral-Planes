@@ -68,8 +68,26 @@ public partial class DrumTrack
             $"[DRUM][BeatSeq] motif={_motif.motifId} depth={depth01:F3} breadth={breadth01:F3} pressure={pressure01:F3} tags={tagCt}"
         );
 
+        var audibleClip = drumAudioSource != null ? drumAudioSource.clip : null;
+
+        // 3.5) A clip authored with a max-loop cap gets excluded from selection once it's
+        // overstayed, letting the next-nearest tag take over. This resets naturally: the
+        // exclusion only ever applies to whatever's currently audible, and
+        // _lastClipSwapFinalizedDsp advances on every real swap, so the excluded clip is
+        // eligible again once something else becomes audible.
+        AudioClip excludeClip = null;
+        if (audibleClip != null && _lastClipSwapFinalizedDsp > 0.0)
+        {
+            float cap = GetMaxConsecutiveLoopSeconds(audibleClip);
+            if (cap > 0f && (AudioSettings.dspTime - _lastClipSwapFinalizedDsp) >= cap)
+            {
+                excludeClip = audibleClip;
+                if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] clip={audibleClip.name} hit maxConsecutiveLoopSeconds={cap:F1}s, excluding from selection");
+            }
+        }
+
         // 4) Select nearest-match target clip
-        var targetClip = ResolveNearestIntensityClip(depth01, breadth01, pressure01);
+        var targetClip = ResolveNearestIntensityClip(depth01, breadth01, pressure01, excludeClip);
         if (targetClip == null)
         {
             Debug.LogWarning($"[DRUM][BeatSeq] exit: ResolveNearestIntensityClip returned null depth={depth01:F3} breadth={breadth01:F3} pressure={pressure01:F3} motif={_motif.motifId}");
@@ -84,7 +102,6 @@ public partial class DrumTrack
             if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: already armed clip={targetClip.name}");
             return;
         }
-        var audibleClip = drumAudioSource != null ? drumAudioSource.clip : null;
         if (!_pendingDrumLoopArmed && audibleClip == targetClip)
         {
             if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: already playing clip={targetClip.name}");
@@ -100,7 +117,12 @@ public partial class DrumTrack
         // 6) Min-dwell gate: don't flip to a different clip too soon after the last swap,
         // even if it's now the nearest match — per-axis hysteresis alone doesn't prevent
         // two axes moving in opposite directions from flipping the selected clip.
-        if (targetClip != audibleClip && _lastClipSwapFinalizedDsp > 0.0)
+        // Bypassed when the switch is forced by the audible clip's own maxConsecutiveLoopSeconds
+        // cap (excludeClip != null): an authored cap is an explicit override of this general
+        // anti-thrash guard, not something the guard should be allowed to block. Without this,
+        // a cap shorter than minClipDwellSeconds could never actually fire — the clip would just
+        // keep looping until minClipDwellSeconds elapsed anyway.
+        if (excludeClip == null && targetClip != audibleClip && _lastClipSwapFinalizedDsp > 0.0)
         {
             double dspNow = AudioSettings.dspTime;
             double sinceSwap = dspNow - _lastClipSwapFinalizedDsp;

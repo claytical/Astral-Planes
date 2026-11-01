@@ -172,7 +172,7 @@ public partial class Collectable
     /// </summary>
     private IEnumerator NotePlayPulseRoutine(float duration)
     {
-        Vector3 restScale = transform.localScale;
+        Vector3 restScale = _baseRootScale;
         Vector3 peakScale = restScale * notePlayPeakScaleMul;
         duration = Mathf.Max(0.01f, duration);
 

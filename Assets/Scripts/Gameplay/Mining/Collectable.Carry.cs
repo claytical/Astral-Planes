@@ -69,7 +69,7 @@ public partial class Collectable
         if (_pulseRoutine != null) { StopCoroutine(_pulseRoutine); _pulseRoutine = null; }
         if (_notePlayPulseRoutine != null) { StopCoroutine(_notePlayPulseRoutine); _notePlayPulseRoutine = null; }
 
-        Vector3 startScale = transform.localScale;
+        Vector3 startScale = _baseRootScale;
         Vector3 startWorldPos = transform.position;
         Transform vehicleTransform = vehicle != null ? vehicle.transform : null;
 
@@ -297,7 +297,6 @@ public partial class Collectable
 
     private IEnumerator PulseEnergySprite()
     {
-        Vector3 startScale = transform.localScale;
         var particles = new ParticleScaleLockstep();
         particles.Capture(this);
 
@@ -310,7 +309,7 @@ public partial class Collectable
                 var col = energySprite.color; col.a = a; energySprite.color = col;
             }
             float ratio = Mathf.Lerp(1f, pulseScale, t);
-            transform.localScale = startScale * ratio;
+            transform.localScale = _baseRootScale * ratio;
             particles.Apply(ratio);
             yield return null;
         }

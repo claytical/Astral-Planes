@@ -255,6 +255,7 @@ public class TrackExpansionController
     public void ResetForNewPhase()
     {
         UnhookExpandBoundary();
+        _host.EndGravityVoidForPendingExpand();
         PendingExpandForBurst            = false;
         _pendingBurstAfterExpand         = null;
         ExpandCommitted                  = false;

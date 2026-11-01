@@ -35,4 +35,5 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 0dfacc5b336a449a68b1538328875e4f, type: 2}
     - {fileID: 11400000, guid: c713eb220ad7e40b8a1ec429390a50ef, type: 2}
     - {fileID: 11400000, guid: 59369580881424aaf9a31890bdca0943, type: 2}
+    - {fileID: 11400000, guid: 879ece8187b5d4198aa035416020479b, type: 2}
     loopMotifs: 0
