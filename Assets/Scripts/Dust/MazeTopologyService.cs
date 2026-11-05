@@ -107,7 +107,23 @@ public sealed class MazeTopologyService
                 solid.Add(item.cell);
         }
 
-        if (config != null && config.porousBorder.exitCount >= 0)
+        if (config != null && config.porousBorder.exitSides.Count > 0)
+        {
+            var sideBorder = CosmicDustMazePatterns.BuildPorousBorderCellsForSides(
+                width, height, config.porousBorder.exitSides, context.IsCellAvailable, out gapGroupsOut);
+
+            // The sides variant walls the full rectangle (bottom row too), so clear every edge
+            // cell the pattern may have left before re-adding the walled ones.
+            for (int x = 0; x < width; x++)
+            for (int y = 0; y < height; y++)
+                if (x == 0 || x == width - 1 || y == 0 || y == height - 1)
+                    solid.Remove(new Vector2Int(x, y));
+
+            foreach (var border in sideBorder)
+                if (!context.IsBlocked(border))
+                    solid.Add(border);
+        }
+        else if (config != null && config.porousBorder.exitCount >= 0)
         {
             var perimeterCells = BuildPorousBorderPerimeter(width, height);
             foreach (var cell in perimeterCells)

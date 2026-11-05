@@ -101,7 +101,6 @@ public class SolarSystemRecordDisplay : MonoBehaviour
             var applicator               = applicatorGo.AddComponent<MotifRingGlyphApplicator>();
             applicator.config            = ringConfig;
             applicator.lineMaterial      = lineMaterial;
-            applicator.sphericalRotation = false;
             applicator.AnimateApply(rings[i]);
 
             float variance = rings.Count > 1 ? (float)i / (rings.Count - 1) * orbitSpeedVariance : 0f;

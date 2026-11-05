@@ -98,7 +98,7 @@ public partial class MotifRingGlyphApplicator
     // Contour then sit above the discs so the ring lines stay visible on top of that backing.
     //
     // FillSortingOrder/ContourSortingOrder are also the base pair for a *stacked* multi-ring
-    // record (see AnimateApply/ApplyStatic/ApplyVinyl in RecordRings.cs): each older ring gets a
+    // record (see AnimateApply/ApplyVinyl in RecordRings.cs): each older ring gets a
     // fill/contour pair 2 higher than the next-newer ring, so an older (innermost) ring's note
     // dips — which visually intrude outward past its own band — still render on top of a newer
     // (outer) ring rather than being covered by it. TravelDotSortingOrder is set far above any
@@ -189,25 +189,6 @@ public partial class MotifRingGlyphApplicator
         var arr = new MaterialPropertyBlock[count];
         for (int i = 0; i < count; i++) arr[i] = new MaterialPropertyBlock();
         return arr;
-    }
-
-    private void ApplyAlpha(RingEntry[] entries, float normalizedAlpha,
-                            MaterialPropertyBlock[] mpbs)
-    {
-        for (int i = 0; i < entries.Length; i++)
-        {
-            Color c = entries[i].BaseColor;
-            if (entries[i].Fill != null)
-                SetFillColor(entries[i].Fill,
-                    new Color(c.r, c.g, c.b, config.ringAlpha * normalizedAlpha), mpbs[i]);
-
-            if (entries[i].Contour != null)
-            {
-                var lc = new Color(c.r, c.g, c.b, config.contourAlpha * normalizedAlpha);
-                entries[i].Contour.startColor = lc;
-                entries[i].Contour.endColor   = lc;
-            }
-        }
     }
 
     private static void SetFillColor(MeshRenderer mr, Color c, MaterialPropertyBlock mpb)

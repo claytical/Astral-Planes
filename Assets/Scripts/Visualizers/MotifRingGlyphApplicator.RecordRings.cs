@@ -6,6 +6,9 @@ using UnityEngine;
 // ── Record ring API ──────────────────────────────────────────────────────
 public partial class MotifRingGlyphApplicator
 {
+    // True while the record rings are the gray locked-preview look (alpha comes from the remaining-ring settings).
+    private bool _lockedLook;
+
     /// <summary>
     /// Build filled + contour record rings from the full motif snapshot with
     /// staggered draw-in, note travel dots, and continuous rotation.
@@ -13,6 +16,7 @@ public partial class MotifRingGlyphApplicator
     public void AnimateApply(MotifSnapshot snapshot)
     {
         StopAllCoroutines();
+        _lockedLook              = false;
         _recordFadingOut         = false;
         _gameplayFadingOut       = false;
         _superNodeMode           = false;
@@ -38,14 +42,14 @@ public partial class MotifRingGlyphApplicator
 
         int segs    = Mathf.Max(16, config.segments);
         int binSize = Mathf.Max(1, snapshot.TotalSteps);
-        var bandedRadii = ComputeBandedInnerRadii(ringKeys, config);
+        var bandedRadii = ComputeRadii(ringKeys, out float ringThick);
         int maxNoteCount = ringKeys.Count > 0 ? ringKeys.Max(k => k.noteCount) : 0;
 
         for (int i = 0; i < ringKeys.Count; i++)
         {
             var (binIndex, role, color, matchRatio, noteCount) = ringKeys[i];
             float innerR     = bandedRadii[i];
-            float outerR     = innerR + config.ringThickness;
+            float outerR     = innerR + ringThick;
             bool  isLastRing = (i == ringKeys.Count - 1);
 
             // Captured per-iteration (not the loop's `i`) so each ring's rotation-gate closure,
@@ -53,12 +57,7 @@ public partial class MotifRingGlyphApplicator
             // `i` happened to be when the loop finished.
             int ringIndex = i;
 
-            var ringNotes = snapshot.CollectedNotes
-                .Where(n => n.BinIndex == binIndex
-                         && Mathf.Approximately(n.SerializedTrackColor.r, color.r)
-                         && Mathf.Approximately(n.SerializedTrackColor.g, color.g)
-                         && Mathf.Approximately(n.SerializedTrackColor.b, color.b))
-                .ToList();
+            var ringNotes = NotesForRing(snapshot, binIndex, color);
 
             // Last ring starts flat — its dips animate in as dots travel.
             // All other rings pre-bake their dips (no travel dot replay).
@@ -74,12 +73,6 @@ public partial class MotifRingGlyphApplicator
 
             float densityNorm = maxNoteCount > 0 ? (float)noteCount / maxNoteCount : 0f;
             float rotDeg = RecordRingRotationSpeed(matchRatio, densityNorm);
-            if (sphericalRotation)
-            {
-                // Distribute rings at evenly-spaced Y angles so they form tilted orbits.
-                entry.Root.transform.localEulerAngles =
-                    new Vector3(0f, (float)i / ringKeys.Count * 180f, 0f);
-            }
             if (matchRatio < config.directionMatchRatioThreshold) rotDeg = -rotDeg;
 
             float tugR    = outerR * (1f - config.tugDepthFraction);
@@ -119,7 +112,6 @@ public partial class MotifRingGlyphApplicator
                     role, binIndex, color, binSize, outerR,
                     shouldStop: () => _recordFadingOut,
                     ringOrdinal: i,
-                    spherical: sphericalRotation,
                     isHighlighted: () => _highlightedRingIndices.Contains(ringIndex)));
             }
             else
@@ -132,83 +124,22 @@ public partial class MotifRingGlyphApplicator
                     new List<NoteAnimInfo>(),
                     noteViz,
                     shouldStop: () => _recordFadingOut,
-                    spherical: sphericalRotation,
                     isHighlighted: () => _highlightedRingIndices.Contains(ringIndex)));
             }
         }
 
-        RefreshPlayAreaFit(_recordRings.Count, bandedRadii[bandedRadii.Length - 1] + config.ringThickness);
-    }
-
-    /// <summary>
-    /// Render rings from a snapshot instantly with no draw-in animation or rotation.
-    /// Used for non-highlighted carousel slots in the PhaseLibrary scene.
-    /// Passing null clears the slot. <paramref name="alphaScale"/> dims all layers (0–1).
-    /// </summary>
-    public void ApplyStatic(MotifSnapshot snapshot, float alphaScale = 1f)
-    {
-        StopAllCoroutines();
-        _recordFadingOut   = false;
-        _gameplayFadingOut = false;
-        DestroyList(_recordRings);
-        ResetHighlightState();
-
-        if (snapshot == null || config == null) return;
-
-        var ringKeys = BuildRingKeys(snapshot);
-        if (ringKeys.Count == 0) return;
-
-        int segs = Mathf.Max(16, config.segments);
-        var bandedRadii = ComputeBandedInnerRadii(ringKeys, config);
-
-        for (int i = 0; i < ringKeys.Count; i++)
-        {
-            var (binIndex, role, color, _, _) = ringKeys[i];
-            float innerR = bandedRadii[i];
-            float outerR = innerR + config.ringThickness;
-
-            var ringNotes = snapshot.CollectedNotes
-                .Where(n => n.BinIndex == binIndex
-                         && Mathf.Approximately(n.SerializedTrackColor.r, color.r)
-                         && Mathf.Approximately(n.SerializedTrackColor.g, color.g)
-                         && Mathf.Approximately(n.SerializedTrackColor.b, color.b))
-                .ToList();
-
-            var (fillOrder, contourOrder) = RecordRingSortingOrder(i, ringKeys.Count);
-            var entry = BuildRingEntry($"StaticRing_Bin{binIndex}_{role}",
-                innerR, outerR, segs, color, role, binIndex, ringNotes, snapshot.TotalSteps,
-                fillSortingOrderOverride: fillOrder, contourSortingOrderOverride: contourOrder,
-                contourWidthOverride: config.recordLineWidth, ringOrdinal: i);
-            _recordRings.Add(entry);
-
-            // Render mesh and contour immediately — no coroutines.
-            var mesh = entry.Fill.GetComponent<MeshFilter>().sharedMesh;
-            mesh.SetTriangles(entry.FullTris, 0);
-            mesh.RecalculateBounds();
-
-            entry.Contour.positionCount = entry.ContourPoints.Count;
-            for (int j = 0; j < entry.ContourPoints.Count; j++)
-                entry.Contour.SetPosition(j, new Vector3(
-                    entry.ContourPoints[j].x, entry.ContourPoints[j].y, 0f));
-        }
-
-        if (alphaScale < 1f)
-        {
-            var mpbs = MakeMpbs(_recordRings.Count);
-            ApplyAlpha(_recordRings.ToArray(), alphaScale, mpbs);
-        }
-
-        RefreshPlayAreaFit(_recordRings.Count, bandedRadii[bandedRadii.Length - 1] + config.ringThickness);
+        RefreshPlayAreaFit(_recordRings.Count, bandedRadii[bandedRadii.Length - 1] + ringThick);
     }
 
     /// <summary>
     /// Render rings from a snapshot instantly (no draw-in) as a flat spinning vinyl disc.
-    /// Used for non-highlighted carousel slots that should look like rotating records rather
-    /// than static or spherical displays. Each ring spins on its local Z-axis.
+    /// Used for non-highlighted carousel slots that should look like rotating records.
+    /// Each ring spins on its local Z-axis.
     /// </summary>
     public void ApplyVinyl(MotifSnapshot snapshot, float alphaScale = 1f)
     {
         StopAllCoroutines();
+        _lockedLook        = false;
         _recordFadingOut   = false;
         _gameplayFadingOut = false;
         DestroyList(_recordRings);
@@ -220,21 +151,16 @@ public partial class MotifRingGlyphApplicator
         if (ringKeys.Count == 0) return;
 
         int segs = Mathf.Max(16, config.segments);
-        var bandedRadii = ComputeBandedInnerRadii(ringKeys, config);
+        var bandedRadii = ComputeRadii(ringKeys, out float ringThick);
         int maxNoteCount = ringKeys.Count > 0 ? ringKeys.Max(k => k.noteCount) : 0;
 
         for (int i = 0; i < ringKeys.Count; i++)
         {
             var (binIndex, role, color, matchRatio, noteCount) = ringKeys[i];
             float innerR = bandedRadii[i];
-            float outerR = innerR + config.ringThickness;
+            float outerR = innerR + ringThick;
 
-            var ringNotes = snapshot.CollectedNotes
-                .Where(n => n.BinIndex == binIndex
-                         && Mathf.Approximately(n.SerializedTrackColor.r, color.r)
-                         && Mathf.Approximately(n.SerializedTrackColor.g, color.g)
-                         && Mathf.Approximately(n.SerializedTrackColor.b, color.b))
-                .ToList();
+            var ringNotes = NotesForRing(snapshot, binIndex, color);
 
             var (fillOrder, contourOrder) = RecordRingSortingOrder(i, ringKeys.Count);
             var entry = BuildRingEntry($"VinylRing_Bin{binIndex}_{role}",
@@ -258,13 +184,9 @@ public partial class MotifRingGlyphApplicator
             StartCoroutine(SpinRingContinuous(entry.Root.transform, rotDeg));
         }
 
-        if (alphaScale < 1f)
-        {
-            var mpbs = MakeMpbs(_recordRings.Count);
-            ApplyAlpha(_recordRings.ToArray(), alphaScale, mpbs);
-        }
+        if (alphaScale < 1f) SetAlphaScale(alphaScale);
 
-        RefreshPlayAreaFit(_recordRings.Count, bandedRadii[bandedRadii.Length - 1] + config.ringThickness);
+        RefreshPlayAreaFit(_recordRings.Count, bandedRadii[bandedRadii.Length - 1] + ringThick);
     }
 
     /// <summary>
@@ -273,9 +195,10 @@ public partial class MotifRingGlyphApplicator
     /// (the motif's nodesPerStar) rather than recorded bins. Used for the "next up" locked
     /// entry in the PhaseLibrary carousel: selectable, but nothing to preview-play.
     /// </summary>
-    public void ApplyLockedPreview(int ringCount, float alphaScale = 1f)
+    public void ApplyLockedPreview(int ringCount, float alphaScale = 1f, float lineWidth = 0f)
     {
         StopAllCoroutines();
+        _lockedLook        = true;
         _recordFadingOut   = false;
         _gameplayFadingOut = false;
         DestroyList(_recordRings);
@@ -284,18 +207,30 @@ public partial class MotifRingGlyphApplicator
         if (config == null) return;
 
         ringCount = Mathf.Max(0, ringCount);
+        float ringThick = config.ringThickness;
+        float[] fixedRadii = null;
+        if (_fixedFit > 0f) fixedRadii = ComputeFixedRadii(ringCount, out ringThick);
         int segs  = Mathf.Max(16, config.segments);
         alphaScale = Mathf.Clamp01(alphaScale);
 
         for (int i = 0; i < ringCount; i++)
         {
-            float innerR = RingInnerRadius(i);
-            float outerR = innerR + config.ringThickness;
+            float innerR = fixedRadii != null ? fixedRadii[i] : RingInnerRadius(i);
+            float outerR = innerR + ringThick;
+
+            // A locked ring has no contour, so its filled band is the line: thin it to the contour
+            // width a recorded ring would have, centred on the same outer edge.
+            if (fixedRadii != null && lineWidth > 0f && lineWidth < ringThick)
+            {
+                float edge = outerR;
+                innerR = edge - lineWidth * 0.5f;
+                outerR = edge + lineWidth * 0.5f;
+            }
 
             var entry = BuildRingEntry($"LockedRing_{i}", innerR, outerR, segs,
                 config.remainingRingColor, default, -1,
                 new List<MotifSnapshot.NoteEntry>(), 0,
-                config.remainingRingAlpha * alphaScale, config.remainingContourAlpha * alphaScale,
+                config.remainingRingAlpha * alphaScale, 0f,
                 ringOrdinal: i);
             _recordRings.Add(entry);
 
@@ -312,7 +247,7 @@ public partial class MotifRingGlyphApplicator
             // at its construction default of positionCount = 0 — present, but drawing nothing.
         }
 
-        RefreshPlayAreaFit(_recordRings.Count);
+        RefreshPlayAreaFit(_recordRings.Count, fixedRadii != null ? 1f : (float?)null);
     }
 
     /// <summary>
@@ -337,6 +272,97 @@ public partial class MotifRingGlyphApplicator
             if (shouldHighlight) _highlightedRingIndices.Add(i);
             else                 _highlightedRingIndices.Remove(i);
         }
+    }
+
+    /// <summary>Sets the contour line width of the already-built record rings, in place.</summary>
+    public void SetContourWidth(float width)
+    {
+        foreach (var e in _recordRings)
+            if (e.Contour != null) e.Contour.widthMultiplier = width;
+    }
+
+    /// <summary>
+    /// Re-tints the already-built record rings to <paramref name="alphaScale"/> (0–1) without
+    /// rebuilding them. Used by the carousel to fade a glyph between selected and unselected.
+    /// </summary>
+    public void SetAlphaScale(float alphaScale)
+    {
+        if (config == null || _recordRings.Count == 0) return;
+        alphaScale = Mathf.Clamp01(alphaScale);
+        float fillA    = _lockedLook ? config.remainingRingAlpha    : config.ringAlpha;
+        float contourA = _lockedLook ? 0f : config.contourAlpha;
+        var mpb = new MaterialPropertyBlock();
+        foreach (var e in _recordRings)
+        {
+            Color c = e.BaseColor;
+            if (e.Fill != null) SetFillColor(e.Fill, new Color(c.r, c.g, c.b, fillA * alphaScale), mpb);
+            if (e.Contour != null)
+            {
+                var lc = new Color(c.r, c.g, c.b, contourA * alphaScale);
+                e.Contour.startColor = lc;
+                e.Contour.endColor   = lc;
+            }
+        }
+    }
+
+    private SpriteRenderer _selectionBackdrop;
+    private static Sprite  _circleSprite;
+
+    /// <summary>
+    /// Carousel only: fades a black circle in behind this glyph (k = 1) so the lines of the glyphs
+    /// behind it don't cross the selected glyph's translucent rings, or out (k = 0). The sprite is
+    /// 1 unit across, so it is scaled to the stack's actual reach (see BackdropRadius). It sorts
+    /// below every ring (order 0 vs FillSortingOrder).
+    /// </summary>
+    public void SetSelectedBackdrop(float k)
+    {
+        k = Mathf.Clamp01(k);
+
+        if (_selectionBackdrop == null)
+        {
+            if (k <= 0f) return;
+            var go = new GameObject("SelectionBackdrop");
+            go.transform.SetParent(transform, worldPositionStays: false);
+            _selectionBackdrop              = go.AddComponent<SpriteRenderer>();
+            _selectionBackdrop.sprite       = CircleSprite();
+            _selectionBackdrop.sortingOrder = FullBgDiscSortingOrder - 1;
+        }
+
+        _selectionBackdrop.enabled = k > 0f;
+        _selectionBackdrop.color   = new Color(0f, 0f, 0f, k);
+        _selectionBackdrop.transform.localScale = Vector3.one * (2f * BackdropRadius());
+    }
+
+    // Outermost reach of the record in local units: the largest ring's outer edge, grown by the
+    // playing-bin highlight's scale pulse (which scales a ring's Root past its built radius) and
+    // half the contour width. Falls back to the fixed-fit unit radius before any ring is built.
+    private float BackdropRadius()
+    {
+        float outer = 0f;
+        foreach (var e in _recordRings) outer = Mathf.Max(outer, e.OuterRadius);
+        if (outer <= 0f) return 1f;
+        return outer * Mathf.Max(1f, config != null ? config.highlightScaleMultiplier : 1f)
+             + (config != null ? config.recordLineWidth * 0.5f : 0f);
+    }
+
+    private static Sprite CircleSprite()
+    {
+        if (_circleSprite != null) return _circleSprite;
+
+        const int size = 256;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        var px  = new Color32[size * size];
+        float r = size * 0.5f;
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float d = Mathf.Sqrt((x + 0.5f - r) * (x + 0.5f - r) + (y + 0.5f - r) * (y + 0.5f - r));
+                px[y * size + x] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(r - d) * 255f)); // 1px antialiased edge
+            }
+        tex.SetPixels32(px);
+        tex.Apply();
+        _circleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+        return _circleSprite;
     }
 
     /// <summary>Un-highlights every ring — used when preview playback stops.</summary>
@@ -528,6 +554,15 @@ public partial class MotifRingGlyphApplicator
         }
         return radii;
     }
+
+    // The snapshot's collected notes that belong on the ring for this bin and track colour.
+    private static List<MotifSnapshot.NoteEntry> NotesForRing(MotifSnapshot snapshot, int binIndex, Color color) =>
+        snapshot.CollectedNotes
+            .Where(n => n.BinIndex == binIndex
+                     && Mathf.Approximately(n.SerializedTrackColor.r, color.r)
+                     && Mathf.Approximately(n.SerializedTrackColor.g, color.g)
+                     && Mathf.Approximately(n.SerializedTrackColor.b, color.b))
+            .ToList();
 
     private IEnumerator SpinRingContinuous(Transform t, float rotDegPerSec)
     {

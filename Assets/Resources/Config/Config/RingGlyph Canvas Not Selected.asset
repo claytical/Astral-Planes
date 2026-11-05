@@ -13,15 +13,16 @@ MonoBehaviour:
   m_Name: RingGlyph Canvas Not Selected
   m_EditorClassIdentifier: Assembly-CSharp::RingGlyphConfig
   innerRadius: 0.1
-  ringThickness: 0.15
-  ringSpacing: 0.05
+  ringThickness: 0.1
+  ringSpacing: 0.09
   interBinSpacing: 0.1
   segments: 256
+  ringStartAngleOffset: 1.5707964
   fitPaddingFraction: 0.05
   ringMeshMaterial: {fileID: 2100000, guid: db6f88bb6fd04da5bdaac2167f76440b, type: 2}
-  ringAlpha: 0.166
-  contourAlpha: 1
-  lineWidth: 0.01
+  ringAlpha: 0.308
+  contourAlpha: 0.455
+  lineWidth: 0.005
   recordLineWidth: 0.012
   tugDepthFraction: 0.25
   tugHalfWidthRad: 0.75
@@ -29,11 +30,10 @@ MonoBehaviour:
   highlightBrightness: 0.5
   highlightPulseDuration: 0.15
   nonHighlightedTransitionDuration: 0.15
-  nonHighlightedDarkenAmount: 0.6
+  nonHighlightedDarkenAmount: 0.479
   nonHighlightedAlphaMultiplier: 0.35
-  remainingRingColor: {r: 0.6, g: 0.6, b: 0.6, a: 1}
-  remainingRingAlpha: 0.4
-  remainingContourAlpha: 0.25
+  remainingRingColor: {r: 0.3962264, g: 0.3962264, b: 0.3962264, a: 1}
+  remainingRingAlpha: 0.094
   nextUpColorCycleDuration: 1.5
   ringDrawInDuration: 0.5
   ringStaggerDelay: 0.08

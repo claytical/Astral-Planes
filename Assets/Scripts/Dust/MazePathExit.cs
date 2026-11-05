@@ -13,8 +13,8 @@ public class MazePathExit : MonoBehaviour
     public Vector2Int AnchorCell { get; private set; }
     public IReadOnlyList<Vector2Int> GapCells { get; private set; }
     public BoundaryWrap.BoundarySide Side { get; private set; }
-    public int? TargetMotifIndex { get; private set; }
-    public int? TargetPhaseIndex { get; private set; }
+    public int TargetPhaseIndex { get; private set; }
+    public int TargetMotifIndex { get; private set; }
 
     private PathChoiceCoordinator _owner;
     private Collider2D _col;
@@ -27,8 +27,8 @@ public class MazePathExit : MonoBehaviour
         Vector2Int anchorCell,
         List<Vector2Int> gapCells,
         BoundaryWrap.BoundarySide side,
-        int? targetMotifIndex,
-        int? targetPhaseIndex,
+        int targetPhaseIndex,
+        int targetMotifIndex,
         GameObject visualInstance = null,
         float sealFadeSeconds = 0.75f)
     {
@@ -36,8 +36,8 @@ public class MazePathExit : MonoBehaviour
         AnchorCell = anchorCell;
         GapCells = gapCells;
         Side = side;
-        TargetMotifIndex = targetMotifIndex;
         TargetPhaseIndex = targetPhaseIndex;
+        TargetMotifIndex = targetMotifIndex;
         _col = GetComponent<Collider2D>();
         _visualInstance = visualInstance;
         _sealFadeSeconds = sealFadeSeconds;

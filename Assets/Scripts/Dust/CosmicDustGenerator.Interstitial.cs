@@ -176,13 +176,14 @@ public partial class CosmicDustGenerator
         onExitsComputed?.Invoke(exits);
     }
 
-    // Safe because BuildPorousBorderCells' perimeter walk always goes top row -> right column
-    // -> left column, so a top-row cell is never also a side-column cell (no corner ambiguity).
+    // Gap cells are never corners (both BuildPorousBorderCells variants keep them off the corner),
+    // so checking Top, Left, Right, then falling through to Bottom is unambiguous.
     private static BoundaryWrap.BoundarySide SideOfBorderCell(Vector2Int c, int w, int h)
     {
         if (c.y == h - 1) return BoundaryWrap.BoundarySide.Top;
         if (c.x == 0) return BoundaryWrap.BoundarySide.Left;
-        return BoundaryWrap.BoundarySide.Right;
+        if (c.x == w - 1) return BoundaryWrap.BoundarySide.Right;
+        return BoundaryWrap.BoundarySide.Bottom;
     }
 
     private static readonly Vector2Int[] kCardinalDirs =

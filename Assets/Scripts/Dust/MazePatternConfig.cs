@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -173,6 +174,11 @@ public sealed class PorousBorderParams
 {
     [FormerlySerializedAs("borderExitCount")]
     [Min(0)] public int exitCount = 3;
+
+    /// <summary>When non-empty, replaces the evenly-spread exitCount gaps with exactly one gap on
+    /// each listed edge (Bottom allowed), reported in this order. Used by the path-choice
+    /// interstitial so each exit's edge matches the maze direction it leads in.</summary>
+    public List<BoundaryWrap.BoundarySide> exitSides = new();
 
     public void Validate()
     {

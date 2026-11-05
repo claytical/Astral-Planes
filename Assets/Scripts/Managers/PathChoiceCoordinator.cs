@@ -25,10 +25,10 @@ public sealed class PathChoiceCoordinator
     }
 
     /// <summary>
-    /// Called between the ring spin-off and the ordinary linear motif/phase advance. If there's
-    /// nothing real to choose between (0 or 1 option), falls straight through to the existing
-    /// linear path unchanged. Otherwise grows a blind, multi-exit interstitial maze and waits
-    /// for a vehicle to reach one of the exits before resuming.
+    /// Called between the ring spin-off and the next motif. If the motif maze offers no move at
+    /// all, falls straight through to the existing linear path unchanged. Otherwise grows a
+    /// blind interstitial maze with one exit per open maze direction (a single exit is just a
+    /// one-way corridor) and waits for a vehicle to reach one before resuming.
     /// </summary>
     public IEnumerator RunPathChoiceAndAdvance()
     {
@@ -42,17 +42,11 @@ public sealed class PathChoiceCoordinator
             yield break;
         }
 
-        var remainingMotifs = ptm.GetRemainingMotifIndices();
-        bool crossPhase = remainingMotifs.Count == 0;
-        IReadOnlyList<int> targets = crossPhase ? ptm.GetRemainingPhaseIndices() : remainingMotifs;
-
-        // Every motif/phase transition gets the interstitial-maze treatment, even a lone
-        // target with no real branching (the phase's final motif, or a single wrap-to-phase-0
-        // target once loopChapters wraps past the last phase — see GetRemainingPhaseIndices) —
-        // porousBorder.exitCount below just becomes 1, a single-exit corridor instead of a
-        // real choice. Only truly nothing to transition to (0 targets) skips the maze.
-        bool nothingToOffer = targets.Count == 0;
-        if (nothingToOffer)
+        // Exits come from the motif maze: inward and/or outward along the current motif's arm
+        // (or all four arms from the hub), each on the screen edge matching its direction. Only
+        // a library with nothing to move to (a lone hub) skips the interstitial.
+        var mazeExits = ptm.GetMazeExits();
+        if (mazeExits.Count == 0)
         {
             yield return _gameFlow.StartCoroutine(_sceneFlow.StartNextMotifInPhase());
             yield break;
@@ -90,7 +84,9 @@ public sealed class PathChoiceCoordinator
         pattern.patternType = MazePatternType.Tunnels;
         pattern.tunnels.corridorWidth = corridorWidth;
         pattern.tunnels.corridorStep = corridorWidth + 3; // thick-dust walls around the vehicle
-        pattern.porousBorder.exitCount = targets.Count;
+        pattern.porousBorder.exitCount = mazeExits.Count;
+        foreach (var e in mazeExits)
+            pattern.porousBorder.exitSides.Add(MotifMaze.SideOf(e.Dir));
 
         _allExits.Clear();
         _winnerExit = null;
@@ -110,13 +106,13 @@ public sealed class PathChoiceCoordinator
             yield break;
         }
 
-        int exitCountUsed = Mathf.Min(exitInfos.Count, targets.Count);
-        for (int i = 0; i < exitCountUsed; i++)
+        // Match by edge, not list order: the generator reports one exit per requested side.
+        foreach (var target in mazeExits)
         {
-            var info = exitInfos[i];
-            int? motifIdx = crossPhase ? (int?)null : targets[i];
-            int? phaseIdx = crossPhase ? (int?)targets[i] : (int?)null;
-            _allExits.Add(CreateExitTrigger(drums, info, motifIdx, phaseIdx));
+            var side = MotifMaze.SideOf(target.Dir);
+            int infoIdx = exitInfos.FindIndex(i => i.Side == side);
+            if (infoIdx < 0) continue;
+            _allExits.Add(CreateExitTrigger(drums, exitInfos[infoIdx], target.Phase, target.Motif));
         }
 
         SpawnWisp(drums, vehicleCells, ptm);
@@ -168,12 +164,9 @@ public sealed class PathChoiceCoordinator
 
         // Same peek pattern as CreateExitTrigger's role-color preview: resolve the wisp's
         // bridging sample from the motif its assigned exit actually leads into, not the
-        // outgoing motif. crossPhase exits (TargetPhaseIndex set, TargetMotifIndex null) have
-        // no same-phase motif to peek at — mirroring CreateExitTrigger's own limitation — so
-        // fall back to the current outgoing motif rather than leaving the bridge sample null.
-        MotifProfile targetMotif = targetExit.TargetMotifIndex.HasValue
-            ? ptm.PeekMotifInCurrentPhase(targetExit.TargetMotifIndex.Value)
-            : ptm.currentMotif;
+        // outgoing motif. Falls back to the current motif if the peek misses, rather than
+        // leaving the bridge sample null.
+        MotifProfile targetMotif = ptm.PeekMotif(targetExit.TargetPhaseIndex, targetExit.TargetMotifIndex) ?? ptm.currentMotif;
 
         var go = Object.Instantiate(prefab, Vector3.zero, Quaternion.identity);
         bool placed = go.TryGetComponent<Wisp>(out var wisp) &&
@@ -182,7 +175,7 @@ public sealed class PathChoiceCoordinator
             Object.Destroy(go);
     }
 
-    private MazePathExit CreateExitTrigger(DrumTrack drums, CosmicDustGenerator.PathExitInfo info, int? motifIdx, int? phaseIdx)
+    private MazePathExit CreateExitTrigger(DrumTrack drums, CosmicDustGenerator.PathExitInfo info, int phaseIdx, int motifIdx)
     {
         float cellSize = Mathf.Max(0.01f, drums.GetCellWorldSize());
 
@@ -224,12 +217,8 @@ public sealed class PathChoiceCoordinator
             Vector2 visualCenter = OffsetVisualToScreenEdge(triggerCenter, info.Side);
             visualInstance = Object.Instantiate(_gameFlow.PathExitVisualPrefab, visualCenter, Quaternion.identity, go.transform);
             ConfigureExitParticleFlow(visualInstance, info.Side);
-            if (motifIdx.HasValue)
-            {
-                var targetMotif = _gameFlow.phaseTransitionManager.PeekMotifInCurrentPhase(motifIdx.Value);
-                var roleColors = targetMotif?.GetActiveRoleColors();
-                ConfigureExitParticleRoleColors(visualInstance, roleColors);
-            }
+            var targetMotif = _gameFlow.phaseTransitionManager.PeekMotif(phaseIdx, motifIdx);
+            ConfigureExitParticleRoleColors(visualInstance, targetMotif?.GetActiveRoleColors());
             // Play explicitly rather than relying on the prefab's "Play On Awake" setting, so a
             // burst-style particle effect fires reliably no matter how the prefab is authored.
             foreach (var ps in visualInstance.GetComponentsInChildren<ParticleSystem>())
@@ -243,7 +232,7 @@ public sealed class PathChoiceCoordinator
         }
 
         var exit = go.AddComponent<MazePathExit>();
-        exit.Configure(this, info.AnchorCell, new List<Vector2Int>(info.GapCells), info.Side, motifIdx, phaseIdx, visualInstance, _gameFlow.PathExitSealFadeSeconds);
+        exit.Configure(this, info.AnchorCell, new List<Vector2Int>(info.GapCells), info.Side, phaseIdx, motifIdx, visualInstance, _gameFlow.PathExitSealFadeSeconds);
         return exit;
     }
 
@@ -310,12 +299,10 @@ public sealed class PathChoiceCoordinator
         _ /* Bottom */                  => Vector2.up,
     };
 
-    // The axis a vehicle straightens along before being carried out through a Left/Right/Top
+    // The axis a vehicle straightens along before being carried out through a Left/Right/Top/Bottom
     // exit — perpendicular to InwardDirection/OutwardDirection. A Left or Right wall's opening
     // runs vertically, so the vehicle aligns its world Y to the exit anchor's; a Top wall's
-    // opening runs horizontally, so it aligns X instead. (Bottom exits don't currently occur —
-    // GenerateInterstitialMaze's porous border only ever opens Top/Left/Right — but Vector2.right
-    // is the correct tangential axis for one if that ever changes.)
+    // opening runs horizontally (Top or Bottom), so it aligns X instead.
     private static Vector2 TangentialAxis(BoundaryWrap.BoundarySide side) =>
         side == BoundaryWrap.BoundarySide.Left || side == BoundaryWrap.BoundarySide.Right
             ? Vector2.up
@@ -516,8 +503,8 @@ public sealed class PathChoiceCoordinator
         if (remainingFade > 0f)
             yield return new WaitForSeconds(remainingFade);
 
-        int? chosenMotif = winnerExit.TargetMotifIndex;
-        int? chosenPhase = winnerExit.TargetPhaseIndex;
+        int chosenPhase = winnerExit.TargetPhaseIndex;
+        int chosenMotif = winnerExit.TargetMotifIndex;
         var mirroredEdge = SceneFlowCoordinator.MirrorSide(winnerExit.Side);
         var exitAnchorCell = winnerExit.AnchorCell;
 
@@ -527,6 +514,6 @@ public sealed class PathChoiceCoordinator
         _winnerExit = null;
         _winnerVehicle = null;
 
-        yield return _gameFlow.StartCoroutine(_sceneFlow.StartChosenMotifOrPhase(chosenMotif, chosenPhase, mirroredEdge, exitAnchorCell));
+        yield return _gameFlow.StartCoroutine(_sceneFlow.StartChosenMotifOrPhase(chosenPhase, chosenMotif, mirroredEdge, exitAnchorCell));
     }
 }

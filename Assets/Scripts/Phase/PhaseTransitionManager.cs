@@ -34,29 +34,28 @@ public class PhaseTransitionManager : MonoBehaviour
     public int FirstPhaseIndex  => 0;
     public int PhaseCount       => (chapterLibrary != null && chapterLibrary.phases != null) ? chapterLibrary.phases.Count : 0;
 
-    /// <summary>Indices after currentMotifIndex within the current phase's motif list, in order, not wrapped.</summary>
-    public IReadOnlyList<int> GetRemainingMotifIndices()
-    {
-        var result = new List<int>();
-        if (_chapterMotifs == null) return result;
-        for (int i = currentMotifIndex + 1; i < _chapterMotifs.Count; i++)
-            result.Add(i);
-        return result;
-    }
+    /// <summary>
+    /// Open moves from the current motif through the orbits (see MotifMazeGraph): previous / next
+    /// motif in this phase's ring, outward and inward. From the tutorial the only move is into
+    /// phase 1. Called at the motif bridge, after the current motif's ring has been saved, so the
+    /// current motif counts as completed and its outward step is always open.
+    /// </summary>
+    public List<MotifMazeGraph.Exit> GetMazeExits() =>
+        new MotifMazeGraph(chapterLibrary, (_, _) => true).GetExits(currentPhaseIndex, currentMotifIndex);
 
-    public int RemainingMotifCount => Mathf.Max(0, (_chapterMotifs?.Count ?? 0) - (currentMotifIndex + 1));
-
-    /// <summary>Motif at motifIndex within the current phase's motif list, without changing state. Null if out of range.</summary>
-    public MotifProfile PeekMotifInCurrentPhase(int motifIndex)
+    /// <summary>Motif at (phaseIndex, motifIndex) in the library, without changing state. Null if out of range.</summary>
+    public MotifProfile PeekMotif(int phaseIndex, int motifIndex)
     {
-        if (_chapterMotifs == null || motifIndex < 0 || motifIndex >= _chapterMotifs.Count) return null;
-        return _chapterMotifs[motifIndex];
+        var phases = chapterLibrary != null ? chapterLibrary.phases : null;
+        if (phases == null || phaseIndex < 0 || phaseIndex >= phases.Count) return null;
+        var motifs = phases[phaseIndex]?.motifs;
+        if (motifs == null || motifIndex < 0 || motifIndex >= motifs.Count) return null;
+        return motifs[motifIndex];
     }
 
     /// <summary>
-    /// Single next phase index, respecting loopChapters/holdOnLastChapter — the one source of
-    /// truth for "what phase comes after this one," shared by AdvancePhase and
-    /// GetRemainingPhaseIndices so they can't disagree. -1 = nothing next (last phase,
+    /// Single next phase index, respecting loopChapters/holdOnLastChapter. Looping wraps to
+    /// phase 1 (the first arm phase), never the phase 0 hub. -1 = nothing next (last phase,
     /// loopChapters=false, holdOnLastChapter=false).
     /// </summary>
     private int ComputeNextPhaseIndex()
@@ -69,28 +68,13 @@ public class PhaseTransitionManager : MonoBehaviour
 
         if (next >= count)
         {
-            if (loopChapters) next = 0;
+            if (loopChapters) next = Mathf.Min(1, count - 1);
             else if (holdOnLastChapter) next = count - 1;
             else return -1;
         }
 
         return next;
     }
-
-    /// <summary>
-    /// The single next phase index, as a list of at most one element — a maze exit should
-    /// only ever lead to the immediate next phase's motif 0, never skip ahead or offer a
-    /// menu of other phases. Empty when there is no next phase (see ComputeNextPhaseIndex).
-    /// </summary>
-    public IReadOnlyList<int> GetRemainingPhaseIndices()
-    {
-        var result = new List<int>();
-        int next = ComputeNextPhaseIndex();
-        if (next >= 0) result.Add(next);
-        return result;
-    }
-
-    public int RemainingPhaseCount => GetRemainingPhaseIndices().Count;
 
     /// <summary>
     /// Advances to the next phase, respecting loopChapters and holdOnLastChapter settings.
@@ -140,7 +124,7 @@ public class PhaseTransitionManager : MonoBehaviour
         StartChapter(resolvedIndex, who);
     }
 
-    public void StartChapter(int phaseIndex, string who)
+    public void StartChapter(int phaseIndex, string who, int motifIndex = 0)
     {
         int oldIndex = currentPhaseIndex;
         var oldMotif = currentMotif;
@@ -150,7 +134,7 @@ public class PhaseTransitionManager : MonoBehaviour
 
         LoadChapterForPhase(phaseIndex);
 
-        currentMotifIndex = (_chapterMotifs != null && _chapterMotifs.Count > 0) ? 0 : -1;
+        currentMotifIndex = (_chapterMotifs != null && _chapterMotifs.Count > 0) ? Mathf.Clamp(motifIndex, 0, _chapterMotifs.Count - 1) : -1;
         currentMotif      = (currentMotifIndex >= 0) ? _chapterMotifs[currentMotifIndex] : null;
 
         if (oldIndex != currentPhaseIndex)

@@ -1007,6 +1007,7 @@ GameObject:
   - component: {fileID: 1014060962}
   - component: {fileID: 1014060966}
   - component: {fileID: 1014060965}
+  - component: {fileID: 1014060967}
   m_Layer: 5
   m_Name: Title
   m_TagString: Untagged
@@ -1135,6 +1136,20 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1014060961}
   m_CullTransparentMesh: 1
+--- !u!114 &1014060967
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1014060961}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 017e526baa2524645b89f2baed32c501, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::IntroTitleFader
+  fadeDelay: 2
+  fadeDuration: 10
 --- !u!1 &1057326950
 GameObject:
   m_ObjectHideFlags: 0
@@ -1350,6 +1365,7 @@ MonoBehaviour:
   pathExitSealFadeSeconds: 0.35
   pathTransitionOffscreenMargin: 2
   pathTransitionTravelTimeout: 3
+  pathExitCaptureDepthCells: 4
   wispPrefab: {fileID: 2567590292593330884, guid: 6120d0fb3b6a8405abb162fc41452f69,
     type: 3}
   demoMode: 0
@@ -1765,6 +1781,18 @@ MonoBehaviour:
   chorusDelay: 40
   chorusRate: 0.8
   chorusDepth: 0.03
+--- !u!114 &1717945139 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 205164797312018208, guid: 819e08eb0311545b6b574630b02792e9,
+    type: 3}
+  m_PrefabInstance: {fileID: 2040152346}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6167996e666794377a6ed1f2b6c7b742, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MotifRingGlyphApplicator
 --- !u!1 &1725700393
 GameObject:
   m_ObjectHideFlags: 0
@@ -1976,6 +2004,11 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 205164797312018208, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
+      propertyPath: lineMaterial
+      value: 
+      objectReference: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee, type: 2}
+    - target: {fileID: 205164797312018208, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
       propertyPath: maxDisplayRadius
       value: 3.33
       objectReference: {fileID: 0}
@@ -1992,9 +2025,49 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
+      propertyPath: upSlot
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: downSlot
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: orbitFlatten
+      value: 0.274
+      objectReference: {fileID: 0}
+    - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: phaseSpacing
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: centerOffset.y
+      value: -2
+      objectReference: {fileID: 0}
+    - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
       propertyPath: pressToStartCue
       value: 
       objectReference: {fileID: 1057326950}
+    - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: unselectedAlpha
+      value: 0.15
+      objectReference: {fileID: 0}
+    - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: slots.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: 'slots.Array.data[0]'
+      value: 
+      objectReference: {fileID: 1717945139}
     - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
       propertyPath: showAllPhasesForDesign
@@ -2011,6 +2084,11 @@ PrefabInstance:
       propertyPath: midiStreamPlayer
       value: 
       objectReference: {fileID: 921184574}
+    - target: {fileID: 3841950725742420044, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 20
+      objectReference: {fileID: 0}
     - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
       propertyPath: m_Pivot.x
@@ -2094,7 +2172,7 @@ PrefabInstance:
     - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6462711525076251061, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
@@ -2111,8 +2189,27 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6557949755247544911, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: lineWidth
+      value: 0.04
+      objectReference: {fileID: 0}
+    - target: {fileID: 6557949755247544911, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: lineColor.a
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6557949755247544911, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: lineMaterial
+      value: 
+      objectReference: {fileID: 2100000, guid: ca69ba5acf97f46b9b756b5ef73c08da, type: 2}
     m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: 6923712477886807996, guid: 819e08eb0311545b6b574630b02792e9, type: 3}
+    - {fileID: 8905245117782567966, guid: 819e08eb0311545b6b574630b02792e9, type: 3}
+    - {fileID: 815967476455487031, guid: 819e08eb0311545b6b574630b02792e9, type: 3}
+    - {fileID: 2861694913563882912, guid: 819e08eb0311545b6b574630b02792e9, type: 3}
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 819e08eb0311545b6b574630b02792e9, type: 3}

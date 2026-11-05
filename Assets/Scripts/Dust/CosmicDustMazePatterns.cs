@@ -639,6 +639,58 @@ public static class CosmicDustMazePatterns
         return result;
     }
 
+    /// <summary>
+    /// Like BuildPorousBorderCells, but the border is the full rectangle (bottom row included)
+    /// and each entry of <paramref name="sides"/> gets exactly one 2-cell gap on that edge, never
+    /// on a corner. <paramref name="gapGroupsOut"/> lines up with <paramref name="sides"/> by index.
+    /// </summary>
+    public static HashSet<Vector2Int> BuildPorousBorderCellsForSides(
+        int width,
+        int height,
+        IReadOnlyList<BoundaryWrap.BoundarySide> sides,
+        Func<int, int, bool> isCellAvailable,
+        out List<List<Vector2Int>> gapGroupsOut)
+    {
+        gapGroupsOut = new List<List<Vector2Int>>();
+
+        var result = new HashSet<Vector2Int>();
+        if (width < 4 || height < 4 || isCellAvailable == null) return result;
+
+        var gapCells = new HashSet<Vector2Int>();
+        foreach (var side in sides)
+        {
+            bool horizontal = side == BoundaryWrap.BoundarySide.Top || side == BoundaryWrap.BoundarySide.Bottom;
+            int along = horizontal ? width : height;
+
+            // Gap spans [start, start + 1] along the edge, both strictly inside the corners.
+            int start = Random.Range(1, along - 2);
+            var group = new List<Vector2Int>(2);
+            for (int k = 0; k < 2; k++)
+            {
+                var cell = side switch
+                {
+                    BoundaryWrap.BoundarySide.Top    => new Vector2Int(start + k, height - 1),
+                    BoundaryWrap.BoundarySide.Bottom => new Vector2Int(start + k, 0),
+                    BoundaryWrap.BoundarySide.Left   => new Vector2Int(0, start + k),
+                    _                                => new Vector2Int(width - 1, start + k),
+                };
+                if (gapCells.Add(cell)) group.Add(cell);
+            }
+            gapGroupsOut.Add(group);
+        }
+
+        for (int x = 0; x < width; x++)
+        for (int y = 0; y < height; y++)
+        {
+            if (x != 0 && x != width - 1 && y != 0 && y != height - 1) continue;
+            var cell = new Vector2Int(x, y);
+            if (gapCells.Contains(cell) || !isCellAvailable(x, y)) continue;
+            result.Add(cell);
+        }
+
+        return result;
+    }
+
     private static int CountFilledNeighbors(
         Vector2Int cell,
         Dictionary<Vector2Int, bool> fillMap,

@@ -341,7 +341,7 @@ public class RingPreviewPlayer : MonoBehaviour
     }
 
     // Same tolerant, alpha-blind per-channel comparison MotifRingGlyphApplicator.RecordRings.cs
-    // uses to assign a note to its ring (AnimateApply/ApplyStatic/ApplyVinyl) — previously this
+    // uses to assign a note to its ring (AnimateApply/ApplyVinyl) — previously this
     // used an exact Dictionary<(int,Color),MusicalRole> key (bitwise equality, alpha included),
     // which could silently miss and fall back to default(MusicalRole) (== Bass), desyncing which
     // ring's firework a note triggered from which ring its dip actually rendered on.

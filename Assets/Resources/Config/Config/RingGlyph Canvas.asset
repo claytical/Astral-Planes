@@ -17,6 +17,7 @@ MonoBehaviour:
   ringSpacing: 1
   interBinSpacing: 0.1
   segments: 256
+  ringStartAngleOffset: 1.5707964
   fitPaddingFraction: 0.043
   ringMeshMaterial: {fileID: 2100000, guid: db6f88bb6fd04da5bdaac2167f76440b, type: 2}
   ringAlpha: 0.1
@@ -31,14 +32,13 @@ MonoBehaviour:
   nonHighlightedTransitionDuration: 0
   nonHighlightedDarkenAmount: 0
   nonHighlightedAlphaMultiplier: 0
-  remainingRingColor: {r: 0.6320754, g: 0.6320754, b: 0.6320754, a: 1}
-  remainingRingAlpha: 0.4
-  remainingContourAlpha: 0.25
+  remainingRingColor: {r: 0.6132076, g: 0.6132076, b: 0.6132076, a: 1}
+  remainingRingAlpha: 0.801
   nextUpColorCycleDuration: 1.5
-  ringDrawInDuration: 0
-  ringStaggerDelay: 0
+  ringDrawInDuration: 2
+  ringStaggerDelay: 1
   rotSpeedBase: 25
-  rotSpeedMax: 100
+  rotSpeedMax: 1
   directionMatchRatioThreshold: 0.5
   noteDotRadius: 0
   noteTravelDuration: 1
@@ -47,9 +47,9 @@ MonoBehaviour:
   impactSfx: {fileID: 0}
   impactSfxVolume: 0.6
   noteTetherTransitionDuration: 0.25
-  backgroundDiscColor: {r: 1, g: 1, b: 1, a: 0}
+  backgroundDiscColor: {r: 0.5377358, g: 0.5377358, b: 0.5377358, a: 1}
   placedBackgroundAlpha: 0.124
-  fullBackgroundAlpha: 0.008
+  fullBackgroundAlpha: 1
   spinOffDuration: 0.45
   rollOffDuration: 2
   tiltXDegrees: 75

@@ -111,6 +111,11 @@ public class MotifSnapshot
     /// field existed ⇒ resolution falls back to the raw MotifIndex.</summary>
     public string MotifId;
 
+    /// <summary>UTC ticks when this ring was written to disk, used to find the most recently played
+    /// motif across sessions (Timestamp is in-session game time). 0 on rings saved before this
+    /// field existed; RingSessionStore fills it from the file's modified time on load.</summary>
+    public long SavedAtUtcTicks;
+
     // -------------------------------------------------------------------------
     // Runtime-typed properties (reconstruct from serializable backing)
     // -------------------------------------------------------------------------

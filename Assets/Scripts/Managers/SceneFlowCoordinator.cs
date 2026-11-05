@@ -424,8 +424,8 @@ public sealed class SceneFlowCoordinator
     }
 
     /// <summary>
-    /// Applies a path-choice interstitial's outcome: jumps PhaseTransitionManager to the chosen
-    /// motif or phase, repositions every vehicle to the mirrored entry edge of wherever they
+    /// Applies a path-choice interstitial's outcome: starts PhaseTransitionManager at the chosen
+    /// phase and motif, repositions every vehicle to the mirrored entry edge of wherever they
     /// exited the interstitial, then runs the ordinary maze/star regeneration. Mirrors
     /// StartNextMotifInPhase line-for-line except for the PTM call and the edge reposition.
     /// </summary>
@@ -435,7 +435,7 @@ public sealed class SceneFlowCoordinator
     /// the new maze, so exiting bottom-right lands you bottom-left, not at a random spot on the
     /// left edge.
     /// </param>
-    public IEnumerator StartChosenMotifOrPhase(int? motifIndex, int? phaseIndex, BoundaryWrap.BoundarySide entryEdge, Vector2Int exitAnchorCell)
+    public IEnumerator StartChosenMotifOrPhase(int phaseIndex, int motifIndex, BoundaryWrap.BoundarySide entryEdge, Vector2Int exitAnchorCell)
     {
         if (_gameFlow.dustGenerator != null)
             _gameFlow.dustGenerator.ResumeRegrowthAfterBridge();
@@ -449,10 +449,9 @@ public sealed class SceneFlowCoordinator
             yield break;
         }
 
-        if (phaseIndex.HasValue)
-            _gameFlow.phaseTransitionManager.StartChapter(phaseIndex.Value, "GFM/PathChoice");
-        else if (motifIndex.HasValue)
-            _gameFlow.phaseTransitionManager.JumpToMotifIndex(motifIndex.Value, "GFM/PathChoice");
+        // Every motif-maze move changes phase (inward, outward, or the outer-ring loop), so this
+        // always enters a chapter directly at the chosen motif.
+        _gameFlow.phaseTransitionManager.StartChapter(phaseIndex, "GFM/PathChoice", motifIndex);
 
         var lockedOwners = new List<LocalPlayer>();
         var entryCells = StageVehiclesOffscreenAtEdge(entryEdge, exitAnchorCell, lockedOwners);

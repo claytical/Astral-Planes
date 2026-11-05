@@ -34,26 +34,6 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
     [Tooltip("Material for contour LineRenderers (Sprites/Default works well).")]
     public Material lineMaterial;
 
-    [Tooltip("When true, rings rotate at speeds distributed evenly across [rotSpeedBase, rotSpeedMax] " +
-             "by ring index rather than by fill duration. Use on library cards for a spherical look.")]
-    public bool sphericalRotation = false;
-
-    [Tooltip("When GameFlowManager is unavailable (carousel, solar system), the ring-stack outer radius " +
-             "(world units) TARGETED when ring count is at or above maxRingCountForSizing — not a hard " +
-             "ceiling. The stack is always rescaled to interpolate between minDisplayRadius (at " +
-             "minRingCountForSizing) and this value, so ring count directly drives overall size instead " +
-             "of a cap that only ever shrinks (or never engages at all). 0 = no fit (raw, unscaled size).")]
-    public float maxDisplayRadius = 0f;
-
-    [Tooltip("Ring-stack outer radius (world units) when ring count is at or below minRingCountForSizing.")]
-    public float minDisplayRadius = 0.5f;
-
-    [Tooltip("Ring count corresponding to minDisplayRadius.")]
-    public int minRingCountForSizing = 2;
-
-    [Tooltip("Ring count corresponding to maxDisplayRadius.")]
-    public int maxRingCountForSizing = 16;
-
     [Tooltip("NoteVisualizer whose noteMarkers provide travel-dot start positions for gameplay rings.")]
     [SerializeField] private NoteVisualizer noteVisualizer;
 
@@ -184,14 +164,6 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
         _highlightedRingIndices.Clear();
     }
 
-    public void FitToPlayArea(float width, float height, float cx, float cy)
-    {
-        float s = Mathf.Min(width, height);
-        transform.position   = new Vector3(cx, cy, transform.position.z);
-        transform.localScale = new Vector3(s, s, 1f);
-        _fitScale = transform.localScale;
-    }
-
     private float RingInnerRadius(int idx) =>
         config.innerRadius + idx * (config.ringThickness + config.ringSpacing);
 
@@ -218,6 +190,49 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
         _ringCollider.radius = RingInnerRadius(ringCount - 1) + config.ringThickness;
     }
 
+    // ── Fixed-fit layout (PhaseLibrary carousel) ───────────────────────────────
+    // The whole stack fills `worldRadius` whatever its ring count: rings keep one constant thickness
+    // and the gaps between them absorb the difference, so a 12-ring motif is tightly packed and a
+    // 2-ring motif widely spaced. 0 = off (config radii, ring-count-driven sizing).
+    private const float FixedHole      = 0.12f;
+    private const float FixedFill      = 0.75f;
+    private const int   FixedTightRings = 12;
+
+    private float _fixedFit;
+
+    public void SetFixedFit(float worldRadius) => _fixedFit = Mathf.Max(0f, worldRadius);
+
+    // Inner radii in a unit stack (outer edge of the last ring = 1) and the shared ring thickness.
+    private static float[] ComputeFixedRadii(int ringCount, out float thickness)
+    {
+        var radii = new float[ringCount];
+        float span = 1f - FixedHole;
+        thickness  = span / FixedTightRings * FixedFill;
+        if (ringCount == 0) return radii;
+        if (ringCount == 1) { radii[0] = 1f - thickness; return radii; }
+
+        float pitch = (span - thickness) / (ringCount - 1);
+        if (thickness > FixedFill * pitch)
+        {
+            // More rings than fit at the tight thickness: shrink thickness with the pitch.
+            pitch     = span / (ringCount - 1 + FixedFill);
+            thickness = FixedFill * pitch;
+        }
+
+        for (int i = 0; i < ringCount; i++)
+            radii[i] = 1f - thickness - (ringCount - 1 - i) * pitch;
+        return radii;
+    }
+
+    private float[] ComputeRadii(
+        List<(int binIndex, MusicalRole role, Color color, float matchRatio, int noteCount)> ringKeys,
+        out float thickness)
+    {
+        if (_fixedFit > 0f) return ComputeFixedRadii(ringKeys.Count, out thickness);
+        thickness = config.ringThickness;
+        return ComputeBandedInnerRadii(ringKeys, config);
+    }
+
     private void RefreshPlayAreaFit(int ringCount, float? actualOuterRadiusOverride = null)
     {
         if (config == null || ringCount == 0) return;
@@ -241,21 +256,12 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
             return;
         }
 
-        if (maxDisplayRadius > 0f)
+        if (_fixedFit > 0f)
         {
             float outerRadius = actualOuterRadiusOverride ?? (RingInnerRadius(ringCount - 1) + config.ringThickness);
             if (outerRadius <= 0f) return;
 
-            // Interpolate between min/max targets by ring count so overall size is driven directly
-            // by how many rings there are, rather than a cap that only ever shrinks an oversized
-            // stack (or never engages at all when the config's natural size is already small).
-            int minCount = Mathf.Max(1, minRingCountForSizing);
-            int maxCount = Mathf.Max(minCount + 1, maxRingCountForSizing);
-            float t            = Mathf.InverseLerp(minCount, maxCount, ringCount);
-            float targetRadius = Mathf.Lerp(minDisplayRadius, maxDisplayRadius, t);
-
-            float scale = targetRadius / outerRadius;
-            transform.localScale = Vector3.one * scale;
+            transform.localScale = Vector3.one * (_fixedFit / outerRadius);
             _fitScale            = transform.localScale;
         }
     }

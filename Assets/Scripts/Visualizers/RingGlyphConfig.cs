@@ -7,6 +7,10 @@ using UnityEngine.Serialization;
 // affect — Fill-only, Contour-only, or Shared (both layers, or the whole ring as a unit) —
 // plus a few headers for visual elements that are neither layer (background discs, the note
 // travel dot, the tether).
+//
+// Gameplay-only and track-selection-only fields are collapsed into foldout drawers by
+// Assets/Editor/RingGlyphConfigEditor.cs (its name lists must be updated when adding such a field;
+// unlisted fields appear in the shared section).
 [CreateAssetMenu(fileName = "RingGlyphConfig", menuName = "Astral Planes/Visualizers/Ring Glyph Config")]
 public class RingGlyphConfig : ScriptableObject
 {
@@ -23,12 +27,12 @@ public class RingGlyphConfig : ScriptableObject
 
     [Tooltip("Gap between the outer edge of one ring and the inner edge of the next. For gameplay and " +
              "locked-preview rings this is the uniform gap everywhere. For record/carousel rings " +
-             "(AnimateApply/ApplyStatic/ApplyVinyl) it means something narrower: the gap WITHIN a bin's " +
+             "(AnimateApply/ApplyVinyl) it means something narrower: the gap WITHIN a bin's " +
              "band, between rings that share the same BinIndex — keep it small. See interBinSpacing " +
              "below for the gap BETWEEN one bin's band and the next.")]
     public float ringSpacing = 0.02f;
 
-    [Tooltip("Record/carousel rings only (AnimateApply/ApplyStatic/ApplyVinyl) — gap between one bin's " +
+    [Tooltip("Record/carousel rings only (AnimateApply/ApplyVinyl) — gap between one bin's " +
              "ring band and the next, distinct from ringSpacing's now-narrower within-band meaning. " +
              "Should be noticeably larger than ringSpacing, and tuned large enough relative to " +
              "tugDepthFraction that one band's note dips don't visually reach into the next band. " +
@@ -78,7 +82,7 @@ public class RingGlyphConfig : ScriptableObject
     [Tooltip("LineRenderer width in local units.")]
     public float lineWidth = 0.003f;
 
-    [Tooltip("Contour width for record/carousel rings (AnimateApply/ApplyStatic/ApplyVinyl) only — wider than lineWidth so the ethereal edge-softness gradient (RingLineEthereal.mat) is actually visible instead of collapsing into a few pixels. Gameplay and locked-preview rings still use lineWidth.")]
+    [Tooltip("Contour width for record/carousel rings (AnimateApply/ApplyVinyl) only — wider than lineWidth so the ethereal edge-softness gradient (RingLineEthereal.mat) is actually visible instead of collapsing into a few pixels. Gameplay and locked-preview rings still use lineWidth.")]
     public float recordLineWidth = 0.012f;
 
     [Range(0f, 1f)]
@@ -125,12 +129,6 @@ public class RingGlyphConfig : ScriptableObject
              "ring's visibility depends on — keep it clearly visible, not just a faint wash.")]
     public float remainingRingAlpha = 0.4f;
 
-    [Range(0f, 1f)]
-    [Tooltip("Unused — remaining-progress placeholder rings no longer draw a Contour (see " +
-             "remainingRingAlpha's tooltip), so this has no visible effect. Left in place only " +
-             "because ApplyNextUpColor (GameplayRings.cs) still writes it to an undrawn LineRenderer.")]
-    public float remainingContourAlpha = 0.25f;
-
     [Tooltip("Seconds to lerp from one active role color to the next on the next-up placeholder ring.")]
     public float nextUpColorCycleDuration = 1.5f;
 
@@ -145,9 +143,8 @@ public class RingGlyphConfig : ScriptableObject
     public float ringStaggerDelay = 0.08f;
 
     [Header("Rotation (Shared)")]
-    [Tooltip("Rotation base value. " +
-             "Gameplay rings: degrees/beat × bpm/60 = deg/sec (scales with active BPM). " +
-             "Record rings: speed at a 0 density+match-ratio score (see rotSpeedMax for the score-1 end).")]
+    [Tooltip("Record/carousel rings only — rotation speed (deg/sec) at a 0 density+match-ratio score " +
+             "(see rotSpeedMax for the score-1 end).")]
     public float rotSpeedBase = 20f;
 
     [Tooltip("Maximum rotation speed cap in degrees/sec.")]

@@ -420,7 +420,7 @@ public partial class MotifRingGlyphApplicator
             var entry = BuildRingEntry($"RemainingRing_{i}", innerR, outerR, segs,
                 config.remainingRingColor, default, -1,
                 new List<MotifSnapshot.NoteEntry>(), 0,
-                config.remainingRingAlpha, config.remainingContourAlpha, ringOrdinal: idx);
+                config.remainingRingAlpha, 0f, ringOrdinal: idx);
             _remainingRings.Add(entry);
 
             StartCoroutine(AnimateMeshFill(
@@ -490,7 +490,7 @@ public partial class MotifRingGlyphApplicator
 
         if (ring.Contour != null)
         {
-            var lc = new Color(baseColor.r, baseColor.g, baseColor.b, config.remainingContourAlpha);
+            var lc = new Color(baseColor.r, baseColor.g, baseColor.b, 0f);
             ring.Contour.startColor = lc;
             ring.Contour.endColor   = lc;
         }
@@ -564,7 +564,7 @@ public partial class MotifRingGlyphApplicator
             {
                 var rgb = (i == 0) ? _nextUpCurrentColor : _remainingRings[i].BaseColor;
                 FadeEntry(_remainingRings[i], rgb,
-                    config.remainingRingAlpha * k, config.remainingContourAlpha * k, mpbs[idx]);
+                    config.remainingRingAlpha * k, 0f, mpbs[idx]);
             }
             FadeBackgroundDiscs(k);
             yield return null;

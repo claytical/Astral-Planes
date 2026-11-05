@@ -85,13 +85,26 @@ public partial class MotifRingGlyphApplicator
         mesh.RecalculateBounds();
     }
 
+    // Spins a ring on its local Z axis until `shouldStop`, pausing while it isn't highlighted.
+    private static IEnumerator SpinUntilStopped(
+        Transform ringTransform, float rotDegPerSec,
+        System.Func<bool> shouldStop, System.Func<bool> isHighlighted)
+    {
+        while (!shouldStop())
+        {
+            if (ringTransform == null) yield break;
+            if (isHighlighted == null || isHighlighted())
+                ringTransform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
+            yield return null;
+        }
+    }
+
     private IEnumerator AnimateSingleRing(
         LineRenderer lr, List<Vector2> pts,
         float delay, float drawDuration,
         Transform ringTransform, float rotDegPerSec,
         List<NoteAnimInfo> noteInfos, NoteVisualizer noteViz,
         System.Func<bool> shouldStop,
-        bool spherical = false,
         System.Func<bool> isHighlighted = null)
     {
         if (delay > 0f) yield return new WaitForSeconds(delay);
@@ -132,18 +145,7 @@ public partial class MotifRingGlyphApplicator
         for (int i = 0; i < total; i++)
             lr.SetPosition(i, new Vector3(pts[i].x, pts[i].y, 0f));
 
-        while (!shouldStop())
-        {
-            if (ringTransform == null) yield break;
-            if (isHighlighted == null || isHighlighted())
-            {
-                if (spherical)
-                    ringTransform.Rotate(0f, rotDegPerSec * Time.deltaTime, 0f);
-                else
-                    ringTransform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
-            }
-            yield return null;
-        }
+        yield return SpinUntilStopped(ringTransform, rotDegPerSec, shouldStop, isHighlighted);
     }
 
     // Plays the last record ring the same way a gameplay ring animates:
@@ -157,7 +159,6 @@ public partial class MotifRingGlyphApplicator
         MusicalRole role, int binIndex, Color color, int binSteps, float outerR,
         System.Func<bool> shouldStop,
         int ringOrdinal = 0,
-        bool spherical = false,
         System.Func<bool> isHighlighted = null)
     {
         if (delay > 0f) yield return new WaitForSeconds(delay);
@@ -206,18 +207,7 @@ public partial class MotifRingGlyphApplicator
                 }));
         }
 
-        while (!shouldStop())
-        {
-            if (ringTransform == null) yield break;
-            if (isHighlighted == null || isHighlighted())
-            {
-                if (spherical)
-                    ringTransform.Rotate(0f, rotDegPerSec * Time.deltaTime, 0f);
-                else
-                    ringTransform.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
-            }
-            yield return null;
-        }
+        yield return SpinUntilStopped(ringTransform, rotDegPerSec, shouldStop, isHighlighted);
     }
 
     private IEnumerator WaitAndLaunchDot(

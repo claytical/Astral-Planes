@@ -35,5 +35,9 @@ public class PhaseLibrary : ScriptableObject
             if (!seen.Add(p.phaseId))
                 Debug.LogWarning($"[PhaseLibrary] Duplicate phaseId '{p.phaseId}' (phase '{p.phaseName}'). Assign a unique id.");
         }
+
+        // Phase 0 is the single tutorial motif; every later phase is an orbit of any size.
+        if (phases.Count > 0 && phases[0] != null && (phases[0].motifs?.Count ?? 0) != 1)
+            Debug.LogWarning($"[PhaseLibrary] Phase 0 ('{phases[0].phaseName}') should have exactly 1 motif (the tutorial).");
     }
 }

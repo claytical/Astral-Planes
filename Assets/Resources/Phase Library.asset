@@ -13,13 +13,18 @@ MonoBehaviour:
   m_Name: Phase Library
   m_EditorClassIdentifier: Assembly-CSharp::PhaseChapterLibrary
   phases:
-  - phaseName: Steam Demo
+  - phaseName: Tutorial
     phaseId: 2cfde5cf3d2048b8910ab984b7267338
     motifs:
     - {fileID: 11400000, guid: 39d204e098aac450aaa74bc66d2708b4, type: 2}
+    loopMotifs: 0
+  - phaseName: Inner System
+    phaseId: 883cf97b56fd40de8b345caeb71fc5c1
+    motifs:
     - {fileID: 11400000, guid: f8216e90d53ac4365b251f482390aba7, type: 2}
     - {fileID: 11400000, guid: 7da891f3f6cff4e32a6369ad618109a4, type: 2}
     - {fileID: 11400000, guid: e3bd1aeb9985b42a1aab789430434dcf, type: 2}
+    - {fileID: 11400000, guid: 3a813a514b2474c8ca82c09409defe85, type: 2}
     - {fileID: 11400000, guid: 3a813a514b2474c8ca82c09409defe85, type: 2}
     loopMotifs: 0
   - phaseName: EP
@@ -28,6 +33,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 71d8771ade7c04484bf40e07a09dcb53, type: 2}
     - {fileID: 11400000, guid: d128ad57d4e11486bba9dd57cd935bbc, type: 2}
     - {fileID: 11400000, guid: 01d5a06a93dbc4649989f03be242f088, type: 2}
+    - {fileID: 11400000, guid: e3bd1aeb9985b42a1aab789430434dcf, type: 2}
     loopMotifs: 0
   - phaseName: Next
     phaseId: 7372954664d149969c3d8cf05cef0823
