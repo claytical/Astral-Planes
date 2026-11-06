@@ -15,7 +15,7 @@ MonoBehaviour:
   innerRadius: 1
   ringThickness: 0.05
   ringSpacing: 1
-  interBinSpacing: 0.1
+  interBinSpacing: 100
   segments: 256
   ringStartAngleOffset: 1.5707964
   fitPaddingFraction: 0.043
@@ -23,23 +23,23 @@ MonoBehaviour:
   ringAlpha: 0.1
   contourAlpha: 0.973
   lineWidth: 0.9
-  recordLineWidth: 0.05
+  recordLineWidth: 0.075
   tugDepthFraction: 0.192
   tugHalfWidthRad: 0.5
-  highlightScaleMultiplier: 1.15
-  highlightBrightness: 0.533
+  highlightScaleMultiplier: 1.05
+  highlightBrightness: 0.318
   highlightPulseDuration: 0.15
   nonHighlightedTransitionDuration: 0
   nonHighlightedDarkenAmount: 0
-  nonHighlightedAlphaMultiplier: 0
+  nonHighlightedAlphaMultiplier: 0.5
   remainingRingColor: {r: 0.6132076, g: 0.6132076, b: 0.6132076, a: 1}
   remainingRingAlpha: 0.801
   nextUpColorCycleDuration: 1.5
-  ringDrawInDuration: 2
-  ringStaggerDelay: 1
-  rotSpeedBase: 25
-  rotSpeedMax: 1
-  directionMatchRatioThreshold: 0.5
+  ringDrawInDuration: 1
+  ringStaggerDelay: 0
+  rotSpeedBase: 100
+  rotSpeedMax: 10
+  directionMatchRatioThreshold: 1
   noteDotRadius: 0
   noteTravelDuration: 1
   launchSfx: {fileID: 0}

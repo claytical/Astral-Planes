@@ -625,7 +625,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
             slot.ApplyLockedPreview(entry.Profile.nodesPerStar, alpha,
                 unselectedGlyphConfig != null ? unselectedGlyphConfig.recordLineWidth : 0f);
         else if (isCenter)
-            slot.AnimateApply(entry.Snapshot);
+            slot.AnimateApply(entry.Snapshot, replayLastRing: false);
         else
             slot.ApplyVinyl(entry.Snapshot, alpha);
 

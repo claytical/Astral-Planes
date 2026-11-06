@@ -13,7 +13,7 @@ public partial class MotifRingGlyphApplicator
     /// Build filled + contour record rings from the full motif snapshot with
     /// staggered draw-in, note travel dots, and continuous rotation.
     /// </summary>
-    public void AnimateApply(MotifSnapshot snapshot)
+    public void AnimateApply(MotifSnapshot snapshot, bool replayLastRing = true)
     {
         StopAllCoroutines();
         _lockedLook              = false;
@@ -50,7 +50,7 @@ public partial class MotifRingGlyphApplicator
             var (binIndex, role, color, matchRatio, noteCount) = ringKeys[i];
             float innerR     = bandedRadii[i];
             float outerR     = innerR + ringThick;
-            bool  isLastRing = (i == ringKeys.Count - 1);
+            bool  isLastRing = replayLastRing && i == ringKeys.Count - 1;
 
             // Captured per-iteration (not the loop's `i`) so each ring's rotation-gate closure,
             // read across many later frames, checks its own slot in _recordRings — not whatever
@@ -181,7 +181,7 @@ public partial class MotifRingGlyphApplicator
             float densityNorm = maxNoteCount > 0 ? (float)noteCount / maxNoteCount : 0f;
             float rotDeg = RecordRingRotationSpeed(matchRatio, densityNorm);
             if (matchRatio < config.directionMatchRatioThreshold) rotDeg = -rotDeg;
-            StartCoroutine(SpinRingContinuous(entry.Root.transform, rotDeg));
+            StartCoroutine(SpinRingContinuous(i, entry.Root.transform, rotDeg));
         }
 
         if (alphaScale < 1f) SetAlphaScale(alphaScale);
@@ -209,7 +209,7 @@ public partial class MotifRingGlyphApplicator
         ringCount = Mathf.Max(0, ringCount);
         float ringThick = config.ringThickness;
         float[] fixedRadii = null;
-        if (_fixedFit > 0f) fixedRadii = ComputeFixedRadii(ringCount, out ringThick);
+        if (_fixedFit > 0f) fixedRadii = ComputeFixedRadii(ringCount, null, config, out ringThick);
         int segs  = Mathf.Max(16, config.segments);
         alphaScale = Mathf.Clamp01(alphaScale);
 
@@ -271,6 +271,13 @@ public partial class MotifRingGlyphApplicator
 
             if (shouldHighlight) _highlightedRingIndices.Add(i);
             else                 _highlightedRingIndices.Remove(i);
+
+            // The playing bin's contour draws above every other ring (just under the travel dots /
+            // fireworks); otherwise it goes back to its slot in the stack.
+            if (_recordRings[i].Contour != null)
+                _recordRings[i].Contour.sortingOrder = shouldHighlight
+                    ? TravelDotSortingOrder - 1
+                    : RecordRingSortingOrder(i, _recordRings.Count).contour;
         }
     }
 
@@ -564,12 +571,14 @@ public partial class MotifRingGlyphApplicator
                      && Mathf.Approximately(n.SerializedTrackColor.b, color.b))
             .ToList();
 
-    private IEnumerator SpinRingContinuous(Transform t, float rotDegPerSec)
+    // Only the ring(s) of the bin currently playing (see SetPlayingBin) turn; the rest hold their angle.
+    private IEnumerator SpinRingContinuous(int ringIndex, Transform t, float rotDegPerSec)
     {
         while (!_recordFadingOut)
         {
             if (t == null) yield break;
-            t.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
+            if (_highlightedRingIndices.Contains(ringIndex))
+                t.Rotate(0f, 0f, rotDegPerSec * Time.deltaTime);
             yield return null;
         }
     }

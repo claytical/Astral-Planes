@@ -45,7 +45,7 @@ public static class RingSessionStore
     // A ring whose (PhaseId, MotifId) no longer exists in the library (its phase was split or
     // renamed) is re-homed in memory to the first slot, in phase order, that holds its MotifId. Rings that
     // still resolve, or match nothing, are left alone.
-    private static bool RehomeOrphan(MotifSnapshot snap, PhaseLibrary library)
+    public static bool RehomeOrphan(MotifSnapshot snap, PhaseLibrary library)
     {
         var phases = library?.phases;
         if (phases == null || string.IsNullOrEmpty(snap.PhaseId) || string.IsNullOrEmpty(snap.MotifId)) return false;

@@ -203,7 +203,14 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
     public void SetFixedFit(float worldRadius) => _fixedFit = Mathf.Max(0f, worldRadius);
 
     // Inner radii in a unit stack (outer edge of the last ring = 1) and the shared ring thickness.
-    private static float[] ComputeFixedRadii(int ringCount, out float thickness)
+    // With ringKeys, rings in the same bin band tightly and a bin transition gets a gap
+    // interBinSpacing/ringSpacing times wider (the fixed fit is unit-less, so only the ratio of the
+    // two config gaps applies). Without ringKeys (locked preview) every gap is equal.
+    private static float[] ComputeFixedRadii(
+        int ringCount,
+        List<(int binIndex, MusicalRole role, Color color, float matchRatio, int noteCount)> ringKeys,
+        RingGlyphConfig config,
+        out float thickness)
     {
         var radii = new float[ringCount];
         float span = 1f - FixedHole;
@@ -211,16 +218,30 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
         if (ringCount == 0) return radii;
         if (ringCount == 1) { radii[0] = 1f - thickness; return radii; }
 
-        float pitch = (span - thickness) / (ringCount - 1);
-        if (thickness > FixedFill * pitch)
+        // More rings than fit at the tight thickness: shrink thickness so gaps keep >= (1 - FixedFill) of the span.
+        thickness = Mathf.Min(thickness, span * FixedFill / ringCount);
+
+        float ratio = 1f;
+        if (ringKeys != null && config != null && config.ringSpacing > 0f)
+            ratio = Mathf.Max(1f, config.interBinSpacing / config.ringSpacing);
+
+        // Gap weights between consecutive rings: 1 within a bin, ratio across bins.
+        var weights = new float[ringCount - 1];
+        float totalWeight = 0f;
+        for (int i = 1; i < ringCount; i++)
         {
-            // More rings than fit at the tight thickness: shrink thickness with the pitch.
-            pitch     = span / (ringCount - 1 + FixedFill);
-            thickness = FixedFill * pitch;
+            bool sameBin = ringKeys == null || ringKeys[i].binIndex == ringKeys[i - 1].binIndex;
+            weights[i - 1] = sameBin ? 1f : ratio;
+            totalWeight += weights[i - 1];
         }
 
+        float gapUnit = (span - ringCount * thickness) / totalWeight;
+        float r = FixedHole;
         for (int i = 0; i < ringCount; i++)
-            radii[i] = 1f - thickness - (ringCount - 1 - i) * pitch;
+        {
+            if (i > 0) r += thickness + gapUnit * weights[i - 1];
+            radii[i] = r;
+        }
         return radii;
     }
 
@@ -228,7 +249,7 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
         List<(int binIndex, MusicalRole role, Color color, float matchRatio, int noteCount)> ringKeys,
         out float thickness)
     {
-        if (_fixedFit > 0f) return ComputeFixedRadii(ringKeys.Count, out thickness);
+        if (_fixedFit > 0f) return ComputeFixedRadii(ringKeys.Count, ringKeys, config, out thickness);
         thickness = config.ringThickness;
         return ComputeBandedInnerRadii(ringKeys, config);
     }
