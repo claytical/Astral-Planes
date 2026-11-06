@@ -2016,7 +2016,7 @@ PrefabInstance:
         type: 3}
       propertyPath: notePlaybackFireworkPrefab
       value: 
-      objectReference: {fileID: 1113209529470810508, guid: e563eb7a83fde45d6bb2664a054d9041,
+      objectReference: {fileID: 2567590292593330884, guid: eaf38378e36e04069a0b0d39995bcb84,
         type: 3}
     - target: {fileID: 2018841000974329430, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}

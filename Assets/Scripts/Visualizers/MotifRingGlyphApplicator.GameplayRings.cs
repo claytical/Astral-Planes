@@ -104,9 +104,7 @@ public partial class MotifRingGlyphApplicator
     /// separately via <see cref="BeginBinRingDeformation"/> when the playhead
     /// reaches the bin's start step.
     /// </summary>
-    public void SpawnBinRing(MusicalRole role, int binIndex, Color color,
-                              List<MotifSnapshot.NoteEntry> notes, int totalSteps,
-                              InstrumentTrack track = null)
+    public void SpawnBinRing(MusicalRole role, int binIndex, Color color, int totalSteps)
     {
         if (config == null) return;
 
@@ -120,8 +118,7 @@ public partial class MotifRingGlyphApplicator
         // BeginBinRingDeformation's FindIndex targets the fresh ring instead of the old one.
         int existingIdx = _gameplayRings.FindIndex(r => r.BinIndex == binIndex && r.Role == role);
         int idx = existingIdx >= 0 ? existingIdx : _gameplayRings.Count;
-        if (existingIdx >= 0 && _gameplayRings[existingIdx].Root != null)
-            Destroy(_gameplayRings[existingIdx].Root);
+        if (existingIdx >= 0) DestroyEntry(_gameplayRings[existingIdx]);
 
         float innerR = RingInnerRadius(idx);
         float outerR = innerR + config.ringThickness;
@@ -142,15 +139,13 @@ public partial class MotifRingGlyphApplicator
         if (idx % 2 == 1) rotDeg = -rotDeg;
 
         StartCoroutine(AnimateMeshFill(
-            entry.Fill.GetComponent<MeshFilter>().sharedMesh,
-            entry.FullTris, segs, delay: 0f, config.ringDrawInDuration));
+            entry.FillMesh, entry.FullTris, segs, delay: 0f, config.ringDrawInDuration));
 
         // Draw in the flat circle contour, then rotate persistently.
         StartCoroutine(AnimateSingleRing(
             entry.Contour, entry.ContourPoints,
             0f, config.ringDrawInDuration,
             entry.Root.transform, rotDeg,
-            new List<NoteAnimInfo>(), null,
             shouldStop: () => _gameplayFadingOut));
 
         // Reset deformation count when the record was hidden — starts a fresh session.
@@ -242,7 +237,7 @@ public partial class MotifRingGlyphApplicator
         int       cancelledCount = 0; // notes broken by the vehicle never reach onLaunch
 
         // shouldStop: only hard-clear kills deformation; spin-off lets it finish naturally.
-        System.Func<bool> shouldStop = () => _clearingGameplayRings || ring.Root == null;
+        System.Func<bool> shouldStop = () => ring.Root == null;
 
         foreach (var note in sortedNotes)
         {
@@ -341,7 +336,7 @@ public partial class MotifRingGlyphApplicator
         // Hide the stack after deformation — only when all concurrent deformations are done
         // and we are not in spin-off or SuperNode mode. Runs as its own coroutine so a newly
         // started bin's deformation can cancel it outright (see BeginBinRingDeformation).
-        if (!_superNodeMode && !_gameplayFadingOut && !_clearingGameplayRings && !_spinOffPending
+        if (!_superNodeMode && !_gameplayFadingOut && !_spinOffPending
             && _pendingDeformationCount == 0)
         {
             _gameplayHideCoroutine = StartCoroutine(HideGameplayRingStackAfterLoopBoundary());
@@ -360,13 +355,21 @@ public partial class MotifRingGlyphApplicator
             bool boundaryHit = false;
             System.Action onBoundary = () => boundaryHit = true;
             drum.OnLoopBoundary += onBoundary;
-            while (!boundaryHit && !_superNodeMode && !_gameplayFadingOut
-                   && !_clearingGameplayRings && !_spinOffPending && _pendingDeformationCount == 0)
-                yield return null;
-            drum.OnLoopBoundary -= onBoundary;
+            // try/finally: this coroutine is routinely stopped mid-wait (BeginBinRingDeformation,
+            // ClearGameplayRings), and Dispose runs the finally so the handler can't leak.
+            try
+            {
+                while (!boundaryHit && !_superNodeMode && !_gameplayFadingOut
+                       && !_spinOffPending && _pendingDeformationCount == 0)
+                    yield return null;
+            }
+            finally
+            {
+                drum.OnLoopBoundary -= onBoundary;
+            }
         }
 
-        if (_superNodeMode || _gameplayFadingOut || _clearingGameplayRings || _spinOffPending
+        if (_superNodeMode || _gameplayFadingOut || _spinOffPending
             || _pendingDeformationCount != 0)
         {
             _gameplayHideCoroutine = null;
@@ -376,14 +379,13 @@ public partial class MotifRingGlyphApplicator
         float dur          = config != null ? config.scaleDownDuration : 0.5f;
         Vector3 startScale = transform.localScale;
         float elapsed      = 0f;
-        while (elapsed < dur && !_clearingGameplayRings && !_gameplayFadingOut
-               && _pendingDeformationCount == 0)
+        while (elapsed < dur && !_gameplayFadingOut && _pendingDeformationCount == 0)
         {
             elapsed += Time.deltaTime;
             transform.localScale = Vector3.Lerp(startScale, Vector3.zero, elapsed / dur);
             yield return null;
         }
-        if (!_clearingGameplayRings && !_gameplayFadingOut && _pendingDeformationCount == 0)
+        if (!_gameplayFadingOut && _pendingDeformationCount == 0)
             transform.localScale = Vector3.zero;
 
         _gameplayHideCoroutine = null;
@@ -406,7 +408,6 @@ public partial class MotifRingGlyphApplicator
         }
 
         DestroyList(_remainingRings);
-        _remainingRings.Clear();
 
         remainingCount = Mathf.Max(0, remainingCount);
         int segs = Mathf.Max(16, config.segments);
@@ -419,18 +420,15 @@ public partial class MotifRingGlyphApplicator
 
             var entry = BuildRingEntry($"RemainingRing_{i}", innerR, outerR, segs,
                 config.remainingRingColor, default, -1,
-                new List<MotifSnapshot.NoteEntry>(), 0,
-                config.remainingRingAlpha, 0f, ringOrdinal: idx);
+                null, 0,
+                config.remainingRingAlpha, 0f, ringOrdinal: idx, skipContour: true);
             _remainingRings.Add(entry);
 
             StartCoroutine(AnimateMeshFill(
-                entry.Fill.GetComponent<MeshFilter>().sharedMesh,
-                entry.FullTris, segs, delay: i * config.ringStaggerDelay, config.ringDrawInDuration));
+                entry.FillMesh, entry.FullTris, segs, delay: i * config.ringStaggerDelay, config.ringDrawInDuration));
 
-            // No Contour draw-in — see the matching comment in RecordRings.cs's ApplyLockedPreview.
-            // A remaining-progress placeholder never has notes either, so the filled annulus mesh
-            // above is the whole visual; ApplyNextUpColor below still colors entry.Contour, it just
-            // has nothing drawn to show that color on.
+            // No Contour at all (skipContour) — a remaining-progress placeholder never has notes,
+            // so the filled annulus mesh is the whole visual. See ApplyLockedPreview in RecordRings.cs.
         }
 
         int totalRingCount = _gameplayRings.Count + _remainingRings.Count;
@@ -461,7 +459,6 @@ public partial class MotifRingGlyphApplicator
             yield break;
         }
 
-        var mpb = new MaterialPropertyBlock();
         int i = 0;
         while (ring.Root != null)
         {
@@ -472,28 +469,21 @@ public partial class MotifRingGlyphApplicator
             while (t < dur && ring.Root != null)
             {
                 t += Time.deltaTime;
-                ApplyNextUpColor(ring, Color.Lerp(from, to, t / dur), mpb);
+                ApplyNextUpColor(ring, Color.Lerp(from, to, t / dur));
                 yield return null;
             }
             i = (i + 1) % colors.Count;
         }
     }
 
-    private void ApplyNextUpColor(RingEntry ring, Color baseColor, MaterialPropertyBlock mpb = null)
+    private void ApplyNextUpColor(RingEntry ring, Color baseColor)
     {
         _nextUpCurrentColor = baseColor;
 
         if (ring.Fill != null)
             SetFillColor(ring.Fill,
                 new Color(baseColor.r, baseColor.g, baseColor.b, config.remainingRingAlpha),
-                mpb ?? new MaterialPropertyBlock());
-
-        if (ring.Contour != null)
-        {
-            var lc = new Color(baseColor.r, baseColor.g, baseColor.b, 0f);
-            ring.Contour.startColor = lc;
-            ring.Contour.endColor   = lc;
-        }
+                ScratchMpb);
     }
 
     /// <summary>Destroy all gameplay rings immediately and hide the record.</summary>
@@ -502,19 +492,15 @@ public partial class MotifRingGlyphApplicator
         StopAllCoroutines(); // prevent ghost decrements from old deformation coroutines
         _shakeCoroutine = null; // StopAllCoroutines above killed it without resetting localPosition
         transform.localPosition = Vector3.zero;
-        _clearingGameplayRings   = true;
-        _gameplayFadingOut       = true;
+        _gameplayFadingOut       = false;
         _superNodeMode           = false;
         _spinOffPending          = false;
         _pendingDeformationCount = 0;
         _pendingRingNotes.Clear();
         DestroyList(_gameplayRings);
         DestroyList(_remainingRings);
-        _remainingRings.Clear();
-        if (_fullBgDisc != null)   { Destroy(_fullBgDisc.gameObject);   _fullBgDisc = null; }
-        if (_placedBgDisc != null) { Destroy(_placedBgDisc.gameObject); _placedBgDisc = null; }
-        _gameplayFadingOut       = false;
-        _clearingGameplayRings   = false;
+        DestroyDisc(ref _fullBgDisc);
+        DestroyDisc(ref _placedBgDisc);
         transform.localScale     = Vector3.zero;
         if (_ringCollider != null) _ringCollider.enabled = false;
     }
@@ -549,22 +535,20 @@ public partial class MotifRingGlyphApplicator
         int total = _gameplayRings.Count + _remainingRings.Count;
         if (total == 0) { _recordFadeOutCoroutine = null; yield break; }
 
-        var mpbs = MakeMpbs(total);
         float dur = Mathf.Max(0.01f, duration);
         float t   = 0f;
         while (t < dur)
         {
             t += Time.deltaTime;
             float k = 1f - Mathf.Clamp01(t / dur);
-            int idx = 0;
-            for (int i = 0; i < _gameplayRings.Count; i++, idx++)
+            for (int i = 0; i < _gameplayRings.Count; i++)
                 FadeEntry(_gameplayRings[i], _gameplayRings[i].BaseColor,
-                    config.ringAlpha * k, config.contourAlpha * k, mpbs[idx]);
-            for (int i = 0; i < _remainingRings.Count; i++, idx++)
+                    config.ringAlpha * k, config.contourAlpha * k);
+            for (int i = 0; i < _remainingRings.Count; i++)
             {
                 var rgb = (i == 0) ? _nextUpCurrentColor : _remainingRings[i].BaseColor;
                 FadeEntry(_remainingRings[i], rgb,
-                    config.remainingRingAlpha * k, 0f, mpbs[idx]);
+                    config.remainingRingAlpha * k, 0f);
             }
             FadeBackgroundDiscs(k);
             yield return null;
@@ -574,10 +558,10 @@ public partial class MotifRingGlyphApplicator
         _recordFadeOutCoroutine = null;
     }
 
-    private void FadeEntry(RingEntry ring, Color rgb, float fillAlpha, float contourAlpha, MaterialPropertyBlock mpb)
+    private void FadeEntry(RingEntry ring, Color rgb, float fillAlpha, float contourAlpha)
     {
         if (ring.Fill != null)
-            SetFillColor(ring.Fill, new Color(rgb.r, rgb.g, rgb.b, fillAlpha), mpb);
+            SetFillColor(ring.Fill, new Color(rgb.r, rgb.g, rgb.b, fillAlpha), ScratchMpb);
         if (ring.Contour != null)
         {
             var lc = new Color(rgb.r, rgb.g, rgb.b, contourAlpha);

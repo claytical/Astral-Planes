@@ -4,9 +4,9 @@ using UnityEngine;
 //  BinRingController
 //
 //  When a bin fills: spawn a flat circle ring, then immediately start the
-//  deformation sequence. WaitAndLaunchDot handles per-note step-sync
-//  internally, so deformation dots fire at the correct beat even if the
-//  bridge fires before the bin's start step comes around.
+//  deformation sequence. The applicator's WaitAndLaunchDot handles per-note
+//  step-sync internally, so deformation dots fire at the correct beat even
+//  if the bridge fires before the bin's start step comes around.
 // =========================================================================
 public class BinRingController : MonoBehaviour
 {
@@ -58,8 +58,6 @@ public class BinRingController : MonoBehaviour
 
     // ── Public API ───────────────────────────────────────────────────────────
 
-    public void CancelPendingDraw() { }
-
     /// <summary>
     /// Populate and show the full placeholder record stack for the current motif —
     /// called explicitly by SceneFlowCoordinator at the right point in each motif-start
@@ -107,9 +105,7 @@ public class BinRingController : MonoBehaviour
 
         var notes = track.GetBinNoteEntries(binIndex);
 
-        _ringApplicator.SpawnBinRing(
-            track.assignedRole, binIndex, track.DisplayColor,
-            notes, totalSteps, track);
+        _ringApplicator.SpawnBinRing(track.assignedRole, binIndex, track.DisplayColor, totalSteps);
 
         _ringApplicator.BeginBinRingDeformation(
             binIndex, notes, totalSteps, track, track.assignedRole, track.DisplayColor);

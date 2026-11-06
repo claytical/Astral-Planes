@@ -111,6 +111,11 @@ public class PhaseLibraryCarousel : MonoBehaviour
     [Tooltip("Glyph config for every unselected motif.")]
     [SerializeField] private RingGlyphConfig unselectedGlyphConfig;
 
+    [Tooltip("World scale of the selected (centre) glyph. Its rings use the selected config's innerRadius, " +
+             "ringThickness, ringSpacing and interBinSpacing as literal units (no fixed fit), so it can be " +
+             "much larger than its neighbours.")]
+    [SerializeField, Min(0.01f)] private float selectedGlyphScale = 1f;
+
     [Tooltip("Authoritative motif list: phase 0 = tutorial (1 motif), later phases = orbits of any size.")]
     [SerializeField] private PhaseLibrary phaseLibrary;
 
@@ -202,6 +207,8 @@ public class PhaseLibraryCarousel : MonoBehaviour
         {
             previewPlayer.OnBinIndexChanged += HandlePreviewBinChanged;
             previewPlayer.OnNoteFired       += HandleNoteFired;
+            previewPlayer.OnNotePulse       += HandleNotePulse;
+            previewPlayer.OnNoteApproach    += HandleNoteApproach;
         }
     }
 
@@ -211,6 +218,8 @@ public class PhaseLibraryCarousel : MonoBehaviour
         {
             previewPlayer.OnBinIndexChanged -= HandlePreviewBinChanged;
             previewPlayer.OnNoteFired       -= HandleNoteFired;
+            previewPlayer.OnNotePulse       -= HandleNotePulse;
+            previewPlayer.OnNoteApproach    -= HandleNoteApproach;
         }
     }
 
@@ -230,6 +239,20 @@ public class PhaseLibraryCarousel : MonoBehaviour
     {
         if (_selectedGlyph == null) return;
         _selectedGlyph.SpawnNoteFirework(role, binIndex, angleRad);
+    }
+
+    // Turns the matching ring into place ahead of its note (centered slot only).
+    private void HandleNoteApproach(MusicalRole role, int binIndex, int localStep, double startDsp, double prevStartDsp)
+    {
+        if (_selectedGlyph == null) return;
+        _selectedGlyph.ApproachNote(role, binIndex, localStep, startDsp, prevStartDsp);
+    }
+
+    // Swells the matching ring's dip for the note's sounding length — centered slot only.
+    private void HandleNotePulse(MusicalRole role, int binIndex, int localStep, double startDsp, float durationSec)
+    {
+        if (_selectedGlyph == null) return;
+        _selectedGlyph.PulseNote(role, binIndex, localStep, startDsp, durationSec);
     }
 
     // ── Entries ────────────────────────────────────────────────────────────────
@@ -620,12 +643,14 @@ public class PhaseLibraryCarousel : MonoBehaviour
         var cfg = isCenter ? selectedGlyphConfig : unselectedGlyphConfig;
         if (cfg != null) slot.config = cfg;
 
-        // Glyph size comes from SetFixedFit (one radius for every glyph, set before this call).
+        // Unselected glyphs share one radius (SetFixedFit); the selected one lays out from its config.
+        if (isCenter) slot.SetFreeLayout(selectedGlyphScale);
+        else          slot.SetFixedFit(_grid.R);
         if (entry.IsLocked)
             slot.ApplyLockedPreview(entry.Profile.nodesPerStar, alpha,
                 unselectedGlyphConfig != null ? unselectedGlyphConfig.recordLineWidth : 0f);
         else if (isCenter)
-            slot.AnimateApply(entry.Snapshot, replayLastRing: false);
+            slot.AnimateApply(entry.Snapshot, replayLastRing: false, notePulse: true);
         else
             slot.ApplyVinyl(entry.Snapshot, alpha);
 
@@ -637,7 +662,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
         if (previewPlayer == null) return;
         var entry = CurrentEntry;
         if (entry.IsLocked) previewPlayer.Stop();
-        else                previewPlayer.Play(entry.Snapshot);
+        else previewPlayer.Play(entry.Snapshot);
     }
 
     // ── Input ──────────────────────────────────────────────────────────────────
@@ -792,18 +817,14 @@ public class PhaseLibraryCarousel : MonoBehaviour
         {
             if (n.Glyph == null) continue;
 
-            // Rings stay as drawn so they can tween/tilt; a node whose selected state flipped only
-            // swaps its config and re-widths its existing contour lines in place.
+            // Contour shape (tug depth/width) is baked from the glyph's config when its rings are
+            // built, so a node whose selected state flipped must be rebuilt with the new state's
+            // config — swapping the config alone would leave it wearing the old state's shape.
             bool center = n.D == 0;
             if (n.Centered != center)
             {
                 n.Centered = center;
-                var cfg = center ? selectedGlyphConfig : unselectedGlyphConfig;
-                if (cfg != null)
-                {
-                    n.Glyph.config = cfg;
-                    n.Glyph.SetContourWidth(cfg.recordLineWidth);
-                }
+                ApplyEntry(n.Glyph, GetEntry(cur.Phase, n.Motif), center, NodeAlpha(cur, n, true));
             }
 
             n.Glyph.SetAlphaScale(NodeAlpha(cur, n, true));

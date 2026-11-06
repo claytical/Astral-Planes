@@ -13,7 +13,7 @@ public partial class MotifRingGlyphApplicator
     /// Build filled + contour record rings from the full motif snapshot with
     /// staggered draw-in, note travel dots, and continuous rotation.
     /// </summary>
-    public void AnimateApply(MotifSnapshot snapshot, bool replayLastRing = true)
+    public void AnimateApply(MotifSnapshot snapshot, bool replayLastRing = true, bool notePulse = false)
     {
         StopAllCoroutines();
         _lockedLook              = false;
@@ -21,11 +21,7 @@ public partial class MotifRingGlyphApplicator
         _gameplayFadingOut       = false;
         _superNodeMode           = false;
         _pendingDeformationCount = 0;
-        foreach (Transform child in transform)
-            Destroy(child.gameObject);
-        _recordRings.Clear();
-        _gameplayRings.Clear();
-        _remainingRings.Clear();
+        DestroyAllChildren();
         ResetHighlightState();
 
         if (snapshot == null || config == null) return;
@@ -33,17 +29,23 @@ public partial class MotifRingGlyphApplicator
         var ringKeys = BuildRingKeys(snapshot);
         if (ringKeys.Count == 0) return;
 
-        var noteViz       = GameFlowManager.Instance?.controller?.noteVisualizer;
-        var tracks        = GameFlowManager.Instance?.controller?.tracks;
-        var trackByQColor = new Dictionary<Color, InstrumentTrack>();
-        if (tracks != null)
-            foreach (var tr in tracks)
-                if (tr != null) { Color32 q = tr.DisplayColor; trackByQColor[(Color)q] = tr; }
+        var noteViz = GameFlowManager.Instance?.controller?.noteVisualizer;
+
+        // Only the replayed last ring fires travel dots, so only it needs the track lookup.
+        Dictionary<Color, InstrumentTrack> trackByQColor = null;
+        if (replayLastRing)
+        {
+            trackByQColor = new Dictionary<Color, InstrumentTrack>();
+            var tracks = GameFlowManager.Instance?.controller?.tracks;
+            if (tracks != null)
+                foreach (var tr in tracks)
+                    if (tr != null) { Color32 q = tr.DisplayColor; trackByQColor[(Color)q] = tr; }
+        }
 
         int segs    = Mathf.Max(16, config.segments);
         int binSize = Mathf.Max(1, snapshot.TotalSteps);
         var bandedRadii = ComputeRadii(ringKeys, out float ringThick);
-        int maxNoteCount = ringKeys.Count > 0 ? ringKeys.Max(k => k.noteCount) : 0;
+        int maxNoteCount = ringKeys.Max(k => k.noteCount);
 
         for (int i = 0; i < ringKeys.Count; i++)
         {
@@ -75,35 +77,33 @@ public partial class MotifRingGlyphApplicator
             float rotDeg = RecordRingRotationSpeed(matchRatio, densityNorm);
             if (matchRatio < config.directionMatchRatioThreshold) rotDeg = -rotDeg;
 
-            float tugR    = outerR * (1f - config.tugDepthFraction);
-            var noteInfos = new List<NoteAnimInfo>();
-            foreach (var n in ringNotes)
-            {
-                Color32 q = n.TrackColor;
-                if (!trackByQColor.TryGetValue(q, out var track)) continue;
-                int   localStep = n.Step % binSize;
-                float angle     = localStep / (float)binSize * Mathf.PI * 2f
-                    + config.ringStartAngleOffset + MotifRingGlyphGenerator.RingOrdinalAngleJitter(i);
-                noteInfos.Add(new NoteAnimInfo
-                {
-                    Track        = track,
-                    AbsStep      = n.Step,
-                    NoteAngle    = angle,
-                    RingLocalPos = new Vector3(Mathf.Cos(angle) * outerR, Mathf.Sin(angle) * outerR, 0f),
-                    TugLocalPos  = new Vector3(Mathf.Cos(angle) * tugR,   Mathf.Sin(angle) * tugR,   0f),
-                    DotColor     = color,
-                    SourceNote   = n,
-                });
-            }
-            noteInfos.Sort((a, b) => a.NoteAngle.CompareTo(b.NoteAngle));
-
             float delay = i * config.ringStaggerDelay;
-            StartCoroutine(AnimateMeshFill(
-                entry.Fill.GetComponent<MeshFilter>().sharedMesh,
-                entry.FullTris, segs, delay, config.ringDrawInDuration));
+            StartCoroutine(AnimateMeshFill(entry.FillMesh, entry.FullTris, segs, delay, config.ringDrawInDuration));
 
             if (isLastRing)
             {
+                float tugR    = outerR * (1f - config.tugDepthFraction);
+                var noteInfos = new List<NoteAnimInfo>();
+                foreach (var n in ringNotes)
+                {
+                    Color32 q = n.TrackColor;
+                    if (!trackByQColor.TryGetValue(q, out var track)) continue;
+                    int   localStep = n.Step % binSize;
+                    float angle     = localStep / (float)binSize * Mathf.PI * 2f
+                        + config.ringStartAngleOffset + MotifRingGlyphGenerator.RingOrdinalAngleJitter(i);
+                    noteInfos.Add(new NoteAnimInfo
+                    {
+                        Track        = track,
+                        AbsStep      = n.Step,
+                        NoteAngle    = angle,
+                        RingLocalPos = new Vector3(Mathf.Cos(angle) * outerR, Mathf.Sin(angle) * outerR, 0f),
+                        TugLocalPos  = new Vector3(Mathf.Cos(angle) * tugR,   Mathf.Sin(angle) * tugR,   0f),
+                        DotColor     = color,
+                        SourceNote   = n,
+                    });
+                }
+                noteInfos.Sort((a, b) => a.NoteAngle.CompareTo(b.NoteAngle));
+
                 StartCoroutine(AnimateLastRecordRing(
                     entry.Contour, entry.ContourPoints,
                     delay,
@@ -114,6 +114,18 @@ public partial class MotifRingGlyphApplicator
                     ringOrdinal: i,
                     isHighlighted: () => _highlightedRingIndices.Contains(ringIndex)));
             }
+            else if (notePulse)
+            {
+                // Track selection's sounding ring: stays still, and each dip swells with its note
+                // (see PulseNote) instead of the whole ring spinning.
+                PreparePulseState(entry, outerR, binSize);
+                _idleCoroutines.Add(StartCoroutine(DrawInThenNotePulse(
+                    entry.Contour, entry.ContourPoints, delay, outerR, binSize,
+                    entry.Root.transform, () => _recordFadingOut)));
+                _idleRotDeg.Add(rotDeg);
+                _idleBinSteps = binSize;
+                _notePulseOn  = true;
+            }
             else
             {
                 // Pre-baked rings draw their dipped shape; no travel dots replayed.
@@ -121,8 +133,6 @@ public partial class MotifRingGlyphApplicator
                     entry.Contour, entry.ContourPoints,
                     delay, config.ringDrawInDuration,
                     entry.Root.transform, rotDeg,
-                    new List<NoteAnimInfo>(),
-                    noteViz,
                     shouldStop: () => _recordFadingOut,
                     isHighlighted: () => _highlightedRingIndices.Contains(ringIndex)));
             }
@@ -152,7 +162,7 @@ public partial class MotifRingGlyphApplicator
 
         int segs = Mathf.Max(16, config.segments);
         var bandedRadii = ComputeRadii(ringKeys, out float ringThick);
-        int maxNoteCount = ringKeys.Count > 0 ? ringKeys.Max(k => k.noteCount) : 0;
+        int maxNoteCount = ringKeys.Max(k => k.noteCount);
 
         for (int i = 0; i < ringKeys.Count; i++)
         {
@@ -169,19 +179,18 @@ public partial class MotifRingGlyphApplicator
                 contourWidthOverride: config.recordLineWidth, ringOrdinal: i);
             _recordRings.Add(entry);
 
-            var mesh = entry.Fill.GetComponent<MeshFilter>().sharedMesh;
-            mesh.SetTriangles(entry.FullTris, 0);
-            mesh.RecalculateBounds();
+            entry.FillMesh.SetTriangles(entry.FullTris, 0);
+            entry.FillMesh.RecalculateBounds();
 
-            entry.Contour.positionCount = entry.ContourPoints.Count;
-            for (int j = 0; j < entry.ContourPoints.Count; j++)
-                entry.Contour.SetPosition(j, new Vector3(
-                    entry.ContourPoints[j].x, entry.ContourPoints[j].y, 0f));
+            ApplyContourPoints(entry.Contour, entry.ContourPoints);
 
             float densityNorm = maxNoteCount > 0 ? (float)noteCount / maxNoteCount : 0f;
             float rotDeg = RecordRingRotationSpeed(matchRatio, densityNorm);
             if (matchRatio < config.directionMatchRatioThreshold) rotDeg = -rotDeg;
-            StartCoroutine(SpinRingContinuous(i, entry.Root.transform, rotDeg));
+            _idleCoroutines.Add(StartCoroutine(SpinRingContinuous(i, entry.Root.transform, rotDeg)));
+            _idleRotDeg.Add(rotDeg);
+            _idleBinSteps = Mathf.Max(1, snapshot.TotalSteps);
+            _notePulseOn  = false;
         }
 
         if (alphaScale < 1f) SetAlphaScale(alphaScale);
@@ -229,22 +238,18 @@ public partial class MotifRingGlyphApplicator
 
             var entry = BuildRingEntry($"LockedRing_{i}", innerR, outerR, segs,
                 config.remainingRingColor, default, -1,
-                new List<MotifSnapshot.NoteEntry>(), 0,
+                null, 0,
                 config.remainingRingAlpha * alphaScale, 0f,
-                ringOrdinal: i);
+                ringOrdinal: i, skipContour: true);
             _recordRings.Add(entry);
 
             StartCoroutine(AnimateMeshFill(
-                entry.Fill.GetComponent<MeshFilter>().sharedMesh,
-                entry.FullTris, segs, delay: i * config.ringStaggerDelay, config.ringDrawInDuration));
+                entry.FillMesh, entry.FullTris, segs, delay: i * config.ringStaggerDelay, config.ringDrawInDuration));
 
-            // No Contour draw-in here: a locked-preview ring never has notes (see the empty note
-            // list passed to BuildRingEntry above), so there are no dips to trace — it's just a
-            // plain circle. The filled annulus mesh above already IS that plain circle (a solid,
-            // seam-free mesh, unlike the Contour's LineRenderer — see MotifRingGlyphGenerator.cs's
-            // class-level remarks for why that LineRenderer's closure is fragile), so it alone is
-            // "the ring." entry.Contour still exists (BuildRingEntry always creates it) but is left
-            // at its construction default of positionCount = 0 — present, but drawing nothing.
+            // No Contour at all (skipContour): a locked-preview ring never has notes, so there are
+            // no dips to trace — it's a plain circle, and the filled annulus mesh IS that circle (a
+            // solid, seam-free mesh, unlike a LineRenderer contour — see MotifRingGlyphGenerator.cs's
+            // class-level remarks for why that closure is fragile). entry.Contour is null.
         }
 
         RefreshPlayAreaFit(_recordRings.Count, fixedRadii != null ? 1f : (float?)null);
@@ -298,11 +303,10 @@ public partial class MotifRingGlyphApplicator
         alphaScale = Mathf.Clamp01(alphaScale);
         float fillA    = _lockedLook ? config.remainingRingAlpha    : config.ringAlpha;
         float contourA = _lockedLook ? 0f : config.contourAlpha;
-        var mpb = new MaterialPropertyBlock();
         foreach (var e in _recordRings)
         {
             Color c = e.BaseColor;
-            if (e.Fill != null) SetFillColor(e.Fill, new Color(c.r, c.g, c.b, fillA * alphaScale), mpb);
+            if (e.Fill != null) SetFillColor(e.Fill, new Color(c.r, c.g, c.b, fillA * alphaScale), ScratchMpb);
             if (e.Contour != null)
             {
                 var lc = new Color(c.r, c.g, c.b, contourA * alphaScale);
@@ -442,7 +446,9 @@ public partial class MotifRingGlyphApplicator
         Vector3 startScale = t.localScale;
         Vector3 endScale   = highlightOn ? Vector3.one * config.highlightScaleMultiplier : Vector3.one;
 
-        var scratchMpb = new MaterialPropertyBlock();
+        // The shared scratch block is safe across yields here: every use below is a Set-then-apply
+        // (or a read right after GetPropertyBlock) with no state carried between frames.
+        var scratchMpb = ScratchMpb;
         Color fillStart = Color.clear, fillEnd = Color.clear;
         if (ring.Fill != null)
         {
@@ -515,9 +521,8 @@ public partial class MotifRingGlyphApplicator
 
         if (entry.Fill != null)
         {
-            var mpb = new MaterialPropertyBlock();
             SetFillColor(entry.Fill,
-                DimColor(entry.BaseColor, config.ringAlpha * config.nonHighlightedAlphaMultiplier), mpb);
+                DimColor(entry.BaseColor, config.ringAlpha * config.nonHighlightedAlphaMultiplier), ScratchMpb);
         }
         if (entry.Contour != null)
         {

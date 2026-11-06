@@ -61,19 +61,6 @@ public static class MotifRingGlyphGenerator
         };
     }
 
-    /// <summary>
-    /// Generate a single contour ring polyline using the ring-index radius formula.
-    /// </summary>
-    public static GlyphPolyline GenerateSingleRing(
-        MusicalRole role, int binIndex, Color color,
-        List<MotifSnapshot.NoteEntry> notes, int totalSteps,
-        int ringIndex, RingGlyphConfig cfg)
-    {
-        if (cfg == null) return null;
-        float radius = cfg.innerRadius + ringIndex * (cfg.ringThickness + cfg.ringSpacing) + cfg.ringThickness;
-        return GenerateSingleRingAtRadius(role, binIndex, color, notes, totalSteps, radius, cfg, ringIndex);
-    }
-
     // Per-ring seam offset — see the class-level remarks on GoldenAngleRad above. Public so
     // callers computing a ring's note/travel-dot/tether/firework angle outside this class
     // (MotifRingGlyphApplicator.RecordRings.cs, .GameplayRings.cs, RingPreviewPlayer.cs) can

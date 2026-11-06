@@ -18,13 +18,16 @@ using UnityEngine.Audio;
 //  The parent GO is rotated by the contour animation coroutine, so fill and
 //  contour rotate together.
 //
-//  _gameplayRings — one ring per completed bin, spawned during play
-//  _recordRings   — full-motif snapshot, shown at bridge time
+//  _gameplayRings  — one ring per completed bin, spawned during play
+//  _remainingRings — gray placeholders for motif progress not yet completed
+//  _recordRings    — full-motif snapshot: bridge display, SolarSystemRecordDisplay,
+//                    and the PhaseLibrary carousel's glyphs (selected / vinyl / locked)
 //
-//  Split across partials: GameplayRings.cs (per-bin rings), RecordRings.cs
-//  (full-motif snapshot rendering), SpinOff.cs (roll-off exit animation),
-//  RingBuilder.cs (mesh/GameObject construction), Animation.cs (low-level
-//  draw-in/travel-dot coroutines).
+//  Split across partials: GameplayRings.cs (per-bin rings, tether breaking, record
+//  fade-out), RecordRings.cs (snapshot rendering, playing-bin highlight, selection
+//  backdrop, firework), Wave.cs (carousel note-pulse mode), SpinOff.cs (roll-off exit
+//  animation), RingBuilder.cs (mesh/GameObject construction), Animation.cs (draw-in,
+//  travel-dot, contour-tween and shake coroutines).
 // =========================================================================
 public partial class MotifRingGlyphApplicator : MonoBehaviour
 {
@@ -71,6 +74,8 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
         // placeholder ring uses -1), so this is what BuildRingEntry uses to stagger each ring's
         // contour seam angle — see RingOrdinalAngleJitter in MotifRingGlyphGenerator.cs.
         public int           RingOrdinal;
+        // Fill annulus mesh — owned by this entry; destroying Root does not free it (see DestroyEntry).
+        public Mesh          FillMesh;
     }
 
     private readonly List<RingEntry> _gameplayRings  = new();
@@ -83,7 +88,6 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
 
     private bool    _recordFadingOut;
     private bool    _gameplayFadingOut;    // stops rotation coroutines; set when spin animation begins
-    private bool    _clearingGameplayRings; // stops deformation coroutines; set only in ClearGameplayRings
     private bool    _superNodeMode;
     private bool    _spinOffPending;       // spin is imminent; prevents per-deformation hide during wait
     private Vector3 _fitScale;
@@ -140,17 +144,24 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     void Start() => GameFlowManager.Instance?.RegisterRingGlyphApplicator(this);
-    void OnDestroy() => Clear();
 
-    /// <summary>Destroy all rings (both layers).</summary>
-    public void Clear()
+    /// <summary>Destroy every child (rings, background discs, selection backdrop) and null the cached refs.
+    /// Destroy is deferred to end of frame, so the refs must be nulled here — otherwise a same-frame
+    /// SetSelectedBackdrop would reuse the doomed backdrop.</summary>
+    private void DestroyAllChildren()
     {
+        DestroyList(_recordRings);
+        DestroyList(_gameplayRings);
+        DestroyList(_remainingRings);
+        DestroyDisc(ref _placedBgDisc);
+        DestroyDisc(ref _fullBgDisc);
         foreach (Transform child in transform) Destroy(child.gameObject);
-        _recordRings.Clear();
-        _gameplayRings.Clear();
-        _remainingRings.Clear();
-        _placedBgDisc = null;
-        _fullBgDisc   = null;
+        _selectionBackdrop = null;
+    }
+
+    private void OnDestroy()
+    {
+        DestroyAllChildren();
         ResetHighlightState();
     }
 
@@ -162,6 +173,7 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
             if (co != null) StopCoroutine(co);
         _ringPulseCoroutines.Clear();
         _highlightedRingIndices.Clear();
+        ResetIdleState();
     }
 
     private float RingInnerRadius(int idx) =>
@@ -199,8 +211,24 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
     private const int   FixedTightRings = 12;
 
     private float _fixedFit;
+    private float _freeScale;
 
-    public void SetFixedFit(float worldRadius) => _fixedFit = Mathf.Max(0f, worldRadius);
+    public void SetFixedFit(float worldRadius)
+    {
+        _fixedFit  = Mathf.Max(0f, worldRadius);
+        _freeScale = 0f;
+    }
+
+    /// <summary>
+    /// Free layout (carousel's selected glyph): no fixed-fit, so the config's innerRadius,
+    /// ringThickness, ringSpacing and interBinSpacing are literal local units and the stack's size
+    /// follows from its ring count. <paramref name="scale"/> multiplies the whole glyph.
+    /// </summary>
+    public void SetFreeLayout(float scale)
+    {
+        _fixedFit  = 0f;
+        _freeScale = Mathf.Max(0f, scale);
+    }
 
     // Inner radii in a unit stack (outer edge of the last ring = 1) and the shared ring thickness.
     // With ringKeys, rings in the same bin band tightly and a bin transition gets a gap
@@ -284,13 +312,35 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
 
             transform.localScale = Vector3.one * (_fixedFit / outerRadius);
             _fitScale            = transform.localScale;
+            return;
         }
+
+        if (_freeScale > 0f)
+        {
+            transform.localScale = Vector3.one * _freeScale;
+            _fitScale            = transform.localScale;
+        }
+    }
+
+    // Destroys the ring's GameObject and the fill mesh it owns (Destroy(Root) alone leaks the mesh).
+    private static void DestroyEntry(RingEntry e)
+    {
+        if (e.Root != null) Destroy(e.Root);
+        if (e.FillMesh != null) Destroy(e.FillMesh);
     }
 
     private static void DestroyList(List<RingEntry> list)
     {
-        foreach (var e in list)
-            if (e.Root != null) Destroy(e.Root);
+        foreach (var e in list) DestroyEntry(e);
         list.Clear();
+    }
+
+    private static void DestroyDisc(ref MeshRenderer disc)
+    {
+        if (disc == null) return;
+        var mf = disc.GetComponent<MeshFilter>();
+        if (mf != null && mf.sharedMesh != null) Destroy(mf.sharedMesh);
+        Destroy(disc.gameObject);
+        disc = null;
     }
 }

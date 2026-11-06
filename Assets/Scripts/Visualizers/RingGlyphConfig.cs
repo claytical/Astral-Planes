@@ -15,17 +15,17 @@ using UnityEngine.Serialization;
 public class RingGlyphConfig : ScriptableObject
 {
     [Header("Layout (Shared)")]
-    [Tooltip("Inner edge radius of the innermost ring in local units (parent-relative) — just the " +
-             "starting offset for ring 0, NOT the dominant factor in overall stack size once there " +
-             "are more than a couple of rings. RingInnerRadius(n) = innerRadius + n*(ringThickness+" +
-             "ringSpacing) — for a multi-ring stack that per-ring term dominates the total, so " +
-             "ringThickness/ringSpacing are the more effective knobs for changing overall size.")]
+    [Tooltip("Size of the hole at the centre: inner edge radius of the innermost ring, in local units. " +
+             "Honored literally by the carousel's selected glyph and by gameplay rings (which are then " +
+             "scaled to the play area). Ignored by carousel unselected glyphs, which are fixed-fit.")]
     public float innerRadius = 0.08f;
 
-    [Tooltip("Radial thickness of each filled ring in local units.")]
+    [Tooltip("Radial thickness of each filled ring in local units. Ignored by carousel unselected " +
+             "glyphs (fixed-fit picks its own thickness).")]
     public float ringThickness = 0.04f;
 
-    [Tooltip("Gap between the outer edge of one ring and the inner edge of the next. For gameplay and " +
+    [Tooltip("Gap between the outer edge of one ring and the inner edge of the next. In fixed-fit " +
+             "(carousel unselected glyphs) only the ratio interBinSpacing / ringSpacing matters. For gameplay and " +
              "locked-preview rings this is the uniform gap everywhere. For record/carousel rings " +
              "(AnimateApply/ApplyVinyl) it means something narrower: the gap WITHIN a bin's " +
              "band, between rings that share the same BinIndex — keep it small. See interBinSpacing " +
@@ -41,7 +41,7 @@ public class RingGlyphConfig : ScriptableObject
     public float interBinSpacing = 0.1f;
 
     [Range(64, 512)]
-    [Tooltip("Number of vertices per ring. Higher values = smoother sine dips. Feeds the Fill mesh's " +
+    [Tooltip("Number of vertices per ring. Higher values = smoother notch curves. Feeds the Fill mesh's " +
              "triangle count, the Contour's point count, and the background discs' mesh resolution.")]
     public int segments = 256;
 
@@ -86,10 +86,18 @@ public class RingGlyphConfig : ScriptableObject
     public float recordLineWidth = 0.012f;
 
     [Range(0f, 1f)]
-    [Tooltip("Inward dip depth as a fraction of the ring radius. 0.65 gives a pronounced pac-man dip; tune in Inspector (0.4 = subtle, 0.85 = very deep).")]
+    [Tooltip("Contour notch depth at a note, as a fraction of that ring's own radius (outer rings dip farther in " +
+             "absolute terms). 1 reaches the exact center of the glyph. Also sets where travel dots, tethers and " +
+             "fireworks land (outerRadius × (1 − depth)). Where notes overlap the deepest one wins — depths don't add. " +
+             "In the carousel's selected glyph the notch shows only waveRestDepth of this between notes. Baked when a " +
+             "glyph is built. Subtle ≈ 0.2, pronounced ≈ 0.65.")]
     public float tugDepthFraction = 0.65f;
 
-    [Tooltip("Angular half-width of each tug bell in radians (0.8 ≈ 46°, giving ~92° total mouth width per note).")]
+    [Range(0.02f, Mathf.PI)]
+    [Tooltip("Angular half-width of each note's notch, in radians (0.8 ≈ 46°, ~92° total). Scaled 0.7×–1.3× per note " +
+             "by its commit time (fast = narrower, slow = wider). Neighboring steps are only ~0.2–0.4 rad apart, so " +
+             "values much above 0.3 make adjacent notches merge into one plateau. π makes every note's notch span " +
+             "the whole ring. Baked when a glyph is built.")]
     public float tugHalfWidthRad = 0.8f;
 
     [Header("Playback Highlight (Fill + Contour)")]
@@ -155,6 +163,28 @@ public class RingGlyphConfig : ScriptableObject
              "default (positive) direction; below it, the ring spins reversed. Distinguishes " +
              "clean/matched bins from improvised/unmatched-heavy ones.")]
     public float directionMatchRatioThreshold = 0.5f;
+
+    [Header("Note Pulse (Track Selection)")]
+    [Range(0f, 1f)]
+    [Tooltip("Track selection's sounding ring only — fraction of a note's full dip depth that remains " +
+             "while the note isn't sounding. 0 = dips flatten between notes, 1 = no pulse.")]
+    public float waveRestDepth = 0.35f;
+
+    [Min(0.001f)]
+    [Tooltip("Seconds for a dip to swell from rest to full depth when its note starts.")]
+    public float notePulseAttackSec = 0.03f;
+
+    [Min(0f)]
+    [Tooltip("Shortest time a pulse takes to relax back to rest, so very short notes still read.")]
+    public float notePulseMinSec = 0.12f;
+
+    [Tooltip("Seconds to delay the pulse to line up with the synth's audible output latency. " +
+             "Raise it if the line moves before you hear the note.")]
+    public float notePulseLatencySec = 0f;
+
+    [Tooltip("Track selection's sounding ring only — when a note fires, turn its ring so that note's " +
+             "dip sits at the top. The ring turns clockwise continuously, so each note is at 12 as it pulses and the ring keeps moving toward the next.")]
+    public bool notePulseRotateToTop = true;
 
     [Header("Note Travel Dot & SFX")]
     [Tooltip("Radius of the mini-ring dot that travels from note marker to tug point (in ring-local units).")]

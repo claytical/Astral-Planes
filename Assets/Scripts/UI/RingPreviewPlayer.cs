@@ -46,6 +46,16 @@ public class RingPreviewPlayer : MonoBehaviour
     /// role's ring should show it — used to spawn a positional VFX on the matching ring.</summary>
     public event System.Action<MusicalRole, int, float> OnNoteFired;
 
+    /// <summary>Fired once per role per step with a note: (role, binIndex, localStep within the bin,
+    /// the step's scheduled dsp time, longest note duration in seconds at that step). Drives the
+    /// ring dip pulse, which swells for the note's sounding length.</summary>
+    public event System.Action<MusicalRole, int, int, double, float> OnNotePulse;
+
+    /// <summary>Fired ahead of a role's next note on its ring: (role, binIndex, localStep of that
+    /// note, its scheduled dsp time, dsp time the ring starts moving — the previous note's start). Lets the ring sweep into place before
+    /// the pulse starts.</summary>
+    public event System.Action<MusicalRole, int, int, double, double> OnNoteApproach;
+
     // [step] → list of (midiNote, midiChannel, vel127, durationMs, role)
     private List<List<(int note, int channel, int vel127, int durationMs, MusicalRole role)>> _stepTable;
 
@@ -234,8 +244,9 @@ public class RingPreviewPlayer : MonoBehaviour
 
     public void Stop()
     {
-        _playing      = false;
-        _lastStep     = -1;
+        _playing        = false;
+        _approachPrimed = false;
+        _lastStep       = -1;
         _loopStartDsp = 0.0;
         _stepTable    = null;
 
@@ -307,8 +318,82 @@ public class RingPreviewPlayer : MonoBehaviour
         }
     }
 
+    // Longest note at this step for a role — a chord shares one ring dip. Scans in place so the
+    // per-step hot path doesn't allocate.
+    private static int LongestDurationMs(
+        List<(int note, int channel, int vel127, int durationMs, MusicalRole role)> notes, MusicalRole role)
+    {
+        int longest = 0;
+        for (int i = 0; i < notes.Count; i++)
+            if (notes[i].role == role && notes[i].durationMs > longest) longest = notes[i].durationMs;
+        return longest;
+    }
+
+    // Reused every step (cleared at the top of FireStep) instead of allocating per step.
+    private readonly HashSet<MusicalRole> _firedRoles = new();
+
+    // The step's scheduled time on the preview clock (not this frame's time).
+    private double StepStartDsp(int step)
+    {
+        double stepOffsetSec = step * (double)_stepDurationSec;
+        double loopsElapsed  = System.Math.Floor((AudioSettings.dspTime - _loopStartDsp - stepOffsetSec) / _loopLengthSec);
+        return _loopStartDsp + loopsElapsed * _loopLengthSec + stepOffsetSec;
+    }
+
+    private static bool HasRole(
+        List<(int note, int channel, int vel127, int durationMs, MusicalRole role)> notes, MusicalRole role)
+    {
+        for (int i = 0; i < notes.Count; i++) if (notes[i].role == role) return true;
+        return false;
+    }
+
+    // Playback just started: each ring (role, bin) gets an approach to its first note, free to
+    // move from now, so every ring begins its slow sweep to 12 straight away. Later loops are
+    // covered by FireNextApproach wrapping round.
+    private void FirePlaybackStartApproaches(int step)
+    {
+        double nowStepDsp = StepStartDsp(step);
+        _approachRings.Clear();
+        for (int s = 0; s < _totalSteps; s++)
+            foreach (var n in _stepTable[s])
+            {
+                int bin = s / _stepsPerLoop;
+                if (!_approachRings.Add((n.role, bin))) continue;
+                int ahead = s >= step ? s - step : s + _totalSteps - step;
+                OnNoteApproach.Invoke(n.role, bin, s % _stepsPerLoop,
+                    nowStepDsp + ahead * (double)_stepDurationSec, nowStepDsp);
+            }
+    }
+
+    // After a role's note at `step`, announce its next note on the same ring (same role, same bin).
+    // With none later in the bin it wraps to the ring's first note in the next loop, so the ring
+    // starts turning as soon as this pulse ends and takes the whole idle gap to get back to 12.
+    private void FireNextApproach(int step, MusicalRole role, double stepStartDsp)
+    {
+        int binStart = step / _stepsPerLoop * _stepsPerLoop;
+        int binEnd   = binStart + _stepsPerLoop;
+        for (int s = step + 1; s < binEnd + (step - binStart); s++)
+        {
+            int idx = s < binEnd ? s : binStart + (s - binEnd);        // wraps within the bin
+            if (!HasRole(_stepTable[idx], role)) continue;
+            int ahead = s < binEnd ? s - step : s - step + (_totalSteps - _stepsPerLoop);
+            OnNoteApproach.Invoke(role, binStart / _stepsPerLoop, idx - binStart,
+                stepStartDsp + ahead * (double)_stepDurationSec, stepStartDsp);
+            return;
+        }
+    }
+
+    private readonly HashSet<(MusicalRole role, int bin)> _approachRings = new();
+    private bool _approachPrimed;
+
     private void FireStep(int step)
     {
+        if (OnNoteApproach != null && !_approachPrimed)
+        {
+            _approachPrimed = true;
+            FirePlaybackStartApproaches(step);
+        }
+
         var notes = _stepTable[step];
         if (notes.Count == 0) return;
 
@@ -316,7 +401,7 @@ public class RingPreviewPlayer : MonoBehaviour
 
         // Multiple notes (a chord) can share a role at this step — they'd all land at the same
         // ring angle, so only spawn one firework per role per step rather than one per note.
-        HashSet<MusicalRole> firedRoles = null;
+        _firedRoles.Clear();
 
         foreach (var (note, ch, vel127, durationMs, role) in notes)
         {
@@ -329,9 +414,24 @@ public class RingPreviewPlayer : MonoBehaviour
                 Velocity = vel127,
             });
 
+            if (OnNoteFired == null && OnNotePulse == null && OnNoteApproach == null) continue;
+            if (!_firedRoles.Add(role)) continue;
+
+            if (OnNoteApproach != null)
+                FireNextApproach(step, role, StepStartDsp(step));
+
+            if (OnNotePulse != null)
+            {
+                // The step's scheduled time on the preview clock, not this frame's time, so the
+                // pulse isn't pushed late by Update's frame quantization.
+                double stepOffsetSec = step * (double)_stepDurationSec;
+                double loopsElapsed  = System.Math.Floor((AudioSettings.dspTime - _loopStartDsp - stepOffsetSec) / _loopLengthSec);
+                double startDsp      = _loopStartDsp + loopsElapsed * _loopLengthSec + stepOffsetSec;
+                OnNotePulse.Invoke(role, step / _stepsPerLoop, step % _stepsPerLoop,
+                    startDsp, LongestDurationMs(notes, role) / 1000f);
+            }
+
             if (OnNoteFired == null) continue;
-            firedRoles ??= new HashSet<MusicalRole>();
-            if (!firedRoles.Add(role)) continue;
 
             int   localStep = step % _stepsPerLoop;
             float angleRad  = localStep / (float)_stepsPerLoop * Mathf.PI * 2f

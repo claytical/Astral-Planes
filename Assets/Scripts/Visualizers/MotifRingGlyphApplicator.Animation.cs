@@ -26,7 +26,7 @@ public partial class MotifRingGlyphApplicator
     }
 
     /// <summary>Larger, lower-frequency shake for a successful tether break — reads as a released spring.</summary>
-    public void PlayBreakShake()
+    private void PlayBreakShake()
     {
         if (config == null) return;
         PlayShake(config.breakShakeDuration, config.breakShakeAmplitude, config.breakShakeFrequency);
@@ -45,9 +45,9 @@ public partial class MotifRingGlyphApplicator
         _shakeCoroutine = StartCoroutine(ShakeRoutine(duration, amplitude, frequency));
     }
 
-    // Drives transform.localPosition only — never written elsewhere in this class, so this can't
-    // fight the show/hide (localScale), play-area fit (position), or spin-off exit (rotation)
-    // coroutines that already own the other transform fields.
+    // Drives transform.localPosition. The only other writer is ClearGameplayRings, which resets it to
+    // zero after killing this coroutine, so this can't fight the show/hide (localScale), play-area
+    // fit (world position) or spin-off exit (rotation) coroutines that own the other transform fields.
     private IEnumerator ShakeRoutine(float duration, float amplitude, float frequency)
     {
         float t = 0f;
@@ -103,36 +103,20 @@ public partial class MotifRingGlyphApplicator
         LineRenderer lr, List<Vector2> pts,
         float delay, float drawDuration,
         Transform ringTransform, float rotDegPerSec,
-        List<NoteAnimInfo> noteInfos, NoteVisualizer noteViz,
         System.Func<bool> shouldStop,
-        System.Func<bool> isHighlighted = null)
+        System.Func<bool> isHighlighted = null,
+        bool spinAfter = true)
     {
         if (delay > 0f) yield return new WaitForSeconds(delay);
 
         int   total    = pts.Count;
-        int   nextNote = 0;
         float elapsed  = 0f;
         lr.positionCount = 2;
 
         while (elapsed < drawDuration)
         {
             elapsed += Time.deltaTime;
-            float progress   = Mathf.Clamp01(elapsed / drawDuration);
-            float drawnAngle = progress * Mathf.PI * 2f + config.ringStartAngleOffset;
-
-            while (nextNote < noteInfos.Count && drawnAngle >= noteInfos[nextNote].NoteAngle)
-            {
-                var info = noteInfos[nextNote++];
-                if (noteViz?.noteMarkers != null && info.Track != null &&
-                    noteViz.noteMarkers.TryGetValue((info.Track, info.AbsStep), out var markerTr) &&
-                    markerTr != null)
-                {
-                    StartCoroutine(TravelNoteDot(
-                        markerTr.position, ringTransform,
-                        info.RingLocalPos, info.TugLocalPos,
-                        config.noteTravelDuration, info.DotColor));
-                }
-            }
+            float progress = Mathf.Clamp01(elapsed / drawDuration);
 
             int count = Mathf.Clamp(Mathf.RoundToInt(progress * total), 2, total);
             lr.positionCount = count;
@@ -145,7 +129,8 @@ public partial class MotifRingGlyphApplicator
         for (int i = 0; i < total; i++)
             lr.SetPosition(i, new Vector3(pts[i].x, pts[i].y, 0f));
 
-        yield return SpinUntilStopped(ringTransform, rotDegPerSec, shouldStop, isHighlighted);
+        if (spinAfter)
+            yield return SpinUntilStopped(ringTransform, rotDegPerSec, shouldStop, isHighlighted);
     }
 
     // Plays the last record ring the same way a gameplay ring animates:
@@ -238,9 +223,17 @@ public partial class MotifRingGlyphApplicator
             onStep(drumRef.currentStep, drumRef.GetLeaderSteps()); // in case we're already there
             if (!stepFired)
             {
+                // try/finally: StopCoroutine/StopAllCoroutines (ClearGameplayRings, AnimateApply, ...)
+                // runs the finally via Dispose, so the handler can't leak onto DrumTrack.
                 drumRef.OnStepChanged += onStep;
-                yield return new WaitUntil(() => stepFired || shouldStop() || (isCancelled?.Invoke() ?? false));
-                drumRef.OnStepChanged -= onStep;
+                try
+                {
+                    yield return new WaitUntil(() => stepFired || shouldStop() || (isCancelled?.Invoke() ?? false));
+                }
+                finally
+                {
+                    drumRef.OnStepChanged -= onStep;
+                }
             }
         }
 
@@ -331,7 +324,7 @@ public partial class MotifRingGlyphApplicator
             go.transform.position = startWorld;
 
             var lr = go.AddComponent<LineRenderer>();
-            if (lineMaterial != null) lr.material = lineMaterial;
+            if (lineMaterial != null) lr.sharedMaterial = lineMaterial;
             lr.startColor        = lr.endColor = color;
             lr.widthMultiplier   = config.lineWidth * 2f;
             lr.useWorldSpace     = false;

@@ -10,7 +10,7 @@ public partial class MotifRingGlyphApplicator
         List<MotifSnapshot.NoteEntry> notes, int totalSteps,
         float? fillAlphaOverride = null, float? contourAlphaOverride = null,
         int? fillSortingOrderOverride = null, int? contourSortingOrderOverride = null,
-        float? contourWidthOverride = null, int ringOrdinal = 0)
+        float? contourWidthOverride = null, int ringOrdinal = 0, bool skipContour = false)
     {
         var root = new GameObject(goName);
         root.transform.SetParent(transform, worldPositionStays: false);
@@ -37,8 +37,26 @@ public partial class MotifRingGlyphApplicator
         // which visually intrude outward past their own band — still read as on top.
         mr.sortingOrder      = fillSortingOrderOverride ?? FillSortingOrder;
 
-        var mpb = new MaterialPropertyBlock();
-        SetFillColor(mr, new Color(color.r, color.g, color.b, fillAlphaOverride ?? config.ringAlpha), mpb);
+        SetFillColor(mr, new Color(color.r, color.g, color.b, fillAlphaOverride ?? config.ringAlpha), ScratchMpb);
+
+        // Placeholder rings (locked preview / remaining progress) never draw a contour, so skip
+        // generating its ~257 points and the LineRenderer.
+        if (skipContour)
+        {
+            return new RingEntry
+            {
+                Root          = root,
+                Fill          = mr,
+                BaseColor     = color,
+                FullTris      = fullTris,
+                ContourPoints = new List<Vector2>(),
+                BinIndex      = binIndex,
+                Role          = role,
+                OuterRadius   = outerR,
+                RingOrdinal   = ringOrdinal,
+                FillMesh      = mesh,
+            };
+        }
 
         // ── Contour ───────────────────────────────────────────────────────────
         var contourGo = new GameObject("Contour");
@@ -49,7 +67,7 @@ public partial class MotifRingGlyphApplicator
         var pts = poly?.Points ?? new List<Vector2>();
 
         var lr = contourGo.AddComponent<LineRenderer>();
-        if (lineMaterial != null) lr.material = lineMaterial;
+        if (lineMaterial != null) lr.sharedMaterial = lineMaterial;
         lr.useWorldSpace     = false;
         lr.loop              = false;
         lr.widthMultiplier   = contourWidthOverride ?? config.lineWidth;
@@ -84,6 +102,7 @@ public partial class MotifRingGlyphApplicator
             Role          = role,
             OuterRadius   = outerR,
             RingOrdinal   = ringOrdinal,
+            FillMesh      = mesh,
         };
     }
 
@@ -140,16 +159,25 @@ public partial class MotifRingGlyphApplicator
         int segs = Mathf.Max(16, config.segments);
 
         float placedR = placedCount > 0 ? RingInnerRadius(placedCount - 1) + config.ringThickness : 0f;
-        _placedBgDisc.GetComponent<MeshFilter>().sharedMesh = BuildDiscMesh(placedR, segs);
+        ReplaceDiscMesh(_placedBgDisc, BuildDiscMesh(placedR, segs));
         SetFillColor(_placedBgDisc,
             new Color(config.backgroundDiscColor.r, config.backgroundDiscColor.g, config.backgroundDiscColor.b, config.placedBackgroundAlpha),
             _placedBgMpb);
 
         float fullR = totalCount > 0 ? RingInnerRadius(totalCount - 1) + config.ringThickness : 0f;
-        _fullBgDisc.GetComponent<MeshFilter>().sharedMesh = BuildDiscMesh(fullR, segs);
+        ReplaceDiscMesh(_fullBgDisc, BuildDiscMesh(fullR, segs));
         SetFillColor(_fullBgDisc,
             new Color(config.backgroundDiscColor.r, config.backgroundDiscColor.g, config.backgroundDiscColor.b, config.fullBackgroundAlpha),
             _fullBgMpb);
+    }
+
+    // Swaps in a freshly built disc mesh, destroying the one it replaces.
+    private static void ReplaceDiscMesh(MeshRenderer disc, Mesh mesh)
+    {
+        var mf  = disc.GetComponent<MeshFilter>();
+        var old = mf.sharedMesh;
+        mf.sharedMesh = mesh;
+        if (old != null) Destroy(old);
     }
 
     private static Mesh BuildDiscMesh(float radius, int segments)
@@ -184,12 +212,12 @@ public partial class MotifRingGlyphApplicator
         return mesh;
     }
 
-    private static MaterialPropertyBlock[] MakeMpbs(int count)
-    {
-        var arr = new MaterialPropertyBlock[count];
-        for (int i = 0; i < count; i++) arr[i] = new MaterialPropertyBlock();
-        return arr;
-    }
+    // Shared scratch block — SetPropertyBlock copies its contents, so one instance serves every
+    // caller that sets a color and immediately applies it (single-threaded, never held across a yield).
+    // Created lazily: a static field initializer runs in the type's cctor, which Unity can trigger
+    // from a MonoBehaviour constructor, where creating native objects (MaterialPropertyBlock) throws.
+    private static MaterialPropertyBlock _scratchMpb;
+    private static MaterialPropertyBlock ScratchMpb => _scratchMpb ??= new MaterialPropertyBlock();
 
     private static void SetFillColor(MeshRenderer mr, Color c, MaterialPropertyBlock mpb)
     {

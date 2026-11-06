@@ -26,6 +26,8 @@ public class RingGlyphConfigEditor : Editor
         "highlightScaleMultiplier", "highlightBrightness", "highlightPulseDuration",
         "nonHighlightedTransitionDuration", "nonHighlightedDarkenAmount", "nonHighlightedAlphaMultiplier",
         "directionMatchRatioThreshold", "rotSpeedBase",
+        "waveRestDepth", "notePulseAttackSec", "notePulseMinSec", "notePulseLatencySec",
+        "notePulseRotateToTop",
     };
 
     const string GameplayPrefKey = "RingGlyphConfigEditor.GameplayOnly";
@@ -36,6 +38,7 @@ public class RingGlyphConfigEditor : Editor
         serializedObject.Update();
 
         DrawGroup(null);
+        DrawContourWarnings();
 
         bool gameplay = EditorGUILayout.BeginFoldoutHeaderGroup(
             EditorPrefs.GetBool(GameplayPrefKey, false), "Gameplay Only");
@@ -50,6 +53,20 @@ public class RingGlyphConfigEditor : Editor
         EditorGUILayout.EndFoldoutHeaderGroup();
 
         serializedObject.ApplyModifiedProperties();
+    }
+
+    // Warns when notation-line knobs are set so high the notches stop reading as notes.
+    void DrawContourWarnings()
+    {
+        var depth = serializedObject.FindProperty("tugDepthFraction");
+        var width = serializedObject.FindProperty("tugHalfWidthRad");
+        var segs  = serializedObject.FindProperty("segments");
+        if (depth != null && depth.floatValue >= 0.95f)
+            EditorGUILayout.HelpBox("tugDepthFraction ≥ 0.95: notches reach the glyph center, and travel dots, tethers and fireworks land there too.", MessageType.Warning);
+        if (width != null && width.floatValue >= 1.2f)
+            EditorGUILayout.HelpBox("tugHalfWidthRad ≥ 1.2: each notch spans over a third of the ring, so neighboring notes merge and the whole contour collapses inward.", MessageType.Warning);
+        if (segs != null && segs.intValue < 128)
+            EditorGUILayout.HelpBox("segments < 128: notches will look faceted.", MessageType.Info);
     }
 
     // group == null draws every property that belongs to neither drawer.

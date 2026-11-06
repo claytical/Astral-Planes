@@ -25,7 +25,7 @@ public partial class MotifRingGlyphApplicator
         if (drum != null && drum.leaderStartDspTime > 0)
         {
             double loopBoundaryDsp = drum.leaderStartDspTime + drum.GetLoopLengthInSeconds();
-            while (AudioSettings.dspTime < loopBoundaryDsp && !_clearingGameplayRings)
+            while (AudioSettings.dspTime < loopBoundaryDsp)
                 yield return null;
         }
 
@@ -40,7 +40,7 @@ public partial class MotifRingGlyphApplicator
             float maxWait = Mathf.Max(spinDuration + rollDuration,
                 drum != null ? drum.GetLoopLengthInSeconds() : 0f);
             float waited  = 0f;
-            while (_pendingDeformationCount > 0 && waited < maxWait && !_clearingGameplayRings)
+            while (_pendingDeformationCount > 0 && waited < maxWait)
             {
                 waited += Time.deltaTime;
                 yield return null;
@@ -61,9 +61,7 @@ public partial class MotifRingGlyphApplicator
 
         DestroyList(_gameplayRings);
         DestroyList(_remainingRings);
-        _remainingRings.Clear();
         _gameplayFadingOut       = false;
-        _spinOffPending          = false;
         _superNodeMode           = false;
         _pendingDeformationCount = 0;
         transform.localScale     = Vector3.zero;
