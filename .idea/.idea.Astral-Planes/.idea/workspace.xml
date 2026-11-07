@@ -6,11 +6,29 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Editor/RingGlyphConfigEditor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Editor/RingGlyphConfigEditor.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Materials/Ring Mesh Dark Fill.mat" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Materials/Ring Mesh Dark Fill.mat" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Materials/RingLineEthereal.mat" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Materials/RingLineEthereal.mat" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Effects/Spawn/Note Explosion.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Effects/Spawn/Note Explosion.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/UI/PhaseLibraryCarousel.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/UI/PhaseLibraryCarousel.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/RingGlyph Canvas Not Selected.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Config/RingGlyph Canvas Not Selected.asset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/RingGlyph Canvas.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Config/RingGlyph Canvas.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/1_Two.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/1_Two.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/2_Waiting.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/2_Waiting.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/3_Here We Go.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/3_Here We Go.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/4_Circus.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/Motifs/4_Circus.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Phase Library.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Phase Library.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/Main.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/Main.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/MotifOrbitLineRenderer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/MotifOrbitLineRenderer.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/PhaseLibraryCarousel.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/PhaseLibraryCarousel.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/RingSessionStore.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/RingSessionStore.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.GameplayRings.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.GameplayRings.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.RecordRings.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.RecordRings.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.RingBuilder.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.RingBuilder.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.Wave.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.Wave.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/RingGlyphConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/RingGlyphConfig.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Shaders/RingUnlit.shader" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Shaders/RingUnlit.shader" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ECOSYSTEM.md" beforeDir="false" afterPath="$PROJECT_DIR$/ECOSYSTEM.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -314,7 +332,7 @@
       <workItem from="1789233258760" duration="39123000" />
       <workItem from="1789660411739" duration="16930000" />
       <workItem from="1790088069128" duration="2171000" />
-      <workItem from="1793551912644" duration="49424000" />
+      <workItem from="1793551912644" duration="75397000" />
     </task>
     <servers />
   </component>

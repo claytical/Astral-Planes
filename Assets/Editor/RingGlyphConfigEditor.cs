@@ -27,7 +27,7 @@ public class RingGlyphConfigEditor : Editor
         "nonHighlightedTransitionDuration", "nonHighlightedDarkenAmount", "nonHighlightedAlphaMultiplier",
         "directionMatchRatioThreshold", "rotSpeedBase",
         "waveRestDepth", "notePulseAttackSec", "notePulseMinSec", "notePulseLatencySec",
-        "notePulseRotateToTop",
+        "notePulseRotateToTop", "notePulseCueDeg", "playingBinToOuter", "binSwapDuration",
     };
 
     const string GameplayPrefKey = "RingGlyphConfigEditor.GameplayOnly";

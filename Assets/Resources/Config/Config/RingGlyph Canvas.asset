@@ -20,7 +20,7 @@ MonoBehaviour:
   ringStartAngleOffset: 1.5707964
   fitPaddingFraction: 0.4
   ringMeshMaterial: {fileID: 2100000, guid: db6f88bb6fd04da5bdaac2167f76440b, type: 2}
-  ringAlpha: 0.1
+  ringAlpha: 0.2
   contourAlpha: 0.973
   lineWidth: 0.1
   recordLineWidth: 0.03
@@ -28,12 +28,15 @@ MonoBehaviour:
   tugHalfWidthRad: 0.15
   highlightScaleMultiplier: 1.05
   highlightBrightness: 0.318
+  playingBinToOuter: 1
+  binSwapDuration: 0.5
   highlightPulseDuration: 0.3
   nonHighlightedTransitionDuration: 0
   nonHighlightedDarkenAmount: 0
   nonHighlightedAlphaMultiplier: 0.5
   remainingRingColor: {r: 0.6132076, g: 0.6132076, b: 0.6132076, a: 1}
-  remainingRingAlpha: 0.801
+  remainingRingAlpha: 0.734
+  remainingRingLineWidth: 0.012
   nextUpColorCycleDuration: 1.5
   ringDrawInDuration: 0
   ringStaggerDelay: 0
@@ -45,7 +48,7 @@ MonoBehaviour:
   notePulseMinSec: 0.12
   notePulseLatencySec: 0
   notePulseRotateToTop: 1
-  notePulseRotateRestSec: 0
+  notePulseCueDeg: 180
   noteDotRadius: 0
   noteTravelDuration: 1
   launchSfx: {fileID: 0}

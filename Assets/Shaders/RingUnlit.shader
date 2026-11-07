@@ -11,6 +11,14 @@ Shader "Astral Planes/RingUnlit"
         // LineRenderer-only: fades alpha across the strip's width (UV.y) for a soft/glowing edge.
         // 0 = off (default); MeshRenderer Fill rings never opt in, so they're unaffected.
         _EdgeSoftness ("Edge Softness (LineRenderer only)", Range(0, 1)) = 0
+        // Shapes the fade: 1 = the plain smoothstep ramp, higher = a thin bright core with a long faint glow.
+        // LineRenderer-only: fraction of the line's length over which alpha fades to 0 at one end, so that end
+        // is soft instead of cut off. Positive = fade the end (UV.x = 1), negative = fade the start (UV.x = 0),
+        // 0 = off. Set per line via a property block.
+        _TipFade ("Tip Fade (LineRenderer only)", Range(-1, 1)) = 0
+        // Particle quads: 1 = fade alpha radially (soft round dot) instead of across the strip width.
+        [Toggle] _Radial ("Radial Fade (particles)", Float) = 0
+        _EdgePower ("Edge Power (LineRenderer only)", Range(1, 8)) = 1
     }
 
     SubShader
@@ -43,6 +51,9 @@ Shader "Astral Planes/RingUnlit"
                 float4 _BaseColor;
                 float4 _Color;
                 float  _EdgeSoftness;
+                float  _EdgePower;
+                float  _Radial;
+                float  _TipFade;
             CBUFFER_END
 
             struct Attributes
@@ -77,11 +88,22 @@ Shader "Astral Planes/RingUnlit"
             half4 frag(Varyings IN) : SV_Target
             {
                 half4 col = IN.color;
+                if (_Radial > 0.5)
+                {
+                    half r = saturate(1.0 - length(IN.uv * 2.0 - 1.0));
+                    col.a *= smoothstep(0.0, 1.0, r);
+                    return col;
+                }
                 if (_EdgeSoftness > 0.0001)
                 {
                     // Distance from the strip's center line: 1 at center, 0 at either edge.
                     half centerDist = 1.0 - abs(IN.uv.y * 2.0 - 1.0);
-                    col.a *= smoothstep(0.0, _EdgeSoftness, centerDist);
+                    col.a *= pow(smoothstep(0.0, _EdgeSoftness, centerDist), _EdgePower);
+                }
+                if (abs(_TipFade) > 0.0001)
+                {
+                    half along = _TipFade > 0.0 ? 1.0 - IN.uv.x : IN.uv.x;
+                    col.a *= smoothstep(0.0, 1.0, saturate(along / abs(_TipFade)));
                 }
                 return col;
             }

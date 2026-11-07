@@ -18,7 +18,7 @@ MonoBehaviour:
     motifs:
     - {fileID: 11400000, guid: 39d204e098aac450aaa74bc66d2708b4, type: 2}
     loopMotifs: 0
-  - phaseName: Inner System
+  - phaseName: Lucid Dreaming
     phaseId: 883cf97b56fd40de8b345caeb71fc5c1
     motifs:
     - {fileID: 11400000, guid: f8216e90d53ac4365b251f482390aba7, type: 2}
@@ -35,7 +35,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 01d5a06a93dbc4649989f03be242f088, type: 2}
     - {fileID: 11400000, guid: e3bd1aeb9985b42a1aab789430434dcf, type: 2}
     loopMotifs: 0
-  - phaseName: Next
+  - phaseName: Some Phase
     phaseId: 7372954664d149969c3d8cf05cef0823
     motifs:
     - {fileID: 11400000, guid: 0dfacc5b336a449a68b1538328875e4f, type: 2}

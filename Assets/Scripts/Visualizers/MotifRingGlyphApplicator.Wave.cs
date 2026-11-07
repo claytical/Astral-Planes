@@ -20,6 +20,8 @@ public partial class MotifRingGlyphApplicator
         public NotePulse?[] Pulses;             // latest pulse per center (null = at rest)
         public int        BinSteps;
         public int        PointCount;           // N (excludes the closing duplicate)
+        public float      Scale = 1f;           // current outer radius / built outer radius (bin slot swap)
+        public bool       Redraw;               // Scale changed: rewrite the line even if no note is pulsing
     }
 
     private readonly Dictionary<LineRenderer, RingPulseState> _pulseStates = new();
@@ -107,7 +109,7 @@ public partial class MotifRingGlyphApplicator
 
     // Each turn goes clockwise at constant speed between its begin and arrive dsp times (same
     // latency-shifted clock as PulseAmplitude). Consecutive turns chain end to start, so a ring
-    // never stops: each note's pulse fires as the ring passes 12 o'clock, and it keeps moving to
+    // never stops: each note's pulse fires as the ring passes the cue point (notePulseCueDeg), and it keeps moving to
     // cue up the next note.
     private IEnumerator RunRotations(int ringIdx, Queue<RotateCmd> q)
     {
@@ -177,20 +179,20 @@ public partial class MotifRingGlyphApplicator
         return false;
     }
 
-    // Root Z (degrees) that puts this dip at 12 o'clock; the dip's local angle is built the same
+    // Root Z (degrees) that puts this dip at the cue point (config.notePulseCueDeg); the dip's local angle is built the same
     // way as MotifRingGlyphGenerator.BuildRingPoints.
     private float TopRotationDeg(RingEntry ring, RingPulseState s, int dip)
     {
         float noteAngle = s.Centers[dip] / (float)s.PointCount * Mathf.PI * 2f
             + config.ringStartAngleOffset
             + MotifRingGlyphGenerator.RingOrdinalAngleJitter(ring.RingOrdinal);
-        return (Mathf.PI * 0.5f - noteAngle) * Mathf.Rad2Deg;
+        return config.notePulseCueDeg - noteAngle * Mathf.Rad2Deg;
     }
 
     /// <summary>
     /// Look-ahead from RingPreviewPlayer: turns the note's ring clockwise, continuously, from the
     /// previous note's start (<paramref name="prevStartDsp"/>) to this note's start, so this note
-    /// is at 12 o'clock exactly as it pulses. Other rings are untouched.
+    /// is at the cue point exactly as it pulses. Other rings are untouched.
     /// </summary>
     public void ApproachNote(MusicalRole role, int binIndex, int localStep, double startDsp, double prevStartDsp)
     {
@@ -318,17 +320,18 @@ public partial class MotifRingGlyphApplicator
             // Rebuilding a LineRenderer's geometry is the expensive part, and with several bins
             // most rings sit idle at any moment. Only touch the line while something is moving,
             // plus one frame to settle back to rest.
-            if (!active && !dirty) { yield return null; continue; }
+            if (!active && !dirty && !s.Redraw) { yield return null; continue; }
             dirty = active;
+            s.Redraw = false;
 
             for (int i = 0; i < n; i++)
             {
                 float dip = s.Dip[i];
-                if (dip <= 0f || owner[i] < 0) { output[i] = s.Base[i]; continue; }
+                if (dip <= 0f || owner[i] < 0) { output[i] = s.Base[i] * s.Scale; continue; }
                 float baseR = outerR - dip;
-                output[i] = baseR > 0.0001f
+                output[i] = (baseR > 0.0001f
                     ? s.Base[i] * ((outerR - dip * amps[owner[i]]) / baseR)
-                    : s.Base[i];
+                    : s.Base[i]) * s.Scale;
             }
             output[n] = output[0];
             lr.SetPositions(output);

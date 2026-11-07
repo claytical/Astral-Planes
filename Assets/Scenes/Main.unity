@@ -2045,8 +2045,13 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
+      propertyPath: orbitDimAlpha
+      value: 0.269
+      objectReference: {fileID: 0}
+    - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
       propertyPath: centerOffset.y
-      value: -2
+      value: -1.5
       objectReference: {fileID: 0}
     - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
@@ -2056,7 +2061,7 @@ PrefabInstance:
     - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
       propertyPath: unselectedAlpha
-      value: 0.15
+      value: 0.3
       objectReference: {fileID: 0}
     - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
@@ -2068,6 +2073,12 @@ PrefabInstance:
       propertyPath: 'slots.Array.data[0]'
       value: 
       objectReference: {fileID: 1717945139}
+    - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: unselectedGlyphConfig
+      value: 
+      objectReference: {fileID: 11400000, guid: 55c70b8124e5b4eca816e58b95a8f00a,
+        type: 2}
     - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
       propertyPath: showAllPhasesForDesign
@@ -2191,8 +2202,13 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6557949755247544911, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
+      propertyPath: tipReach
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 6557949755247544911, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
       propertyPath: lineWidth
-      value: 0.04
+      value: 0.05
       objectReference: {fileID: 0}
     - target: {fileID: 6557949755247544911, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
@@ -2203,7 +2219,37 @@ PrefabInstance:
         type: 3}
       propertyPath: lineMaterial
       value: 
-      objectReference: {fileID: 2100000, guid: ca69ba5acf97f46b9b756b5ef73c08da, type: 2}
+      objectReference: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee, type: 2}
+    - target: {fileID: 6557949755247544911, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: tipSparkSize
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 6557949755247544911, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: tipBurstCount
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6557949755247544911, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: tipSparkSpeed
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6557949755247544911, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: tipSparkOffset
+      value: 0.03
+      objectReference: {fileID: 0}
+    - target: {fileID: 6557949755247544911, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: tipSparksPrefab
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 6557949755247544911, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: tipSparkLifetime
+      value: 0.75
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects:
     - {fileID: 6923712477886807996, guid: 819e08eb0311545b6b574630b02792e9, type: 3}

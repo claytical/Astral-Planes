@@ -82,7 +82,7 @@ public class RingGlyphConfig : ScriptableObject
     [Tooltip("LineRenderer width in local units.")]
     public float lineWidth = 0.003f;
 
-    [Tooltip("Contour width for record/carousel rings (AnimateApply/ApplyVinyl) only — wider than lineWidth so the ethereal edge-softness gradient (RingLineEthereal.mat) is actually visible instead of collapsing into a few pixels. Gameplay and locked-preview rings still use lineWidth.")]
+    [Tooltip("Contour width for record/carousel rings (AnimateApply/ApplyVinyl) only — wider than lineWidth so the ethereal edge-softness gradient (RingLineEthereal.mat) is actually visible instead of collapsing into a few pixels. Gameplay rings use lineWidth; placeholder rings use remainingRingLineWidth.")]
     public float recordLineWidth = 0.012f;
 
     [Range(0f, 1f)]
@@ -107,6 +107,14 @@ public class RingGlyphConfig : ScriptableObject
     [Range(0f, 1f)]
     [Tooltip("How far to lerp a highlighted ring's Fill/Contour color toward white. 0 = no brightening, 1 = fully white.")]
     public float highlightBrightness = 0.5f;
+
+    [Tooltip("Selected glyph: the playing bin's rings slide to the outermost slots and the other bands " +
+             "shift inward (same order), returning to the recorded order when playback stops.")]
+    public bool playingBinToOuter = true;
+
+    [Min(0f)]
+    [Tooltip("Seconds for the bands to slide to their new slots when the playing bin changes.")]
+    public float binSwapDuration = 0.5f;
 
     [Tooltip("Seconds to lerp a ring's scale and color in when its playing-bin highlight turns on.")]
     public float highlightPulseDuration = 0.15f;
@@ -136,6 +144,12 @@ public class RingGlyphConfig : ScriptableObject
              "it avoids a fragile LineRenderer closure entirely), so this Fill alpha is what the whole " +
              "ring's visibility depends on — keep it clearly visible, not just a faint wash.")]
     public float remainingRingAlpha = 0.4f;
+
+    [Min(0f)]
+    [Tooltip("Width of the remaining/locked placeholder rings. They are filled meshes with no Contour, so " +
+             "the fill band is thinned to this width, centred on the ring's outer edge. 0 = use the full " +
+             "ringThickness. Applies to gameplay remaining rings and carousel locked-preview rings.")]
+    public float remainingRingLineWidth = 0.012f;
 
     [Tooltip("Seconds to lerp from one active role color to the next on the next-up placeholder ring.")]
     public float nextUpColorCycleDuration = 1.5f;
@@ -185,6 +199,11 @@ public class RingGlyphConfig : ScriptableObject
     [Tooltip("Track selection's sounding ring only — when a note fires, turn its ring so that note's " +
              "dip sits at the top. The ring turns clockwise continuously, so each note is at 12 as it pulses and the ring keeps moving toward the next.")]
     public bool notePulseRotateToTop = true;
+
+    [Range(0f, 360f)]
+    [Tooltip("Where on the glyph the sounding note sits as it pulses, in degrees counter-clockwise from " +
+             "3 o'clock: 90 = 12 o'clock, 180 = 9, 270 = 6 o'clock. The ring still turns clockwise.")]
+    public float notePulseCueDeg = 180f;
 
     [Header("Note Travel Dot & SFX")]
     [Tooltip("Radius of the mini-ring dot that travels from note marker to tug point (in ring-local units).")]

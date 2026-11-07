@@ -253,6 +253,14 @@ public class PhaseLibraryCarousel : MonoBehaviour
     {
         if (_selectedGlyph == null) return;
         _selectedGlyph.PulseNote(role, binIndex, localStep, startDsp, durationSec);
+
+        // The orbit line's needle ripples on the same clock as the dip pulse.
+        if (orbitLines != null)
+        {
+            double at = startDsp + (selectedGlyphConfig != null ? selectedGlyphConfig.notePulseLatencySec : 0f);
+            _selectedGlyph.TryGetRingColor(role, binIndex, out var sparkColor);
+            orbitLines.PulseNeedle(at, Color.white);
+        }
     }
 
     // ── Entries ────────────────────────────────────────────────────────────────
@@ -572,11 +580,13 @@ public class PhaseLibraryCarousel : MonoBehaviour
         if (orbitLines == null) return;
         orbitLines.Clear();
         foreach (var g in _groups)
-            if (g.Phase >= 1 && g.Count >= 2) DrawOrbit(g);
+            if (g.Phase >= 1 && g.Count >= 2) DrawOrbit(g, allowShimmer: Mathf.Abs(g.YOff) < 0.001f);
     }
 
     // The orbit ellipse: near half at the group's alpha, far half dimmer, with gaps behind glyphs.
-    private void DrawOrbit(OrbitGroup g)
+    // The last near-side run before the selected glyph's footprint (its left edge, by the playback
+    // point) is drawn as the animated needle when allowShimmer.
+    private void DrawOrbit(OrbitGroup g, bool allowShimmer)
     {
         var o = g.Shape;
 
@@ -585,17 +595,49 @@ public class PhaseLibraryCarousel : MonoBehaviour
         {
             if (n.Glyph == null || !n.Glyph.gameObject.activeSelf) continue;
             Evaluate(g, n.D, g.Spin, out var pos, out float tilt);
-            _footprints.Add((new Vector2(pos.x, pos.y), _grid.R + linePadding,
-                             _grid.R * Mathf.Cos(tilt * Mathf.Deg2Rad) + linePadding));
+            // The selected glyph lays out freely, so its footprint follows its real outermost ring.
+            float r = n.Centered && n.Glyph.OuterWorldRadius > 0f ? n.Glyph.OuterWorldRadius : _grid.R;
+            _footprints.Add((new Vector2(pos.x, pos.y), r + linePadding,
+                             r * Mathf.Cos(tilt * Mathf.Deg2Rad) + linePadding));
         }
 
         int seg = Mathf.Max(16, orbitSegments);
         bool runIsFar = false;
+        bool startsHidden = false, needleDrawn = false, startFaded = false;
         _run.Clear();
 
-        void Flush()
+        Vector3 PointAt(int i)
         {
-            if (_run.Count >= 2) orbitLines.DrawPolyline(_run, g.LineAlpha * (runIsFar ? orbitDimAlpha : 1f));
+            float t = i / (float)seg * Mathf.PI * 2f;
+            return _grid.C + new Vector3(o.Rx * Mathf.Sin(t), g.YOff + RiseAt(o, t), 0f);
+        }
+        bool IsHidden(Vector3 p)
+        {
+            foreach (var f in _footprints)
+            {
+                float dx = (p.x - f.at.x) / f.halfW;
+                float dy = (p.y - f.at.y) / f.halfH;
+                if (dx * dx + dy * dy < 1f) return true;
+            }
+            return false;
+        }
+
+        // The needle is the run that reaches the last visible point before the line wraps back to the start.
+        int lastVisible = -1;
+        for (int i = seg; i >= 0 && lastVisible < 0; i--)
+            if (!IsHidden(PointAt(i))) lastVisible = i;
+
+        void Flush(bool last)
+        {
+            if (_run.Count >= 2)
+            {
+                bool needle = allowShimmer && startsHidden && last && !needleDrawn && !runIsFar;
+                if (needle) needleDrawn = true;
+                // The first near run after the glyph (its right side) is the line's soft end.
+                bool softStart = allowShimmer && startsHidden && !last && !startFaded && !runIsFar;
+                if (softStart) startFaded = true;
+                orbitLines.DrawPolyline(_run, g.LineAlpha * (runIsFar ? orbitDimAlpha : 1f), needle, softStart);
+            }
             _run.Clear();
         }
 
@@ -603,23 +645,18 @@ public class PhaseLibraryCarousel : MonoBehaviour
         {
             float t    = i / (float)seg * Mathf.PI * 2f;
             float cosT = Mathf.Cos(t);
-            var p = _grid.C + new Vector3(o.Rx * Mathf.Sin(t), g.YOff + RiseAt(o, t), 0f);
+            var p = PointAt(i);
 
-            bool hidden = false;
-            foreach (var f in _footprints)
-            {
-                float dx = (p.x - f.at.x) / f.halfW;
-                float dy = (p.y - f.at.y) / f.halfH;
-                if (dx * dx + dy * dy < 1f) { hidden = true; break; }
-            }
-            if (hidden) { Flush(); continue; }
+            bool hidden = IsHidden(p);
+            if (i == 0) startsHidden = hidden;
+            if (hidden) { Flush(i > lastVisible); continue; }
 
             bool far = cosT < -0.0001f;
-            if (_run.Count > 0 && far != runIsFar) Flush();
+            if (_run.Count > 0 && far != runIsFar) Flush(false);
             runIsFar = far;
             _run.Add(p);
         }
-        Flush();
+        Flush(true);
     }
 
     private void RefreshLabel()
@@ -647,8 +684,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
         if (isCenter) slot.SetFreeLayout(selectedGlyphScale);
         else          slot.SetFixedFit(_grid.R);
         if (entry.IsLocked)
-            slot.ApplyLockedPreview(entry.Profile.nodesPerStar, alpha,
-                unselectedGlyphConfig != null ? unselectedGlyphConfig.recordLineWidth : 0f);
+            slot.ApplyLockedPreview(entry.Profile.nodesPerStar, alpha);
         else if (isCenter)
             slot.AnimateApply(entry.Snapshot, replayLastRing: false, notePulse: true);
         else

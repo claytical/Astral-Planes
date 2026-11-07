@@ -69,6 +69,9 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
         public int           BinIndex;
         public MusicalRole   Role;
         public float         OuterRadius;
+        // Outer radius right now (0 = still the built OuterRadius). Differs while the playing bin's
+        // band has been swapped to another slot — see AnimateRingSlots.
+        public float         CurOuter;
         // This ring's position in its own stack (0 = innermost), NOT BinIndex — multiple rings
         // can share (or lack) a meaningful BinIndex (e.g. every locked-preview/remaining-progress
         // placeholder ring uses -1), so this is what BuildRingEntry uses to stagger each ring's
@@ -173,7 +176,20 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
             if (co != null) StopCoroutine(co);
         _ringPulseCoroutines.Clear();
         _highlightedRingIndices.Clear();
+        _slotCoroutine = null;
+        _recordKeys    = null;
         ResetIdleState();
+    }
+
+    // A placeholder ring has no contour, so its filled band is the line: thin it to
+    // remainingRingLineWidth, centred on the same outer edge.
+    private void ApplyPlaceholderLineWidth(ref float innerR, ref float outerR)
+    {
+        float w = config.remainingRingLineWidth;
+        if (w <= 0f || w >= outerR - innerR) return;
+        float edge = outerR;
+        innerR = edge - w * 0.5f;
+        outerR = edge + w * 0.5f;
     }
 
     private float RingInnerRadius(int idx) =>

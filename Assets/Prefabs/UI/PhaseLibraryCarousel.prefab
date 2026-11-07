@@ -154,8 +154,24 @@ MonoBehaviour:
   lineMaterial: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee, type: 2}
   lineColor: {r: 1, g: 1, b: 1, a: 1}
   lineWidth: 0.06
-  arcSegments: 16
   sortingOrder: -1
+  shimmerEnabled: 1
+  idleAmplitude: 0.12
+  pulseAmplitude: 1.2
+  wavelength: 0.22
+  rippleSpeed: 1.4
+  rippleReach: 3
+  rippleDecaySec: 0.7
+  wobbleHz: 0.6
+  widthPulse: 0.6
+  brightnessPulse: 0.5
+  tipSparksEnabled: 1
+  tipSparksPrefab: {fileID: 2567590292593330884, guid: a276ed4c32ff23441a3f6099ac175029,
+    type: 3}
+  tipBurstCount: 10
+  tipSparkSize: 0.05
+  tipSparkSpeed: 0.8
+  tipSparkLifetime: 0.45
 --- !u!1 &815967476455487031
 GameObject:
   m_ObjectHideFlags: 0
@@ -202,11 +218,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MotifRingGlyphApplicator
   config: {fileID: 11400000, guid: 4293b72a96166429997d9cefa9464185, type: 2}
   lineMaterial: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee, type: 2}
-  sphericalRotation: 0
-  maxDisplayRadius: 2
-  minDisplayRadius: 0.3
-  minRingCountForSizing: 2
-  maxRingCountForSizing: 16
   noteVisualizer: {fileID: 0}
   noteTravelDotPrefab: {fileID: 0}
   tetherBreakEffectPrefab: {fileID: 0}
@@ -268,8 +279,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5be57da6739554a38bbc6d58de874381, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhaseLibraryCarousel
-  selectedGlyphConfig: {fileID: 11400000, guid: 55c70b8124e5b4eca816e58b95a8f00a, type: 2}
-  unselectedGlyphConfig: {fileID: 11400000, guid: 4293b72a96166429997d9cefa9464185, type: 2}
   slots:
   - {fileID: 4310944924945027113}
   - {fileID: 205164797312018208}
@@ -277,11 +286,15 @@ MonoBehaviour:
   upSlot: {fileID: 4166260162177387620}
   downSlot: {fileID: 7138411120738201164}
   neighborTiltDegrees: 55
-  neighborGap: 0.5
+  cellFill: 0.9
   orbitLines: {fileID: 6557949755247544911}
   linePadding: 0.1
-  orbitSag: 0.18
   orbitDimAlpha: 0.35
+  orbitFlatten: 0.12
+  backDepthZ: 0.5
+  centerOffset: {x: 0, y: 0}
+  phaseSpacing: 0
+  orbitSegments: 128
   slideDuration: 0.25
   trackSelectionScene: TrackSelection
   inputCooldown: 0.2
@@ -291,6 +304,11 @@ MonoBehaviour:
   tutorialLabel: Tutorial
   unexploredLabel: Unexplored
   previewPlayer: {fileID: 3751250523553378462}
+  selectedGlyphConfig: {fileID: 11400000, guid: 55c70b8124e5b4eca816e58b95a8f00a,
+    type: 2}
+  unselectedGlyphConfig: {fileID: 11400000, guid: 4293b72a96166429997d9cefa9464185,
+    type: 2}
+  selectedGlyphScale: 1
   phaseLibrary: {fileID: 11400000, guid: 4660cb6f322234453bcc49b92f037354, type: 2}
   showAllPhasesForDesign: 0
   onMotifConfirmed:
@@ -357,11 +375,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MotifRingGlyphApplicator
   config: {fileID: 11400000, guid: 4293b72a96166429997d9cefa9464185, type: 2}
   lineMaterial: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee, type: 2}
-  sphericalRotation: 0
-  maxDisplayRadius: 2
-  minDisplayRadius: 0.3
-  minRingCountForSizing: 2
-  maxRingCountForSizing: 16
   noteVisualizer: {fileID: 0}
   noteTravelDotPrefab: {fileID: 0}
   tetherBreakEffectPrefab: {fileID: 0}
@@ -413,11 +426,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MotifRingGlyphApplicator
   config: {fileID: 11400000, guid: 55c70b8124e5b4eca816e58b95a8f00a, type: 2}
   lineMaterial: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee, type: 2}
-  sphericalRotation: 1
-  maxDisplayRadius: 3.33
-  minDisplayRadius: 0.5
-  minRingCountForSizing: 2
-  maxRingCountForSizing: 16
   noteVisualizer: {fileID: 0}
   noteTravelDotPrefab: {fileID: 0}
   tetherBreakEffectPrefab: {fileID: 0}
@@ -607,11 +615,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MotifRingGlyphApplicator
   config: {fileID: 11400000, guid: 4293b72a96166429997d9cefa9464185, type: 2}
   lineMaterial: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee, type: 2}
-  sphericalRotation: 0
-  maxDisplayRadius: 2
-  minDisplayRadius: 0.3
-  minRingCountForSizing: 2
-  maxRingCountForSizing: 16
   noteVisualizer: {fileID: 0}
   noteTravelDotPrefab: {fileID: 0}
   tetherBreakEffectPrefab: {fileID: 0}
@@ -663,11 +666,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MotifRingGlyphApplicator
   config: {fileID: 11400000, guid: 4293b72a96166429997d9cefa9464185, type: 2}
   lineMaterial: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee, type: 2}
-  sphericalRotation: 0
-  maxDisplayRadius: 2
-  minDisplayRadius: 0.3
-  minRingCountForSizing: 2
-  maxRingCountForSizing: 16
   noteVisualizer: {fileID: 0}
   noteTravelDotPrefab: {fileID: 0}
   tetherBreakEffectPrefab: {fileID: 0}

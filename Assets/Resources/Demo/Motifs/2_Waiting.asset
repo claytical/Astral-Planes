@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: 2_Waiting
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: waiting
-  displayName: waiting
+  displayName: Making Waffles
   keyRootMidi: 70
   entryDrumLoops:
   - {fileID: 8300000, guid: a6b537cd91fc44bc2a4357aa1a154bea, type: 3}
@@ -23,22 +23,27 @@ MonoBehaviour:
     depth01: 0
     breadth01: 0
     pressure01: 0
+    maxConsecutiveLoopSeconds: 0
   - clip: {fileID: 8300000, guid: e095cc2787fa74168ab460cb92fb1259, type: 3}
     depth01: 0.25
     breadth01: 0.25
     pressure01: 0.25
+    maxConsecutiveLoopSeconds: 0
   - clip: {fileID: 8300000, guid: c0d471632abfa453a919a93eeef1406a, type: 3}
     depth01: 0.5
     breadth01: 0.5
     pressure01: 0.5
+    maxConsecutiveLoopSeconds: 0
   - clip: {fileID: 8300000, guid: c6203f9021ee148bbadff648d3e20ffe, type: 3}
     depth01: 0.75
     breadth01: 0.75
     pressure01: 0.75
+    maxConsecutiveLoopSeconds: 0
   - clip: {fileID: 8300000, guid: 29918de9d949044b8bc0299e58bc63e7, type: 3}
     depth01: 1
     breadth01: 1
     pressure01: 1
+    maxConsecutiveLoopSeconds: 0
   entryLoopCount: 16
   resetFirstCarryOnStart: 0
   bridgeSamples:
@@ -53,6 +58,8 @@ MonoBehaviour:
   mazePattern: {fileID: 11400000, guid: 801fa6791dfb34c298cea3d865cdf526, type: 2}
   roleGeoConfigs: []
   genericFillNeverRegrowRatio: 0.5
+  genericFillRatio01: 0
+  genericFillRegrowSoftenMultiplier01: 1
   chordProgression: {fileID: 11400000, guid: e7e83b9a382cd456a99566c339aaadc1, type: 2}
   alternateChordProgressionProfile: {fileID: 11400000, guid: b956b0bff50d748d88897368376e5eeb,
     type: 2}

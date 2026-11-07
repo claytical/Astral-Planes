@@ -45,6 +45,8 @@ public partial class MotifRingGlyphApplicator
         int segs    = Mathf.Max(16, config.segments);
         int binSize = Mathf.Max(1, snapshot.TotalSteps);
         var bandedRadii = ComputeRadii(ringKeys, out float ringThick);
+        _recordKeys      = ringKeys;
+        _recordThickness = ringThick;
         int maxNoteCount = ringKeys.Max(k => k.noteCount);
 
         for (int i = 0; i < ringKeys.Count; i++)
@@ -204,7 +206,7 @@ public partial class MotifRingGlyphApplicator
     /// (the motif's nodesPerStar) rather than recorded bins. Used for the "next up" locked
     /// entry in the PhaseLibrary carousel: selectable, but nothing to preview-play.
     /// </summary>
-    public void ApplyLockedPreview(int ringCount, float alphaScale = 1f, float lineWidth = 0f)
+    public void ApplyLockedPreview(int ringCount, float alphaScale = 1f)
     {
         StopAllCoroutines();
         _lockedLook        = true;
@@ -227,14 +229,7 @@ public partial class MotifRingGlyphApplicator
             float innerR = fixedRadii != null ? fixedRadii[i] : RingInnerRadius(i);
             float outerR = innerR + ringThick;
 
-            // A locked ring has no contour, so its filled band is the line: thin it to the contour
-            // width a recorded ring would have, centred on the same outer edge.
-            if (fixedRadii != null && lineWidth > 0f && lineWidth < ringThick)
-            {
-                float edge = outerR;
-                innerR = edge - lineWidth * 0.5f;
-                outerR = edge + lineWidth * 0.5f;
-            }
+            ApplyPlaceholderLineWidth(ref innerR, ref outerR);
 
             var entry = BuildRingEntry($"LockedRing_{i}", innerR, outerR, segs,
                 config.remainingRingColor, default, -1,
@@ -283,6 +278,96 @@ public partial class MotifRingGlyphApplicator
                 _recordRings[i].Contour.sortingOrder = shouldHighlight
                     ? TravelDotSortingOrder - 1
                     : RecordRingSortingOrder(i, _recordRings.Count).contour;
+        }
+
+        // The playing bin's band slides to the outermost slots (and back to canonical when none plays).
+        if (config.playingBinToOuter && _recordKeys != null && _recordKeys.Count == _recordRings.Count)
+        {
+            if (_slotCoroutine != null) StopCoroutine(_slotCoroutine);
+            _slotCoroutine = StartCoroutine(AnimateRingSlots(ComputeSlotOuterRadii(binIndex)));
+        }
+    }
+
+    // ── Playing bin takes the outer slots ───────────────────────────────────
+    // Keys of the built record (ascending bin, then role) and its shared ring thickness, kept so
+    // the bands can be re-laid-out; null for glyphs that aren't the note-pulse record.
+    private List<(int binIndex, MusicalRole role, Color color, float matchRatio, int noteCount)> _recordKeys;
+    private float     _recordThickness;
+    private Coroutine _slotCoroutine;
+    private Vector3[] _slotVerts;
+
+    // Outer radius of every ring (by ring index) when `playingBin`'s band is moved to the outermost
+    // slot and the other bands keep their order inside it. No band matches → the canonical layout.
+    private float[] ComputeSlotOuterRadii(int playingBin)
+    {
+        var order = Enumerable.Range(0, _recordKeys.Count)
+            .OrderBy(i => _recordKeys[i].binIndex == playingBin ? 1 : 0)   // stable: others keep their order
+            .ToList();
+        var reordered = order.Select(i => _recordKeys[i]).ToList();
+        var radii     = ComputeRadii(reordered, out float thick);
+
+        var outer = new float[_recordKeys.Count];
+        for (int j = 0; j < order.Count; j++) outer[order[j]] = radii[j] + thick;
+        return outer;
+    }
+
+    private IEnumerator AnimateRingSlots(float[] target)
+    {
+        var from = new float[target.Length];
+        for (int i = 0; i < from.Length; i++)
+            from[i] = _recordRings[i].CurOuter > 0f ? _recordRings[i].CurOuter : _recordRings[i].OuterRadius;
+
+        float dur = Mathf.Max(0f, config.binSwapDuration);
+        for (float elapsed = 0f; ; elapsed += Time.deltaTime)
+        {
+            float u = dur > 0f ? Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / dur)) : 1f;
+            for (int i = 0; i < target.Length && i < _recordRings.Count; i++)
+                SetRingOuterRadius(i, Mathf.Lerp(from[i], target[i], u));
+            if (u >= 1f) break;
+            yield return null;
+        }
+        _slotCoroutine = null;
+    }
+
+    /// <summary>World-space radius of the outermost built record ring (0 until rings exist).</summary>
+    public float OuterWorldRadius
+    {
+        get
+        {
+            float outer = 0f;
+            for (int i = 0; i < _recordRings.Count; i++)
+                outer = Mathf.Max(outer, _recordRings[i].CurOuter > 0f ? _recordRings[i].CurOuter : _recordRings[i].OuterRadius);
+            return outer * transform.lossyScale.x;
+        }
+    }
+
+    // Moves ring i to the given outer radius, keeping its thickness: rewrites the fill annulus and
+    // tells the contour (baked at the built radius) to scale to match.
+    private void SetRingOuterRadius(int i, float outer)
+    {
+        var e = _recordRings[i];
+        if (e.Root == null || e.FillMesh == null) return;
+
+        int n = e.FillMesh.vertexCount / 2;
+        if (_slotVerts == null || _slotVerts.Length != n * 2) _slotVerts = new Vector3[n * 2];
+        float inner = Mathf.Max(0f, outer - _recordThickness);
+        for (int k = 0; k < n; k++)
+        {
+            float a = k / (float)n * Mathf.PI * 2f;
+            float c = Mathf.Cos(a), sn = Mathf.Sin(a);
+            _slotVerts[k]     = new Vector3(c * outer, sn * outer, 0f);
+            _slotVerts[n + k] = new Vector3(c * inner, sn * inner, 0f);
+        }
+        e.FillMesh.SetVertices(_slotVerts);
+        e.FillMesh.RecalculateBounds();
+
+        e.CurOuter = outer;
+        _recordRings[i] = e;
+
+        if (e.Contour != null && e.OuterRadius > 0f && _pulseStates.TryGetValue(e.Contour, out var s))
+        {
+            s.Scale  = outer / e.OuterRadius;
+            s.Redraw = true;
         }
     }
 
@@ -376,6 +461,19 @@ public partial class MotifRingGlyphApplicator
         return _circleSprite;
     }
 
+    /// <summary>The base color of the ring for a role/bin, e.g. to tint effects that belong to its note.</summary>
+    public bool TryGetRingColor(MusicalRole role, int binIndex, out Color color)
+    {
+        for (int i = 0; i < _recordRings.Count; i++)
+        {
+            if (_recordRings[i].BinIndex != binIndex || _recordRings[i].Role != role) continue;
+            color = _recordRings[i].BaseColor;
+            return true;
+        }
+        color = Color.white;
+        return false;
+    }
+
     /// <summary>Un-highlights every ring — used when preview playback stops.</summary>
     public void ClearPlayingBinHighlight() => SetPlayingBin(int.MinValue); // no ring ever matches this bin
 
@@ -398,7 +496,7 @@ public partial class MotifRingGlyphApplicator
             // noteInfos built in AnimateApply) rather than the ring's plain, undipped radius —
             // otherwise the firework sits on the circle the ring would be at with no notes,
             // not the pulled-in position the note's dip is actually drawn at.
-            float tugR = ring.OuterRadius * (1f - config.tugDepthFraction);
+            float tugR = (ring.CurOuter > 0f ? ring.CurOuter : ring.OuterRadius) * (1f - config.tugDepthFraction);
             // angleRad (from RingPreviewPlayer) already carries the global ringStartAngleOffset,
             // but not this specific ring's ordinal jitter — add it here where ring.RingOrdinal is
             // actually resolved, so the firework lands on the same dip the contour drew.

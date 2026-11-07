@@ -417,6 +417,7 @@ public partial class MotifRingGlyphApplicator
             int   idx    = _gameplayRings.Count + i;
             float innerR = RingInnerRadius(idx);
             float outerR = innerR + config.ringThickness;
+            ApplyPlaceholderLineWidth(ref innerR, ref outerR);
 
             var entry = BuildRingEntry($"RemainingRing_{i}", innerR, outerR, segs,
                 config.remainingRingColor, default, -1,

@@ -70,6 +70,9 @@ public partial class MotifRingGlyphApplicator
         if (lineMaterial != null) lr.sharedMaterial = lineMaterial;
         lr.useWorldSpace     = false;
         lr.loop              = false;
+        // RingUnlit's edge softness reads V across the strip's width, so the UV layout must stay Stretch/View.
+        lr.textureMode       = LineTextureMode.Stretch;
+        lr.alignment         = LineAlignment.View;
         lr.widthMultiplier   = contourWidthOverride ?? config.lineWidth;
         // Rounds joints along the polyline (softens the sharp inward "V" at each note's tug-dip),
         // same technique as PhaseStarDustAffect.CreateTentacleLine. numCapVertices is deliberately
