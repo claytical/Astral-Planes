@@ -159,10 +159,17 @@ public class RingPreviewPlayer : MonoBehaviour
             else
                 roleProf = MusicalRoleProfileLibrary.GetProfile(kvp.Key);
 
-            if (roleProf != null && kvp.Value < 16)
+            // Saved playback profile (what was actually heard live) wins over re-derivation.
+            int presetToUse = roleProf != null ? roleProf.midiPreset : 0;
+            bool havePreset = roleProf != null;
+            if (snap.TrackBins != null)
+                foreach (var tb in snap.TrackBins)
+                    if (tb.Role == kvp.Key && tb.HasPlaybackProfile) { presetToUse = tb.MidiPreset; havePreset = true; break; }
+
+            if (havePreset && kvp.Value < 16)
             {
-                _channelPresets[kvp.Value] = roleProf.midiPreset;
-                if (GameFlowManager.VerboseLogging) Debug.Log($"[PREVIEW] Channel {kvp.Value} ({kvp.Key}) Preset {roleProf.midiPreset}");
+                _channelPresets[kvp.Value] = presetToUse;
+                if (GameFlowManager.VerboseLogging) Debug.Log($"[PREVIEW] Channel {kvp.Value} ({kvp.Key}) Preset {presetToUse}");
             }
         }
 
@@ -177,15 +184,15 @@ public class RingPreviewPlayer : MonoBehaviour
         {
             if (entry.Step < 0 || entry.Step >= _totalSteps) continue;
 
-            var role = ResolveRoleForNote(snap.TrackBins, entry.BinIndex, entry.TrackColor);
+            var role = entry.HasRole ? entry.Role : ResolveRoleForNote(snap.TrackBins, entry.BinIndex, entry.TrackColor);
 
-            Chord chord       = GetChordForBin(entry.BinIndex, motif.chordProgression, motif.alternateChordProgressionProfile);
-            int   retunedNote = SnapNoteToChord(entry.Note, chord);
+            // Saved pitch is already the final chord-quantized note the player heard; don't re-snap.
+            int retunedNote = entry.Note;
 
             int ch = RoleChannel.TryGetValue(role, out int rc) ? rc : 4;
 
             float v01  = entry.Velocity > 1.01f ? entry.Velocity / 127f : entry.Velocity;
-            int vel127 = Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(40f, 127f, v01)), 40, 100);
+            int vel127 = ComputeVelocity(snap.TrackBins, role, v01);
 
             // Session duration in MPTK ticks → ms via capture-time BPM (same math as
             // MidiVoice.PlayNoteTicks). 0 ⇒ legacy ring, filled by the fallback below.
@@ -460,39 +467,18 @@ public class RingPreviewPlayer : MonoBehaviour
         return default;
     }
 
-    private static Chord GetChordForBin(int bin,
-        ChordProgressionProfile primary, ChordProgressionProfile alternate)
+    // Mirrors the live path: role [min,max] velocity range, then volumeMultiplier.
+    // Legacy rings (no saved profile) keep the old fixed 40–100 curve.
+    private static int ComputeVelocity(List<MotifSnapshot.TrackBinData> trackBins, MusicalRole role, float v01)
     {
-        ChordProgressionProfile prog = null;
-        int localBin = bin;
-
-        if (bin >= 4 && alternate != null && alternate.chordSequence?.Count > 0)
-        {
-            prog     = alternate;
-            localBin = bin - 4;
-        }
-        else if (primary != null && primary.chordSequence?.Count > 0)
-        {
-            prog = primary;
-        }
-
-        if (prog == null) return default;
-        return prog.chordSequence[localBin % prog.chordSequence.Count];
-    }
-
-    private static int SnapNoteToChord(int midiNote, Chord chord)
-    {
-        if (chord.intervals == null || chord.intervals.Count == 0) return midiNote;
-        int best = midiNote, bestDist = int.MaxValue;
-        for (int oct = -2; oct <= 8; oct++)
-            foreach (int interval in chord.intervals)
+        if (trackBins != null)
+            foreach (var tb in trackBins)
             {
-                int tone = chord.rootNote + interval + oct * 12;
-                if (tone < 21 || tone > 108) continue;
-                int d = Mathf.Abs(tone - midiNote);
-                if (d < bestDist) { bestDist = d; best = tone; }
+                if (tb.Role != role || !tb.HasPlaybackProfile) continue;
+                float v = Mathf.Lerp(tb.MinVelocity, tb.MaxVelocity, Mathf.Clamp01(v01)) * tb.VolumeMultiplier;
+                return Mathf.Clamp(Mathf.RoundToInt(v), 1, 127);
             }
-        return best;
+        return Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(40f, 127f, v01)), 40, 100);
     }
 
     private void PrimeChannels()

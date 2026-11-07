@@ -250,6 +250,11 @@ public class MotifSnapshot
         /// 0 on legacy rings ⇒ preview falls back to distance-to-next-onset.</summary>
         public int   DurationTicks;
 
+        /// <summary>Exact role of the recording track. Only valid when HasRole (false on legacy rings
+        /// ⇒ preview falls back to the track-color match).</summary>
+        public MusicalRole Role;
+        public bool        HasRole;
+
         /// <summary>
         /// Normalized step position within the bin (0 = first step, 1 = last step).
         /// Drives ring tug-dip width in MotifRingGlyphGenerator: later-position notes
@@ -303,6 +308,14 @@ public class MotifSnapshot
         public MusicalRole Role;
         public int         BinIndex;
         public bool        IsFilled;
+
+        /// <summary>Playback profile of the recording track (preset/loudness as heard live).
+        /// Only valid when HasPlaybackProfile; false on legacy rings.</summary>
+        public bool  HasPlaybackProfile;
+        public int   MidiPreset;
+        public float VolumeMultiplier = 1f;
+        public int   MinVelocity = 60;
+        public int   MaxVelocity = 127;
 
         /// <summary>Time.time when this bin was marked filled. -1 if not filled.</summary>
         public float CompletionTime;

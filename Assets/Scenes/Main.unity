@@ -2084,6 +2084,11 @@ PrefabInstance:
       propertyPath: showAllPhasesForDesign
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
+        type: 3}
+      propertyPath: unselectedSpinDegPerSec
+      value: 32
+      objectReference: {fileID: 0}
     - target: {fileID: 3751250523553378462, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
       propertyPath: ringGlyphConfig

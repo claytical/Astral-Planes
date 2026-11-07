@@ -53,6 +53,10 @@ public class PhaseLibraryCarousel : MonoBehaviour
              "above (squashes it vertically by cos). The selected glyph is never tipped.")]
     [SerializeField] private float neighborTiltDegrees = 55f;
 
+    [Tooltip("Degrees per second unselected glyphs slowly turn about their own Z axis (the disc normal). " +
+             "0 disables. The selected glyph never spins.")]
+    [SerializeField] private float unselectedSpinDegPerSec = 8f;
+
     [Tooltip("Fraction of a grid cell's half-size (the smaller of width/height) that each glyph's " +
              "outer radius fills. The same size is used for every glyph.")]
     [Range(0.2f, 1f)]
@@ -289,11 +293,17 @@ public class PhaseLibraryCarousel : MonoBehaviour
         int sharing = 0;
         foreach (var m in phase.motifs)
             if (m != null && m.motifId == motif.motifId) sharing++;
-        if (sharing <= 1) return candidates[0];
 
+        // Several files can resolve to one (PhaseId, MotifId): a phase reorder renames the slot
+        // file but leaves the old one on disk. Newest save wins; when slots share a motifId the
+        // snapshot's MotifIndex narrows the field first.
+        MotifSnapshot best = null;
         foreach (var c in candidates)
-            if (c.MotifIndex == motifIndex) return c;
-        return null;
+        {
+            if (sharing > 1 && c.MotifIndex != motifIndex) continue;
+            if (best == null || c.SavedAtUtcTicks > best.SavedAtUtcTicks) best = c;
+        }
+        return best;
     }
 
     private CarouselEntry GetEntry(int phaseIndex, int motifIndex)
@@ -373,6 +383,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
         public int Motif;
         public int D; // signed steps from the group's selected motif
         public bool Centered; // whether Glyph was last applied (and configured) as the selected look
+        public float SpinDeg = Random.Range(0f, 360f); // unselected glyphs' slow Z-spin, phased per node
     }
 
     // One orbit on screen: a phase's motifs (Full) or just its front motif (adjacent phases).
@@ -512,6 +523,25 @@ public class PhaseLibraryCarousel : MonoBehaviour
         foreach (var n in g.Nodes) AssignNode(g, n, isSelectedGroup);
     }
 
+    // The orbit's X tip, then (unselected glyphs only) a turn about the disc's own normal.
+    private static Quaternion GlyphRotation(float tilt, OrbitNode n) =>
+        Quaternion.Euler(tilt, 0f, 0f) * Quaternion.Euler(0f, 0f, n.Centered ? 0f : n.SpinDeg);
+
+    // Advances the unselected glyphs' spin and re-applies only their rotation (slides re-place every frame anyway).
+    private void SpinUnselected()
+    {
+        if (unselectedSpinDegPerSec == 0f || _groups == null || _sliding) return;
+        float step = unselectedSpinDegPerSec * Time.unscaledDeltaTime;
+        foreach (var g in _groups)
+            foreach (var n in g.Nodes)
+            {
+                if (n.Glyph == null || n.Centered) continue;
+                n.SpinDeg = Mathf.Repeat(n.SpinDeg + step, 360f);
+                Evaluate(g, n.D, g.Spin, out _, out float tilt);
+                n.Glyph.transform.localRotation = GlyphRotation(tilt, n);
+            }
+    }
+
     private void PlaceGroup(OrbitGroup g)
     {
         foreach (var n in g.Nodes)
@@ -520,7 +550,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
             Evaluate(g, n.D, g.Spin, out var pos, out float tilt);
             n.Glyph.gameObject.SetActive(true);
             n.Glyph.transform.position      = pos;
-            n.Glyph.transform.localRotation = Quaternion.Euler(tilt, 0f, 0f);
+            n.Glyph.transform.localRotation = GlyphRotation(tilt, n);
 
             // Every glyph's renderers use the same explicit sortingOrders (rings stack at 3, 5, 7…),
             // and an explicit order always beats z, so without a group a far glyph's higher-numbered
@@ -705,6 +735,8 @@ public class PhaseLibraryCarousel : MonoBehaviour
 
     private void Update()
     {
+        SpinUnselected();
+
         // This polls raw device state directly (no Input Action / EventSystem involved), so it
         // has no built-in awareness of modal UI on top of it. The settings panel's own Confirm
         // press must not also be read here as "confirm the carousel and load TrackSelection" —

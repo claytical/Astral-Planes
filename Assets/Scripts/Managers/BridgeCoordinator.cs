@@ -134,7 +134,7 @@ public sealed class BridgeCoordinator
                 int localStep = n.stepIndex % binSize;
                 float commitTime01 = (binSize > 1) ? localStep / (float)(binSize - 1) : 0.5f;
 
-                snapshot.CollectedNotes.Add(new MotifSnapshot.NoteEntry(
+                var entry = new MotifSnapshot.NoteEntry(
                     step: n.stepIndex,
                     note: n.note,
                     velocity: n.velocity,
@@ -142,9 +142,13 @@ public sealed class BridgeCoordinator
                     binIndex: binIndex,
                     isMatched: true,
                     commitTime01: commitTime01,
-                    durationTicks: n.duration));
+                    durationTicks: n.duration);
+                entry.Role = track.assignedRole;
+                entry.HasRole = true;
+                snapshot.CollectedNotes.Add(entry);
             }
 
+            var prof = track.ActiveProfile ?? MusicalRoleProfileLibrary.GetProfile(track.assignedRole);
             int allocatedBins = Mathf.Max(1, track.loopMultiplier);
             for (int b = 0; b < allocatedBins; b++)
             {
@@ -152,6 +156,11 @@ public sealed class BridgeCoordinator
                 {
                     TrackColor = track.DisplayColor,
                     Role = track.assignedRole,
+                    HasPlaybackProfile = prof != null,
+                    MidiPreset = prof != null ? prof.midiPreset : 0,
+                    VolumeMultiplier = prof != null ? prof.volumeMultiplier : 1f,
+                    MinVelocity = prof != null ? prof.minVelocity : 60,
+                    MaxVelocity = prof != null ? prof.maxVelocity : 127,
                     BinIndex = b,
                     IsFilled = track.IsBinFilled(b),
                     CompletionTime = track.GetBinCompletionTime(b),
