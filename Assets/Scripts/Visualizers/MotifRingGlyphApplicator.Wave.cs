@@ -147,11 +147,26 @@ public partial class MotifRingGlyphApplicator
         LineRenderer lr, List<Vector2> pts, float delay, float outerR, int binSteps,
         Transform ringTransform, System.Func<bool> shouldStop)
     {
+        // Draw in at the pulse's resting shape (e.g. bulged outward) so the first pulse frame doesn't pop.
         yield return AnimateSingleRing(
-            lr, pts, delay, config.ringDrawInDuration,
+            lr, RestShapePoints(lr, pts, outerR), delay, config.ringDrawInDuration,
             ringTransform, 0f,
             shouldStop, spinAfter: false);
         yield return AnimateNotePulseRing(lr, outerR, binSteps, shouldStop);
+    }
+
+    // The baked contour with every dip scaled to the pulse's resting amplitude (waveRestDepth).
+    private List<Vector2> RestShapePoints(LineRenderer lr, List<Vector2> pts, float outerR)
+    {
+        if (lr == null || !_pulseStates.TryGetValue(lr, out var s) || s.Centers.Length == 0) return pts;
+        var rest = new List<Vector2>(pts.Count);
+        for (int i = 0; i < pts.Count; i++)
+        {
+            float dip = i < s.Dip.Length ? s.Dip[i] : 0f;
+            float baseR = outerR - dip;
+            rest.Add(dip > 0f && baseR > 0.0001f ? pts[i] * ((outerR - dip * config.waveRestDepth) / baseR) : pts[i]);
+        }
+        return rest;
     }
 
     // Finds the ring for (role, bin) and the baked dip nearest the step.

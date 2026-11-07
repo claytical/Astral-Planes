@@ -89,7 +89,7 @@ public class RingGlyphConfig : ScriptableObject
     [Tooltip("Contour notch depth at a note, as a fraction of that ring's own radius (outer rings dip farther in " +
              "absolute terms). 1 reaches the exact center of the glyph. Also sets where travel dots, tethers and " +
              "fireworks land (outerRadius × (1 − depth)). Where notes overlap the deepest one wins — depths don't add. " +
-             "In the carousel's selected glyph the notch shows only waveRestDepth of this between notes. Baked when a " +
+             "In the carousel's selected glyph the notch shows only waveRestDepth of this between notes (negative = bulged outward). Baked when a " +
              "glyph is built. Subtle ≈ 0.2, pronounced ≈ 0.65.")]
     public float tugDepthFraction = 0.65f;
 
@@ -179,10 +179,11 @@ public class RingGlyphConfig : ScriptableObject
     public float directionMatchRatioThreshold = 0.5f;
 
     [Header("Note Pulse (Track Selection)")]
-    [Range(0f, 1f)]
-    [Tooltip("Track selection's sounding ring only — fraction of a note's full dip depth that remains " +
-             "while the note isn't sounding. 0 = dips flatten between notes, 1 = no pulse.")]
-    public float waveRestDepth = 0.35f;
+    [Range(-1f, 1f)]
+    [Tooltip("Track selection's sounding ring only — fraction of a note's full dip depth while the note " +
+             "isn't sounding. 0 = dips flatten between notes, 1 = no pulse, negative = the note rests as an " +
+             "outward bump of that fraction of the dip depth and each hit swings it through to full depth.")]
+    public float waveRestDepth = -0.4f;
 
     [Min(0.001f)]
     [Tooltip("Seconds for a dip to swell from rest to full depth when its note starts.")]

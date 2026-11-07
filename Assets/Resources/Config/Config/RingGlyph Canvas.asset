@@ -43,7 +43,7 @@ MonoBehaviour:
   rotSpeedBase: 100
   rotSpeedMax: 10
   directionMatchRatioThreshold: 1
-  waveRestDepth: 0.35
+  waveRestDepth: -0.4
   notePulseAttackSec: 0.03
   notePulseMinSec: 0.12
   notePulseLatencySec: 0
