@@ -25,7 +25,9 @@ public partial class InstrumentTrack
         SnapshotBurstLeaderBins(collectable.burstId, finalTargetStep);
 
         int note = collectable.GetNote();
+        NoteCollectedForRound(vehicle, collectable.burstId);
         CollectNote(vehicle, finalTargetStep, note, durationTicks, force, ResolveAuthoredRootForStep(finalTargetStep));
+        AwardCompetitiveNote(vehicle, collectable.burstId);
 
         int targetBin = BinIndexForStep(finalTargetStep);
         if (GameFlowManager.VerboseLogging) Debug.Log($"[CURSOR] Target Bin={targetBin} binCursor: {_binCursor} allocated: {binAllocated} filled: {_binFilled}");
@@ -126,6 +128,8 @@ public partial class InstrumentTrack
     {
         if (vehicle == null || collectable == null || collectable.assignedInstrumentTrack != this) return;
 
+        NoteCollectedForRound(vehicle, collectable.burstId);
+
         // Free the vacated grid cell (same as normal pickup path).
         if (drumTrack != null)
         {
@@ -197,7 +201,7 @@ public partial class InstrumentTrack
     /// Commit a released note into the persistent loop at an absolute step. This is where burst
     /// completion and bin fill logic occurs for manual release.
     /// </summary>
-    public void CommitManualReleasedNote(int stepAbs, int midiNote, int durationTicks, float velocity127, int authoredRootMidi, int burstId, bool lightMarkerNow, bool skipChordQuantize = false)
+    public void CommitManualReleasedNote(int stepAbs, int midiNote, int durationTicks, float velocity127, int authoredRootMidi, int burstId, bool lightMarkerNow, bool skipChordQuantize = false, Vehicle placer = null)
     {
         if (drumTrack == null) return;
 
@@ -213,6 +217,7 @@ public partial class InstrumentTrack
         persistentLoopNotes.RemoveAll(t => t.stepIndex == stepAbs);
         AddNoteToLoop(stepAbs, midiNote, durationTicks, velocity127, lightMarkerNow, authoredRootMidi, skipChordQuantize);
         NotifyNoteCommittedForDust();
+        AwardCompetitiveNote(placer, burstId);
 
         int targetBin = BinIndexForStep(stepAbs);
         RegisterBurstStep(burstId, stepAbs);
@@ -355,7 +360,7 @@ public partial class InstrumentTrack
             $"[TRKDBG] {name} CompleteBurst: burstId={burstId} hadNotes={hadNotes} " +
             $"(_bursts={_bursts?.Count ?? -1})");
 
-        OnCollectableBurstCleared?.Invoke(this, burstId, hadNotes);
+        RaiseBurstCleared(burstId, hadNotes);
     }
 
     // Snapshots leader bin count before the first note of a burst writes to the loop.

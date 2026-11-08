@@ -16,6 +16,9 @@ public partial class LocalPlayer
         set => _isReady = value;
     }
 
+    /// <summary>Competitive modes: permanently out after dying (no continue window, no respawn).</summary>
+    public bool IsEliminated { get; private set; }
+
     public bool IsInContinueWindow => _isInContinueWindow;
     public bool IsRespawning => _isRespawning;
 
@@ -45,9 +48,19 @@ public partial class LocalPlayer
             return;
         }
 
+        if (_isReady &&
+            GameFlowManager.Instance != null &&
+            GameFlowManager.Instance.CurrentState == GameState.Selection &&
+            GameFlowManager.Instance.SessionState.AwaitingModeConfirm)
+        {
+            _sfxSource?.PlayOneShot(confirmFx);
+            GameFlowManager.Instance.ConfirmModeSelection();
+            return;
+        }
+
         OnChooseConfirm?.Invoke();
 
-        if (_isReady || GameFlowManager.Instance == null) return;
+        if (_isReady ||GameFlowManager.Instance == null) return;
 
         switch (GameFlowManager.Instance.CurrentState)
         {
@@ -122,6 +135,7 @@ public partial class LocalPlayer
 
     public void ResetReady()
     {
+        IsEliminated = false;
         _isReady = false;
         IsReady = false;
         _isInContinueWindow = false;
@@ -135,6 +149,12 @@ public partial class LocalPlayer
         plane = null;
         _launched = false;
         _launchStarted = false;
+
+        if (GameFlowManager.Instance?.SessionState?.IsCompetitive == true)
+        {
+            IsEliminated = true;
+            return;
+        }
 
         // Fully chained ?. — SessionState/Players being null (not just Instance) must not throw
         // here: this runs synchronously on whatever call stack killed the vehicle, which can be

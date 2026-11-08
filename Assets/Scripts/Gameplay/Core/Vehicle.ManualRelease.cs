@@ -168,7 +168,8 @@ public partial class Vehicle
             authoredRootMidi: commitAuthoredRoot,
             burstId: p.burstId,
             lightMarkerNow: true,
-            skipChordQuantize: true   // pitch resolved above; octave-fit only
+            skipChordQuantize: true,  // pitch resolved above; octave-fit only
+            placer: this
         );
 
         p.track.PlayOneShotMidi(chosenMidi, commitVel, resolvedDurationTicks);

@@ -32,6 +32,10 @@ public partial class LocalPlayer
     private Vector2Int _dustKeepClearCell;
 
     private Color _color;
+    public Color DisplayColor => _color;
+    /// <summary>Ship sprite cached at launch; survives the vehicle being destroyed on death.</summary>
+    public Sprite DisplaySprite { get; private set; }
+    public string DisplayName => $"Player {(_playerInput != null ? _playerInput.playerIndex + 1 : _id)}";
     private PlayerStatsTracking _playerStats;
 
     public void CreatePlayerSelect()
@@ -181,11 +185,13 @@ public partial class LocalPlayer
         {
             plane.playerStats   = _playerStats;
             plane.playerStatsUI = _ui;
+            _ui.BindCompetitive(_playerStats);
             plane.SyncEnergyUI();
             plane.SetDrumTrack(drums);
 
             var sr = plane.GetComponent<SpriteRenderer>();
             if (sr) sr.color = _color;
+            DisplaySprite = plane.GetBaseSprite();
             SetStats();
             _ui.SetColor(_color);
             _playerInput.SwitchCurrentActionMap("Play");

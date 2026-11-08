@@ -38,6 +38,13 @@ public partial class GameFlowManager
             beginGameplay: BeginGameAfterTutorial);
     }
 
+    /// <summary>Multiplayer: the extra confirm after everyone is ready locks the mode and starts the tutorial.</summary>
+    public void ConfirmModeSelection()
+    {
+        SessionState.LockMode();
+        CheckAllPlayersReady();
+    }
+
     public void BeginGameAfterTutorial()
     {
         SessionGenome.BootNewSessionSeed((int)Random.Range(0, 1000f));
@@ -48,6 +55,12 @@ public partial class GameFlowManager
 
     public void CheckAllPlayersOutOfEnergy()
     {
+        if (SessionState.IsCompetitive)
+        {
+            CheckCompetitiveMatchEnd();
+            return;
+        }
+
         if (SessionState.CheckAllPlayersOutOfEnergy())
             StartCoroutine(HandleGameOverSequence());
     }

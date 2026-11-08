@@ -1378,6 +1378,7 @@ MonoBehaviour:
   noteViz: {fileID: 0}
   phaseTransitionManager: {fileID: 0}
   localPlayers: []
+  competitiveScoringConfig: {fileID: 0}
   playerStatsGrid: {fileID: 0}
   _activeTracks: []
   phaseBridgeFadeOutSeconds: 16

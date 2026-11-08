@@ -89,6 +89,10 @@ public partial class GameFlowManager : MonoBehaviour
     
     public List<LocalPlayer> localPlayers = new();
 
+    [Header("Competitive Mode")]
+    [Tooltip("Scoring tunables. Falls back to 1 point/note, x2 multiplier when unassigned.")]
+    public CompetitiveScoringConfig competitiveScoringConfig;
+
     [SerializeField] private Transform playerStatsGrid; // assign via inspector if possible
     public Transform PlayerStatsGrid => playerStatsGrid;
     private GameState currentState = GameState.Begin;

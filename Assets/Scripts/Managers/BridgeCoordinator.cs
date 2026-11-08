@@ -25,7 +25,8 @@ public sealed class BridgeCoordinator
 
     public void ClearSessionMotifs() => _motifSnapshots.Clear();
 
-    public IEnumerator PlayMotifBridgeAndRestart()
+    /// <param name="endMatchAfterSpin">Competitive motif mode: after the ring spins off, show the match results instead of the interstitial maze.</param>
+    public IEnumerator PlayMotifBridgeAndRestart(bool endMatchAfterSpin = false)
     {
         _session.SetGhostCycleInProgress(true);
         _session.SetBridgePending(true);
@@ -85,6 +86,15 @@ public sealed class BridgeCoordinator
         if (loopBoundaryDsp > 0)
             while (AudioSettings.dspTime < loopBoundaryDsp)
                 yield return null;
+
+        if (endMatchAfterSpin)
+        {
+            // Clear the ghost-cycle guard first: TryBeginMatchEnd refuses while it is set.
+            _session.SetGhostCycleInProgress(false);
+            _session.SetBridgePending(false);
+            _gameFlow.BeginCompetitiveMatchEnd(MatchEndReason.MotifComplete);
+            yield break;
+        }
 
         yield return _gameFlow.StartCoroutine(_gameFlow.PathChoice.RunPathChoiceAndAdvance());
         _session.SetGhostCycleInProgress(false);
@@ -171,6 +181,9 @@ public sealed class BridgeCoordinator
 
         return snapshot;
     }
+
+    /// <summary>Competitive match end: same teardown as a bridge, but the rings are left playing.</summary>
+    public void FreezeGameplayForMatchEnd() => FreezeGameplayForBridge();
 
     private void FreezeGameplayForBridge()
     {

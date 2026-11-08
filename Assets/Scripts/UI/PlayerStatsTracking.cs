@@ -16,6 +16,45 @@ public class PlayerStatsTracking : MonoBehaviour
     public float maxTime;
     public float effiencyScore;
 
+    // Competitive-mode scoring (driven by CompetitiveScoring; separate from the legacy `score` above).
+    public int CompetitiveTotal { get; private set; }      // points, multiplier applied
+    public int RoundNoteScore { get; private set; }        // raw notes placed this round, multiplier NOT applied
+    public bool RoundActive => _roundBursts > 0;           // collected from a discovery burst that hasn't cleared
+    public int ActiveMultiplier => _multiplierBursts > 0 ? _multiplierValue : 0;   // 0 = none held
+    public event System.Action CompetitiveChanged;
+
+    private int _roundBursts;
+    private int _multiplierBursts;
+    private int _multiplierValue;
+
+    /// <summary>First note collected from a discovery burst. multiplier &gt; 0 only for the burst's multiplier holder.</summary>
+    public void JoinRound(int multiplier)
+    {
+        if (_roundBursts == 0) RoundNoteScore = 0;
+        _roundBursts++;
+        if (multiplier > 0)
+        {
+            _multiplierBursts++;
+            _multiplierValue = multiplier;
+        }
+        CompetitiveChanged?.Invoke();
+    }
+
+    public void LeaveRound(bool heldMultiplier)
+    {
+        if (_roundBursts <= 0) return;
+        _roundBursts--;
+        if (heldMultiplier && _multiplierBursts > 0) _multiplierBursts--;
+        CompetitiveChanged?.Invoke();
+    }
+
+    public void AddNotePoints(int totalPoints, int roundPoints)
+    {
+        CompetitiveTotal += totalPoints;
+        RoundNoteScore += roundPoints;
+        CompetitiveChanged?.Invoke();
+    }
+
     private Vector3 lastPosition;
 
     void Start()

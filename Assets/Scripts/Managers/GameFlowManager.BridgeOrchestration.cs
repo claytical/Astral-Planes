@@ -10,6 +10,10 @@ public partial class GameFlowManager
     {
         if (GhostCycleInProgress || BridgePending) return;
         OnMotifCompleted?.Invoke();
-        StartCoroutine(BridgeFlow.PlayMotifBridgeAndRestart());
+
+        // Competitive motif mode: the run ends here. The bridge still plays the ring's spin-off, then
+        // shows the match results instead of the interstitial maze.
+        bool endMatch = SessionState.IsCompetitive && SessionState.Mode == GameMode.CompetitiveMotif;
+        StartCoroutine(BridgeFlow.PlayMotifBridgeAndRestart(endMatch));
     }
 }

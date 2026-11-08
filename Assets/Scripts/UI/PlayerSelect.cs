@@ -12,6 +12,7 @@ public class PlayerSelect : MonoBehaviour
     public GameObject tutorialControls;
     public Image border;
     public TMP_Text modelNameLabel;
+    [Range(0f, 1f)] public float confirmedAlpha = 0.4f;
 
     private int _selectedColor = 0;
     private Hangar _hangar;
@@ -109,8 +110,14 @@ public class PlayerSelect : MonoBehaviour
     public void Confirm()
     {
         controlsAndStats.SetActive(false);
-        planeIcon.transform.parent.gameObject.SetActive(false);
         border.enabled = false;
+
+        // Dim (not hide) the icon so the player can see they're still in. A CanvasGroup rather than
+        // tinting planeIcon.color: LocalPlayer.SetColor reads that color right after Confirm().
+        var holder = planeIcon.transform.parent.gameObject;
+        var group = holder.GetComponent<CanvasGroup>();
+        if (group == null) group = holder.AddComponent<CanvasGroup>();
+        group.alpha = confirmedAlpha;
     }
 
     public void NextVehicle()

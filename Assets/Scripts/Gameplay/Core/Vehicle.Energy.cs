@@ -87,6 +87,8 @@ public partial class Vehicle
 
     private void ConsumeEnergy(float amount)
         {
+            // Competitive match over: gameplay is frozen, so survivors must not drain or die while results show.
+            if (GameFlowManager.Instance != null && GameFlowManager.Instance.MatchEnded) return;
             energyLevel -= amount;
             energyLevel = Mathf.Max(0, energyLevel);
             // !_isDead guards against re-entering the death cascade if this vehicle is drained

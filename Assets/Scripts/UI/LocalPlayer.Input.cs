@@ -170,6 +170,9 @@ public partial class LocalPlayer
         // Score publish-consent prompt on the same press that answers it.
         if (LivingScorePanel.ShouldSuppressConfirm) return;
 
+        // Competitive match end: MatchResultsPanel handles "any button -> main menu" itself.
+        if (GameFlowManager.Instance.MatchEnded) return;
+
         if (GameFlowManager.Instance.CurrentState == GameState.GameOver)
         {
             GameFlowManager.Instance.QuitToSelection();
@@ -177,9 +180,23 @@ public partial class LocalPlayer
         }
     }
 
+    // A confirmed player can flip co-op/competitive with the Selection Next/Previous actions (D-pad left/right) while 2+ players are joined.
+    private bool TryCycleGameMode(int dir)
+    {
+        var gfm = GameFlowManager.Instance;
+        var session = gfm != null ? gfm.SessionState : null;
+        if (!_isReady || session == null || session.CurrentState != GameState.Selection || session.Players.Count < 2 || session.ModeLocked)
+            return false;
+
+        session.CycleMode(dir);
+        _sfxSource?.PlayOneShot(clickFx);
+        return true;
+    }
+
     public void OnNext(InputValue value)
     {
         if (!value.isPressed) return;
+        if (TryCycleGameMode(+1)) return;
         _sfxSource?.PlayOneShot(clickFx);
 
         if (_selection != null)
@@ -194,6 +211,7 @@ public partial class LocalPlayer
     public void OnPrevious(InputValue value)
     {
         if (!value.isPressed) return;
+        if (TryCycleGameMode(-1)) return;
         _sfxSource?.PlayOneShot(clickFx);
 
         if (_selection != null)

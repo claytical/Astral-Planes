@@ -693,7 +693,8 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         BurstPlacementMode placementMode = BurstPlacementMode.Free,
         int trapSearchRadiusCells = 10,
         int trapBufferCells = 1,
-        int forcedTargetBin = -1)
+        int forcedTargetBin = -1,
+        Vehicle multiplierOwner = null)
     {
         _compositionSpawner.SpawnBurst(
             noteSet, maxToSpawn, forcedBurstId,
@@ -701,6 +702,9 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             burstImpulse, spreadAngleDeg, spawnJitterRadius,
             placementMode, trapSearchRadiusCells, trapBufferCells,
             forcedTargetBin);
+
+        if (multiplierOwner != null)
+            RegisterBurstMultiplierOwner(multiplierOwner.playerStats);
     }
 
     private InstrumentTrackCompositionSpawner _compositionSpawnerBacking;
@@ -731,7 +735,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         registerBurstState: (burstId, queued, targetBin) =>
             _bursts[burstId] = new BurstState { remaining = queued, totalSpawned = queued, targetBin = targetBin },
         getBurstTargetBinOrZero: burstId => _bursts.TryGetValue(burstId, out var bs) ? bs.targetBin : 0,
-        raiseBurstCleared: (burstId, hadNotes) => OnCollectableBurstCleared?.Invoke(this, burstId, hadNotes),
+        raiseBurstCleared: RaiseBurstCleared,
         resolveTargetBinFromController: () => controller != null ? controller.GetBinForNextSpawn(this) : GetNextBinForSpawn(),
         isExpansionPending: () => IsExpansionPending,
         beginGravityVoidForPendingExpandIfEligible: voidPos =>
@@ -778,7 +782,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
                         if (_rp == null || _rp.configSelectionMode != RoleConfigSelectionMode.ByVoice)
                             AdvanceBinCursor(1);
                     }
-                    OnCollectableBurstCleared?.Invoke(this, c.burstId, true);
+                    RaiseBurstCleared(c.burstId, true);
                 }
                 else {
                     // Zero notes collected: the entire burst was lost.
@@ -787,7 +791,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
                     // bin rather than bridging on an empty loop.
                     Debug.LogWarning($"[COLLECT:LOST_BURST] {name} burstId={c.burstId} all collectables lost with zero notes written. Bin will not be marked filled; star will re-arm.");
                     if (controller != null) controller.AllowAdvanceNextBurst(this);
-                    OnCollectableBurstCleared?.Invoke(this, c.burstId, false);
+                    RaiseBurstCleared(c.burstId, false);
                 }
             }
         }
