@@ -93,6 +93,9 @@ public partial class ControlTutorialDirector : MonoBehaviour
                 _desiredMode = RingSessionStore.LoadAllRingsFromDisk().Count == 0
                     ? PrimaryMode.PressAnyAuto
                     : PrimaryMode.Hidden;
+                // Fresh game: only the title, the press-any prompt and the tutorial ring preview.
+                if (_desiredMode == PrimaryMode.PressAnyAuto)
+                    HideFreshGameMainClutter();
                 break;
 
             case "TrackSelection":
@@ -163,6 +166,21 @@ public partial class ControlTutorialDirector : MonoBehaviour
 
         // Optional: authored in the Editor as a child of this same (Primary) sub-hierarchy.
         _abortHoldPrompt = go.GetComponentInChildren<AbortHoldPrompt>(true);
+    }
+
+    // Hides the settings affordances on a brand-new game's Main screen (no saved rings yet).
+    private static void HideFreshGameMainClutter()
+    {
+        foreach (var name in new[] { "Settings Glyph Hint", "Settings Panel Root" })
+        {
+            var trs = Resources.FindObjectsOfTypeAll<Transform>();
+            for (int i = 0; i < trs.Length; i++)
+            {
+                var t = trs[i];
+                if (t && t.gameObject.scene.IsValid() && t.name == name)
+                    t.gameObject.SetActive(false);
+            }
+        }
     }
 
     private Transform FindAnchorInScene(string anchorName)
@@ -359,6 +377,9 @@ public partial class ControlTutorialDirector : MonoBehaviour
         SendToAllMinis(m => m.Clear(immediate: true, hideText: true));
         _tutorialPlayers = new List<LocalPlayer>(_mini.Keys);
 
+        // The confirmed-ship dim is only for the pre-tutorial wait; the tutorial owns the screen.
+        if (Hangar.Instance != null) Hangar.Instance.SetSelectionVisible(false);
+
         _desiredMode = useInputGatedTutorial
             ? PrimaryMode.TutorialSequenceInputGated
             : PrimaryMode.TutorialSequenceTimed;
@@ -404,6 +425,7 @@ public partial class ControlTutorialDirector : MonoBehaviour
             UnregisterMini(lp);
         _tutorialPlayers.Clear();
 
+        if (Hangar.Instance != null) Hangar.Instance.SetSelectionVisible(true);
         if (primaryInstance) primaryInstance.HideAndClear(immediate: true);
     }
 

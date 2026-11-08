@@ -882,6 +882,7 @@ MonoBehaviour:
   tutorialControls: {fileID: 4820397974055802570}
   border: {fileID: 634328935348956393}
   modelNameLabel: {fileID: 3717373329132506390}
+  confirmedAlpha: 0.4
 --- !u!1 &2419685079696790311
 GameObject:
   m_ObjectHideFlags: 0
@@ -1024,9 +1025,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: '>'
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 57e075902a5754444b2369bfe799ef9b, type: 2}
-  m_sharedMaterial: {fileID: -6710680176177670383, guid: 57e075902a5754444b2369bfe799ef9b,
-    type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

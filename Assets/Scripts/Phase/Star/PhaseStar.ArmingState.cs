@@ -65,6 +65,7 @@ public partial class PhaseStar
 
         _disarmReason = PhaseStarDisarmReason.None;
         _isArmed = true;
+        TutorialEvents.RaiseStarArmed(transform);
 
         EnableColliders();
         dust?.SetTentaclesActive(false);

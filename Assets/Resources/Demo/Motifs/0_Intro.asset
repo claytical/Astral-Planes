@@ -22,22 +22,27 @@ MonoBehaviour:
     depth01: 0
     breadth01: 0
     pressure01: 0
+    maxConsecutiveLoopSeconds: 0
   - clip: {fileID: 8300000, guid: e095cc2787fa74168ab460cb92fb1259, type: 3}
     depth01: 0.3
     breadth01: 0.2
     pressure01: 0
+    maxConsecutiveLoopSeconds: 0
   - clip: {fileID: 8300000, guid: c0d471632abfa453a919a93eeef1406a, type: 3}
     depth01: 0.2
     breadth01: 0.3
     pressure01: 0
+    maxConsecutiveLoopSeconds: 0
   - clip: {fileID: 8300000, guid: c6203f9021ee148bbadff648d3e20ffe, type: 3}
     depth01: 0.5
     breadth01: 0.4
     pressure01: 0.1
+    maxConsecutiveLoopSeconds: 0
   - clip: {fileID: 8300000, guid: 29918de9d949044b8bc0299e58bc63e7, type: 3}
     depth01: 0.4
     breadth01: 0.5
     pressure01: 0.5
+    maxConsecutiveLoopSeconds: 0
   entryLoopCount: 16
   resetFirstCarryOnStart: 0
   bridgeSamples:
@@ -49,19 +54,8 @@ MonoBehaviour:
   phraseLengthLoopsOverride: 0
   nodesPerStar: 2
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
-  mazePattern: {fileID: 11400000, guid: 72dd665f885cd4f69815d4554743bb1b, type: 2}
-  roleGeoConfigs:
-  - role: 1
-    feature: 2
-    seedCount: 0
-    radiusCells: 0
-    gladeRadius: 0
-    gladeCount: 0
-    useExactNoteCount: 1
-    notesToCellsMultiplier: 20
-    minCellCount: 0
-    centerBiasFraction01: 0.35
-    centerBiasMinDensity01: 0.3
+  mazePattern: {fileID: 11400000, guid: dc7bcb920eadd40139a254499c81741c, type: 2}
+  roleGeoConfigs: []
   genericFillNeverRegrowRatio: 1
   genericFillRatio01: 0
   genericFillRegrowSoftenMultiplier01: 1

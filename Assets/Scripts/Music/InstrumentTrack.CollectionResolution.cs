@@ -7,6 +7,7 @@ public partial class InstrumentTrack
     {
         if (collectable == null || collectable.assignedInstrumentTrack != this) return;
         controller.NotifyCollected(this);
+        TutorialEvents.RaiseNoteCaught(collectable);
         IncrementBurstCollectedMeter(collectable.burstId);
 
         if (drumTrack != null)
@@ -128,6 +129,7 @@ public partial class InstrumentTrack
     {
         if (vehicle == null || collectable == null || collectable.assignedInstrumentTrack != this) return;
 
+        TutorialEvents.RaiseNoteCaught(collectable);
         NoteCollectedForRound(vehicle, collectable.burstId);
 
         // Free the vacated grid cell (same as normal pickup path).
@@ -217,6 +219,7 @@ public partial class InstrumentTrack
         persistentLoopNotes.RemoveAll(t => t.stepIndex == stepAbs);
         AddNoteToLoop(stepAbs, midiNote, durationTicks, velocity127, lightMarkerNow, authoredRootMidi, skipChordQuantize);
         NotifyNoteCommittedForDust();
+        TutorialEvents.RaiseNotePlaced();
         AwardCompetitiveNote(placer, burstId);
 
         int targetBin = BinIndexForStep(stepAbs);
@@ -240,6 +243,7 @@ public partial class InstrumentTrack
     /// </summary>
     public void NotifyNoteDiscarded(int burstId, int authoredAbsStep)
     {
+        TutorialEvents.RaiseNoteDiscarded();
         if (burstId == 0) return;
         if (!_bursts.TryGetValue(burstId, out var state)) return;
 

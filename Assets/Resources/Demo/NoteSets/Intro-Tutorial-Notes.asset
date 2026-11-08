@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f8571c45382984a839a6b50b6bbc8220, type: 3}
-  m_Name: Intro-Lead-NoteSetConfig-0
+  m_Name: Intro-Tutorial-Notes
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: intro-0
-  roleProfile: {fileID: 11400000, guid: 01a0a46bc3bd3489eaa95bb2f1ec236b, type: 2}
+  roleProfile: {fileID: 11400000, guid: 4b7412093e3954bb1a95c5894c451796, type: 2}
   riff: {fileID: 11400000, guid: 9f4b44f70331b48f1a80dea98440ac3a, type: 2}
   mineNodeExpireAfterLoops: 2
   ascendLoops: 8

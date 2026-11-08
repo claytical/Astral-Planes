@@ -535,6 +535,8 @@ public sealed class InstrumentTrackCompositionSpawner
     /// Fires when the drum transport advances a step. Launches any pending collectable
     /// whose absStep matches the current step index.
     /// </summary>
+    private int _tutorialLastBurstId = int.MinValue;
+
     private void OnCompositionStepFired(int step, int leaderSteps)
     {
         var controller = _getController();
@@ -576,6 +578,13 @@ public sealed class InstrumentTrackCompositionSpawner
             _beginSpawnArrival(c, launch.originWorld, launch.targetWorld, launch.note, launch.duration, launch.noteSet, _scratchSteps);
 
             _spawnedCollectables.Add(go);
+
+            // Tutorial callout: the first note of each burst to launch.
+            if (launch.burstId != _tutorialLastBurstId)
+            {
+                _tutorialLastBurstId = launch.burstId;
+                TutorialEvents.RaiseFirstNoteSpawned(c);
+            }
         }
 
         // Unsubscribe once all pending launches have fired.

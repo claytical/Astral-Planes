@@ -1148,7 +1148,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 017e526baa2524645b89f2baed32c501, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::IntroTitleFader
-  fadeDelay: 2
+  fadeDelay: 6
   fadeDuration: 10
 --- !u!1 &1057326950
 GameObject:
@@ -1161,7 +1161,6 @@ GameObject:
   - component: {fileID: 1057326951}
   - component: {fileID: 1057326953}
   - component: {fileID: 1057326952}
-  - component: {fileID: 1057326954}
   m_Layer: 5
   m_Name: Start Text
   m_TagString: Untagged
@@ -1289,22 +1288,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1057326950}
   m_CullTransparentMesh: 1
---- !u!114 &1057326954
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1057326950}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ee14a14ab5c93428e8714f28b7b3dfa0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  minGlow: 0.01
-  maxGlow: 0.3
-  speed: 2
-  glowProperty: _GlowPower
 --- !u!1 &1151719976
 GameObject:
   m_ObjectHideFlags: 0
@@ -2083,7 +2066,7 @@ PrefabInstance:
     - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}
       propertyPath: showAllPhasesForDesign
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2282495354990635995, guid: 819e08eb0311545b6b574630b02792e9,
         type: 3}

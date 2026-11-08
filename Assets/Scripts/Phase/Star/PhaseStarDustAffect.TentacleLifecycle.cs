@@ -144,6 +144,7 @@ public partial class PhaseStarDustAffect
         if (tentacle.targetCell != cell)
             ReleaseReservation(tentacle, tentacle.targetCell);
 
+        TutorialEvents.RaiseTentacleAppeared();
         tentacle.targetCell     = cell;
         tentacle.targetWorldPos = drum.GridToWorldPosition(cell);
         tentacle.tipPos         = starPos;

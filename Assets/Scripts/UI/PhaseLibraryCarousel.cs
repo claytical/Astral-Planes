@@ -149,6 +149,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
     private readonly Dictionary<(string phaseId, string motifId), List<MotifSnapshot>> _snapshots = new();
     private readonly Dictionary<(int phase, int motif), CarouselEntry> _entries = new();
     private bool  _hasEntries;
+    private bool  _loadingTrackSelection;
     private int   _phase;
     private int   _motif;
     private Vector3 _anchor;
@@ -190,7 +191,6 @@ public class PhaseLibraryCarousel : MonoBehaviour
         PickStartNode();
         _graph.Remember(_phase, _motif);
         _hasEntries = (revealAll || rings.Count > 0) && _graph.Exists(_phase, _motif);
-
         InitSlotLayout();
 
         if (pressToStartCue != null) pressToStartCue.SetActive(!_hasEntries);
@@ -770,7 +770,14 @@ public class PhaseLibraryCarousel : MonoBehaviour
 
         if (!_hasEntries)
         {
-            if (confirm) SceneManager.LoadScene(trackSelectionScene);
+            // No saved rings (incl. the fresh-game preview): confirm goes straight to ship select.
+            // This raw poll is what handles gamepad South; IntroInputHandler only sees the
+            // PlayerInput's Submit action. One-shot so both paths can't load the scene twice.
+            if (confirm && !_loadingTrackSelection)
+            {
+                _loadingTrackSelection = true;
+                SceneManager.LoadScene(trackSelectionScene);
+            }
             return;
         }
 

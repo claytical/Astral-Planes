@@ -25,6 +25,7 @@ public partial class DiscoveryTrackNode
 
         _track.SpawnCollectableBurst(_noteSet, -1, -1, origin, repelFrom, 1.0f, 140f, 0.18f, InstrumentTrack.BurstPlacementMode.Free, 10,
             multiplierOwner: vehicle);
+        TutorialEvents.RaiseDiscoveryBurst();
         TriggerExplosion();
     }
 

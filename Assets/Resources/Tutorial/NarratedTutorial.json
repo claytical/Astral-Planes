@@ -1,0 +1,110 @@
+{
+  "holdSeconds": 6,
+  "stages": [
+    {
+      "id": "01_welcome",
+      "gateName": "CarveComplete",
+      "cueLineIndex": -1,
+      "lines": [
+        "Hello, Sonic Wanderer! Welcome to the field.",
+        "Drift around and explore the field.",
+        "It's full of music waiting to happen. You'll be jamming in no time.",
+        "Now charge through the field to generate musical potential."
+      ]
+    },
+    {
+      "id": "02_energy",
+      "gateName": "TentacleAppeared",
+      "cueLineIndex": -1,
+      "lines": [
+        "Careful, that vessel of yours can burn through energy fast.",
+        "Especially with those heavier sounds.",
+        "Looks like you've attracted some attention..."
+      ]
+    },
+    {
+      "id": "03_discoveries",
+      "gateName": "StarArmed",
+      "cueLineIndex": -1,
+      "lines": [
+        "Discoveries are drawn to the energy you've stirred up.",
+        "The hungriest ones have the most potential."
+      ]
+    },
+    {
+      "id": "04_chase",
+      "gateName": "StarPoked",
+      "cueLineIndex": -1,
+      "lines": [
+        "It's ready to be harvested!",
+        "It might be a little tricky to reach.",
+        "Get it!"
+      ]
+    },
+    {
+      "id": "05_melody",
+      "gateName": "DiscoveryBurst",
+      "cueLineIndex": -1,
+      "lines": [
+        "That's it!",
+        "Tease out that melody!"
+      ]
+    },
+    {
+      "id": "06_catch",
+      "gateName": "NoteCaught",
+      "cueLineIndex": -1,
+      "lines": [
+        "Can you hear it?",
+        "Go catch one!"
+      ]
+    },
+    {
+      "id": "07_place",
+      "gateName": "NotePlaced",
+      "cueLineIndex": 1,
+      "lines": [
+        "You caught a piece of the melody.",
+        "That note won't be heard again unless you place it."
+      ]
+    },
+    {
+      "id": "08_loop",
+      "gateName": "RingCompleted",
+      "cueLineIndex": 3,
+      "lines": [
+        "Now it's part of the loop!",
+        "You hear it play as it wraps around?",
+        "Now catch some more.",
+        "Place them anywhere there's an open spot.",
+        "If you miss the timing window... watch out!"
+      ]
+    },
+    {
+      "id": "09_record",
+      "gateName": "None",
+      "cueLineIndex": -1,
+      "lines": [
+        "You've completed your first ring!",
+        "It's coming together.",
+        "Let's finish the rest of this record."
+      ]
+    }
+  ],
+  "discoveryEscaped": {
+    "lines": [
+      "It got away!",
+      "Keep stirring things up. There's more to discover."
+    ]
+  },
+  "noteDiscarded": {
+    "lines": [
+      "Discarded!",
+      "You meant to do that, right?"
+    ]
+  },
+  "cueWindowTexts": [
+    "Now!",
+    "Here!"
+  ]
+}

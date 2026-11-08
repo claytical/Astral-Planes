@@ -163,7 +163,7 @@ public partial class InstrumentTrack
         // Force cache rebuild so PlayLoopedNotesInBin hears this bin immediately.
         if (filled) _loopCacheDirtyPending = true;
 
-        if (filled) OnBinFilled?.Invoke(this, bin);
+        if (filled) { OnBinFilled?.Invoke(this, bin); TutorialEvents.RaiseRingCompleted(); }
     }
 
     // Use clip length (one bar), not the full effective-leader length, so that

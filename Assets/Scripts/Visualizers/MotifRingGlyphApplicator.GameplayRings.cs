@@ -534,7 +534,7 @@ public partial class MotifRingGlyphApplicator
         }
 
         int total = _gameplayRings.Count + _remainingRings.Count;
-        if (total == 0) { _recordFadeOutCoroutine = null; yield break; }
+        if (total == 0) { _recordFadeOutCoroutine = null; TutorialEvents.RaiseIntroRecordHidden(); yield break; }
 
         float dur = Mathf.Max(0.01f, duration);
         float t   = 0f;
@@ -557,6 +557,7 @@ public partial class MotifRingGlyphApplicator
 
         ClearGameplayRings(); // also tears down the two background discs
         _recordFadeOutCoroutine = null;
+        TutorialEvents.RaiseIntroRecordHidden();
     }
 
     private void FadeEntry(RingEntry ring, Color rgb, float fillAlpha, float contourAlpha)

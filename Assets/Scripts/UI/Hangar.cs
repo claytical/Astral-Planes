@@ -32,6 +32,13 @@ public class Hangar : MonoBehaviour
             planeInUseMap[plane] = false;
     }
 
+    /// <summary>Shows/hides the whole ship-select container (every PlayerSelect panel and mini).
+    /// Hidden while the control tutorial plays so it never draws underneath it.</summary>
+    public void SetSelectionVisible(bool visible)
+    {
+        if (planeSelection != null) planeSelection.SetActive(visible);
+    }
+
     public void ResetForNewSession()
     {
         _permanentlyUsed.Clear();

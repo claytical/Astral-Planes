@@ -695,7 +695,7 @@ MonoBehaviour:
   deactivateLabelWhenHidden: 1
   pressAnySequence: 06000000
   driftText: Drift
-  boostText: Energize
+  boostText: Charge
   releaseText: Place
   instructionText: {fileID: 8806483350426262609}
   labelFadeOutSeconds: 0.12
@@ -703,6 +703,7 @@ MonoBehaviour:
   controlSchemePivot: {fileID: 0}
   rootFadeOutSeconds: 0.25
   tutorialSequence: 010000000200000003000000
+  effectsMixerGroup: {fileID: 0}
 --- !u!225 &2987831516447571478
 CanvasGroup:
   m_ObjectHideFlags: 0

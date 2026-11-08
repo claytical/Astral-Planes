@@ -124,9 +124,76 @@ public partial class Vehicle
     // Back-compat with earlier patches / external callers.
     public bool EnqueuePendingNote(PendingCollectedNote p) => EnqueuePendingCollectedNote(p);
 
+    /// <summary>Read-only snapshot of the manual-release timing window for the head queued note.</summary>
+    public struct ReleaseWindowState
+    {
+        public bool            hasPendingNote;
+        public bool            isOpen;            // a press right now would be accepted
+        public InstrumentTrack track;
+        public int             targetAbsStep;     // placeholder the note would land on
+        public float           secondsUntilOpen;  // 0 when already open
+        public float           secondsUntilClose; // time to the end of the grace period after the beat
+    }
+
+    /// <summary>
+    /// Mirrors the pass/fail window math in <see cref="TryReleaseQueuedNote"/> without touching any
+    /// state (no dequeue, discard, sacrifice or arming). Used by the tutorial to time its "Now!" cue.
+    /// KEEP IN SYNC with TryReleaseQueuedNote's gate: target pick, fwd, armSteps, grace.
+    /// </summary>
+    public bool TryGetReleaseWindowState(out ReleaseWindowState s)
+    {
+        s = default;
+        if (_pendingNotes.Count <= 0) return false;
+        s.hasPendingNote = true;
+
+        var p = _pendingNotes.Peek();
+        if (p.track == null || p.track.controller == null || p.track.drumTrack == null) return true;
+        if (!p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbs, out int floorAbs, out int totalSteps)) return true;
+
+        if (gfm == null) gfm = GameFlowManager.Instance;
+        var viz = (gfm != null) ? gfm.noteViz : null;
+        if (viz == null) return true;
+
+        var spokenFor = new HashSet<int>();
+        foreach (var ar in _armedReleases) spokenFor.Add(ar.targetAbsStep);
+
+        int effectiveTotal = Mathf.Max(totalSteps, p.track.GetTotalSteps());
+        if (!viz.TryGetNextUnlitStepExcluding(p.track, rawAbs, effectiveTotal, spokenFor, out int target)) return true;
+
+        double fwd = (target - rawAbs + effectiveTotal) % effectiveTotal;
+        double stepDur = ComputeStepDuration(p.track.drumTrack, effectiveTotal);
+        float armSteps = vehicleConfig.EffectiveArmAheadSteps(stepDur);
+        float grace = vehicleConfig.manualReleaseGracePeriodSteps;
+
+        bool open = fwd <= armSteps || (grace > 0f && (effectiveTotal - fwd) <= grace);
+        if (!open && viz.TryGetNearestUnlitStepExcluding(p.track, rawAbs, effectiveTotal, spokenFor, out int nearest, out double nearestFwd))
+        {
+            if (nearestFwd <= armSteps || (grace > 0f && (effectiveTotal - nearestFwd) <= grace))
+            {
+                target = nearest; fwd = nearestFwd; open = true;
+            }
+        }
+
+        s.track = p.track;
+        s.targetAbsStep = target;
+        s.isOpen = open;
+        s.secondsUntilOpen = open ? 0f : (float)(System.Math.Max(0.0, fwd - armSteps) * stepDur);
+        // Past the beat (fwd wrapped to ~total) means we're in the grace tail: close = remaining grace.
+        double afterBeat = effectiveTotal - fwd;
+        s.secondsUntilClose = open
+            ? (float)((afterBeat <= grace ? System.Math.Max(0.0, grace - afterBeat) : fwd + grace) * stepDur)
+            : 0f;
+        return true;
+    }
+
     public bool TryReleaseQueuedNote(bool allowSacrifice = true)
 {
-    if (_pendingNotes.Count <= 0) return false;
+    if (_pendingNotes.Count <= 0)
+    {
+        // A real press (not the hold-cascade retry) with nothing carried: let the tutorial skip its delay.
+        if (allowSacrifice) TutorialEvents.RaiseCommitPressedWithoutNote();
+        return false;
+    }
 
     if (gfm == null) gfm = GameFlowManager.Instance;
     var viz = (gfm != null) ? gfm.noteViz : null;

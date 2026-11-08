@@ -126,6 +126,7 @@ public partial class PhaseStar
                 Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=sibling-active previewRole={_previewRole}");
             return;
         }
+        TutorialEvents.RaiseStarPoked();
         EjectActivePreviewShardAndFlow(coll);
     }
 
@@ -188,6 +189,7 @@ public partial class PhaseStar
             LastNodeWasEscaped  = outcome == DiscoveryTrackNodeOutcome.Escaped;
             LastNodeWasExpired  = outcome == DiscoveryTrackNodeOutcome.Expired;
 
+            if (outcome != DiscoveryTrackNodeOutcome.Captured) TutorialEvents.RaiseDiscoveryEscaped();
             OnMineNodeResolved?.Invoke(this, _attunedRole);
 
             if (this == null) return;
