@@ -15,40 +15,6 @@ public partial class Collectable
         return effective;
     }
 
-    private static double NextDepositDspForBaseStep(
-        double loopStartDsp,
-        double loopLen,
-        int baseSteps,
-        int targetBaseStep,
-        double dspNow,
-        double eps = 0.010)
-    {
-        baseSteps = Mathf.Max(1, baseSteps);
-        targetBaseStep = ((targetBaseStep % baseSteps) + baseSteps) % baseSteps;
-
-        double loopsSince = (dspNow - loopStartDsp) / loopLen;
-        long curLoopIndex = (long)Math.Floor(loopsSince);
-        if (curLoopIndex < 0) curLoopIndex = 0;
-
-        double tPos = (dspNow - loopStartDsp) - (curLoopIndex * loopLen);
-        tPos %= loopLen;
-        if (tPos < 0) tPos += loopLen;
-
-        double stepDur = loopLen / baseSteps;
-
-        int curStep = (int)Math.Floor(tPos / stepDur);
-        curStep = Math.Clamp(curStep, 0, baseSteps - 1);
-
-        long depositLoopIndex = curLoopIndex + ((targetBaseStep <= curStep) ? 1 : 0);
-
-        double deposit = loopStartDsp + depositLoopIndex * loopLen + targetBaseStep * stepDur;
-
-        while (deposit <= dspNow + eps)
-            deposit += loopLen;
-
-        return deposit;
-    }
-
     private void OnTriggerEnter2D(Collider2D coll)
     {
         // Protected flight: the note is untouchable until it lands on its cell.
@@ -186,7 +152,8 @@ public partial class Collectable
 
     private void HandleAutoDeposit(Vehicle vehicle, int stepToReportBase, float velocity127, float force, int baseSteps, DrumTrack drumTrack)
     {
-        assignedInstrumentTrack.OnCollectableCollected(vehicle, this, stepToReportBase, noteDurationTicks, velocity127);
+        // Schedules the single carry+deposit; the note is committed to the loop on arrival.
+        bool scheduled = assignedInstrumentTrack.OnCollectableCollected(vehicle, this, stepToReportBase, noteDurationTicks, velocity127);
 
         if (_rb == null) TryGetComponent(out _rb);
         if (_rb != null) _rb.simulated = false;
@@ -195,32 +162,9 @@ public partial class Collectable
         var explode = GetComponent<Explode>();
         if (explode != null) explode.Permanent(false);
 
-        double dspNow = AudioSettings.dspTime;
-        double loopLen = drumTrack.GetLoopLengthInSeconds();
-        if (loopLen <= 0.0)
-        {
-            Debug.LogWarning($"[COLLECT] loopLen <= 0 while scheduling deposit; fallback travel. name={name}");
-            BeginCarryThenDepositAtDsp(dspNow + minDepositTravelSeconds, noteDurationTicks, force, onArrived: null);
-            return;
-        }
-
-        double transportStart = drumTrack.leaderStartDspTime;
-        if (transportStart <= 0.0) transportStart = drumTrack.startDspTime;
-        if (transportStart <= 0.0)
-        {
-            Debug.LogWarning($"[COLLECT] No valid transportStart; fallback travel. name={name}");
-            BeginCarryThenDepositAtDsp(dspNow + minDepositTravelSeconds, noteDurationTicks, force, onArrived: null);
-            return;
-        }
-
-        double loopStart = EffectiveLoopStart(transportStart, loopLen, dspNow);
-        double depositDsp = NextDepositDspForBaseStep(loopStart, loopLen, baseSteps, stepToReportBase, dspNow);
-
-        double minNeeded = minDepositTravelSeconds + 0.01;
-        while ((depositDsp - dspNow) < minNeeded)
-            depositDsp += loopLen;
-
-        BeginCarryThenDepositAtDsp(depositDsp, noteDurationTicks, force, onArrived: null);
+        // No valid target step: nothing was scheduled, so just fly off and clean up.
+        if (!scheduled)
+            BeginCarryThenDepositAtDsp(AudioSettings.dspTime + minDepositTravelSeconds, noteDurationTicks, force, onArrived: null);
     }
 
     private float ComputeHitVelocity127(Vehicle vehicle)

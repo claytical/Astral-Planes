@@ -112,7 +112,13 @@ public partial class Vehicle : MonoBehaviour
     private Vector3 _posHistoryLast;
     private Vector3 _lastTravelDir = Vector3.down; // fallback tail direction when stationary
 
-    public bool ManualNoteReleaseEnabled => true;
+    /// <summary>Per-player placement method; set by LocalPlayer at spawn from the ship-select choice.</summary>
+    public NotePlacementMethod PlacementMethod { get; set; } = NotePlacementMethod.Manual;
+    public bool ManualNoteReleaseEnabled => PlacementMethod == NotePlacementMethod.Manual;
+    public float OccupiedStepVelocityMultiplier => vehicleConfig != null ? vehicleConfig.occupiedStepVelocityMultiplier : 1f;
+    public bool OccupiedStepOctaveAccent => vehicleConfig != null && vehicleConfig.occupiedStepOctaveAccent;
+    /// <summary>Called by InstrumentTrack when an auto-deposited note lands (mirrors the manual-commit side effect).</summary>
+    public void NotifyAutoNoteCommitted() => GrantPostCommitRingCollisionImmunity();
 
     public struct PendingCollectedNote
     {

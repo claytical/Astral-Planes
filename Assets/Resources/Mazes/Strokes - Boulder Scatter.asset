@@ -1,0 +1,94 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 61c29f65464264bd8aaca35b6879dc9a, type: 3}
+  m_Name: Strokes - Boulder Scatter
+  m_EditorClassIdentifier: Assembly-CSharp::MazePatternConfig
+  patternType: 4
+  dustTiming:
+    regrowDelay: 3
+    vehiclePlowRegrowDelay: -1
+    collectableArrivalRegrowDelay: -1
+    collectablePlowRegrowDelay: -1
+    jailRegrowDelay: -1
+    superNodeRegrowDelay: -1
+    zapRegrowDelay: -1
+    starDrainReleaseDelay: 6
+    collectableDiscardRegrowDelay: -1
+    collectableBombBlastRegrowDelay: 7
+    trackFilledRegrowDelay: 6
+  clearBoxes:
+    clearBoxCount: 4
+    clearBoxWidth: 5
+    clearBoxHeight: 5
+    shape: 0
+    placementJitter01: 1
+    staggerRows: 0
+    sizeJitter01: 0
+    connectorChance01: 0
+    connectorWidth: 2
+  cellularAutomata:
+    fillChance: 0.3
+    iterations: 3
+    busynessInfluence01: 1
+    surviveMin: 2
+    surviveMax: 4
+    birthMin: 3
+    birthMax: 3
+    radialBias: 0
+    smoothPasses: 0
+    minIslandSize: 0
+    symmetry: 0
+  ring:
+    spacing: 6
+    thickness: 1
+    jitter: 0.35
+    metric: 0
+    innerClearRadius: 0
+    spacingGrowth: 1
+    thicknessGrowth: 0
+    gapCount: 0
+    gapWidth: 3
+    gapOffsetDeg: 0
+    gapTwistDeg: 0
+  drunkenStrokes:
+    strokes: 30
+    maxLen: 5
+    jitter: 0.35
+    dilate: 0.3
+    startMode: 0
+    steered: 0
+    headingNoiseDeg: 25
+    curlDegPerStep: 0
+    branchChance01: 0
+    brushRadius: 1
+    minLenFraction: 0.5
+  diagonalLanes:
+    step: 12
+    slopeX: 1
+    slopeY: 2
+    thickness: 1
+    crossHatch: 0
+    gapPeriod: 0
+    gapLength: 0
+    waveAmplitude: 0
+    waveLength: 16
+  tunnels:
+    corridorStep: 3
+    corridorWidth: 3
+    straightness01: 0
+    braid01: 0
+    plazaChance01: 0
+    plazaExtraCells: 0
+  porousBorder:
+    exitCount: 3
+    exitSides: 
+  minGenericFillRatio01: 0.1

@@ -232,10 +232,19 @@ public class NarratedTutorialController : MonoBehaviour
         return true;
     }
 
+    // "{s}" is a plural suffix: "Wanderer{s}" -> "Wanderers" with 2+ players. Read at show time
+    // because players can still be joining/leaving when the tutorial starts.
+    static string ExpandTokens(string text)
+    {
+        if (string.IsNullOrEmpty(text) || !text.Contains("{s}")) return text;
+        int players = GameFlowManager.Instance?.SessionState?.Players?.Count ?? 1;
+        return text.Replace("{s}", players >= 2 ? "s" : "");
+    }
+
     // Shows a line and restarts the skip clock; a press made while it faded never skips the next line.
     IEnumerator ShowLine(string text, bool eventDriven)
     {
-        yield return _view.Show(text, eventDriven);
+        yield return _view.Show(ExpandTokens(text), eventDriven);
         _lineShownTime = Time.unscaledTime;
         _skipRequested = false;
     }

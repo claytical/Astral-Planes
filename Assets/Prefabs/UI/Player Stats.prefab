@@ -376,9 +376,12 @@ MonoBehaviour:
   competitiveRoots:
   - {fileID: 4976755878749460489}
   totalText: {fileID: 8815467145862168779}
+  currentRoundRoot: {fileID: 0}
   multiplierRoot: {fileID: 8110964849719268422}
   multiplierAmountText: {fileID: 5800731984560652289}
   noteScoreText: {fileID: 7810282751425782219}
+  pulseScale: 1.25
+  pulseDuration: 0.25
 --- !u!114 &4699189711361494541
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -957,6 +960,7 @@ GameObject:
   - component: {fileID: 7862093695297792661}
   - component: {fileID: 9136934083731235871}
   - component: {fileID: 1114975923900774218}
+  - component: {fileID: 3816485257236075841}
   m_Layer: 5
   m_Name: Fuel Background
   m_TagString: Untagged
@@ -1022,6 +1026,24 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &3816485257236075841
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6175565043081759180}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5fea29bb7c508c244a1f805a5fd3fc4d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp-firstpass::Outline
+  outlineMode: 0
+  outlineColor: {r: 0, g: 0, b: 0, a: 1}
+  outlineWidth: 2
+  precomputeOutline: 0
+  bakeKeys: []
+  bakeValues: []
 --- !u!1 &7133441466293186136
 GameObject:
   m_ObjectHideFlags: 0

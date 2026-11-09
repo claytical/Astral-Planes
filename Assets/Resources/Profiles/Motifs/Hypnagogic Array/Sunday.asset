@@ -1,0 +1,146 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
+  m_Name: Sunday
+  m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
+  motifId: Sunday
+  displayName: Sunday
+  keyRootMidi: 50
+  entryDrumLoops:
+  - {fileID: 8300000, guid: fc51ca1f8afaf4174b2eed166358cf8c, type: 3}
+  intensityClipTags:
+  - clip: {fileID: 8300000, guid: fc51ca1f8afaf4174b2eed166358cf8c, type: 3}
+    depth01: 0.075
+    breadth01: 0.079
+    pressure01: 0
+    maxConsecutiveLoopSeconds: 0
+  - clip: {fileID: 8300000, guid: 016c3bc7a21a347ecb9ab396457a5244, type: 3}
+    depth01: 0.138
+    breadth01: 0.151
+    pressure01: 0
+    maxConsecutiveLoopSeconds: 0
+  - clip: {fileID: 8300000, guid: 9cfee9f4b20124512954fe80bb1b084d, type: 3}
+    depth01: 0.481
+    breadth01: 0.347
+    pressure01: 0.54
+    maxConsecutiveLoopSeconds: 0
+  - clip: {fileID: 8300000, guid: 4d7ac38f04d2846a38f7e0cdc3c8b483, type: 3}
+    depth01: 0.393
+    breadth01: 0.146
+    pressure01: 0.31
+    maxConsecutiveLoopSeconds: 0
+  - clip: {fileID: 8300000, guid: 9f198fff4013840ea96cd6cdf7fa81d1, type: 3}
+    depth01: 0.385
+    breadth01: 0.142
+    pressure01: 0.707
+    maxConsecutiveLoopSeconds: 0
+  entryLoopCount: 1
+  resetFirstCarryOnStart: 0
+  bridgeSamples:
+  - {fileID: 8300000, guid: f23da9bdd93984e1ca9418797de0778a, type: 3}
+  bridgeSampleVolume: 1
+  quantizeBridgeSampleToBeat: 1
+  bpm: 160
+  stepsPerLoop: 32
+  phraseLengthLoopsOverride: 0
+  nodesPerStar: 5
+  starBehavior: {fileID: 11400000, guid: 8a258771ba6214752b716ed2a737f120, type: 2}
+  mazePattern: {fileID: 11400000, guid: b23b5785003148639c0f2687270353ba, type: 2}
+  roleGeoConfigs:
+  - role: 0
+    feature: 0
+    seedCount: 0
+    radiusCells: 0
+    gladeRadius: 0
+    gladeCount: 0
+    useExactNoteCount: 1
+    notesToCellsMultiplier: 20
+    minCellCount: 25
+    centerBiasFraction01: 0
+    centerBiasMinDensity01: 0.35
+  - role: 1
+    feature: 0
+    seedCount: 0
+    radiusCells: 0
+    gladeRadius: 0
+    gladeCount: 0
+    useExactNoteCount: 1
+    notesToCellsMultiplier: 20
+    minCellCount: 25
+    centerBiasFraction01: 0
+    centerBiasMinDensity01: 0.35
+  - role: 2
+    feature: 0
+    seedCount: 0
+    radiusCells: 0
+    gladeRadius: 0
+    gladeCount: 0
+    useExactNoteCount: 1
+    notesToCellsMultiplier: 20
+    minCellCount: 25
+    centerBiasFraction01: 0
+    centerBiasMinDensity01: 0.35
+  - role: 3
+    feature: 0
+    seedCount: 0
+    radiusCells: 0
+    gladeRadius: 0
+    gladeCount: 0
+    useExactNoteCount: 1
+    notesToCellsMultiplier: 20
+    minCellCount: 25
+    centerBiasFraction01: 0
+    centerBiasMinDensity01: 0.35
+  - role: 5
+    feature: 0
+    seedCount: 0
+    radiusCells: 0
+    gladeRadius: 0
+    gladeCount: 0
+    useExactNoteCount: 1
+    notesToCellsMultiplier: 20
+    minCellCount: 25
+    centerBiasFraction01: 0
+    centerBiasMinDensity01: 0.35
+  genericFillNeverRegrowRatio: 0.66
+  genericFillRatio01: 0.33
+  genericFillRegrowSoftenMultiplier01: 1
+  chordProgression: {fileID: 11400000, guid: 04a688fc570cd408bb4261ed5647fa97, type: 2}
+  alternateChordProgressionProfile: {fileID: 11400000, guid: 6b3f14ce0d8f5443aa08fb83a1197d6b,
+    type: 2}
+  roleNoteConfigs:
+  - {fileID: 11400000, guid: 86c81c58800654e11a48d004979a77d7, type: 2}
+  - {fileID: 11400000, guid: 6f2854dd456d348929aec0205a09d7dc, type: 2}
+  - {fileID: 11400000, guid: 598202527061d43238bd0a819d55fed8, type: 2}
+  - {fileID: 11400000, guid: 16b9ab1eb607d48c9af867ea7220145d, type: 2}
+  - {fileID: 11400000, guid: 59c5d85d1c61341d299f7a77a1d5c5e1, type: 2}
+  - {fileID: 11400000, guid: 48ff4a960c45d410d83545dc8888c7de, type: 2}
+  - {fileID: 11400000, guid: dc54fd6e60f8f46d09dc7e63cef601b6, type: 2}
+  - {fileID: 11400000, guid: 7f9fb5372d95a446bb4e2c8f5ec0d6de, type: 2}
+  - {fileID: 11400000, guid: b0c8f34c5697641dc9e88116e559b2e8, type: 2}
+  - {fileID: 11400000, guid: c13d6ca36221f44d28ab0a9b0001ed3b, type: 2}
+  - {fileID: 11400000, guid: bfec8f5e51c0a4b9188b3fd6521667f2, type: 2}
+  - {fileID: 11400000, guid: 89668f35d0c524e079d9ea68d30a9f03, type: 2}
+  - {fileID: 11400000, guid: 8f952da3e41f041f9923f89dd4ecefac, type: 2}
+  - {fileID: 11400000, guid: c821a29b265174ef6b0b2ed0da95787e, type: 2}
+  - {fileID: 11400000, guid: 405be191b25c74b588add5f070723187, type: 2}
+  - {fileID: 11400000, guid: 5915d8e97b8ed4a8c8951a507761de5b, type: 2}
+  - {fileID: 11400000, guid: 4f1867e74c16449b4a60d5f4b0d0fc54, type: 2}
+  - {fileID: 11400000, guid: 32fadec6465d64a78ae8d9d2c5d82d9d, type: 2}
+  selectionWeight: 1
+  beatIntroCount: 0
+  driveBeatsFromDensity: 1
+  spawnVehicleTrap: 0
+  trapShape: 0
+  trapRadius: 3
+  trapGrowSeconds: 0.4
+  trapRole: 4

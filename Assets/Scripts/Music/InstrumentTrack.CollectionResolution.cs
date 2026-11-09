@@ -1,14 +1,25 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class InstrumentTrack
 {
-    public void OnCollectableCollected(Vehicle vehicle, Collectable collectable, int reportedStep, int durationTicks, float force)
+    // Steps claimed by auto-deposit notes that are still in flight (caught, not yet committed).
+    // Equivalent of the manual path's "spokenFor" set so two catches never target the same slot.
+    private readonly Dictionary<Collectable, int> _autoClaims = new();
+
+    /// <summary>
+    /// Auto-deposit path. The note is caught now, but is committed to the loop (lit, registered,
+    /// burst accounting, ring/bin completion) only when it ARRIVES at its target step, using the
+    /// same commit pipeline as manual release. Target = next unfilled placeholder ahead of the
+    /// playhead at catch time (falls back to the authored step). Returns false if no carry was scheduled.
+    /// </summary>
+    public bool OnCollectableCollected(Vehicle vehicle, Collectable collectable, int reportedStep, int durationTicks, float force)
     {
-        if (collectable == null || collectable.assignedInstrumentTrack != this) return;
+        if (collectable == null || collectable.assignedInstrumentTrack != this) return false;
         controller.NotifyCollected(this);
         TutorialEvents.RaiseNoteCaught(collectable);
-        IncrementBurstCollectedMeter(collectable.burstId);
+        NoteCollectedForRound(vehicle, collectable.burstId);
 
         if (drumTrack != null)
         {
@@ -17,26 +28,43 @@ public partial class InstrumentTrack
             drumTrack.ResetSpawnCellBehavior(gridPos.x, gridPos.y);
         }
 
-        int finalTargetStep = ResolveTargetStep(collectable, reportedStep);
-        if (finalTargetStep < 0) return;
+        int authoredStep = ResolveTargetStep(collectable, reportedStep);
+        if (authoredStep < 0) return false;
 
-        if (reportedStep >= 0 && collectable.intendedStep >= 0 && reportedStep != collectable.intendedStep)
-            Debug.LogWarning($"[COLLECT:MISMATCH] {name} reportedStep={reportedStep} intended={collectable.intendedStep} burstId={collectable.burstId}");
+        int finalTargetStep = ResolveAutoTargetStep(authoredStep);
+        _autoClaims[collectable] = finalTargetStep;
 
-        SnapshotBurstLeaderBins(collectable.burstId, finalTargetStep);
+        var pending = BuildPendingNote(collectable, reportedStep, durationTicks, force);
 
-        int note = collectable.GetNote();
-        NoteCollectedForRound(vehicle, collectable.burstId);
-        CollectNote(vehicle, finalTargetStep, note, durationTicks, force, ResolveAuthoredRootForStep(finalTargetStep));
-        AwardCompetitiveNote(vehicle, collectable.burstId);
+        // Keep in spawnedCollectables until it lands so in-flight gates (bin expansion, bridge) stay accurate.
+        GameObject markerGo = null;
+        if (controller?.noteVisualizer != null)
+            markerGo = controller.noteVisualizer.PlacePersistentNoteMarker(this, finalTargetStep, lit: false, burstId: collectable.burstId);
+        if (markerGo != null)
+            collectable.ribbonMarker = markerGo.transform;
 
-        int targetBin = BinIndexForStep(finalTargetStep);
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[CURSOR] Target Bin={targetBin} binCursor: {_binCursor} allocated: {binAllocated} filled: {_binFilled}");
-        RegisterBurstStep(collectable.burstId, finalTargetStep);
-        spawnedCollectables?.Remove(collectable.gameObject);
+        double depositDsp = ComputeDepositDsp(finalTargetStep);
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[DEPOSIT] track={name} authored={authoredStep} target={finalTargetStep} dt={(depositDsp - AudioSettings.dspTime):F4}");
 
-        FinalizeAutoCollect(collectable, targetBin);
-        ScheduleNoteDeposit(collectable, finalTargetStep, reportedStep, durationTicks, force);
+        collectable.BeginCarryThenDepositAtDsp(depositDsp, durationTicks, force, onArrived: () =>
+        {
+            _autoClaims.Remove(collectable);
+            spawnedCollectables?.Remove(collectable.gameObject);
+            collectable.MarkAsReportedCollected();
+
+            if (controller?.noteVisualizer != null)
+            {
+                controller.noteVisualizer.ScheduleFirstPlayConfirm(
+                    source: collectable.transform, track: this, step: finalTargetStep,
+                    dspTime: depositDsp, noteDuration: durationTicks, color: DisplayColor);
+                controller.noteVisualizer.RegisterNotePlayTint(this, DisplayColor, TicksToSeconds(durationTicks));
+            }
+
+            float occMult = vehicle != null ? vehicle.OccupiedStepVelocityMultiplier : 1f;
+            bool occAccent = vehicle != null && vehicle.OccupiedStepOctaveAccent;
+            CommitPendingNoteAtStep(pending, finalTargetStep, pending.velocity127, occMult, occAccent, vehicle);
+            if (vehicle != null) vehicle.NotifyAutoNoteCommitted();
+        });
 
         if (_currentBurstArmed && collectable.burstId == currentBurstId)
         {
@@ -44,106 +72,31 @@ public partial class InstrumentTrack
             if (_currentBurstRemaining == 0)
                 _currentBurstArmed = false;
         }
+        return true;
     }
 
-    private void FinalizeAutoCollect(Collectable collectable, int targetBin)
+    // Next unfilled placeholder at/after the playhead, skipping slots claimed by in-flight auto notes.
+    // Falls back to the authored step when no placeholder is available.
+    private int ResolveAutoTargetStep(int authoredStep)
     {
-        if (collectable.burstId == 0 || !_bursts.TryGetValue(collectable.burstId, out var state)) return;
+        var viz = controller != null ? controller.noteVisualizer : null;
+        if (viz == null || !controller.TryGetRawPlayheadAbsStep(out double rawAbs, out _, out _))
+            return authoredStep;
 
-        state.remaining--;
-        if (state.remaining > 0) return;
-
-        int filledBin = state.wroteBin >= 0 ? state.wroteBin : targetBin;
-        controller?.noteVisualizer?.TriggerPlayheadReleasePulse(assignedRole);
-
-        var rp = _activeProfile ?? MusicalRoleProfileLibrary.GetProfile(assignedRole);
-        if (rp == null || rp.configSelectionMode != RoleConfigSelectionMode.ByVoice)
-            AdvanceBinCursor(1);
-
-        bool extendedLeader = state.leaderBins > 0 && state.wroteBin >= state.leaderBins;
-
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[TRK:BURST_CLEARED] track={name} burstId={collectable.burstId} binCursor={_binCursor}");
-
-        CompleteBurst(collectable.burstId, filledBin, hadNotes: true, ascendBinCount: loopMultiplier);
-
-        if (extendedLeader && controller != null)
-            controller.AdvanceOtherTrackCursors(this, 1);
-    }
-
-    private void ScheduleNoteDeposit(Collectable collectable, int finalTargetStep, int reportedStep, int durationTicks, float force)
-    {
-        GameObject markerGo = null;
-        if (controller?.noteVisualizer != null)
-            markerGo = controller.noteVisualizer.PlacePersistentNoteMarker(this, finalTargetStep, lit: false, burstId: collectable.burstId);
-
-        if (markerGo != null)
-            collectable.ribbonMarker = markerGo.transform;
-
-        double depositDsp = ComputeDepositDsp(finalTargetStep);
-
-        const float orbitMax   = 0.65f;
-        const float travelHard = 0.35f;
-        const float minTravel  = 0.02f;
-
-        double now = AudioSettings.dspTime;
-        float dt       = Mathf.Max(0f, (float)(depositDsp - now));
-        float travelSec = Mathf.Clamp(Mathf.Min(travelHard, dt), minTravel, travelHard);
-        float orbitSec  = Mathf.Clamp(dt - travelSec, 0f, orbitMax);
-        if (orbitSec < 0.05f) orbitSec = 0f;
-
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[DEPOSIT] track={name} stepAbs={finalTargetStep} stepLocal={reportedStep} depositDsp={depositDsp:F6} dt={(depositDsp - now):F4}");
-
-        collectable.BeginCarryThenDepositAtDsp(depositDsp, durationTicks: durationTicks, force: force, onArrived: () =>
-        {
-            if (controller == null || controller.noteVisualizer == null || markerGo == null) return;
-
-            controller.noteVisualizer.ScheduleFirstPlayConfirm(
-                source: collectable.transform, track: this, step: finalTargetStep,
-                dspTime: depositDsp, noteDuration: durationTicks, color: DisplayColor);
-
-            controller.noteVisualizer.RegisterNotePlayTint(this, DisplayColor, TicksToSeconds(durationTicks));
-
-            controller.noteVisualizer.RegisterCollectedMarker(this, collectable.burstId, finalTargetStep, markerGo);
-
-            var tag = markerGo.GetComponent<MarkerTag>() ?? markerGo.AddComponent<MarkerTag>();
-            tag.isPlaceholder = false;
-            tag.burstId = collectable.burstId;
-
-            var ml = markerGo.GetComponent<MarkerLight>() ?? markerGo.AddComponent<MarkerLight>();
-            ml.LightUp(this.DisplayColor);
-
-            var vnm = markerGo.GetComponent<VisualNoteMarker>();
-            if (vnm != null) vnm.Initialize(this.DisplayColor);
-        });
+        var claimed = new HashSet<int>(_autoClaims.Values);
+        int effectiveTotal = Mathf.Max(GetTotalSteps(), loopMultiplier * Mathf.Max(1, drumTrack != null ? drumTrack.totalSteps : BinSize()));
+        if (viz.TryGetNextUnlitStepExcluding(this, rawAbs, effectiveTotal, claimed, out int step))
+            return step;
+        return authoredStep;
     }
 
     // ---------------------------------------------------------------------
     // Manual Note Release integration
     // ---------------------------------------------------------------------
 
-    /// <summary>
-    /// Manual-release pickup path: frees the spawn cell and enqueues a note onto the vehicle,
-    /// but does NOT commit anything to the loop yet.
-    /// </summary>
-    public void OnCollectablePickedUpForManualRelease(Vehicle vehicle, Collectable collectable, int reportedBaseStep, int durationTicks, float velocity127)
+    /// <summary>Snapshot a caught collectable as a PendingCollectedNote (authored step identity, pitch, root).</summary>
+    private Vehicle.PendingCollectedNote BuildPendingNote(Collectable collectable, int reportedBaseStep, int durationTicks, float velocity127)
     {
-        if (vehicle == null || collectable == null || collectable.assignedInstrumentTrack != this) return;
-
-        TutorialEvents.RaiseNoteCaught(collectable);
-        NoteCollectedForRound(vehicle, collectable.burstId);
-
-        // Free the vacated grid cell (same as normal pickup path).
-        if (drumTrack != null)
-        {
-            Vector2Int gridPos = drumTrack.WorldToGridPosition(collectable.transform.position);
-            drumTrack.FreeSpawnCell(gridPos.x, gridPos.y);
-            drumTrack.ResetSpawnCellBehavior(gridPos.x, gridPos.y);
-        }
-
-        // Keep the collectable in spawnedCollectables until it is released from the Vehicle.
-        // Removal is deferred to OnManualReleaseConsumed / OnManualReleaseDiscarded so that
-        // AnyCollectablesInFlightGlobal() stays true while the note is being carried.
-
         int binSize = Mathf.Max(1, drumTrack != null ? drumTrack.totalSteps : BinSize());
 
         // Determine authored abs/local step identity.
@@ -195,6 +148,104 @@ public partial class InstrumentTrack
             authoredRootMidi = rootInRegister,
             burstId = collectable.burstId
         };
+
+        return pending;
+    }
+
+    /// <summary>Authored duration at the given step's template, else the fallback.</summary>
+    public int ResolveTemplateDuration(int atStep, int fallbackTicks)
+    {
+        int binSize   = Mathf.Max(1, BinSize());
+        int localStep = ((atStep % binSize) + binSize) % binSize;
+        var noteSet   = GetNoteSetForBin(BinIndexForStep(atStep));
+        if (noteSet != null && noteSet.TryGetTemplateTimingAtStep(localStep, out int authoredDur, out _))
+            return authoredDur;
+        return fallbackTicks;
+    }
+
+    /// <summary>
+    /// Shared commit for a carried note (manual release or auto-deposit arrival): resolves duration,
+    /// cross-bin pitch swap, clash avoidance and occupied-step handling, commits to the loop with a
+    /// lit marker, plays the confirm audio and pulses the marker.
+    /// </summary>
+    internal void CommitPendingNoteAtStep(Vehicle.PendingCollectedNote p, int targetAbsStep, float commitVel,
+        float occupiedVelocityMultiplier, bool occupiedOctaveAccent, Vehicle placer)
+    {
+        int chosenMidi = p.collectedMidi;
+        int resolvedDurationTicks = ResolveTemplateDuration(targetAbsStep, p.durationTicks);
+
+        int spawnBin  = BinIndexForStep(p.authoredAbsStep);
+        int targetBin = BinIndexForStep(targetAbsStep);
+        bool crossBinComposition = spawnBin != targetBin;
+
+        // Cross-bin: the collected note was authored for another bin's chord; use the target
+        // step's authored note. Same-bin: keep the raw collected note.
+        if (crossBinComposition)
+            chosenMidi = GetAuthoredNoteAtAbsStep(targetAbsStep);
+
+        chosenMidi = AvoidClashAtStep(targetAbsStep, chosenMidi);
+
+        bool occupied = IsPersistentStepOccupied(targetAbsStep);
+        if (occupied)
+            commitVel = Mathf.Clamp(commitVel * occupiedVelocityMultiplier, 1f, 127f);
+
+        // Cross-bin: store the target bin's chord root so later retune computes rootDelta=0.
+        int commitAuthoredRoot = p.authoredRootMidi;
+        if (crossBinComposition)
+        {
+            var targetNs = GetNoteSetForBin(targetBin);
+            if (targetNs?.chordRegion != null && targetNs.chordRegion.Count > 0)
+                commitAuthoredRoot = targetNs.chordRegion[ResolveChordRegionIndex(targetBin, targetNs.chordRegion.Count)].rootNote;
+        }
+
+        CommitManualReleasedNote(
+            stepAbs: targetAbsStep,
+            midiNote: chosenMidi,
+            durationTicks: resolvedDurationTicks,
+            velocity127: commitVel,
+            authoredRootMidi: commitAuthoredRoot,
+            burstId: p.burstId,
+            lightMarkerNow: true,
+            skipChordQuantize: true,
+            placer: placer);
+
+        PlayOneShotMidi(chosenMidi, commitVel, resolvedDurationTicks);
+
+        var viz = controller != null ? controller.noteVisualizer : null;
+        if (viz != null)
+        {
+            viz.PulseMarkerSpecial(this, targetAbsStep);
+            viz.TriggerPlayheadReleasePulse(assignedRole);
+        }
+
+        if (occupied && occupiedOctaveAccent)
+            PlayOneShotMidi(chosenMidi + 12, commitVel, resolvedDurationTicks);
+    }
+
+    /// <summary>
+    /// Manual-release pickup path: frees the spawn cell and enqueues a note onto the vehicle,
+    /// but does NOT commit anything to the loop yet.
+    /// </summary>
+    public void OnCollectablePickedUpForManualRelease(Vehicle vehicle, Collectable collectable, int reportedBaseStep, int durationTicks, float velocity127)
+    {
+        if (vehicle == null || collectable == null || collectable.assignedInstrumentTrack != this) return;
+
+        TutorialEvents.RaiseNoteCaught(collectable);
+        NoteCollectedForRound(vehicle, collectable.burstId);
+
+        // Free the vacated grid cell (same as normal pickup path).
+        if (drumTrack != null)
+        {
+            Vector2Int gridPos = drumTrack.WorldToGridPosition(collectable.transform.position);
+            drumTrack.FreeSpawnCell(gridPos.x, gridPos.y);
+            drumTrack.ResetSpawnCellBehavior(gridPos.x, gridPos.y);
+        }
+
+        // Keep the collectable in spawnedCollectables until it is released from the Vehicle.
+        // Removal is deferred to OnManualReleaseConsumed / OnManualReleaseDiscarded so that
+        // AnyCollectablesInFlightGlobal() stays true while the note is being carried.
+
+        var pending = BuildPendingNote(collectable, reportedBaseStep, durationTicks, velocity127);
 
         vehicle.EnqueuePendingNote(pending);
     }

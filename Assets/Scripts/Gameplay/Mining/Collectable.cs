@@ -165,12 +165,11 @@ public partial class Collectable : MonoBehaviour
         private ParticleSystem[] _systems;
         private Vector3[] _baseScales;
 
-        public void Capture(Component owner)
+        public void Capture(Collectable owner)
         {
-            _systems = owner.GetComponentsInChildren<ParticleSystem>();
-            _baseScales = new Vector3[_systems.Length];
-            for (int i = 0; i < _systems.Length; i++)
-                _baseScales[i] = _systems[i].transform.localScale;
+            owner.EnsureParticleBaseScales();
+            _systems = owner._particleSystemsCache;
+            _baseScales = owner._particleBaseScalesCache;
         }
 
         public void Apply(float ratio)
@@ -258,6 +257,21 @@ public partial class Collectable : MonoBehaviour
     // since StopCoroutine leaves scale mid-Lerp with no cleanup, and trusting the live
     // value would let each handoff freeze on (and compound) a wrong "base".
     private Vector3 _baseRootScale;
+
+    // Particle children's true resting local scales, captured once. ParticleScaleLockstep
+    // must never read live child scale: a pulse stopped mid-swell leaves children inflated,
+    // and re-capturing that compounds every cycle (unbounded growth while waiting).
+    private ParticleSystem[] _particleSystemsCache;
+    private Vector3[] _particleBaseScalesCache;
+
+    private void EnsureParticleBaseScales()
+    {
+        if (_particleBaseScalesCache != null) return;
+        _particleSystemsCache = GetComponentsInChildren<ParticleSystem>();
+        _particleBaseScalesCache = new Vector3[_particleSystemsCache.Length];
+        for (int i = 0; i < _particleSystemsCache.Length; i++)
+            _particleBaseScalesCache[i] = _particleSystemsCache[i].transform.localScale;
+    }
 
     private void CaptureBaseSizeIfNeeded()
     {

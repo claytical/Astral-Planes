@@ -756,6 +756,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
     private void OnCollectableDestroyed(Collectable c) {
         if (c == null) return; 
+        _autoClaims.Remove(c);
         if (c.assignedInstrumentTrack != this) return;
         if (c.burstId == 0) return;
         if (c.ReportedCollected) return;

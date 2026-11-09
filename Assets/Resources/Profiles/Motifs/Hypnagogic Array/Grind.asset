@@ -1,0 +1,88 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
+  m_Name: Grind
+  m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
+  motifId: grind
+  displayName: The Grind
+  keyRootMidi: 62
+  entryDrumLoops:
+  - {fileID: 8300000, guid: ebf887400a50545d8b3af501ab7528a3, type: 3}
+  intensityClipTags:
+  - clip: {fileID: 8300000, guid: ebf887400a50545d8b3af501ab7528a3, type: 3}
+    depth01: 0
+    breadth01: 0.03
+    pressure01: 0
+    maxConsecutiveLoopSeconds: 0
+  - clip: {fileID: 8300000, guid: 7a4ca993f79334e68894c5ba815ef3d6, type: 3}
+    depth01: 0.036
+    breadth01: 0.009
+    pressure01: 0
+    maxConsecutiveLoopSeconds: 0
+  - clip: {fileID: 8300000, guid: 7cc5ac41478c44067b2f16732fbbf5bb, type: 3}
+    depth01: 0.1
+    breadth01: 0.1
+    pressure01: 0
+    maxConsecutiveLoopSeconds: 0
+  - clip: {fileID: 8300000, guid: 21a5b38eec1b543c28d11c6626db2532, type: 3}
+    depth01: 0.106
+    breadth01: 0.109
+    pressure01: 0.2
+    maxConsecutiveLoopSeconds: 0
+  entryLoopCount: 1
+  resetFirstCarryOnStart: 0
+  bridgeSamples: []
+  bridgeSampleVolume: 1
+  quantizeBridgeSampleToBeat: 1
+  bpm: 189
+  stepsPerLoop: 64
+  phraseLengthLoopsOverride: 0
+  nodesPerStar: 4
+  starBehavior: {fileID: 11400000, guid: 9dd08ed983d384107aaff4f28fa8803d, type: 2}
+  mazePattern: {fileID: 11400000, guid: ad8c03cba044441b8ee19f38d6a9574f, type: 2}
+  roleGeoConfigs:
+  - role: 0
+    feature: 2
+    seedCount: 6
+    radiusCells: 7
+    gladeRadius: 3
+    gladeCount: 2
+    useExactNoteCount: 0
+    notesToCellsMultiplier: 1
+    minCellCount: 0
+    centerBiasFraction01: 0
+    centerBiasMinDensity01: 0.35
+  genericFillNeverRegrowRatio: 1
+  genericFillRatio01: 0
+  genericFillRegrowSoftenMultiplier01: 1
+  chordProgression: {fileID: 11400000, guid: 5406d8891b5c641b3b1e738eba3930bf, type: 2}
+  alternateChordProgressionProfile: {fileID: 11400000, guid: b956b0bff50d748d88897368376e5eeb,
+    type: 2}
+  roleNoteConfigs:
+  - {fileID: 11400000, guid: 7b44b3a89314b4f709e65dcc75589794, type: 2}
+  - {fileID: 11400000, guid: 2e163ae6e72cc4f53ad62f09ebced4d8, type: 2}
+  - {fileID: 11400000, guid: 5e900fdd5feef4ab7a8e76c7f3fb1416, type: 2}
+  - {fileID: 11400000, guid: fb47e30f1cfc740d5b0c65d778d28dcc, type: 2}
+  - {fileID: 11400000, guid: d31506b7b756d47108fe800d9cb606bb, type: 2}
+  - {fileID: 11400000, guid: f2b0f73ea9f8c4858ae515e4512dcf48, type: 2}
+  - {fileID: 11400000, guid: 6fcb02c6ec6094664a47c669a6c07dd1, type: 2}
+  - {fileID: 11400000, guid: 78866b7dd2ae548e58701513e594c6f8, type: 2}
+  - {fileID: 11400000, guid: 084784ba43b68423f9639d66c00a30fb, type: 2}
+  - {fileID: 11400000, guid: 1111cabdb9975409ab3a137aa59ae5bc, type: 2}
+  selectionWeight: 1
+  beatIntroCount: 0
+  driveBeatsFromDensity: 1
+  spawnVehicleTrap: 0
+  trapShape: 0
+  trapRadius: 3
+  trapGrowSeconds: 0.4
+  trapRole: 4

@@ -53,18 +53,76 @@ public class VisualNoteMarker : MonoBehaviour
         ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         ps.Play();
     }
+    [Header("Placeholder Ring")]
+    [SerializeField] private float ringRadius = 0.35f;
+    [SerializeField] private float ringParticleSize = 0.03f;
+    [SerializeField] private float ringEmissionRate = 40f;
+    [SerializeField] private float ringLifetime = 0.6f;
+    [SerializeField] private float ringAlpha = 0.8f;
+    private bool _ringConfigured;
+
+    // Reuses the (otherwise unused) Pre Capture system as an empty ring of tiny dots.
+    private void ConfigureRingParticles()
+    {
+        if (_ringConfigured || preCaptureParticles == null) return;
+        _ringConfigured = true;
+
+        var ps = preCaptureParticles;
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        var main = ps.main;
+        main.loop = true;
+        main.playOnAwake = false;
+        main.simulationSpace = ParticleSystemSimulationSpace.Local;
+        main.startSpeed = 0f;
+        main.startLifetime = ringLifetime;
+        main.startSize = ringParticleSize;
+        main.startColor = new Color(1f, 1f, 1f, ringAlpha);
+        main.gravityModifier = 0f;
+
+        var shape = ps.shape;
+        shape.enabled = true;
+        shape.shapeType = ParticleSystemShapeType.Circle;
+        shape.radius = ringRadius;
+        shape.radiusThickness = 0f; // edge only
+        shape.arc = 360f;
+        shape.position = Vector3.zero;
+        shape.rotation = Vector3.zero;
+        shape.scale = Vector3.one;
+
+        var emission = ps.emission;
+        emission.enabled = true;
+        emission.rateOverTime = ringEmissionRate;
+
+        var vel = ps.velocityOverLifetime;
+        vel.enabled = false;
+        var force = ps.forceOverLifetime;
+        force.enabled = false;
+
+        var col = ps.colorOverLifetime;
+        col.enabled = true;
+        var g = new Gradient();
+        g.SetKeys(
+            new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+            new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.3f), new GradientAlphaKey(0f, 1f) });
+        col.color = new ParticleSystem.MinMaxGradient(g);
+    }
+
     public void SetWaitingParticles(Color color)
     {
         if (capturedParticles != null)
-        {
-            var main = capturedParticles.main;
-            main.startColor = new Color(1f, 1f, 1f, color.a);
             capturedParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            capturedParticles.Play();
-        }
+
         if (_capturedRenderer != null) _capturedRenderer.sortingOrder = _baseParticleSortOrder + 1;
+
         if (preCaptureParticles != null)
+        {
+            ConfigureRingParticles();
+            var rend = preCaptureParticles.GetComponent<ParticleSystemRenderer>();
+            if (rend != null) rend.sortingOrder = _baseParticleSortOrder + 1;
             preCaptureParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            preCaptureParticles.Play();
+        }
     }
 
     public void LightUp(Color color)
@@ -108,6 +166,7 @@ public class VisualNoteMarker : MonoBehaviour
             var main = capturedParticles.main;
             main.startColor = new Color(color.r, color.g, color.b, 1f);
             capturedParticles.Clear();
+            if (!capturedParticles.isPlaying) capturedParticles.Play(true);
         }
 
         if (preCaptureParticles != null)

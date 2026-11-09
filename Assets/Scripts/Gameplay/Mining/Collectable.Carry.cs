@@ -279,8 +279,22 @@ public partial class Collectable
             yield break;
         }
 
-        while (AudioSettings.dspTime < depositDspTime)
+        // Fly from the release point to the (live) marker position, arriving exactly at depositDsp.
+        Vector3 startPos = transform.position;
+        double startDsp = dspNow;
+        double span = Math.Max(0.0001, depositDspTime - startDsp);
+
+        double nowDsp;
+        while ((nowDsp = AudioSettings.dspTime) < depositDspTime)
+        {
+            if (ribbonMarker)
+            {
+                float t = Mathf.Clamp01((float)((nowDsp - startDsp) / span));
+                float eased = t * t * (3f - 2f * t); // smoothstep
+                transform.position = Vector3.Lerp(startPos, ribbonMarker.position, eased);
+            }
             yield return null;
+        }
 
         if (ribbonMarker) transform.position = ribbonMarker.position;
         onArrived?.Invoke();

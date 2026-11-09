@@ -1,0 +1,79 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
+  m_Name: Funk It
+  m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
+  motifId: funk it
+  displayName: Aww Funk It
+  keyRootMidi: 31
+  entryDrumLoops:
+  - {fileID: 8300000, guid: fcefcd7a5ba3f46f1bf3796ed0ca8b2a, type: 3}
+  intensityClipTags:
+  - clip: {fileID: 8300000, guid: 697f15daf4ef446a6a7b09dfbdade238, type: 3}
+    depth01: 0.167
+    breadth01: 0.149
+    pressure01: 0.149
+    maxConsecutiveLoopSeconds: 0
+  - clip: {fileID: 8300000, guid: f65f4959e367c4afea4e32e14a412043, type: 3}
+    depth01: 0.209
+    breadth01: 0.66
+    pressure01: 0.044
+    maxConsecutiveLoopSeconds: 1
+  - clip: {fileID: 8300000, guid: 6132f64019d0e42f6a2b035f078b93d4, type: 3}
+    depth01: 0.651
+    breadth01: 0.342
+    pressure01: 0.174
+    maxConsecutiveLoopSeconds: 1
+  - clip: {fileID: 8300000, guid: 515e6ed8e00b743b9bf4c2e9008244dd, type: 3}
+    depth01: 0.712
+    breadth01: 0.735
+    pressure01: 0.174
+    maxConsecutiveLoopSeconds: 1
+  entryLoopCount: 1
+  resetFirstCarryOnStart: 0
+  bridgeSamples:
+  - {fileID: 8300000, guid: bfc65bcb301c64a22b68667f7c3166db, type: 3}
+  bridgeSampleVolume: 0.5
+  quantizeBridgeSampleToBeat: 1
+  bpm: 167
+  stepsPerLoop: 32
+  phraseLengthLoopsOverride: 0
+  nodesPerStar: 8
+  starBehavior: {fileID: 11400000, guid: 8a258771ba6214752b716ed2a737f120, type: 2}
+  mazePattern: {fileID: 11400000, guid: 6d8c21d7cca34e6fb42e2b687206cdfa, type: 2}
+  roleGeoConfigs: []
+  genericFillNeverRegrowRatio: 0.214
+  genericFillRatio01: 0.124
+  genericFillRegrowSoftenMultiplier01: 1
+  chordProgression: {fileID: 11400000, guid: 8f16e11bae05e4bc4ad5f9983bacc9ff, type: 2}
+  alternateChordProgressionProfile: {fileID: 11400000, guid: b7b45c18f038e45059a5b37c3cd2d7e6,
+    type: 2}
+  roleNoteConfigs:
+  - {fileID: 11400000, guid: 69189357402be4dcc804d1baa854c7a5, type: 2}
+  - {fileID: 11400000, guid: 21845f9600ccd47aea21b19e6817c0ed, type: 2}
+  - {fileID: 11400000, guid: 1c1a849910c774b319949946ed2198aa, type: 2}
+  - {fileID: 11400000, guid: 314f038179a934029acbc6178f279c45, type: 2}
+  - {fileID: 11400000, guid: 49e005d79a03e461496a250f22674166, type: 2}
+  - {fileID: 11400000, guid: 8ea3ea6aaa7e84c8b82b9196a43dc053, type: 2}
+  - {fileID: 11400000, guid: 9f53bb73fbed04e04beb17ae7c810896, type: 2}
+  - {fileID: 11400000, guid: fa1946ee270984b6c86274ddca34ae65, type: 2}
+  - {fileID: 11400000, guid: 6153f6dd4b94d49b49e2eba794c6cf00, type: 2}
+  - {fileID: 11400000, guid: ca4918b0ce9684665b5ab0bb4ce68009, type: 2}
+  - {fileID: 11400000, guid: 4301374ddf553462eac5f81a605c0d7d, type: 2}
+  selectionWeight: 1
+  beatIntroCount: 0
+  driveBeatsFromDensity: 1
+  spawnVehicleTrap: 0
+  trapShape: 0
+  trapRadius: 3
+  trapGrowSeconds: 0.4
+  trapRole: 4

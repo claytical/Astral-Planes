@@ -46,8 +46,8 @@ public static class MazeDensityModulation
     public static int TunnelsCorridorWidth(int authored, float busyness01) =>
         Mathf.Max(1, Mathf.RoundToInt(authored * Mathf.Lerp(1.15f, 0.75f, busyness01)));
 
-    // Mirrors TunnelsParams.Validate()'s own corridorWidth<=corridorStep invariant, applied to
-    // locals only — the authored asset's fields are never written.
+    // Keeps the modulated width <= step, applied to locals only — the authored asset's fields
+    // are never written (BuildPacManTunnels further floors step at width + 1).
     public static int TunnelsCorridorStep(int authoredStep, int modulatedWidth) =>
         modulatedWidth > authoredStep ? modulatedWidth : authoredStep;
 

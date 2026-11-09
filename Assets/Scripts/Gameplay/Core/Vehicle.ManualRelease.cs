@@ -111,78 +111,23 @@ public partial class Vehicle
 
     private void CommitManualReleaseAtStep(PendingCollectedNote p, int targetAbsStep, float releaseVelocity = -1f)
     {
-        if (gfm == null) gfm = GameFlowManager.Instance;
-        var viz = (gfm != null) ? gfm.noteViz : null;
-
         if (p.track == null || p.track.controller == null || p.track.drumTrack == null)
         {
             if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
             return;
         }
 
-        ResolvePlaybackNote(p, targetAbsStep, out int chosenMidi, out int resolvedDurationTicks);
-
-        int spawnBin  = p.track.BinIndexForStep(p.authoredAbsStep);
-        int targetBin = p.track.BinIndexForStep(targetAbsStep);
-        bool crossBinComposition = spawnBin != targetBin;
-
-        // Cross-bin: use the authored note for the target step — the collected note was
-        // authored for a different bin's chord, so quantizing it can land on a plausible
-        // but wrong pitch. Using the authored note ensures each step gets its intended melody.
-        // Same-bin: keep the raw collected note (already a chord tone of that bin).
-        if (crossBinComposition)
-        {
-            int preSwapMidi = chosenMidi;
-            chosenMidi = p.track.GetAuthoredNoteAtAbsStep(targetAbsStep);
-            if (GameFlowManager.VerboseLogging) Debug.Log(
-                $"[CROSSBIN_SWAP] track={p.track.name} spawnBin={spawnBin} targetBin={targetBin} " +
-                $"authoredAbsStep={p.authoredAbsStep} targetAbsStep={targetAbsStep} " +
-                $"collectedMidi={preSwapMidi} -> authoredNote={chosenMidi}");
-        }
-
-        chosenMidi = p.track.AvoidClashAtStep(targetAbsStep, chosenMidi);
-
-        bool occupied = p.track.IsPersistentStepOccupied(targetAbsStep);
         float commitVel = releaseVelocity >= 0f ? releaseVelocity : p.velocity127;
-        if (occupied)
-            commitVel = Mathf.Clamp(commitVel * vehicleConfig.occupiedStepVelocityMultiplier, 1f, 127f);
 
         if (p.collectable != null) p.collectable.MarkAsReportedCollected();
         if (p.collectable != null) p.collectable.OnManualReleaseConsumed();
 
-        // Cross-bin: store the target bin's chord root so RetuneLoopToCurrentProgression
-        // computes rootDelta=0 for this note (correct anchor, no mis-retune later).
-        int commitAuthoredRoot = p.authoredRootMidi;
-        if (crossBinComposition)
-        {
-            var targetNs = p.track.GetNoteSetForBin(targetBin);
-            if (targetNs?.chordRegion != null && targetNs.chordRegion.Count > 0)
-                commitAuthoredRoot = targetNs.chordRegion[p.track.ResolveChordRegionIndex(targetBin, targetNs.chordRegion.Count)].rootNote;
-        }
+        // Pitch/duration resolution, commit, audio and marker pulses are shared with the
+        // auto-deposit path (InstrumentTrack.CommitPendingNoteAtStep).
+        p.track.CommitPendingNoteAtStep(p, targetAbsStep, commitVel,
+            vehicleConfig.occupiedStepVelocityMultiplier, vehicleConfig.occupiedStepOctaveAccent, this);
 
-        p.track.CommitManualReleasedNote(
-            stepAbs: targetAbsStep,
-            midiNote: chosenMidi,
-            durationTicks: resolvedDurationTicks,
-            velocity127: commitVel,
-            authoredRootMidi: commitAuthoredRoot,
-            burstId: p.burstId,
-            lightMarkerNow: true,
-            skipChordQuantize: true,  // pitch resolved above; octave-fit only
-            placer: this
-        );
-
-        p.track.PlayOneShotMidi(chosenMidi, commitVel, resolvedDurationTicks);
         GrantPostCommitRingCollisionImmunity();
-
-        if (viz != null)
-        {
-            viz.PulseMarkerSpecial(p.track, targetAbsStep);
-            viz.TriggerPlayheadReleasePulse(p.track.assignedRole);
-        }
-
-        if (occupied && vehicleConfig.occupiedStepOctaveAccent)
-            p.track.PlayOneShotMidi(chosenMidi + 12, commitVel, resolvedDurationTicks);
     }
 
     private void OnStepTickForReleaseCue(int stepIndex, int leaderSteps)

@@ -52,6 +52,7 @@ public sealed class SessionStateCoordinator
         !_modeLocked && _players.Count >= 2 && _players.All(p => p != null && p.IsReady);
 
     public void LockMode() => _modeLocked = true;
+    public void UnlockMode() => _modeLocked = false;
 
     /// <summary>Players still in the match (competitive: not permanently eliminated).</summary>
     public int AliveCount => _players.Count(p => p != null && !p.IsEliminated);

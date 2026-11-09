@@ -7,6 +7,15 @@ public partial class LocalPlayer
     private Coroutine _leaveHoldCo;
     private const float HoldToLeaveSeconds = 3f;
 
+    // Leaving the session from the vehicle stage with 2+ players joined needs a short hold so a
+    // casual "undo" tap can never knock a player out of a multiplayer session.
+    private Coroutine _leaveSelectHoldCo;
+    private const float HoldToLeaveSelectSeconds = 1.5f;
+
+    // The tutorial abort-hold prompt is a single shared UI; only hide it when no player's
+    // abort hold is still running.
+    private static int _activeAbortHolds;
+
     // GlobalEscapeQuitListener needs to know, at the moment a physical Escape release would
     // otherwise open the quit-confirmation modal, whether this same press already fired the
     // instant (no-hold) leave below — so it doesn't pop the quit modal on top of a leave that
@@ -26,20 +35,67 @@ public partial class LocalPlayer
         }
         else
         {
+            // Back is a per-player undo, one step at a time:
+            //   ready -> groove-style stage -> vehicle stage -> (hold) leave the session.
+            if (_isReady && _selection != null)
+            {
+                _instantLeaveFrame = Time.frameCount; // keep a same-press Esc from opening the quit modal
+                _sfxSource?.PlayOneShot(clickFx);
+                _selection.Unconfirm();
+                ResetReady();
+                return;
+            }
+            if (_selection != null && _selection.StepBackStage())
+            {
+                _instantLeaveFrame = Time.frameCount;
+                _sfxSource?.PlayOneShot(clickFx);
+                return;
+            }
+
+            int joined = GameFlowManager.Instance?.SessionState?.Players?.Count ?? 1;
+            if (joined >= 2)
+            {
+                // Swallow the tap so Esc doesn't pop the quit modal; leaving needs a hold.
+                _instantLeaveFrame = Time.frameCount;
+                if (_leaveSelectHoldCo == null)
+                    _leaveSelectHoldCo = StartCoroutine(HoldToLeaveSelectRoutine());
+                return;
+            }
             LeaveShipSelect();
         }
     }
 
+    private IEnumerator HoldToLeaveSelectRoutine()
+    {
+        float t = 0f;
+        while (t < HoldToLeaveSelectSeconds)
+        {
+            t += Time.unscaledDeltaTime;
+            yield return null;
+        }
+        _leaveSelectHoldCo = null;
+        LeaveShipSelect();
+    }
+
     private void HandleLeaveReleased()
     {
+        if (_leaveSelectHoldCo != null)
+        {
+            StopCoroutine(_leaveSelectHoldCo);
+            _leaveSelectHoldCo = null;
+        }
+
         if (_leaveHoldCo == null) return;
         StopCoroutine(_leaveHoldCo);
         _leaveHoldCo = null;
-        ControlTutorialDirector.Instance?.CancelAbortHoldUI();
+        _activeAbortHolds = Mathf.Max(0, _activeAbortHolds - 1);
+        if (_activeAbortHolds == 0)
+            ControlTutorialDirector.Instance?.CancelAbortHoldUI();
     }
 
     private IEnumerator HoldToLeaveRoutine()
     {
+        _activeAbortHolds++;
         ControlTutorialDirector.Instance.BeginAbortHoldUI("Quitting", HoldToLeaveSeconds);
 
         float t = 0f;
@@ -51,8 +107,9 @@ public partial class LocalPlayer
         }
 
         _leaveHoldCo = null;
+        _activeAbortHolds = Mathf.Max(0, _activeAbortHolds - 1);
         ControlTutorialDirector.Instance.EndAbortHoldUI();
-        GameFlowManager.Instance.AbortTutorialSession();
+        GameFlowManager.Instance.AbortTutorialForPlayer(this);
     }
 
     private void LeaveShipSelect()
@@ -64,7 +121,12 @@ public partial class LocalPlayer
         if (GameFlowManager.Instance == null || GameFlowManager.Instance.CurrentState != GameState.Selection) return;
 
         _instantLeaveFrame = Time.frameCount;
+        LeaveSessionNow();
+    }
 
+    /// <summary>Removes this player from the session (no scene/state guards; callers decide when that is appropriate).</summary>
+    public void LeaveSessionNow()
+    {
         ControlTutorialDirector.Instance?.UnregisterMini(this);
 
         if (_selection != null)

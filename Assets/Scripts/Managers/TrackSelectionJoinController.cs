@@ -123,6 +123,10 @@ public class TrackSelectionJoinController : MonoBehaviour
 
         if (GameFlowManager.Instance?.CurrentState != GameState.Selection) return;
 
+        // The tutorial roster is fixed when it begins; a mid-tutorial joiner would have no ship
+        // and no tutorial participation.
+        if (ControlTutorialDirector.Instance != null && ControlTutorialDirector.Instance.IsPrimaryTutorialRunning) return;
+
         var assignedIds = new HashSet<int>();
         foreach (var lp in FindObjectsByType<LocalPlayer>(FindObjectsSortMode.None))
         {

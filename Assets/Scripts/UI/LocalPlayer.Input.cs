@@ -197,11 +197,12 @@ public partial class LocalPlayer
     {
         if (!value.isPressed) return;
         if (TryCycleGameMode(+1)) return;
+        if (_isReady) return; // confirmed: no ship/mode navigation (or nav sfx) while the tutorial runs
         _sfxSource?.PlayOneShot(clickFx);
 
         if (_selection != null)
         {
-            _selection.NextVehicle();
+            _selection.Navigate(+1);
             NotifySelectionNavigatedOnce();
         }
 
@@ -212,11 +213,12 @@ public partial class LocalPlayer
     {
         if (!value.isPressed) return;
         if (TryCycleGameMode(-1)) return;
+        if (_isReady) return; // confirmed: no ship/mode navigation (or nav sfx) while the tutorial runs
         _sfxSource?.PlayOneShot(clickFx);
 
         if (_selection != null)
         {
-            _selection.PreviousVehicle();
+            _selection.Navigate(-1);
             NotifySelectionNavigatedOnce();
         }
 

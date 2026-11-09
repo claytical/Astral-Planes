@@ -14,16 +14,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RiffAsset
   riff:
     id: intro-tutorial-groove
-    authoredRootMidi: 46
+    authoredRootMidi: 52
     loopSteps: 16
     events:
     - step: 4
-      midiNote: 46
-      durSteps: 4
+      midiNote: 52
+      durSteps: 8
       velocity01: 0.78740156
     - step: 12
-      midiNote: 46
-      durSteps: 2
+      midiNote: 59
+      durSteps: 8
       velocity01: 0.78740156
     overlapPolicy: 1
     octaveShift: 0

@@ -6,7 +6,7 @@
       "gateName": "CarveComplete",
       "cueLineIndex": -1,
       "lines": [
-        "Hello, Sonic Wanderer! Welcome to the field.",
+        "Hello, Sonic Wanderer{s}! Welcome to the field.",
         "Drift around and explore the field.",
         "It's full of music waiting to happen. You'll be jamming in no time.",
         "Now charge through the field to generate musical potential."
@@ -64,7 +64,7 @@
       "gateName": "NotePlaced",
       "cueLineIndex": 1,
       "lines": [
-        "You caught a piece of the melody.",
+        "Listen. The note you caught has gone quiet where it used to play.",
         "That note won't be heard again unless you place it."
       ]
     },

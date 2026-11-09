@@ -15,6 +15,16 @@ public partial class MotifRingGlyphApplicator
         // the record stays animated during the wait (rings look live, not frozen).
         _spinOffPending = true;
 
+        // The per-deformation auto-hide may already have scaled the stack to zero (or be mid-way
+        // through doing so) by the time the bridge starts. Cancel it and restore the stack now,
+        // so the record stays visible through the wait instead of popping back at spin start.
+        if (_gameplayHideCoroutine != null)
+        {
+            StopCoroutine(_gameplayHideCoroutine);
+            _gameplayHideCoroutine = null;
+        }
+        transform.localScale = _fitScale.sqrMagnitude > 0.0001f ? _fitScale : Vector3.one;
+
         // Motif completion can land anywhere in the currently-playing pass. Wait for the pass
         // to actually finish (all bins played) before doing anything else. This has to happen
         // here, first — not in the caller — because _spinOffPending (set above) is the only

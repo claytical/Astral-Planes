@@ -66,7 +66,14 @@ public partial class LocalPlayer
         {
             case GameState.Selection:
                 _sfxSource?.PlayOneShot(confirmFx);
+                // Stage 1 (vehicle) only advances to the groove-style stage; stage 2 readies up.
+                if (_selection != null && _selection.Stage == PlayerSelect.SelectStage.Vehicle)
+                {
+                    _selection.AdvanceStage();
+                    break;
+                }
                 playerVehicle = _selection.GetChosenPlane();
+                _placementMethod = _selection.CurrentPlacementMethod;
                 _selection.Confirm();
                 SetColor();
                 _isReady = true;
@@ -90,7 +97,14 @@ public partial class LocalPlayer
                 }
                 else if (_isRespawning)
                 {
+                    if (_selection != null && _selection.Stage == PlayerSelect.SelectStage.Vehicle && _selection.GetChosenPlane() != null)
+                    {
+                        _sfxSource?.PlayOneShot(confirmFx);
+                        _selection.AdvanceStage();
+                        break;
+                    }
                     playerVehicle = _selection.GetChosenPlane();
+                    if (_selection != null) _placementMethod = _selection.CurrentPlacementMethod;
                     if (playerVehicle == null)
                     {
                         // No vehicle left to claim (hangar exhausted, or lost the

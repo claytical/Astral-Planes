@@ -9,11 +9,6 @@ public partial class LocalPlayer
     public GameObject playerSelect;
     [SerializeField] private GameObject playerStatsUI;
 
-    [Header("Tutorial UI")]
-    [SerializeField] private ControlTutorialHighlight miniTutorialPrefab;
-    [SerializeField] private Vector3 miniTutorialScale = new Vector3(0.5f, 0.5f, 1f);
-
-    private ControlTutorialHighlight _miniTutorial;
     private bool _hasNavigatedSelectionOnce;
 
     // --- Dust spawn pocket / keep-clear ---
@@ -47,40 +42,15 @@ public partial class LocalPlayer
             _selection = null;
         }
 
-        if (_miniTutorial != null)
-        {
-            Destroy(_miniTutorial.gameObject);
-            _miniTutorial = null;
-        }
-
         _hasNavigatedSelectionOnce = false;
 
         GameObject ps = Instantiate(playerSelect);
         _selection = ps.GetComponent<PlayerSelect>();
+        if (_selection != null) _selection.SetPlacementMethod(_placementMethod);
 
-        // Spawn mini controller and attach it near the player’s selection UI (exactly once)
-        if (miniTutorialPrefab != null && _selection != null)
-        {
-// Choose a very specific anchor transform inside the PlayerSelectShip prefab.
-            Transform miniAnchor =
-                _selection.tutorialControls
-                    ? _selection.tutorialControls.transform
-                    : _selection.transform;
-
-            _miniTutorial = Instantiate(miniTutorialPrefab); // instantiate unparented
-
-            if (ControlTutorialDirector.Instance != null)
-            {
-                ControlTutorialDirector.Instance.RegisterMini(
-                    lp: this,
-                    mini: _miniTutorial,
-                    parentOverride: miniAnchor,
-                    localPos: Vector3.zero,
-                    localScale: miniTutorialScale,
-                    localRot: Quaternion.identity
-                );
-            }
-        }
+        // No per-player control hint during vehicle selection. Joining still hides the shared
+        // primary highlight (previously a side effect of ControlTutorialDirector.RegisterMini).
+        ControlTutorialDirector.Instance?.GetPrimary()?.HideAndClear(immediate: true);
     }
 
     public void SetStats()
@@ -176,7 +146,10 @@ public partial class LocalPlayer
             var vehicleGO = Instantiate(playerVehicle, transform);
             plane = vehicleGO.GetComponent<Vehicle>();
             if (plane != null)
+            {
+                plane.PlacementMethod = _placementMethod;
                 gfm.RegisterVehicle(plane);
+            }
         }
 
         // Player stats plumbing

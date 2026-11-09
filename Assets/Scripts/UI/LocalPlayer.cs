@@ -8,6 +8,9 @@ using UnityEngine.Audio;
 public partial class LocalPlayer : MonoBehaviour
 {
     [SerializeField] private GameObject playerVehicle;
+    /// <summary>Persisted per player across scene loads and respawns; applied to the Vehicle at launch.</summary>
+    private NotePlacementMethod _placementMethod = NotePlacementMethod.Manual;
+    public NotePlacementMethod PlacementMethod => _placementMethod;
     [SerializeField] private AudioMixerGroup effectsMixerGroup;
     public Vehicle plane;
 

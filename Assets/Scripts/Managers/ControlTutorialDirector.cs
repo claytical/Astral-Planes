@@ -375,7 +375,15 @@ public partial class ControlTutorialDirector : MonoBehaviour
     public void BeginPrimaryTutorialSequence()
     {
         SendToAllMinis(m => m.Clear(immediate: true, hideText: true));
-        _tutorialPlayers = new List<LocalPlayer>(_mini.Keys);
+        // Tutorial participants are the joined players. (Previously derived from the per-player
+        // minis, which are no longer created during ship select; an empty list left every
+        // input-gated step unsatisfiable.)
+        _tutorialPlayers = new List<LocalPlayer>();
+        var sessionPlayers = GameFlowManager.Instance != null && GameFlowManager.Instance.SessionState != null
+            ? GameFlowManager.Instance.SessionState.Players : null;
+        if (sessionPlayers != null)
+            foreach (var lp in sessionPlayers)
+                if (lp) _tutorialPlayers.Add(lp);
 
         // The confirmed-ship dim is only for the pre-tutorial wait; the tutorial owns the screen.
         if (Hangar.Instance != null) Hangar.Instance.SetSelectionVisible(false);

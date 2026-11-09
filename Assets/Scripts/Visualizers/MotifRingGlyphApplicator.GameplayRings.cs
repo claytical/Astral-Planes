@@ -379,13 +379,13 @@ public partial class MotifRingGlyphApplicator
         float dur          = config != null ? config.scaleDownDuration : 0.5f;
         Vector3 startScale = transform.localScale;
         float elapsed      = 0f;
-        while (elapsed < dur && !_gameplayFadingOut && _pendingDeformationCount == 0)
+        while (elapsed < dur && !_gameplayFadingOut && !_spinOffPending && _pendingDeformationCount == 0)
         {
             elapsed += Time.deltaTime;
             transform.localScale = Vector3.Lerp(startScale, Vector3.zero, elapsed / dur);
             yield return null;
         }
-        if (!_gameplayFadingOut && _pendingDeformationCount == 0)
+        if (!_gameplayFadingOut && !_spinOffPending && _pendingDeformationCount == 0)
             transform.localScale = Vector3.zero;
 
         _gameplayHideCoroutine = null;
@@ -454,11 +454,9 @@ public partial class MotifRingGlyphApplicator
     {
         if (colors == null || colors.Count == 0 || ring.Root == null) yield break;
 
+        // Single role: pulse between the role color and the placeholder gray (local copy, don't mutate the source list).
         if (colors.Count == 1)
-        {
-            ApplyNextUpColor(ring, colors[0]);
-            yield break;
-        }
+            colors = new List<Color> { colors[0], config.remainingRingColor };
 
         int i = 0;
         while (ring.Root != null)

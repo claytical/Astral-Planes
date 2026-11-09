@@ -74,12 +74,7 @@ public partial class Vehicle
     private void ResolvePlaybackNote(PendingCollectedNote p, int atStep, out int midi, out int dur)
     {
         midi = p.collectedMidi;
-        dur  = p.durationTicks;
-        int binSize   = Mathf.Max(1, p.track.BinSize());
-        int localStep = ((atStep % binSize) + binSize) % binSize;
-        var noteSet   = p.track.GetNoteSetForBin(p.track.BinIndexForStep(atStep));
-        if (noteSet != null && noteSet.TryGetTemplateTimingAtStep(localStep, out int authoredDur, out _))
-            dur = authoredDur;
+        dur  = p.track.ResolveTemplateDuration(atStep, p.durationTicks);
     }
 
     private void DiscardPendingNote(PendingCollectedNote p)
@@ -188,6 +183,7 @@ public partial class Vehicle
 
     public bool TryReleaseQueuedNote(bool allowSacrifice = true)
 {
+    if (!ManualNoteReleaseEnabled) return false;
     if (_pendingNotes.Count <= 0)
     {
         // A real press (not the hold-cascade retry) with nothing carried: let the tutorial skip its delay.
