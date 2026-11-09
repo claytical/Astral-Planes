@@ -152,6 +152,9 @@ public partial class Collectable
 
     private void HandleAutoDeposit(Vehicle vehicle, int stepToReportBase, float velocity127, float force, int baseSteps, DrumTrack drumTrack)
     {
+        // Auto mode never takes the vehicle carry-lock, so release the drum intro hold here.
+        if (drumTrack != null) drumTrack.NotifyFirstCollect();
+
         // Schedules the single carry+deposit; the note is committed to the loop on arrival.
         bool scheduled = assignedInstrumentTrack.OnCollectableCollected(vehicle, this, stepToReportBase, noteDurationTicks, velocity127);
 

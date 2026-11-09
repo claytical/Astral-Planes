@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: 1_Two
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: two
-  displayName: Off
+  displayName: Making Shapes inthe Dark
   keyRootMidi: 45
   entryDrumLoops:
   - {fileID: 8300000, guid: a6b537cd91fc44bc2a4357aa1a154bea, type: 3}

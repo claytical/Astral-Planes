@@ -77,7 +77,10 @@ public partial class DrumTrack : MonoBehaviour
     private readonly HashSet<AudioClip> _preloadedClips = new();
 
     private int _entryLoopsRemaining;
-    private bool _carryLatched; // one-way: set once any vehicle carries a collectable
+    private bool _carryLatched; // one-way: set once any vehicle carries a collectable (or auto-deposits one)
+
+    /// <summary>Auto placement never "carries" via the vehicle lock; latch the intro hold on first catch instead.</summary>
+    public void NotifyFirstCollect() { _carryLatched = true; }
 
     private AudioClip _currentDrumClip;
 

@@ -298,7 +298,8 @@ public class TrackExpansionController
         // Defer if any vehicle is carrying notes — expanding while carrying recomputes
         // all track layouts and invalidates the vehicle's NoteVisualizer target steps.
         // HookedBoundaryForExpand stays true, so this retries every loop boundary.
-        if (Vehicle.AnyVehicleCarrying())
+        // Auto-placement notes in flight count too (no vehicle carry-lock in that mode).
+        if (Vehicle.AnyVehicleCarrying() || Collectable.AnyInDepositFlight())
             return;
 
         bool hadAnyPending = PendingExpandForBurst || _pendingBurstAfterExpand.HasValue;

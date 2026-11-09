@@ -122,6 +122,15 @@ public partial class Collectable : MonoBehaviour
         return false;
     }
 
+    // Auto-deposit notes between catch and landing. Auto mode never takes the Vehicle carry-lock,
+    // so this is what defers bin expansion while a note is still flying to its target step.
+    private static readonly HashSet<Collectable> _s_inDepositFlight = new();
+    public static bool AnyInDepositFlight()
+    {
+        _s_inDepositFlight.RemoveWhere(c => c == null);
+        return _s_inDepositFlight.Count > 0;
+    }
+
     public static bool AnyLiveForTrack(InstrumentTrack track)
         => _s_liveByTrack.TryGetValue(track, out var count) && count > 0;
 
@@ -431,6 +440,7 @@ public partial class Collectable : MonoBehaviour
 
     private void OnDestroy()
     {
+        _s_inDepositFlight.Remove(this);
         MarkNoLongerLive();
         UnbindTimelineStep();
         UnregisterOccupant();

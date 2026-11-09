@@ -183,6 +183,7 @@ public partial class Collectable
         float force,
         Action onArrived)
     {
+        _s_inDepositFlight.Add(this); // removed in OnDestroy (every deposit path ends in Destroy)
         if (_carryRoutine != null) StopCoroutine(_carryRoutine);
         _carryRoutine = StartCoroutine(CarryAndDepositRoutine(depositDspTime, durationTicks, force, onArrived));
     }
