@@ -248,6 +248,26 @@ public partial class CosmicDustGenerator
 
         // (no composite collider rebuild)
     }
+    /// <summary>
+    /// Visual-only scale-out of every active dust cell over <paramref name="seconds"/>, with no
+    /// state changes — the animated counterpart to the one-frame visual wipe ClearMaze does. Run
+    /// it before ClearMaze (which finds the visuals already gone) so an old maze dissolves
+    /// instead of popping out.
+    /// </summary>
+    public void DissolveAllVisuals(float seconds)
+    {
+        if (_gridState == null || seconds <= 0f) return;
+        for (int x = 0; x < _gridState.Width; x++)
+        {
+            for (int y = 0; y < _gridState.Height; y++)
+            {
+                if (TryGetCellGo(new Vector2Int(x, y), out var go) && go != null &&
+                    go.TryGetComponent<CosmicDust>(out var dust) && dust != null)
+                    dust.RunClearVisuals(seconds);
+            }
+        }
+    }
+
     private void HideCellGO(GameObject go)
     {
         if (!go) return;

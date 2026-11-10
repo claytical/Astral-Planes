@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
-  m_Name: 3_Here We Go
+  m_Name: Assembly Line Shuffle
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: herewego
-  displayName: Cowboy Spritz
+  displayName: Assembly Line Shuffle
   keyRootMidi: 61
   entryDrumLoops:
   - {fileID: 8300000, guid: b7c3aed6a3db04dc8bd9183cf9be1935, type: 3}
@@ -54,7 +54,7 @@ MonoBehaviour:
   phraseLengthLoopsOverride: 0
   nodesPerStar: 8
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
-  mazePattern: {fileID: 11400000, guid: 807fb323680746bea9c583afa5036372, type: 2}
+  mazePattern: {fileID: 11400000, guid: da22aefddef94995b336be9216d7a496, type: 2}
   roleGeoConfigs: []
   genericFillNeverRegrowRatio: 0.1
   genericFillRatio01: 0

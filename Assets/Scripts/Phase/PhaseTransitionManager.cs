@@ -43,6 +43,14 @@ public class PhaseTransitionManager : MonoBehaviour
     public List<MotifMazeGraph.Exit> GetMazeExits() =>
         new MotifMazeGraph(chapterLibrary, (_, _) => true).GetExits(currentPhaseIndex, currentMotifIndex);
 
+    /// <summary>Stable phaseId for a phase index, or null if out of range.</summary>
+    public string PeekPhaseId(int phaseIndex)
+    {
+        var phases = chapterLibrary != null ? chapterLibrary.phases : null;
+        if (phases == null || phaseIndex < 0 || phaseIndex >= phases.Count) return null;
+        return phases[phaseIndex]?.phaseId;
+    }
+
     /// <summary>Motif at (phaseIndex, motifIndex) in the library, without changing state. Null if out of range.</summary>
     public MotifProfile PeekMotif(int phaseIndex, int motifIndex)
     {

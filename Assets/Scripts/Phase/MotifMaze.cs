@@ -135,6 +135,7 @@ public sealed class MotifMazeGraph
     {
         if (!Exists(phase, motif)) return false;
         if (_revealAll) return true;
+        if (phase >= 1 && _isCompleted(phase, motif)) return true; // explored motifs always selectable
         if (phase == 0) return !TutorialComplete;
         if (phase == 1) return TutorialComplete;
         return _isCompleted(phase - 1, MapMotif(phase, motif, phase - 1));

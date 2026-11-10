@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
-  m_Name: Folding
+  m_Name: Parlallax Garden
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: folding
-  displayName: folding
+  displayName: Parallax Garden
   keyRootMidi: 55
   entryDrumLoops:
   - {fileID: 8300000, guid: 66128132176a645fba37751d4e518bd8, type: 3}

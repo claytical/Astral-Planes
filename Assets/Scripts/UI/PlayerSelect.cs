@@ -7,6 +7,8 @@ using TMPro;
 public class PlayerSelect : MonoBehaviour
 {
     public Image planeIcon;
+    [Tooltip("Vehicle image under the Groove Style parent; mirrors planeIcon so the ship stays visible in the groove stage.")]
+    public Image vehicleIcon;
     public VehicleStatDisplay statDisplay;
     public GameObject controlsAndStats;
     public GameObject tutorialControls;
@@ -26,7 +28,7 @@ public class PlayerSelect : MonoBehaviour
     private Hangar _hangar;
     private GameObject _chosenPlane;
     private string _currentShipName;
-    private NotePlacementMethod _placementMethod = NotePlacementMethod.Manual;
+    private NotePlacementMethod _placementMethod = NotePlacementMethod.Auto;
 
     public NotePlacementMethod CurrentPlacementMethod => _placementMethod;
 
@@ -90,8 +92,8 @@ public class PlayerSelect : MonoBehaviour
             placementMethodLabel.text = manual ? "Groove Commander" : "Cozy Co-Pilot";
         if (placementDescriptionLabel != null)
             placementDescriptionLabel.text = manual
-                ? "Take control. Arrange the music your way."
-                : "Catch the notes.\nLet the cosmos handle the timing.";
+                ? "Take control.\nArrange the music your way."
+                : "Catch the notes.\nLet the cosmos handle the rest.";
     }
 
     void Start()
@@ -182,6 +184,7 @@ public class PlayerSelect : MonoBehaviour
         if (sr != null)
         {
             planeIcon.sprite = sr.sprite;
+            if (vehicleIcon != null) vehicleIcon.sprite = sr.sprite;
         }
     }
     public void Confirm()

@@ -14,6 +14,9 @@ public partial class CosmicDustGenerator
         public Vector2Int AnchorCell;
         public List<Vector2Int> GapCells;
         public BoundaryWrap.BoundarySide Side;
+        // Radius (cells) of the permanent-clear disk carved around every gap cell — the real
+        // passable opening is the gap span widened by this on each end.
+        public int PassRadiusCells;
     }
 
     /// <summary>
@@ -166,7 +169,8 @@ public partial class CosmicDustGenerator
             {
                 AnchorCell = anchor,
                 GapCells = group,
-                Side = SideOfBorderCell(anchor, w, h)
+                Side = SideOfBorderCell(anchor, w, h),
+                PassRadiusCells = passRadiusCells
             });
         }
 

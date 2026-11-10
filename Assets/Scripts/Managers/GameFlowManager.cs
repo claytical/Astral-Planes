@@ -29,22 +29,33 @@ public partial class GameFlowManager : MonoBehaviour
     [SerializeField, Min(0f)] private float vehiclePhaseInDelaySeconds = 1.2f;
 
     [Header("Path Choice")]
-    [Tooltip("Optional visual marker instantiated at each tunnel exit during the path-choice " +
-             "interstitial (the exit trigger itself has no renderer). Purely decorative — " +
-             "leave unassigned for invisible exits.")]
-    [SerializeField] private GameObject pathExitVisualPrefab;
-    public GameObject PathExitVisualPrefab => pathExitVisualPrefab;
-
-    [Tooltip("Speed (world units/sec) the exit particle effect's Velocity Over Lifetime module " +
-             "is driven at. Direction is computed per exit (inward from whichever border side " +
-             "it's on, toward the player) — this only controls magnitude.")]
-    [SerializeField, Min(0f)] private float pathExitParticleSpeed = 3f;
-    public float PathExitParticleSpeed => pathExitParticleSpeed;
+    [Tooltip("Optional per-kind (revisit / new motif / new phase) particle look for path exits. " +
+             "Exits are built procedurally; unassigned = built-in defaults.")]
+    [SerializeField] private PathExitParticleStyle pathExitParticleStyle;
+    public PathExitParticleStyle PathExitParticleStyle => pathExitParticleStyle;
 
     [Tooltip("Seconds to fade a losing exit's particle visual after it's sealed, before " +
              "deactivating it. Keeps the tunnel closing from reading as an instant pop.")]
     [SerializeField, Min(0f)] private float pathExitSealFadeSeconds = 0.35f;
     public float PathExitSealFadeSeconds => pathExitSealFadeSeconds;
+
+    [Tooltip("Seconds the winning black hole takes to close after the vehicles have been swallowed.")]
+    [SerializeField, Min(0f)] private float pathExitCloseSeconds = 0.6f;
+    public float PathExitCloseSeconds => pathExitCloseSeconds;
+
+    [Tooltip("Seconds the old interstitial maze's dust takes to dissolve (instead of popping out) " +
+             "after the vehicles are swallowed. Runs alongside the hole closing.")]
+    [SerializeField, Min(0f)] private float pathExitDissolveSeconds = 0.5f;
+    public float PathExitDissolveSeconds => pathExitDissolveSeconds;
+
+    [Tooltip("Beat of held stillness after the vehicles vanish into the hole, before it closes.")]
+    [SerializeField, Min(0f)] private float pathExitPostSwallowBeatSeconds = 0.2f;
+    public float PathExitPostSwallowBeatSeconds => pathExitPostSwallowBeatSeconds;
+
+    [Tooltip("Seconds the entry black hole at the next maze's mirrored edge takes to close once " +
+             "the vehicles have emerged and arrived.")]
+    [SerializeField, Min(0f)] private float pathEntryPortalCloseSeconds = 0.6f;
+    public float PathEntryPortalCloseSeconds => pathEntryPortalCloseSeconds;
 
     [Tooltip("World units past the true screen edge a vehicle must clear before it counts as " +
              "off-screen — used both when carrying vehicles out through a chosen exit and when " +

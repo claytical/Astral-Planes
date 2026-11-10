@@ -149,6 +149,18 @@ public sealed partial class NoteAscensionDirector : MonoBehaviour
         return GetLineWorldY() + ascendLineWorldPadding;
     }
 
+    /// <summary>
+    /// Shows/hides the Line of Ascent's particles without disturbing its RectTransform (whose
+    /// world position still drives GetAscendTargetWorldY). Hidden during the path-choice
+    /// interstitial, where the bottom exit would otherwise sit on top of it.
+    /// </summary>
+    public void SetAscentLineVisible(bool visible)
+    {
+        if (lineOfAscent == null) return;
+        foreach (var r in lineOfAscent.GetComponentsInChildren<Renderer>(true))
+            r.enabled = visible;
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------

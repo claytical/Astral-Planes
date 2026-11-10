@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
-  m_Name: Sunday
+  m_Name: Switchyard
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: Sunday
-  displayName: Sunday
+  displayName: Switchyard
   keyRootMidi: 50
   entryDrumLoops:
   - {fileID: 8300000, guid: fc51ca1f8afaf4174b2eed166358cf8c, type: 3}
@@ -54,7 +54,7 @@ MonoBehaviour:
   phraseLengthLoopsOverride: 0
   nodesPerStar: 5
   starBehavior: {fileID: 11400000, guid: 8a258771ba6214752b716ed2a737f120, type: 2}
-  mazePattern: {fileID: 11400000, guid: b23b5785003148639c0f2687270353ba, type: 2}
+  mazePattern: {fileID: 11400000, guid: 807fb323680746bea9c583afa5036372, type: 2}
   roleGeoConfigs:
   - role: 0
     feature: 0
@@ -114,7 +114,7 @@ MonoBehaviour:
   genericFillNeverRegrowRatio: 0.66
   genericFillRatio01: 0.33
   genericFillRegrowSoftenMultiplier01: 1
-  chordProgression: {fileID: 11400000, guid: 04a688fc570cd408bb4261ed5647fa97, type: 2}
+  chordProgression: {fileID: 11400000, guid: 72948641f168645a3ab969303689bac7, type: 2}
   alternateChordProgressionProfile: {fileID: 11400000, guid: 6b3f14ce0d8f5443aa08fb83a1197d6b,
     type: 2}
   roleNoteConfigs:

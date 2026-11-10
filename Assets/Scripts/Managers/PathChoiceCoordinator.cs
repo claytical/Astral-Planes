@@ -16,6 +16,7 @@ public sealed class PathChoiceCoordinator
     private readonly List<MazePathExit> _allExits = new();
     private MazePathExit _winnerExit;
     private Vehicle _winnerVehicle;
+    private HashSet<(string phaseId, string motifId)> _playedKeys = new();
 
     public PathChoiceCoordinator(GameFlowManager gameFlow, SessionStateCoordinator session, SceneFlowCoordinator sceneFlow)
     {
@@ -31,6 +32,16 @@ public sealed class PathChoiceCoordinator
     /// one-way corridor) and waits for a vehicle to reach one before resuming.
     /// </summary>
     public IEnumerator RunPathChoiceAndAdvance()
+    {
+        // The bottom exit sits right on the NoteViz "Line of Ascent"; nothing ascends during the
+        // interstitial, so hide it for the duration and always restore it (idempotent).
+        var ascension = Object.FindFirstObjectByType<NoteAscensionDirector>();
+        ascension?.SetAscentLineVisible(false);
+        yield return _gameFlow.StartCoroutine(RunPathChoiceAndAdvanceInner());
+        ascension?.SetAscentLineVisible(true);
+    }
+
+    private IEnumerator RunPathChoiceAndAdvanceInner()
     {
         var ptm = _gameFlow.phaseTransitionManager;
         var dust = _gameFlow.dustGenerator;
@@ -88,6 +99,10 @@ public sealed class PathChoiceCoordinator
         foreach (var e in mazeExits)
             pattern.porousBorder.exitSides.Add(MotifMaze.SideOf(e.Dir));
 
+        _playedKeys = new HashSet<(string, string)>();
+        foreach (var r in RingSessionStore.LoadAllRingsFromDisk())
+            _playedKeys.Add((r.PhaseId, r.MotifId));
+
         _allExits.Clear();
         _winnerExit = null;
         _winnerVehicle = null;
@@ -112,14 +127,15 @@ public sealed class PathChoiceCoordinator
             var side = MotifMaze.SideOf(target.Dir);
             int infoIdx = exitInfos.FindIndex(i => i.Side == side);
             if (infoIdx < 0) continue;
-            _allExits.Add(CreateExitTrigger(drums, exitInfos[infoIdx], target.Phase, target.Motif));
+            _allExits.Add(CreateExitTrigger(drums, exitInfos[infoIdx], target.Phase, target.Motif, ClassifyExit(target)));
         }
 
         SpawnWisp(drums, vehicleCells, ptm);
 
         var exitAnchors = new List<Vector2Int>(_allExits.Count);
         foreach (var e in _allExits) exitAnchors.Add(e.AnchorCell);
-        dust.SetTravelCorridors(vehicleCells, exitAnchors, radiusCells: 1);
+        _laneRadiusCells = Mathf.Max(1, Mathf.CeilToInt(widestVehicleRadiusWorld / cellWorld));
+        dust.SetTravelCorridors(vehicleCells, exitAnchors, radiusCells: _laneRadiusCells);
 
         yield return new WaitUntil(() => _winnerExit != null || _session.AllPlayersOutOfEnergy());
 
@@ -148,6 +164,7 @@ public sealed class PathChoiceCoordinator
         _winnerExit = exit;
         _winnerVehicle = vehicle;
 
+        exit.BeginSwallow();
         foreach (var e in _allExits)
             if (e != exit) e.SetSealed(true);
     }
@@ -175,7 +192,40 @@ public sealed class PathChoiceCoordinator
             Object.Destroy(go);
     }
 
-    private MazePathExit CreateExitTrigger(DrumTrack drums, CosmicDustGenerator.PathExitInfo info, int phaseIdx, int motifIdx)
+    private MazePathExit CreateExitTrigger(DrumTrack drums, CosmicDustGenerator.PathExitInfo info, int phaseIdx, int motifIdx, PathExitKind kind)
+    {
+        var geo = BuildGeometry(drums, info);
+
+        var go = new GameObject($"PathExit_{info.Side}_{info.AnchorCell.x}_{info.AnchorCell.y}");
+        go.transform.position = geo.Center;
+
+        // Trigger, particle lane and carry-out line all come from `geo`: the trigger covers the
+        // full carved opening (not just the span between the two gap-cell centers) and reaches
+        // CaptureDepth inward from the wall face, exactly the rectangle the particles fill.
+        var col = go.AddComponent<BoxCollider2D>();
+        col.isTrigger = true;
+        col.size = geo.HorizontalWall
+            ? new Vector2(geo.OpeningWidth, geo.CaptureDepth)
+            : new Vector2(geo.CaptureDepth, geo.OpeningWidth);
+        col.offset = geo.Inward * (geo.CaptureDepth * 0.5f);
+
+        var targetMotif = _gameFlow.phaseTransitionManager.PeekMotif(phaseIdx, motifIdx);
+        var visualInstance = PathExitParticleBuilder.Build(
+            geo, kind, targetMotif?.GetActiveRoleColors(), IsPlayed(phaseIdx, motifIdx),
+            _gameFlow.PathExitParticleStyle, go.transform);
+
+        Debug.Log($"[PathExit] {info.Side} -> phase {phaseIdx} motif {motifIdx} ('{targetMotif?.name}') kind={kind}");
+
+        var exit = go.AddComponent<MazePathExit>();
+        exit.Configure(this, info.AnchorCell, new List<Vector2Int>(info.GapCells), info.Side, phaseIdx, motifIdx,
+            geo, visualInstance, _gameFlow.PathExitSealFadeSeconds, kind);
+        return exit;
+    }
+
+    // One geometry for the whole exit. Center is the midpoint of the gap cells along the wall
+    // (NOT info.AnchorCell, which is just group[0]) snapped onto the physical wall face; the
+    // opening width is the gap span widened by the carve radius, i.e. what is actually passable.
+    private PathExitGeometry BuildGeometry(DrumTrack drums, CosmicDustGenerator.PathExitInfo info)
     {
         float cellSize = Mathf.Max(0.01f, drums.GetCellWorldSize());
 
@@ -188,209 +238,44 @@ public sealed class PathChoiceCoordinator
             max = Vector2.Max(max, wp);
         }
 
-        var go = new GameObject($"PathExit_{info.Side}_{info.AnchorCell.x}_{info.AnchorCell.y}");
-        Vector2 triggerCenter = SnapToPhysicalBoundary((min + max) * 0.5f, info.Side);
-        go.transform.position = triggerCenter;
-
-        // Only the boundary-normal axis gets the extra depth (so the capture zone reaches back
-        // into the corridor — see PathExitCaptureDepthCells below). Padding the tangential axis
-        // too would reach past the actual gap cells into the solid wall on either side of the
-        // opening, where the particle visual isn't shown — letting a vehicle sliding along the
-        // wall trip the trigger.
         bool horizontalWall = info.Side == BoundaryWrap.BoundarySide.Top || info.Side == BoundaryWrap.BoundarySide.Bottom;
-        float captureDepthWorld = Mathf.Max(cellSize, _gameFlow.PathExitCaptureDepthCells * cellSize);
-        Vector2 inward = InwardDirection(info.Side);
+        int n = info.GapCells.Count;
 
-        var col = go.AddComponent<BoxCollider2D>();
-        col.isTrigger = true;
-        col.size = new Vector2(
-            horizontalWall ? Mathf.Max(cellSize, max.x - min.x) : captureDepthWorld,
-            horizontalWall ? captureDepthWorld : Mathf.Max(cellSize, max.y - min.y));
-        // Grow the capture zone inward from the wall face rather than centering it on the wall,
-        // so detection starts well before the vehicle reaches the edge instead of only once it's
-        // already touching the wall — see PathExitCaptureDepthCells.
-        col.offset = inward * (captureDepthWorld * 0.5f);
-
-        GameObject visualInstance = null;
-        if (_gameFlow.PathExitVisualPrefab != null)
+        // Real tangential cell pitch, measured between gap cells (the grid's x/y tiles differ
+        // slightly, so GetCellWorldSize() alone would be a few percent off along the wall).
+        float pitch = cellSize;
+        if (n > 1)
         {
-            Vector2 visualCenter = OffsetVisualToScreenEdge(triggerCenter, info.Side);
-            visualInstance = Object.Instantiate(_gameFlow.PathExitVisualPrefab, visualCenter, Quaternion.identity, go.transform);
-            ConfigureExitParticleFlow(visualInstance, info.Side);
-            var targetMotif = _gameFlow.phaseTransitionManager.PeekMotif(phaseIdx, motifIdx);
-            ConfigureExitParticleRoleColors(visualInstance, targetMotif?.GetActiveRoleColors());
-            // Play explicitly rather than relying on the prefab's "Play On Awake" setting, so a
-            // burst-style particle effect fires reliably no matter how the prefab is authored.
-            foreach (var ps in visualInstance.GetComponentsInChildren<ParticleSystem>())
-                ps.Play();
-            // This coordinator already owns the visual's whole lifecycle (destroyed alongside
-            // the rest of the exit once a winner is chosen), so the prefab's own "destroy self
-            // once not playing" behavior is never needed here — and calling Stop() on the
-            // ParticleSystem for the seal-fade must not let it self-destroy mid-fade.
-            foreach (var explosion in visualInstance.GetComponentsInChildren<Explosion>(true))
-                explosion.enabled = false;
+            float span = horizontalWall ? max.x - min.x : max.y - min.y;
+            pitch = Mathf.Max(cellSize * 0.5f, span / (n - 1));
         }
 
-        var exit = go.AddComponent<MazePathExit>();
-        exit.Configure(this, info.AnchorCell, new List<Vector2Int>(info.GapCells), info.Side, phaseIdx, motifIdx, visualInstance, _gameFlow.PathExitSealFadeSeconds);
-        return exit;
+        int passRadius = Mathf.Max(1, info.PassRadiusCells);
+        float opening = (n + 2 * passRadius) * pitch;
+        float depth = Mathf.Max(cellSize, _gameFlow.PathExitCaptureDepthCells * cellSize);
+        return PathExitGeometryFactory.Create(info.Side, (min + max) * 0.5f, opening, depth);
     }
 
-    // The gap-cell average centers correctly along the boundary edge, but the boundary-normal
-    // coordinate (the axis perpendicular to the edge) comes from DrumTrack's grid→world mapping,
-    // which insets top/bottom for UI deadspace (see BoundaryWrap's own warning: "the bottom
-    // boundary may be aligned to UI deadspace rather than world origin"). Snap that one axis to
-    // the real wall collider's inner face instead, so the trigger sits exactly where a vehicle
-    // can actually reach it — this MUST stay the true collision wall (not the further-out screen
-    // edge) or the trigger becomes unreachable, sealed off behind solid boundary collision.
-    private static Vector2 SnapToPhysicalBoundary(Vector2 center, BoundaryWrap.BoundarySide side)
+    // ── Exit kind (revisit / new motif / new phase) ───────────────────────────
+
+    private bool IsPlayed(int phaseIdx, int motifIdx)
     {
-        var boundaries = Boundaries.Instance;
-        if (boundaries == null) return center;
-
-        BoxCollider2D wall = side switch
-        {
-            BoundaryWrap.BoundarySide.Left  => boundaries.leftBoundary,
-            BoundaryWrap.BoundarySide.Right => boundaries.rightBoundary,
-            BoundaryWrap.BoundarySide.Top   => boundaries.topBoundary,
-            _ /* Bottom */                  => boundaries.bottomBoundary,
-        };
-        if (wall == null) return center;
-
-        Bounds b = wall.bounds;
-        switch (side)
-        {
-            case BoundaryWrap.BoundarySide.Left:  center.x = b.max.x; break;
-            case BoundaryWrap.BoundarySide.Right: center.x = b.min.x; break;
-            case BoundaryWrap.BoundarySide.Top:   center.y = b.min.y; break;
-            default /* Bottom */:                 center.y = b.max.y; break;
-        }
-        return center;
+        var ptm = _gameFlow.phaseTransitionManager;
+        var motif = ptm.PeekMotif(phaseIdx, motifIdx);
+        var phaseId = ptm.PeekPhaseId(phaseIdx);
+        return motif != null && phaseId != null && _playedKeys.Contains((phaseId, motif.motifId));
     }
 
-    // Left/Right walls aren't UI-adjusted (Boundaries.cs sets them straight from
-    // orthographicSize*aspect with no anchor override), so their collider bounds already equal
-    // the true screen edge — the visual can sit right on the trigger with no further offset.
-    // Top/Bottom walls ARE deliberately pulled in below/above the UI bars
-    // (AlignTopToPlayerStatsGrid / AlignBottomToVisualizer) so vehicles collide well short of
-    // the true edge; the trigger has to stay there to remain reachable, but the particle effect
-    // alone can read past that solid wall, so push just its world position out to the camera's
-    // true edge for Top/Bottom.
-    private static Vector2 OffsetVisualToScreenEdge(Vector2 triggerCenter, BoundaryWrap.BoundarySide side)
+    private PathExitKind ClassifyExit(MotifMazeGraph.Exit exit)
     {
-        if (side != BoundaryWrap.BoundarySide.Top && side != BoundaryWrap.BoundarySide.Bottom)
-            return triggerCenter;
-
-        var cam = Camera.main;
-        if (cam == null) return triggerCenter;
-
-        triggerCenter.y = side == BoundaryWrap.BoundarySide.Top ? cam.orthographicSize : -cam.orthographicSize;
-        return triggerCenter;
+        var ptm = _gameFlow.phaseTransitionManager;
+        if (exit.Phase != ptm.CurrentPhaseIndex || exit.Dir == MazeArm.Up || exit.Dir == MazeArm.Down)
+            return PathExitKind.NewPhase;
+        return IsPlayed(exit.Phase, exit.Motif) ? PathExitKind.Revisit : PathExitKind.NewMotif;
     }
 
-    // The direction from a boundary side's wall toward the maze interior — e.g. a Right exit
-    // needs negative X to point inward, a Left exit needs positive X for the same visual intent.
-    // Shared by the capture trigger's inward-growing collider and the particle flow direction.
-    private static Vector2 InwardDirection(BoundaryWrap.BoundarySide side) => side switch
-    {
-        BoundaryWrap.BoundarySide.Left  => Vector2.right,
-        BoundaryWrap.BoundarySide.Right => Vector2.left,
-        BoundaryWrap.BoundarySide.Top   => Vector2.down,
-        _ /* Bottom */                  => Vector2.up,
-    };
-
-    // The axis a vehicle straightens along before being carried out through a Left/Right/Top/Bottom
-    // exit — perpendicular to InwardDirection/OutwardDirection. A Left or Right wall's opening
-    // runs vertically, so the vehicle aligns its world Y to the exit anchor's; a Top wall's
-    // opening runs horizontally (Top or Bottom), so it aligns X instead.
-    private static Vector2 TangentialAxis(BoundaryWrap.BoundarySide side) =>
-        side == BoundaryWrap.BoundarySide.Left || side == BoundaryWrap.BoundarySide.Right
-            ? Vector2.up
-            : Vector2.right;
-
-    // Points the particle effect's Velocity Over Lifetime module inward from whichever border
-    // side the exit sits on — toward wherever the player currently is — instead of a single
-    // baked-in direction that only reads correctly for one side (e.g. a Right exit needs
-    // negative X to flow inward; a Left exit needs positive X for the same visual intent).
-    private void ConfigureExitParticleFlow(GameObject visualInstance, BoundaryWrap.BoundarySide side)
-    {
-        if (visualInstance == null) return;
-
-        Vector2 inward = InwardDirection(side);
-        float speed = _gameFlow.PathExitParticleSpeed;
-
-        // The prefab's Shape module is authored so its "front" sits centered on a Right-edge
-        // boundary line (inward == Vector2.left, i.e. 180°) with zero shape rotation. Deriving
-        // the shape's Z rotation from the same inward vector (rather than a second hand-tuned
-        // per-side table) keeps shape orientation and flow direction from ever drifting apart.
-        float inwardAngleDeg = Mathf.Atan2(inward.y, inward.x) * Mathf.Rad2Deg;
-        float shapeZ = inwardAngleDeg - 180f;
-
-        foreach (var ps in visualInstance.GetComponentsInChildren<ParticleSystem>())
-        {
-            var vel = ps.velocityOverLifetime;
-            vel.enabled = true;
-            vel.x = new ParticleSystem.MinMaxCurve(inward.x * speed);
-            vel.y = new ParticleSystem.MinMaxCurve(inward.y * speed);
-
-            var shape = ps.shape;
-            shape.rotation = new Vector3(0f, 0f, shapeZ);
-        }
-    }
-
-    // Replaces the prefab's authored rainbow with a gradient built from the target motif's
-    // active role colors, so a path-choice exit hints at what's behind it. Falls back to the
-    // prefab's own rainbow (no-op) when roleColors is null/empty — a peek miss or a motif with
-    // no active roles shouldn't leave the exit visually blank. Alpha keys are read off the
-    // existing gradient first and kept as-is, so only hue/color content changes — the authored
-    // fade-in/fade-out timing survives untouched.
-    private static void ConfigureExitParticleRoleColors(GameObject visualInstance, List<Color> roleColors)
-    {
-        if (visualInstance == null || roleColors == null || roleColors.Count == 0) return;
-
-        var colorKeys = BuildEvenlySpacedColorKeys(roleColors);
-
-        foreach (var ps in visualInstance.GetComponentsInChildren<ParticleSystem>(true))
-        {
-            var col = ps.colorOverLifetime;
-            if (col.enabled)
-            {
-                var grad = new Gradient();
-                grad.SetKeys(colorKeys, ExtractAlphaKeys(col.color));
-                col.color = new ParticleSystem.MinMaxGradient(grad);
-            }
-
-            var trails = ps.trails;
-            if (trails.enabled)
-            {
-                var tGrad = new Gradient();
-                tGrad.SetKeys(colorKeys, ExtractAlphaKeys(trails.colorOverLifetime));
-                trails.colorOverLifetime = new ParticleSystem.MinMaxGradient(tGrad);
-            }
-        }
-    }
-
-    private static GradientAlphaKey[] ExtractAlphaKeys(ParticleSystem.MinMaxGradient g)
-    {
-        switch (g.mode)
-        {
-            case ParticleSystemGradientMode.TwoGradients: return g.gradientMax.alphaKeys;
-            case ParticleSystemGradientMode.Gradient:
-            case ParticleSystemGradientMode.RandomColor:  return g.gradient.alphaKeys;
-            default: return new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 1f) };
-        }
-    }
-
-    private static GradientColorKey[] BuildEvenlySpacedColorKeys(List<Color> colors)
-    {
-        if (colors.Count == 1)
-            return new[] { new GradientColorKey(colors[0], 0f), new GradientColorKey(colors[0], 1f) };
-
-        var keys = new GradientColorKey[colors.Count];
-        for (int i = 0; i < colors.Count; i++)
-            keys[i] = new GradientColorKey(colors[i], i / (float)(colors.Count - 1));
-        return keys;
-    }
+    // Travel-lane radius sized to the widest active hull; reused when redirecting losers.
+    private int _laneRadiusCells = 1;
 
     private IEnumerator RedirectLosersAndAdvance(List<Vector2Int> vehicleCells, CosmicDustGenerator dust, DrumTrack drums)
     {
@@ -399,7 +284,7 @@ public sealed class PathChoiceCoordinator
 
         // Releases every losing lane via the same diff-on-recompute logic SetTravelCorridors
         // already uses (cells that fall out of the new set get released and regrow requested).
-        dust.SetTravelCorridors(vehicleCells, winnerExit.AnchorCell, radiusCells: 1);
+        dust.SetTravelCorridors(vehicleCells, winnerExit.AnchorCell, radiusCells: Mathf.Max(1, _laneRadiusCells));
 
         foreach (var exit in _allExits)
         {
@@ -407,27 +292,23 @@ public sealed class PathChoiceCoordinator
             dust.SpawnDustAtCells(exit.GapCells, MusicalRole.None, dust.SolidDustColor(), energy01: 1f, growInSeconds: 0.5f, solid: true);
         }
 
-        Vector2 targetWorld = drums.GridToWorldPosition(winnerExit.AnchorCell);
+        var geo = winnerExit.Geometry;
         var side = winnerExit.Side;
-        Vector2 outward = SceneFlowCoordinator.OutwardDirection(side);
-        Vector2 tangentialAxis = TangentialAxis(side);
+        Vector2 outward = geo.Outward;
+        Vector2 tangentialAxis = geo.Tangent;
         float offscreenMargin = _gameFlow.PathTransitionOffscreenMargin;
 
-        // Two stages, driven in the same loop: every vehicle (winner included) first aligns
-        // itself to the winner exit's tangential coordinate (straightens onto the corridor's
-        // center line — vertically for a Left/Right exit, horizontally for a Top exit) without
-        // yet moving toward the wall, then gets carried straight outward through the boundary
-        // until it clears the true screen edge — so it reads as being drawn into the center of
-        // the particle aisle rather than cutting a diagonal line toward a point. The winner isn't
-        // skipped straight to the carry-out stage: the capture trigger is deliberately wider than
-        // the corridor's visual opening (a forgiving capture zone, and now several cells deep —
-        // see PathExitCaptureDepthCells — so capture fires well before the vehicle is near the
-        // edge), so the winner may have touched it off-center or from an angle and still needs to
-        // straighten out first. All vehicles get input locked, including the winner, so the
+        // Two stages, driven in the same loop. Every vehicle (winner included) first aligns to
+        // the lit lane's center line (geo.Center — the SAME point the trigger and particles are
+        // built around, not the first gap cell), then is carried outward through the wall until
+        // it clears the true screen edge. During the carry the lateral error keeps being
+        // corrected (proportional on offset, damped on lateral velocity), so momentum or a
+        // slightly off-center hand-off can't bend the exit line away from the particles.
+        // The winner isn't skipped straight to the carry stage: it may have touched the (now
+        // opening-wide) trigger off-center or from an angle. All vehicles get input locked so the
         // pull-in reads as a scripted exit rather than fighting player input.
         var aligning = new List<Vehicle>();
         var carrying = new List<Vehicle>();
-        var lockedOwners = new List<LocalPlayer>();
         foreach (var v in _gameFlow.GetVehicles())
         {
             if (v == null) continue;
@@ -437,15 +318,12 @@ public sealed class PathChoiceCoordinator
                 if (lp != null && lp.plane == v)
                 {
                     lp.SetInputLocked(true);
-                    lockedOwners.Add(lp);
                     break;
                 }
             }
 
-            // Capture now fires several cells before the wall (PathExitCaptureDepthCells), so the
-            // winner is no longer necessarily right up against the solid boundary — but going
-            // non-solid immediately still only helps: it lets the vehicle glide freely through
-            // corridor-side wall cells while straightening out, instead of waiting for "arrival"
+            // Going non-solid immediately only helps the winner: it glides freely through
+            // corridor-side wall cells while straightening, instead of waiting for "arrival"
             // like losers converging in from elsewhere in the maze.
             if (v == winnerVehicle)
                 SceneFlowCoordinator.SetVehicleSolid(v, false);
@@ -454,7 +332,11 @@ public sealed class PathChoiceCoordinator
         }
 
         float timeout = _gameFlow.PathTransitionTravelTimeout;
-        const float arriveTangentialOffset = 0.75f;
+        // Quarter of the opening each side of center — tight enough that the carry starts
+        // visibly inside the lit lane, loose enough that bang-bang alignment settles quickly.
+        float arriveTangentialOffset = Mathf.Max(0.12f, geo.OpeningWidth * 0.25f);
+        const float lateralGain = 3f;
+        const float lateralDamping = 0.15f;
         float elapsed = 0f;
         while (elapsed < timeout && (aligning.Count > 0 || carrying.Count > 0))
         {
@@ -463,7 +345,7 @@ public sealed class PathChoiceCoordinator
                 var v = aligning[i];
                 if (v == null) { aligning.RemoveAt(i); continue; }
 
-                float tangentialOffset = Vector2.Dot(targetWorld - (Vector2)v.transform.position, tangentialAxis);
+                float tangentialOffset = geo.OffsetToCenter(v.transform.position);
                 if (Mathf.Abs(tangentialOffset) <= arriveTangentialOffset)
                 {
                     aligning.RemoveAt(i);
@@ -484,27 +366,50 @@ public sealed class PathChoiceCoordinator
                     carrying.RemoveAt(i);
                     continue;
                 }
-                v.Move(outward);
+
+                // Shrink into the mass as the vehicle nears the hole's center, so it reads as
+                // being swallowed rather than just driving off-screen.
+                float massR = Mathf.Max(0.1f, winnerExit.PortalRadius);
+                float distToHole = Vector2.Distance(v.transform.position, geo.VisualCenter);
+                float closeness = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(massR * 1.3f, massR * 0.2f, distToHole));
+                VehicleSwallowScale.Apply(v, Mathf.Lerp(1f, 0.15f, closeness));
+
+                float offset = geo.OffsetToCenter(v.transform.position);
+                float lateralVel = v.rb != null ? Vector2.Dot(v.rb.linearVelocity, tangentialAxis) : 0f;
+                float lateral = Mathf.Clamp(offset * lateralGain - lateralVel * lateralDamping, -1.5f, 1.5f);
+                v.Move((outward + tangentialAxis * lateral).normalized);
             }
 
             elapsed += Time.deltaTime;
             yield return null;
         }
 
-        foreach (var lp in lockedOwners)
-            lp?.SetInputLocked(false);
+        // Timeout backstop: never leave a vehicle on screen beside the lit lane. Anything still
+        // aligning/carrying is placed just off-screen along the lane's center line.
+        foreach (var v in aligning) SnapOffscreenAlongLane(v, geo, offscreenMargin);
+        foreach (var v in carrying) SnapOffscreenAlongLane(v, geo, offscreenMargin);
 
-        // Losing exits' particle visuals are still fading (SetSealed kicked off a coroutine on
-        // each MazePathExit) — top up to the fade's full duration before hard-destroying the exit
-        // GameObjects below, so a fast carry-out (e.g. no losers, or one already close to the
-        // winner) can't cut a losing exit's dissolve short.
-        float remainingFade = _gameFlow.PathExitSealFadeSeconds - elapsed;
-        Debug.Log($"[PathExitFade] RedirectLosersAndAdvance: carry-out took {elapsed:F2}s, topping up {Mathf.Max(0f, remainingFade):F2}s before destroying {_allExits.Count} exit(s)");
-        if (remainingFade > 0f)
-            yield return new WaitForSeconds(remainingFade);
+        // Anyone the timeout backstop teleported is still full-size/visible-scaled: hide it
+        // inside the hole's scale too. (Input stays locked — staging for the next motif owns the unlock.)
+        foreach (var v in _gameFlow.GetVehicles())
+            if (v != null) VehicleSwallowScale.Apply(v, 0.15f);
+
+        // The vehicles are gone: let the swallow land for a beat, then close the winning hole
+        // and dissolve the old maze TOGETHER, so nothing on screen pops out in a single frame.
+        // The hole is only destroyed after its close has fully played.
+        float closeSeconds = _gameFlow.PathExitCloseSeconds;
+        float dissolveSeconds = _gameFlow.PathExitDissolveSeconds;
+        float beat = _gameFlow.PathExitPostSwallowBeatSeconds;
+        if (beat > 0f) yield return new WaitForSeconds(beat);
+
+        winnerExit.BeginClose(closeSeconds);
+        dust.DissolveAllVisuals(dissolveSeconds);
+        Debug.Log($"[PathExitFade] carry-out took {elapsed:F2}s; closing winner over {closeSeconds:F2}s, dissolving maze over {dissolveSeconds:F2}s");
+        yield return new WaitForSeconds(Mathf.Max(closeSeconds, dissolveSeconds, _gameFlow.PathExitSealFadeSeconds));
 
         int chosenPhase = winnerExit.TargetPhaseIndex;
         int chosenMotif = winnerExit.TargetMotifIndex;
+        var chosenKind = winnerExit.Kind;
         var mirroredEdge = SceneFlowCoordinator.MirrorSide(winnerExit.Side);
         var exitAnchorCell = winnerExit.AnchorCell;
 
@@ -514,6 +419,29 @@ public sealed class PathChoiceCoordinator
         _winnerExit = null;
         _winnerVehicle = null;
 
-        yield return _gameFlow.StartCoroutine(_sceneFlow.StartChosenMotifOrPhase(chosenPhase, chosenMotif, mirroredEdge, exitAnchorCell));
+        // Bring the Line of Ascent back before the next motif starts (the wrapper also restores it).
+        Object.FindFirstObjectByType<NoteAscensionDirector>()?.SetAscentLineVisible(true);
+
+        yield return _gameFlow.StartCoroutine(_sceneFlow.StartChosenMotifOrPhase(chosenPhase, chosenMotif, mirroredEdge, exitAnchorCell, chosenKind));
+    }
+
+    private static void SnapOffscreenAlongLane(Vehicle v, PathExitGeometry geo, float margin)
+    {
+        if (v == null) return;
+        Debug.LogWarning($"[PathExit] {v.name} didn't clear {geo.Side} exit in time; snapping off-screen along the lane.");
+
+        Vector2 pos = v.transform.position;
+        pos += geo.Tangent * geo.OffsetToCenter(pos);   // onto the lane center line
+        pos = SceneFlowCoordinator.OffscreenPointAlong(pos, geo.Side, margin);
+        SceneFlowCoordinator.SetVehicleSolid(v, false);
+        if (v.rb != null)
+        {
+            v.rb.position = pos;
+            v.rb.linearVelocity = Vector2.zero;
+        }
+        else
+        {
+            v.transform.position = pos;
+        }
     }
 }

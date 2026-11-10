@@ -38,9 +38,9 @@ MonoBehaviour:
   highestNote: 90
   outputMixerGroup: {fileID: 1546140300052845382, guid: 07985bf4f6d469340930e958ef313c14,
     type: 2}
-  volumeMultiplier: 1.03
+  volumeMultiplier: 0.718
   minVelocity: 74
-  maxVelocity: 127
+  maxVelocity: 120
   regrowthDelay: 3
   bombBlastRadiusMul: 1.4
   bombPermanentClearRatio01: 0.2

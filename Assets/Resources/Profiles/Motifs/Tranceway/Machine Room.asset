@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
-  m_Name: Grind
+  m_Name: Machine Room
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: grind
-  displayName: The Grind
+  displayName: Machine Room
   keyRootMidi: 62
   entryDrumLoops:
   - {fileID: 8300000, guid: ebf887400a50545d8b3af501ab7528a3, type: 3}
@@ -48,7 +48,7 @@ MonoBehaviour:
   phraseLengthLoopsOverride: 0
   nodesPerStar: 4
   starBehavior: {fileID: 11400000, guid: 9dd08ed983d384107aaff4f28fa8803d, type: 2}
-  mazePattern: {fileID: 11400000, guid: ad8c03cba044441b8ee19f38d6a9574f, type: 2}
+  mazePattern: {fileID: 11400000, guid: 5dc528c5ddff4757bca6006b9f63578c, type: 2}
   roleGeoConfigs:
   - role: 0
     feature: 2

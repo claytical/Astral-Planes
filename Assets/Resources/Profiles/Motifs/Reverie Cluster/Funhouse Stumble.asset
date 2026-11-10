@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
-  m_Name: 4_Circus
+  m_Name: Funhouse Stumble
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: circus
-  displayName: Soleil
+  displayName: Funhouse Stumble
   keyRootMidi: 43
   entryDrumLoops:
   - {fileID: 8300000, guid: 2c9e9f60fcefa467f95614209d77fdc3, type: 3}
@@ -54,7 +54,7 @@ MonoBehaviour:
   phraseLengthLoopsOverride: 0
   nodesPerStar: 8
   starBehavior: {fileID: 11400000, guid: 9dd08ed983d384107aaff4f28fa8803d, type: 2}
-  mazePattern: {fileID: 11400000, guid: 059fdd65eda947328608fb9bd56f2f7b, type: 2}
+  mazePattern: {fileID: 11400000, guid: 9cebcd153dd043c2ace409c7cc8ebfa0, type: 2}
   roleGeoConfigs: []
   genericFillNeverRegrowRatio: 0.5
   genericFillRatio01: 0

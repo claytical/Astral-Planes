@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 644406ac13b5548d3940aef1183c6592, type: 3}
-  m_Name: Funk It
+  m_Name: Rooftop Hop
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: funk it
-  displayName: Aww Funk It
+  displayName: Rooftop Hop
   keyRootMidi: 31
   entryDrumLoops:
   - {fileID: 8300000, guid: fcefcd7a5ba3f46f1bf3796ed0ca8b2a, type: 3}
@@ -49,7 +49,7 @@ MonoBehaviour:
   phraseLengthLoopsOverride: 0
   nodesPerStar: 8
   starBehavior: {fileID: 11400000, guid: 8a258771ba6214752b716ed2a737f120, type: 2}
-  mazePattern: {fileID: 11400000, guid: 6d8c21d7cca34e6fb42e2b687206cdfa, type: 2}
+  mazePattern: {fileID: 11400000, guid: cc97b2b234944849bfe7a6d9312d3a59, type: 2}
   roleGeoConfigs: []
   genericFillNeverRegrowRatio: 0.214
   genericFillRatio01: 0.124

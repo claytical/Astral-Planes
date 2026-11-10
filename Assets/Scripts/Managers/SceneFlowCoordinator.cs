@@ -435,7 +435,7 @@ public sealed class SceneFlowCoordinator
     /// the new maze, so exiting bottom-right lands you bottom-left, not at a random spot on the
     /// left edge.
     /// </param>
-    public IEnumerator StartChosenMotifOrPhase(int phaseIndex, int motifIndex, BoundaryWrap.BoundarySide entryEdge, Vector2Int exitAnchorCell)
+    public IEnumerator StartChosenMotifOrPhase(int phaseIndex, int motifIndex, BoundaryWrap.BoundarySide entryEdge, Vector2Int exitAnchorCell, PathExitKind entryKind = PathExitKind.NewMotif)
     {
         if (_gameFlow.dustGenerator != null)
             _gameFlow.dustGenerator.ResumeRegrowthAfterBridge();
@@ -456,8 +456,15 @@ public sealed class SceneFlowCoordinator
         var lockedOwners = new List<LocalPlayer>();
         var entryCells = StageVehiclesOffscreenAtEdge(entryEdge, exitAnchorCell, lockedOwners);
 
+        // A matching black hole opens on the mirrored edge while the new maze grows, so the
+        // vehicles' exit has an entrance instead of the field going empty and popping in.
+        var entryPortal = SpawnEntryPortal(entryEdge, entryCells, phaseIndex, motifIndex, entryKind);
+
         yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false, vehicleCellOverrides: entryCells));
         yield return _gameFlow.StartCoroutine(DriveVehiclesInFromOffscreen(entryCells));
+
+        if (entryPortal != null)
+            entryPortal.CloseAndDestroy(_gameFlow.PathEntryPortalCloseSeconds);
 
         foreach (var lp in lockedOwners)
             lp?.SetInputLocked(false);
@@ -493,7 +500,7 @@ public sealed class SceneFlowCoordinator
     }
 
     // World-space direction pointing away from the maze through `side` — the negation of
-    // ConfigureExitParticleFlow's "inward" vector (PathChoiceCoordinator.cs), shared here so
+    // PathExitGeometry.Inward vector, shared here so
     // exit-carry and entry-staging agree on which way is "out."
     public static Vector2 OutwardDirection(BoundaryWrap.BoundarySide side) => side switch
     {
@@ -522,9 +529,9 @@ public sealed class SceneFlowCoordinator
                 if (boundaries != null && boundaries.rightBoundary != null) return boundaries.rightBoundary.bounds.min.x;
                 return cam != null ? cam.orthographicSize * cam.aspect : (float?)null;
             case BoundaryWrap.BoundarySide.Top:
-                return cam != null ? cam.orthographicSize : (float?)null;
+                return cam != null ? cam.transform.position.y + cam.orthographicSize : (float?)null;
             default: // Bottom
-                return cam != null ? -cam.orthographicSize : (float?)null;
+                return cam != null ? cam.transform.position.y - cam.orthographicSize : (float?)null;
         }
     }
 
@@ -635,6 +642,11 @@ public sealed class SceneFlowCoordinator
                 v.transform.position = stagingPos;
             }
 
+            // Teleporting would otherwise draw a trail line across the screen, and the vehicle
+            // stays shrunk (from being swallowed) until it emerges from the entry hole.
+            v.ClearTrailForWrap();
+            VehicleSwallowScale.Apply(v, 0.15f);
+
             foreach (var lp in _session.Players)
             {
                 if (lp != null && lp.plane == v)
@@ -660,6 +672,10 @@ public sealed class SceneFlowCoordinator
         const float arriveDistanceSq = 0.75f * 0.75f;
         float timeout = _gameFlow.PathTransitionTravelTimeout;
         var pending = new List<Vehicle>(entryCells.Keys);
+        var startDist = new Dictionary<Vehicle, float>();
+        foreach (var pv in pending)
+            if (pv != null)
+                startDist[pv] = Mathf.Max(0.5f, Vector2.Distance(pv.transform.position, drums.GridToWorldPosition(entryCells[pv])));
         float elapsed = 0f;
 
         while (elapsed < timeout && pending.Count > 0)
@@ -674,10 +690,15 @@ public sealed class SceneFlowCoordinator
                 if (toTarget.sqrMagnitude <= arriveDistanceSq)
                 {
                     SnapVehicleTo(v, targetWorld);
+                    VehicleSwallowScale.Restore(v);
                     SetVehicleSolid(v, true);
                     pending.RemoveAt(i);
                     continue;
                 }
+
+                // Emerge from the hole: grow back to full size as the vehicle travels in.
+                float progress = 1f - Mathf.Clamp01(toTarget.magnitude / startDist[v]);
+                VehicleSwallowScale.Apply(v, Mathf.Lerp(0.15f, 1f, Mathf.SmoothStep(0f, 1f, progress * 1.4f)));
                 v.Move(toTarget.normalized);
             }
             elapsed += Time.deltaTime;
@@ -689,8 +710,35 @@ public sealed class SceneFlowCoordinator
         {
             if (v == null) continue;
             SnapVehicleTo(v, drums.GridToWorldPosition(entryCells[v]));
+            VehicleSwallowScale.Restore(v);
             SetVehicleSolid(v, true);
         }
+    }
+
+    // Opens the entry black hole on the mirrored edge, at the along-edge position the vehicles
+    // will enter from. Colors come from the motif being entered; it is a fresh (not played) look.
+    private PathExitPortal SpawnEntryPortal(
+        BoundaryWrap.BoundarySide edge, Dictionary<Vehicle, Vector2Int> entryCells,
+        int phaseIndex, int motifIndex, PathExitKind kind)
+    {
+        var drums = _gameFlow.activeDrumTrack;
+        if (drums == null || entryCells.Count == 0) return null;
+
+        Vector2Int cell = default;
+        foreach (var kv in entryCells) { cell = kv.Value; break; }
+
+        float cellSize = Mathf.Max(0.01f, drums.GetCellWorldSize());
+        float opening = 4f * cellSize;   // gap span + carve radius, same as an exit's passable opening
+        float depth = Mathf.Max(cellSize, _gameFlow.PathExitCaptureDepthCells * cellSize);
+        var geo = PathExitGeometryFactory.Create(edge, drums.GridToWorldPosition(cell), opening, depth);
+
+        var motif = _gameFlow.phaseTransitionManager != null
+            ? _gameFlow.phaseTransitionManager.PeekMotif(phaseIndex, motifIndex)
+            : null;
+        var root = PathExitParticleBuilder.Build(
+            geo, kind, motif?.GetActiveRoleColors(), false, _gameFlow.PathExitParticleStyle, null);
+        root.name = "PathEntryVisual";
+        return root.GetComponent<PathExitPortal>();
     }
 
     private static void SnapVehicleTo(Vehicle v, Vector2 worldPos)

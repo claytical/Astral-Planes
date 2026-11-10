@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: CollectableTuning
   m_EditorClassIdentifier: Assembly-CSharp::CollectableTuning
   baseMotion:
-    baseLinearSpeed: 2
+    baseLinearSpeed: 1
     linearDamping: 0.2
     forceAccelHeadroomMul: 2.5
     forceBrakingFraction: 0.25
@@ -46,8 +46,8 @@ MonoBehaviour:
     trailDriftSpeed: 1.1
     trailDriftFocusMul: 0.15
   dustCollision:
-    dustCollisionEnterImpulse: 0.85
-    dustCollisionStayForce: 2.25
+    dustCollisionEnterImpulse: 0.75
+    dustCollisionStayForce: 2
     arrivalCarveFadeSeconds: 0.15
   bomb:
     blastRadius: 2

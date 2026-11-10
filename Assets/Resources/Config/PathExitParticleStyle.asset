@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2ed028e710af04bdeb7580d1266649c2, type: 3}
+  m_Name: PathExitParticleStyle
+  m_EditorClassIdentifier: Assembly-CSharp::PathExitParticleStyle
+  revisitLook:
+    massRadius: 0.25
+    rimCount: 1
+    rimSpin: 25
+    bubbleSize: 0.09
+    bubbleRate: 6
+    fallSeconds: 1.8
+    swirl: 0.8
+    trailSeconds: 0
+    ringPulse: 0
+    brightness: 0.5
+  newMotifLook:
+    massRadius: 0.3
+    rimCount: 1
+    rimSpin: 45
+    bubbleSize: 0.11
+    bubbleRate: 12
+    fallSeconds: 1.4
+    swirl: 1.2
+    trailSeconds: 0.35
+    ringPulse: 0
+    brightness: 0.75
+  newPhaseLook:
+    massRadius: 0.5
+    rimCount: 2
+    rimSpin: 70
+    bubbleSize: 0.15
+    bubbleRate: 22
+    fallSeconds: 1.1
+    swirl: 1.8
+    trailSeconds: 0.6
+    ringPulse: 1
+    brightness: 0.95
+  playedSaturation: 0.35
+  playedValue: 0.6
+  playedAlpha: 0.492
