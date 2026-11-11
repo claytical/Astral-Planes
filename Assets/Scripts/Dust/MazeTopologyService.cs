@@ -138,7 +138,9 @@ public sealed class MazeTopologyService
                 config.tunnels.straightness01,
                 config.tunnels.braid01,
                 config.tunnels.plazaChance01,
-                config.tunnels.plazaExtraCells),
+                config.tunnels.plazaExtraCells,
+                // Interstitial (exit sides set) walls the full outer ring afterwards; keep rooms off it.
+                edgeInset: (config.porousBorder.exitSides.Count > 0) ? 1 : 0),
             _ => BuildFullFill(width, height, context.IsBlocked),
         };
 

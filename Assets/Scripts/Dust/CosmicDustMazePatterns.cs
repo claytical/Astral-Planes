@@ -756,11 +756,21 @@ public static class CosmicDustMazePatterns
         float straightness01 = 0f,
         float braid01 = 0f,
         float plazaChance01 = 0f,
-        int plazaExtraCells = 0)
+        int plazaExtraCells = 0,
+        int edgeInset = 0)
     {
         var growth = new List<(Vector2Int, Vector3)>();
         if (width <= 0 || height <= 0) return growth;
         if (gridToWorld == null || isCellAvailable == null) return growth;
+
+        // edgeInset reserves an outer ring of wall that rooms/corridors never use. Callers that
+        // wall the grid's outer ring afterwards (interstitial porous border) need this, otherwise
+        // every edge-anchored room/passage loses a row to the border and ends up corridorWidth-1
+        // wide — narrower than the widest ship.
+        int fullW = width, fullH = height;
+        edgeInset = Mathf.Clamp(edgeInset, 0, Mathf.Max(0, (Mathf.Min(width, height) - 1) / 2));
+        width  -= 2 * edgeInset;
+        height -= 2 * edgeInset;
 
         corridorWidth = Mathf.Max(1, corridorWidth);
         int step = Mathf.Max(corridorWidth + 1, corridorStep);
@@ -901,12 +911,13 @@ public static class CosmicDustMazePatterns
             }
         }
 
-        // Every available cell NOT in openCells becomes dust (wall)
-        for (int x = 0; x < width; x++)
-        for (int y = 0; y < height; y++)
+        // Every available cell NOT in openCells becomes dust (wall). Rooms live in inset-shifted
+        // coordinates; the inset ring itself is never open.
+        for (int x = 0; x < fullW; x++)
+        for (int y = 0; y < fullH; y++)
         {
             if (!isCellAvailable(x, y)) continue;
-            if (openCells.Contains(new Vector2Int(x, y))) continue;
+            if (openCells.Contains(new Vector2Int(x - edgeInset, y - edgeInset))) continue;
 
             var grid  = new Vector2Int(x, y);
             var world = gridToWorld(grid);

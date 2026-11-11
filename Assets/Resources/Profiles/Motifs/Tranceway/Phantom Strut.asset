@@ -72,16 +72,13 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 511ea5cb69d274bf1bafe1f07efdb9fb, type: 2}
   - {fileID: 11400000, guid: e22b85a5b724f4218bb815c0c27e90f4, type: 2}
   - {fileID: 11400000, guid: 7ced3340e02f14494838f12fe755e595, type: 2}
-  - {fileID: 11400000, guid: cd0adbd603cc449da9abd772582197c1, type: 2}
-  - {fileID: 11400000, guid: a2d3c8c53e318438c92a17c31bbb522e, type: 2}
-  - {fileID: 11400000, guid: 491f06cb4bb6e42cabe2cf6a9cd948c1, type: 2}
-  - {fileID: 11400000, guid: 38d82c0da11364f01a6ed46fa49e4057, type: 2}
+  - {fileID: 11400000, guid: 3aedb4d29c0544a388368c01cbdb410b, type: 2}
   - {fileID: 11400000, guid: d47d8c0b939cc42eca449852acc161ff, type: 2}
   - {fileID: 11400000, guid: 9a08a93f642724a0d9ab60c48393c3d5, type: 2}
   - {fileID: 11400000, guid: 06a9d6e4711944f3cbadfb80ad57785f, type: 2}
   - {fileID: 11400000, guid: b5c4598d22f794ee0b49f5c146c61005, type: 2}
   - {fileID: 11400000, guid: 2224cdccffe22446e93fd71aba82c740, type: 2}
-  - {fileID: 11400000, guid: 2224cdccffe22446e93fd71aba82c740, type: 2}
+  - {fileID: 11400000, guid: cd0adbd603cc449da9abd772582197c1, type: 2}
   selectionWeight: 1
   beatIntroCount: 0
   driveBeatsFromDensity: 1
