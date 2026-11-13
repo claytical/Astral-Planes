@@ -132,7 +132,18 @@ public partial class CosmicDustGenerator : MonoBehaviour
         () => vehicleMask,
         () => config.regrowVetoBoxMul,
         () => config.regrowVetoMaxHits,
-        SetDustCollision);
+        SetDustCollision,
+        YieldPlowSuppressedCellToVehicle);
+
+    // Hard-cap fallback for a plow-suppressed cell a vehicle is still sitting in: finish the carve
+    // through the normal vehicle path (regrow scheduled; regrow already defers while a vehicle
+    // overlaps) instead of re-enabling the collider around the vehicle. Returns false if the cell
+    // couldn't be carved (e.g. bypass-proof CellFlags.Solid), so the caller keeps old behavior.
+    private bool YieldPlowSuppressedCellToVehicle(Vector2Int gp)
+    {
+        CarveDustByVehicle(gp, DustTimings.clearFadeOutSeconds);
+        return !(TryGetCellState(gp, out var st) && st == DustCellState.Solid);
+    }
 
     [Header("Tile Sizing")]
     [SerializeField] private float tileDiameterWorld = 1f;          // cached from dustfab.hitbox

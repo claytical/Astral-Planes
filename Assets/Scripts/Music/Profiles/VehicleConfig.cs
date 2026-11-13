@@ -121,4 +121,13 @@ public class VehicleConfig : ScriptableObject
     public float drainFeedbackShrinkScale = 0.7f;
     [Tooltip("Duration of the shrink-and-recover flicker/pulse triggered by a drain hit.")]
     public float drainFeedbackDuration = 0.25f;
+
+    [Header("Turbulence (passing through a dormant star)")]
+    [Tooltip("Peak sideways buffeting acceleration at full turbulence (world units/s^2).")]
+    public float turbulenceLateralAccel = 45f;
+    [Tooltip("How fast the buffeting flips side to side (noise cycles per second).")]
+    public float turbulenceFrequency = 7f;
+    [Range(0f, 1f)]
+    [Tooltip("Fraction of steering authority lost at full turbulence.")]
+    public float turbulenceAuthorityPenalty01 = 0.5f;
 }

@@ -65,13 +65,18 @@ public partial class CosmicDust
         if (actual <= 0) return 0;
         _currentEnergyUnits -= actual;
 
-        // Lerp RGB toward gray as energy depletes, and drop alpha too.
-        // At Charge01=1: full role color. At Charge01=0: gray at low alpha.
+        // Lerp RGB toward gray as energy depletes. At Charge01=1: full role color. At 0: gray at
+        // low alpha. Both channels derive from undrained state (never the already-drained
+        // _currentTint), so repeated chips don't compound — and while any energy remains the cell
+        // is still Solid with its collider live, so alpha stays on the same solid-cell scale
+        // SetEnergyUnits uses. A colliding cell must never read as cleared (invisible-wall bug).
         Color gray = new Color(0.3f, 0.3f, 0.3f, 0f);
-        Color full = _currentTint;
+        Color full = _undrainedRgb;
         full.a = 1f;
         Color drained = Color.Lerp(gray, full, Charge01);
-        drained.a = Mathf.Lerp(0.05f, _currentTint.a, Charge01);
+        drained.a = _currentEnergyUnits > 0
+            ? Mathf.Lerp(kSolidAlphaFloor, kSolidAlphaCeiling, Charge01)
+            : 0.05f;
 
         _currentTint = drained;
         ApplyTintVisual(_currentTint);

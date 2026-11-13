@@ -31,6 +31,31 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     }
 
     [SerializeField, Min(0f)] private float pushDecayPerSecond = 5f;
+    [Tooltip("While frozen (dormant charging, paused for a sibling) the star doesn't steer, but stays " +
+             "pushable so a ship can never be pinned against it. A shove decays back to rest at this rate (world units/s^2).")]
+    [SerializeField, Min(0f)] private float frozenSettleDeceleration = 20f;
+
+    [Serializable]
+    private sealed class GhostDriftTuning
+    {
+        [Tooltip("Slow wander speed while dormant (world units/s).")]
+        public float driftSpeed = 0.35f;
+        [Tooltip("How quickly the star eases into its wander velocity.")]
+        public float driftAccel = 1.5f;
+        [Tooltip("Speed the star is flung away at when a ship passes through it.")]
+        public float scatterSpeed = 4f;
+        [Tooltip("How much of the ship's own heading the scatter inherits (0 = straight away from the ship).")]
+        [Range(0f, 1f)] public float scatterFollowsShip = 0.5f;
+        [Tooltip("Turbulence strength handed to the ship while it overlaps the star (0..1).")]
+        [Range(0f, 1f)] public float turbulence01 = 0.8f;
+        [Tooltip("How long the turbulence lingers after the ship leaves the star.")]
+        public float turbulenceSeconds = 0.6f;
+    }
+
+    // Dormant (charging) stars are faint, so instead of being a wall a ship can get pinned on
+    // they're a drifting ghost: ships pass through, get buffeted, and scatter the star elsewhere.
+    [Header("Dormant Ghost Drift")]
+    [SerializeField] private GhostDriftTuning ghost = new();
 
     [Header("Anti-Jump")]
     [SerializeField] private bool enableUnstickImpulse = false;
@@ -44,6 +69,17 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     private float _stuckTimer;
 
     private bool _frozen;
+
+    // Ghost drift: requested by PhaseStar while dormant; _ghostCollisionsIgnored tracks whether
+    // vehicle<->star collisions are currently ignored (stays on until no ship overlaps, so the
+    // star never turns solid inside a hull).
+    private bool _ghostRequested;
+    private bool _ghostCollisionsIgnored;
+    private Collider2D[] _starColliders;
+    private readonly List<Collider2D> _ghostIgnoredVehicleCols = new();
+    private readonly List<Collider2D> _vehicleColScratch = new();
+
+    public void SetGhostDrift(bool on) => _ghostRequested = on;
 
     private Vector2? _overrideTarget;
     public void SetOverrideTarget(Vector2? target) { _overrideTarget = target; }
@@ -62,6 +98,10 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         {
             _rb.linearVelocity = Vector2.zero;
             _rb.angularVelocity = 0f;
+            // Frozen = no self-steering, NOT immovable: a position-locked (FreezeAll) star acts as
+            // an infinite-mass wall, and a ship overlapping or wedged against one gets pinned in
+            // place (X-agong stuck-on-dormant-star bug). FixedUpdate settles shoves back to rest.
+            _rb.constraints = RigidbodyConstraints2D.FreezeRotation;
         }
     }
 
@@ -182,11 +222,21 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (!_enabled || _profile == null || !_rb) return;
+        if (!_rb) return;
+        SyncGhostCollisions();
+        if (!_enabled || _profile == null) return;
+
+        if (_frozen && _ghostRequested)
+        {
+            TickGhostDrift(Time.fixedDeltaTime);
+            return;
+        }
 
         if (_frozen)
         {
-            _rb.linearVelocity = Vector2.zero;
+            // Let collisions shove it, then glide back to rest instead of snapping to zero.
+            _rb.linearVelocity = Vector2.MoveTowards(_rb.linearVelocity, Vector2.zero,
+                frozenSettleDeceleration * Time.fixedDeltaTime);
             return;
         }
 
@@ -455,6 +505,149 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         }
 
         return sum;
+    }
+
+    // ---------------- Dormant ghost drift ----------------
+
+    private bool GhostWanted => _ghostRequested && _frozen && _enabled;
+
+    private void SyncGhostCollisions()
+    {
+        if (GhostWanted)
+        {
+            // Re-applied every tick: picks up ships that joined/respawned, and Unity can drop a
+            // pair's ignore state when either collider is disabled/re-enabled (the star toggles
+            // its colliders on state changes). A handful of pairs — cheap.
+            SetVehicleCollisionsIgnored(true);
+            return;
+        }
+
+        if (!_ghostCollisionsIgnored) return;
+
+        // Leaving ghost mode: don't go solid while a ship is inside the star — keep scattering
+        // away until clear, then restore collisions.
+        if (AnyVehicleOverlapping(out var v))
+        {
+            ScatterFrom(v);
+            return;
+        }
+        SetVehicleCollisionsIgnored(false);
+    }
+
+    private void TickGhostDrift(float dt)
+    {
+        // Ships passing through: buffet them and fling the star somewhere else.
+        CollectVehicleColliders();
+        for (int i = 0; i < _vehicleColScratch.Count; i++)
+        {
+            var vc = _vehicleColScratch[i];
+            if (!vc || !vc.enabled || vc.isTrigger) continue;
+            if (!OverlapsStar(vc)) continue;
+            var vehicle = vc.GetComponentInParent<Vehicle>();
+            if (vehicle == null) continue;
+            vehicle.ApplyTurbulence(ghost.turbulence01, ghost.turbulenceSeconds);
+            ScatterFrom(vehicle);
+        }
+
+        // Slow wander; anything faster (a scatter) bleeds off at the settle rate.
+        _rechooseTimer -= dt;
+        if (_rechooseTimer <= 0f) PickNewDriftDir();
+
+        Vector2 dir = _driftDir + ComputeEdgeRepulsion(_rb.position);
+        if (dir.sqrMagnitude > 0.0001f) dir.Normalize();
+        Vector2 target = dir * Mathf.Max(0f, ghost.driftSpeed);
+
+        Vector2 cur = _rb.linearVelocity;
+        float accel = cur.sqrMagnitude > target.sqrMagnitude * 2.25f + 0.01f
+            ? frozenSettleDeceleration
+            : ghost.driftAccel;
+        _rb.linearVelocity = Vector2.MoveTowards(cur, target, accel * dt);
+        SoftContainInsideScreen();
+        OnVelocityChanged?.Invoke(_rb.linearVelocity);
+    }
+
+    private void ScatterFrom(Vehicle vehicle)
+    {
+        if (vehicle == null || vehicle.rb == null) return;
+        Vector2 away = _rb.position - vehicle.rb.position;
+        away = away.sqrMagnitude > 0.0001f ? away.normalized : Random.insideUnitCircle.normalized;
+
+        Vector2 shipVel = vehicle.rb.linearVelocity;
+        Vector2 dir = shipVel.sqrMagnitude > 0.01f
+            ? Vector2.Lerp(away, shipVel.normalized, ghost.scatterFollowsShip)
+            : away;
+        if (dir.sqrMagnitude < 0.0001f) dir = away;
+        dir.Normalize();
+
+        Vector2 scatter = dir * Mathf.Max(ghost.scatterSpeed, shipVel.magnitude * 0.5f);
+        if (_rb.linearVelocity.sqrMagnitude < scatter.sqrMagnitude)
+            _rb.linearVelocity = scatter;
+        _driftDir = dir; // keep wandering the way it was knocked
+        _rechooseTimer = Random.Range(1.2f, 2.4f);
+    }
+
+    private void CacheStarColliders()
+    {
+        if (_starColliders == null || _starColliders.Length == 0)
+            _starColliders = GetComponentsInChildren<Collider2D>(true);
+    }
+
+    private void CollectVehicleColliders()
+    {
+        _vehicleColScratch.Clear();
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        if (_gfm == null || _gfm.localPlayers == null) return;
+        for (int i = 0; i < _gfm.localPlayers.Count; i++)
+        {
+            var lp = _gfm.localPlayers[i];
+            var v = lp != null ? lp.plane : null;
+            if (v == null) continue;
+            v.GetComponentsInChildren(true, _tmpCols);
+            _vehicleColScratch.AddRange(_tmpCols);
+        }
+    }
+    private readonly List<Collider2D> _tmpCols = new();
+
+    private void SetVehicleCollisionsIgnored(bool ignore)
+    {
+        CacheStarColliders();
+        if (ignore)
+        {
+            CollectVehicleColliders();
+            for (int i = 0; i < _vehicleColScratch.Count; i++)
+            {
+                var vc = _vehicleColScratch[i];
+                if (!vc) continue;
+                for (int s = 0; s < _starColliders.Length; s++)
+                    if (_starColliders[s]) Physics2D.IgnoreCollision(_starColliders[s], vc, true);
+                if (!_ghostIgnoredVehicleCols.Contains(vc)) _ghostIgnoredVehicleCols.Add(vc);
+            }
+            _ghostCollisionsIgnored = true;
+            return;
+        }
+
+        for (int i = 0; i < _ghostIgnoredVehicleCols.Count; i++)
+        {
+            var vc = _ghostIgnoredVehicleCols[i];
+            if (!vc) continue;
+            for (int s = 0; s < _starColliders.Length; s++)
+                if (_starColliders[s]) Physics2D.IgnoreCollision(_starColliders[s], vc, false);
+        }
+        _ghostIgnoredVehicleCols.Clear();
+        _ghostCollisionsIgnored = false;
+    }
+
+    private bool OverlapsStar(Collider2D other)
+    {
+        CacheStarColliders();
+        for (int s = 0; s < _starColliders.Length; s++)
+        {
+            var sc = _starColliders[s];
+            if (!sc || !sc.enabled || sc.isTrigger) continue;
+            // Geometric query — works even while the pair's collisions are ignored.
+            if (sc.Distance(other).isOverlapped) return true;
+        }
+        return false;
     }
 
     private void PickNewDriftDir()

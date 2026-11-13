@@ -341,6 +341,8 @@ public partial class Vehicle : MonoBehaviour
             }
         }
 
+        ApplyTurbulenceBuffet(dt);
+
         // Plow drag: applied after acceleration so high-resistance cells create real terminal velocity
         if (_plowVelocityDrain > 0f && rb.linearVelocity.sqrMagnitude > 0.01f)
             rb.linearVelocity *= Mathf.Max(0f, 1f - _plowVelocityDrain);
@@ -382,6 +384,10 @@ public partial class Vehicle : MonoBehaviour
         if (profile.pressureInstabilityStrength01 > 0f && _lastPressureFactor > 0f)
             auth *= 1f - _lastPressureFactor * profile.pressureInstabilityStrength01;
 
+        float turb = CurrentTurbulence01;
+        if (turb > 0f)
+            auth *= 1f - turb * vehicleConfig.turbulenceAuthorityPenalty01;
+
         if (profile.speedInstabilityStrength01 > 0f)
         {
             float speedFactor = Mathf.Clamp01(rb.linearVelocity.magnitude / profile.arcadeMaxSpeed);
@@ -389,6 +395,52 @@ public partial class Vehicle : MonoBehaviour
         }
 
         return Mathf.Clamp01(auth);
+    }
+
+    // ---- Turbulence (e.g. flying through a dormant PhaseStar's ghost) ----
+    // Strength holds at its peak while refreshed, then fades linearly to 0 over the linger window.
+    private float _turbulencePeak01;
+    private float _turbulenceStartFadeAt;
+    private float _turbulenceEndAt;
+    // Per-ship noise offset (Random can't be called from a MonoBehaviour field initializer).
+    private float TurbulenceSeed => (_id * 97.31f) % 1000f;
+
+    private float CurrentTurbulence01
+    {
+        get
+        {
+            float now = Time.time;
+            if (now >= _turbulenceEndAt) return 0f;
+            if (now <= _turbulenceStartFadeAt) return _turbulencePeak01;
+            return _turbulencePeak01 * Mathf.InverseLerp(_turbulenceEndAt, _turbulenceStartFadeAt, now);
+        }
+    }
+
+    /// <summary>Buffets the ship sideways and loosens its steering for a moment. Call every tick
+    /// while the source is in contact; it lingers for lingerSeconds after the last call.</summary>
+    public void ApplyTurbulence(float strength01, float lingerSeconds)
+    {
+        float s = Mathf.Max(CurrentTurbulence01, Mathf.Clamp01(strength01));
+        _turbulencePeak01 = s;
+        _turbulenceStartFadeAt = Time.time;
+        _turbulenceEndAt = Time.time + Mathf.Max(0.01f, lingerSeconds);
+    }
+
+    private void ApplyTurbulenceBuffet(float dt)
+    {
+        float turb = CurrentTurbulence01;
+        if (turb <= 0f || vehicleConfig.turbulenceLateralAccel <= 0f) return;
+
+        Vector2 v = rb.linearVelocity;
+        Vector2 side = v.sqrMagnitude > 0.01f
+            ? Vector2.Perpendicular(v.normalized)
+            : (Vector2)transform.right;
+        float t = Time.time * Mathf.Max(0.01f, vehicleConfig.turbulenceFrequency);
+        float lateral = Mathf.PerlinNoise(t, TurbulenceSeed) * 2f - 1f;
+        float surge   = Mathf.PerlinNoise(TurbulenceSeed, t) * 2f - 1f;
+        Vector2 forward = v.sqrMagnitude > 0.01f ? v.normalized : (Vector2)transform.up;
+        rb.linearVelocity += (side * lateral + forward * surge * 0.35f)
+                             * (vehicleConfig.turbulenceLateralAccel * turb * dt);
     }
 
     public void Move(Vector2 direction)

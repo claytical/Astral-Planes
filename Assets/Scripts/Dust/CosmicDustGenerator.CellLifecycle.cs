@@ -76,6 +76,10 @@ public partial class CosmicDustGenerator
         FinalizeVehicleCarve(cell, fadeSeconds, shipProfile);
     }
 
+    // False for bypass-proof dust ChipDustByVehicle will always refuse — the plow must not
+    // suppress those colliders, or the vehicle slides into a cell it can never carve out of.
+    public bool CanVehicleChip(Vector2Int cell) => IsInBounds(cell) && !HasCellFlag(cell, CellFlags.Solid);
+
     public void ChipDustByVehicle(Vector2Int cell, int energyAmount, float fadeSeconds, float resistanceBypass01 = 0f, ShipMusicalProfile shipProfile = null)
     {
         if (!IsInBounds(cell)) return;

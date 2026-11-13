@@ -69,7 +69,7 @@ public partial class PhaseStar
         _tentacleActivationCo = StartCoroutine(Co_ActivateTentaclesAfterDelay());
         cravingNavigator?.SetActive(true);
 
-        // Stay pinned in place while charging.
+        // No self-steering while charging — ghost drift (PhaseStarMotion2D) wanders it slowly.
         motion?.SetFrozen(true);
         motion?.SetOverrideTarget(null);
 

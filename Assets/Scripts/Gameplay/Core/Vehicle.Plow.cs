@@ -157,6 +157,7 @@ public partial class Vehicle
                 if (!isSolid) continue;
                 if (effectiveRes >= 1f) continue;
                 if (!canCarve) continue;
+                if (!gen.CanVehicleChip(cell)) continue; // uncarveable: stays a real wall
 
                 gen.SuppressCellColliderForPlow(cell);
                 gen.ChipDustByVehicle(cell, chipAmount, fade, profile.carveResistanceBypass01, profile);

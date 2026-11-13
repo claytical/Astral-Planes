@@ -8,6 +8,8 @@ public partial class CosmicDust
 // Authoritative/resting tint of this dust cell.
 // This is what retinting, charge drain, role assignment, etc. should modify.
     public Color CurrentTint => _currentTint;
+    // Alpha actually on screen (after pulses / collider-disabled ghosting) — diagnostics only.
+    public float DisplayedAlpha => _displayTint.a;
 
 // Currently displayed tint on the sprite.
 // Temporary pulses modify this, but must not overwrite _currentTint.
@@ -46,6 +48,9 @@ private void ClearRainbowParticleDirtyIfNeeded()
 
 // Canonical/rest tint.
     private Color _currentTint = Color.white;
+    // Role color before any ChipEnergy drain-toward-gray; ChipEnergy lerps from this so
+    // successive chips don't compound. Set wherever the base role tint is (re)applied.
+    private Color _undrainedRgb = Color.white;
 
     private Color _baseColor;
     private float _baseSize;
@@ -77,6 +82,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
         // (diffusion, retinting) must not reset drain progress.
         tint.a = _currentTint.a;
         _currentTint = tint;
+        _undrainedRgb = tint;
 
         if (!_tintPulseActive || applyImmediatelyIfNoPulse)
             ApplyDisplayedTint(_currentTint);

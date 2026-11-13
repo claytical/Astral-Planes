@@ -196,10 +196,18 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
         config.innerRadius + idx * (config.ringThickness + config.ringSpacing);
 
     // ── Gameplay collision ──────────────────────────────────────────────────
-    // Solid while the ring stack is flat (spawn, deformation, idle hide); disabled
-    // once the tilt-exit phase begins (RunSpinRollScale) so the vehicle can phase
-    // through. Static, non-trigger — Unity's physics solver pushes the vehicle out
-    // for free, same as CosmicDust.
+    // Solid only while the ring stack is visible and flat (spawn, deformation, spin-off
+    // wait); disabled when the stack scales away after a loop, and once the tilt-exit
+    // phase begins (RunSpinRollScale) so the vehicle can phase through. Static,
+    // non-trigger — Unity's physics solver pushes the vehicle out, same as CosmicDust.
+    // LateUpdate enforces the invariant: never a solid collider on a ~zero-scale stack.
+
+    private void LateUpdate()
+    {
+        if (_ringCollider != null && _ringCollider.enabled
+            && Mathf.Abs(transform.lossyScale.x) < 1e-3f)
+            _ringCollider.enabled = false;
+    }
 
     private void EnsureRingCollider()
     {

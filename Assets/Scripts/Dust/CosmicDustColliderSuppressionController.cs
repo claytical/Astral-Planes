@@ -20,6 +20,8 @@ public sealed class CosmicDustColliderSuppressionController
     private readonly Func<float> _getRegrowVetoBoxMul;
     private readonly Func<int> _getRegrowVetoMaxHits;
     private readonly Action<CosmicDust, bool> _setDustCollision;
+    // Carves a still-solid cell out from under an overlapping vehicle; true if it's no longer solid.
+    private readonly Func<Vector2Int, bool> _yieldCellToVehicle;
 
     // Cells whose colliders are temporarily disabled by an active vehicle plow.
     // Vehicle.DoPlowTick refreshes the stamp each tick; Tick() re-enables colliders
@@ -32,9 +34,10 @@ public sealed class CosmicDustColliderSuppressionController
     private List<Vector2Int> _plowSuppressedKeys;
     private const float kPlowColliderRecoveryGraceSeconds = 0.25f;
     // Hard cap on suppression regardless of continued overlap — a vehicle parked on a still-
-    // solid cell (stopped mid-carve, or driven back onto one) must eventually be repelled
-    // again instead of sitting inside it indefinitely, which is what an unbounded "defer while
-    // overlapping" wait would otherwise allow.
+    // solid cell (stopped mid-carve, or driven back onto one) can't defer resolution forever.
+    // At the cap, an overlapped cell is yielded to the vehicle (carved) rather than having its
+    // collider re-enabled around the hull: re-enabling inside a vehicle embeds it in several
+    // box colliders at once and pins it in place (Howler stuck-in-cleared-dust bug).
     private const float kPlowColliderMaxSuppressionSeconds = 1.0f;
     private Collider2D[] _vehicleVetoHits;
 
@@ -48,7 +51,8 @@ public sealed class CosmicDustColliderSuppressionController
         Func<LayerMask> getVehicleMask,
         Func<float> getRegrowVetoBoxMul,
         Func<int> getRegrowVetoMaxHits,
-        Action<CosmicDust, bool> setDustCollision)
+        Action<CosmicDust, bool> setDustCollision,
+        Func<Vector2Int, bool> yieldCellToVehicle)
     {
         _gridState = gridState;
         _isInBounds = isInBounds;
@@ -60,6 +64,7 @@ public sealed class CosmicDustColliderSuppressionController
         _getRegrowVetoBoxMul = getRegrowVetoBoxMul;
         _getRegrowVetoMaxHits = getRegrowVetoMaxHits;
         _setDustCollision = setDustCollision;
+        _yieldCellToVehicle = yieldCellToVehicle;
     }
 
     public void DisableCellCollider(Vector2Int cell)
@@ -112,12 +117,21 @@ public sealed class CosmicDustColliderSuppressionController
                 continue;
             }
 
-            // Defer while a vehicle still overlaps so the collider doesn't pop it out --
-            // unless suppression has run past the hard cap, in which case a still-solid cell
-            // must re-collide regardless (a parked vehicle would otherwise never be repelled).
+            // Defer while a vehicle still overlaps so the collider doesn't pop it out. Past the
+            // hard cap, hand the cell to the vehicle (carve it) instead of re-enabling the
+            // collider around the hull; only if it can't be carved fall through to re-enable.
             bool suppressedTooLong = _plowSuppressionStartTime.TryGetValue(gp, out float startedAt)
                 && (now - startedAt) >= kPlowColliderMaxSuppressionSeconds;
-            if (IsVehicleOverlappingCell(gp) && !suppressedTooLong) continue;
+            if (IsVehicleOverlappingCell(gp))
+            {
+                if (!suppressedTooLong) continue;
+                if (_yieldCellToVehicle != null && _yieldCellToVehicle(gp))
+                {
+                    _plowSuppressedColliders.Remove(gp);
+                    _plowSuppressionStartTime.Remove(gp);
+                    continue;
+                }
+            }
 
             var dust = _gridState.CellDust?[gp.x, gp.y];
             if (dust != null) _setDustCollision(dust, true);

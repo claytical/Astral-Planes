@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -79,7 +80,74 @@ public partial class Vehicle
         _timeBelowMoveThreshold += Time.fixedDeltaTime;
     else
         _timeBelowMoveThreshold = 0f;
+
+    UpdateStuckProbe(speed);
 }
+
+    // ---- Stuck probe (diagnostic) ----
+    // Input held but not moving (and not in a scripted recovery glide) for kStuckProbeSeconds →
+    // log, once per episode, every collider touching/overlapping the hull, with dust cell state.
+    // Exists to name the culprit if the "pinned in visibly cleared dust" bug ever recurs.
+    private const float kStuckProbeSeconds = 0.75f;
+    private float _stuckProbeSeconds;
+    private bool _stuckProbeLogged;
+    private static readonly ContactPoint2D[] _stuckContacts = new ContactPoint2D[16];
+    private static readonly List<Collider2D> _stuckOverlaps = new List<Collider2D>(16);
+
+    private void UpdateStuckProbe(float speed)
+    {
+        bool pushing = _moveInput.sqrMagnitude > 0.0001f && !_movementLocked;
+        if (!pushing || speed > vehicleConfig.stuckSpeedThreshold)
+        {
+            _stuckProbeSeconds = 0f;
+            _stuckProbeLogged = false;
+            return;
+        }
+
+        _stuckProbeSeconds += Time.fixedDeltaTime;
+        if (_stuckProbeLogged || _stuckProbeSeconds < kStuckProbeSeconds) return;
+        _stuckProbeLogged = true;
+        LogStuckProbe();
+    }
+
+    private void LogStuckProbe()
+    {
+        var gen = gfm != null ? gfm.dustGenerator : null;
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"[VEHICLE:STUCK] {name} pinned at {rb.position} (cell {(drumTrack != null ? drumTrack.WorldToGridPosition(rb.position).ToString() : "?")}) " +
+                  $"input={_moveInput} boosting={boosting} energy={energyLevel:F2} plowDrain={_plowVelocityDrain:F2}");
+
+        int contacts = rb.GetContacts(_stuckContacts);
+        sb.Append($"\n  contacts={contacts}");
+        for (int i = 0; i < contacts; i++)
+            AppendStuckColliderInfo(sb, _stuckContacts[i].collider, gen, $"normal={_stuckContacts[i].normal} sep={_stuckContacts[i].separation:F3}");
+
+        var filter = new ContactFilter2D();
+        filter.NoFilter();
+        filter.useTriggers = false;
+        _stuckOverlaps.Clear();
+        int overlaps = rb.Overlap(filter, _stuckOverlaps);
+        sb.Append($"\n  overlaps={overlaps}");
+        for (int i = 0; i < overlaps; i++)
+            AppendStuckColliderInfo(sb, _stuckOverlaps[i], gen, null);
+
+        Debug.LogWarning(sb.ToString(), this);
+    }
+
+    private void AppendStuckColliderInfo(System.Text.StringBuilder sb, Collider2D col, CosmicDustGenerator gen, string extra)
+    {
+        if (col == null) { sb.Append("\n    <null>"); return; }
+        sb.Append($"\n    {col.name} layer={LayerMask.LayerToName(col.gameObject.layer)} enabled={col.enabled} trigger={col.isTrigger}");
+        if (extra != null) sb.Append(' ').Append(extra);
+
+        var dust = col.GetComponentInParent<CosmicDust>();
+        if (dust == null || gen == null || drumTrack == null) return;
+        Vector2Int gp = drumTrack.WorldToGridPosition(dust.transform.position);
+        string state = gen.TryGetCellState(gp, out var st) ? st.ToString() : "?";
+        sb.Append($" | dust cell={gp} state={state} role={dust.Role} charge={dust.Charge01:F2} " +
+                  $"tintA={dust.CurrentTint.a:F2} shownA={dust.DisplayedAlpha:F2} chippable={gen.CanVehicleChip(gp)} " +
+                  $"liveRes={gen.GetLiveCarveResistance01(gp):F2}");
+    }
 
     public bool IsDustPluckIdleSuppressed =>
         _timeBelowMoveThreshold >= vehicleConfig.dustPluckIdleSuppressSeconds;

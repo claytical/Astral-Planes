@@ -109,7 +109,6 @@ public partial class MotifRingGlyphApplicator
         if (config == null) return;
 
         EnsureRingCollider();
-        _ringCollider.enabled = true;
 
         // A bin can empty (its last pending note broken via TryBreakNextPendingTether, which
         // un-fills the bin so BinFrontierAllocator offers it again) and later refill, re-firing
@@ -154,8 +153,18 @@ public partial class MotifRingGlyphApplicator
 
         int totalRingCount = _gameplayRings.Count + _remainingRings.Count;
         RefreshPlayAreaFit(totalRingCount);
-        UpdateRingColliderRadius(_gameplayRings.Count);
         UpdateBackgroundDiscRadii(_gameplayRings.Count, totalRingCount);
+        EnableRingColliderAndEject();
+    }
+
+    // The collider follows the visible, flat ring stack: enable it (sized to the current stack)
+    // only when the stack is shown at full scale, and push out any ship it just engulfed.
+    private void EnableRingColliderAndEject()
+    {
+        EnsureRingCollider();
+        if (_gameplayRings.Count == 0) return;
+        _ringCollider.enabled = true;
+        UpdateRingColliderRadius(_gameplayRings.Count);
         EjectVehiclesFromRing();
     }
 
@@ -386,7 +395,12 @@ public partial class MotifRingGlyphApplicator
             yield return null;
         }
         if (!_gameplayFadingOut && !_spinOffPending && _pendingDeformationCount == 0)
+        {
             transform.localScale = Vector3.zero;
+            // A zero-scaled stack is invisible — its collider would otherwise collapse to a
+            // point-sized solid circle at the play-area centre that pins ships (phantom collision).
+            if (_ringCollider != null) _ringCollider.enabled = false;
+        }
 
         _gameplayHideCoroutine = null;
     }

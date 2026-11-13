@@ -295,6 +295,10 @@ public partial class PhaseStar : MonoBehaviour
 
         UpdateStateRecovery();
 
+        // Dormant (charging) stars are faint: ships pass through them as a drifting ghost
+        // (turbulence + scatter) instead of hitting an easy-to-miss wall. See PhaseStarMotion2D.
+        motion?.SetGhostDrift(_state == PhaseStarState.Dormant && !_burstOffScreen && !_isDisposing);
+
         _accumulatorRotAngle += accumulatorRotSpeed * dt;
 
         ComputeDiamondRotation(dt, out float rotA, out bool aLocked, out float rotB, out bool bLocked);

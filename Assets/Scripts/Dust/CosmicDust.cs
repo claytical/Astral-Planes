@@ -74,6 +74,7 @@ private GameFlowManager _gfm;
             // Neutral default — matches the hidden/unrevealed look; ApplyRoleAndCharge sets the
             // real tint once a role is assigned.
             _currentTint = Color.white;
+            _undrainedRgb = Color.white;
             _displayTint = _currentTint;
             _displayTint.a = kRegrowAlphaCap;
             _dustSpriteBaseLocalPos = visual.particleSystem.transform.localPosition;

@@ -24,6 +24,8 @@ public partial class MotifRingGlyphApplicator
             _gameplayHideCoroutine = null;
         }
         transform.localScale = _fitScale.sqrMagnitude > 0.0001f ? _fitScale : Vector3.one;
+        // Restored stack is flat and solid again until the tilt phase drops collision.
+        EnableRingColliderAndEject();
 
         // Motif completion can land anywhere in the currently-playing pass. Wait for the pass
         // to actually finish (all bins played) before doing anything else. This has to happen
