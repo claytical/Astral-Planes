@@ -36,7 +36,7 @@ public partial class LocalPlayer
         // confirm, ship-select, restart, etc.) — same guard role as LivingScorePanel.ShouldSuppressConfirm.
         // ShouldSuppressInput (not just IsOpen) also covers the same frame the panel just closed
         // on this exact press.
-        if (SettingsPanelController.ShouldSuppressInput) return;
+        if (ModalMenu.ShouldSuppressInput) return;
 
         if (_isReady &&
             GameFlowManager.Instance != null &&

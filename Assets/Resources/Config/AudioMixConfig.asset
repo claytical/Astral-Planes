@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1342da6cdb144bfcb9117917ccf7ae15, type: 3}
+  m_Name: AudioMixConfig
+  m_EditorClassIdentifier: Assembly-CSharp::AudioMixConfig
+  roleBuses:
+  - role: 0
+    group: {fileID: 8757496109221892152, guid: 07985bf4f6d469340930e958ef313c14, type: 2}
+  - role: 1
+    group: {fileID: -7502792225068152454, guid: 07985bf4f6d469340930e958ef313c14,
+      type: 2}
+  - role: 2
+    group: {fileID: 733832146008888724, guid: 07985bf4f6d469340930e958ef313c14, type: 2}
+  - role: 3
+    group: {fileID: 1546140300052845382, guid: 07985bf4f6d469340930e958ef313c14, type: 2}
+  - role: 5
+    group: {fileID: -8632850657534393594, guid: 07985bf4f6d469340930e958ef313c14,
+      type: 2}
+  drumsGroup: {fileID: 7911228863291149657, guid: 07985bf4f6d469340930e958ef313c14,
+    type: 2}
+  drumVolume: 1

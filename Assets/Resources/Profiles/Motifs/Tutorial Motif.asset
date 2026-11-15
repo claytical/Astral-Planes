@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Tutorial Motif
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: intro
-  displayName: intro
+  displayName: Loops
   keyRootMidi: 58
   entryDrumLoops:
   - {fileID: 8300000, guid: a6b537cd91fc44bc2a4357aa1a154bea, type: 3}
@@ -43,11 +43,11 @@ MonoBehaviour:
     breadth01: 0.5
     pressure01: 0.5
     maxConsecutiveLoopSeconds: 0
-  entryLoopCount: 16
+  entryLoopCount: 8
   resetFirstCarryOnStart: 0
   bridgeSamples:
   - {fileID: 8300000, guid: 9cd80b32a196747aca22eb0da4edc2c8, type: 3}
-  bridgeSampleVolume: 0.027
+  bridgeSampleVolume: 0.223
   quantizeBridgeSampleToBeat: 1
   bpm: 75
   stepsPerLoop: 16

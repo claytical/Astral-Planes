@@ -235,7 +235,8 @@ public partial class MotifRingGlyphApplicator
                 config.remainingRingColor, default, -1,
                 null, 0,
                 config.remainingRingAlpha * alphaScale, 0f,
-                ringOrdinal: i, skipContour: true);
+                ringOrdinal: i, skipContour: true,
+                fillMaterialOverride: config.remainingRingMaterial);
             _recordRings.Add(entry);
 
             StartCoroutine(AnimateMeshFill(

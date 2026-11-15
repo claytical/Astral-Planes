@@ -52,6 +52,12 @@ public class NoteTether : MonoBehaviour
     private Vector3 _startWorldOverride;
     private bool    _hasStartOverride;
 
+    // Hull-edge start — set each frame by Vehicle via SetStartAnchorCircle(). The start point
+    // is the spot on this circle facing the end, so the cable leaves the ship's edge.
+    private Vector3 _startCircleCenter;
+    private float   _startCircleRadius;
+    private bool    _hasStartCircle;
+
     // Camera.main lookup does an internal tag search; cache it instead of re-resolving
     // every frame in RebuildCurve/ResolveEndWorldPosition (this runs once per active
     // tether per frame, and several can be alive across simultaneous track releases).
@@ -120,7 +126,7 @@ private int     _cachedHash  = 0;
     void Update()
 {
     // If either endpoint is missing, try to (re)acquire before destroying
-    bool hasStart = _hasStartOverride || (start != null);
+    bool hasStart = _hasStartCircle || _hasStartOverride || (start != null);
     if (!hasStart || !end)
     {
         // Try to resolve 'start' from the visualizer's marker table every few frames
@@ -191,7 +197,7 @@ private int     _cachedHash  = 0;
     if (_dripEmitter != null)
     {
         Vector3 endW     = ResolveEndWorldPosition();
-        Vector3 startPos = _hasStartOverride ? _startWorldOverride : (start != null ? start.position : transform.position);
+        Vector3 startPos = ResolveStartWorldPosition(endW);
         Vector3 dir      = (endW - startPos).normalized;
         _dripEmitter.SetDripDirection(dir, dripBaseSpeed, dripGravity);
     }
@@ -283,6 +289,27 @@ private int     _cachedHash  = 0;
     {
         _startWorldOverride = worldPos;
         _hasStartOverride   = true;
+    }
+
+    // Starts the tether on the edge of a circle (e.g. a ship's hull), at the point facing the end.
+    public void SetStartAnchorCircle(Vector3 center, float radius)
+    {
+        _startCircleCenter = center;
+        _startCircleRadius = Mathf.Max(0f, radius);
+        _hasStartCircle    = true;
+    }
+
+    private Vector3 ResolveStartWorldPosition(Vector3 endW)
+    {
+        if (_hasStartCircle)
+        {
+            Vector2 toEnd = (Vector2)(endW - _startCircleCenter);
+            if (toEnd.sqrMagnitude < 1e-8f) return _startCircleCenter;
+            Vector2 edge = (Vector2)_startCircleCenter + toEnd.normalized * _startCircleRadius;
+            return new Vector3(edge.x, edge.y, _startCircleCenter.z);
+        }
+        if (_hasStartOverride) return _startWorldOverride;
+        return start != null ? start.position : transform.position;
     }
 
     public void BindByStep(InstrumentTrack track, int step, NoteVisualizer viz) {
@@ -599,8 +626,8 @@ private int     _cachedHash  = 0;
     }
     private void RebuildCurve()
 {
-    Vector3 aW = _hasStartOverride ? _startWorldOverride : (start != null ? start.position : transform.position);
     Vector3 dW = ResolveEndWorldPosition();
+    Vector3 aW = ResolveStartWorldPosition(dW);
 
     var cam = worldCamera != null ? worldCamera : ResolveCachedMainCamera();
     if (cam == null)

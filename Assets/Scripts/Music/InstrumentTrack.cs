@@ -557,10 +557,11 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (RemainingActiveWindowSec() <= 0f)
             Debug.LogWarning($"[NOTE:ZERO_WINDOW] {name} note={note} dur={durationTicks} — window=0 at dsp={AudioSettings.dspTime:F3} leaderStart={drumTrack?.leaderStartDspTime:F3} clipLen={drumTrack?.GetClipLengthInSeconds():F3}");
 
-        // Read volumeMultiplier live off the active role profile (not a cached channel-volume
-        // snapshot) so tuning it takes effect immediately without a motif re-trigger.
-        float scaledVelocity = velocity * (_activeProfile?.volumeMultiplier ?? 1f);
-        midiVoice.PlayNoteTicks(note, durationTicks, scaledVelocity);
+        // Read volumeMultiplier live off the active role profile each note (so tuning takes effect
+        // immediately) and apply it as channel gain, not velocity — velocity scaling clamps at 127
+        // and its loudness effect depends on each SoundFont preset's modulators/velocity layers.
+        midiVoice.SetGainTrim(_activeProfile?.volumeMultiplier ?? 1f);
+        midiVoice.PlayNoteTicks(note, durationTicks, velocity);
     }
 
     private float TicksToSeconds(int durationTicks)
@@ -848,6 +849,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     public void PlayCollectionConfirm(int note, float velocity)
     {
         if (midiVoice == null) return;
+        midiVoice.SetGainTrim(_activeProfile?.volumeMultiplier ?? 1f);
         midiVoice.PlayCollectionConfirm(note, velocity);
     }
     

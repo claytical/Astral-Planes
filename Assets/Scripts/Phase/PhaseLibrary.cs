@@ -33,7 +33,19 @@ public class PhaseLibrary : ScriptableObject
             if (string.IsNullOrEmpty(p.phaseId))
                 p.phaseId = Guid.NewGuid().ToString("N");
             if (!seen.Add(p.phaseId))
-                Debug.LogWarning($"[PhaseLibrary] Duplicate phaseId '{p.phaseId}' (phase '{p.phaseName}'). Assign a unique id.");
+            {
+                // Duplicating a list entry in the inspector copies its id, and every lookup by id
+                // (carousel preview, StartChapterById) then resolves to the FIRST phase with it.
+                // Re-id the later copy; rings already saved under the old id are re-homed by
+                // motifId on load (RingSessionStore.RehomeOrphan).
+                string old = p.phaseId;
+                p.phaseId = Guid.NewGuid().ToString("N");
+                seen.Add(p.phaseId);
+                Debug.LogWarning($"[PhaseLibrary] Duplicate phaseId '{old}' on phase '{p.phaseName}' — reassigned to '{p.phaseId}'.");
+#if UNITY_EDITOR
+                UnityEditor.EditorUtility.SetDirty(this);
+#endif
+            }
         }
 
         // Phase 0 is the single tutorial motif; every later phase is an orbit of any size.

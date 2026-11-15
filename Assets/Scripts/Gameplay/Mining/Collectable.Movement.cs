@@ -154,6 +154,8 @@ public partial class Collectable
             assignedInstrumentTrack.PlayOneShotMidi(assignedNote, spawnVelocity127 * 0.5f, noteDurationTicks);
         }
 
+        TutorialEvents.RaiseNoteSounded(this);
+
         PickIntent();
         _intentTimer = _intentInterval;
 

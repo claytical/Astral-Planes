@@ -127,13 +127,15 @@ public partial class LocalPlayer : MonoBehaviour
         _onPlayLeaveCanceled = ctx => HandlePlayLeaveReleased();
         _playLeaveAction.canceled += _onPlayLeaveCanceled;
 
+        BindPauseAction();
+
         // Optional: manual note release action
         _releaseAction = _playerInput.actions.FindAction(releaseActionName, throwIfNotFound: false);
         if (_releaseAction != null)
         {
             _onReleasePerformed = ctx =>
             {
-                if (plane != null)
+                if (plane != null && !ModalMenu.ShouldSuppressInput)
                 {
                     plane.TryReleaseQueuedNote();
                     plane.SetReleaseButtonHeld(true);
@@ -184,6 +186,7 @@ public partial class LocalPlayer : MonoBehaviour
             _playLeaveAction.started -= _onPlayLeaveStarted;
             _playLeaveAction.canceled -= _onPlayLeaveCanceled;
         }
+        UnbindPauseAction();
         if (_releaseAction != null)
         {
             _releaseAction.performed -= _onReleasePerformed;

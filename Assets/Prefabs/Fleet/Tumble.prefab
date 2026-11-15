@@ -164,10 +164,9 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: -10
+  m_SortingOrder: 200
   m_MaskInteraction: 0
-  m_Sprite: {fileID: -3450807878113555736, guid: bbeb4509c6e5d4661912d4d0dc9de1a9,
-    type: 3}
+  m_Sprite: {fileID: 21300000, guid: 698b919de63584cb5b93e17f4a498253, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 0.7490196}
   m_FlipX: 0
   m_FlipY: 0
@@ -240,7 +239,7 @@ CircleCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_Radius: 0.26
+  m_Radius: 0.23046875
 --- !u!82 &2515959493319008489
 AudioSource:
   m_ObjectHideFlags: 0
@@ -350,6 +349,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10eade318f31ba248b72c13c52f1c81c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  effectsMixerGroup: {fileID: 0}
 --- !u!1 &5958635974756898733
 GameObject:
   m_ObjectHideFlags: 0
@@ -5276,6 +5276,6 @@ SpriteRenderer:
   m_Size: {x: 0.62, y: 1.16}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 1
+  m_WasSpriteAssigned: 0
   m_SpriteSortPoint: 0
   m_BlendShapeWeights: []

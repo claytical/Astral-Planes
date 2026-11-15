@@ -1,5 +1,9 @@
 using UnityEngine;
 
+// The star's "personality" for a motif (MotifProfile.starBehavior). HOW it moves through the
+// current maze — nav mode (Direct / CorridorFollow / LaneGlide / RingOrbit / Burrow) plus
+// multipliers on the speed/jitter/orbit/replan/keep-clear values below — comes from the motif's
+// MazePatternConfig.starNavigation (StarNavigationParams) and stacks on top of this profile.
 [CreateAssetMenu(menuName = "Astral Planes/Phase/PhaseStar Behavior Profile", fileName = "PhaseStarBehaviorProfile")]
 public class PhaseStarBehaviorProfile : ScriptableObject
 {
@@ -38,8 +42,9 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     public float orbitBias = 0f;
 
     [Header("Craving Navigation (PhaseStarCravingNavigator)")]
-    [Tooltip("Seconds between BFS replans. Lower = more responsive direction changes; higher = cheaper. " +
-             "Typical range: 0.3–1.0s.")]
+    [Tooltip("Seconds between hunt-target replans (a BFS path replan in CorridorFollow/RingOrbit mazes, " +
+             "a straight-line nearest-cell pick otherwise). Lower = more responsive; higher = cheaper. " +
+             "Scaled per maze by MazePatternConfig.starNavigation.replanIntervalMultiplier. Typical range: 0.3–1.0s.")]
     [Min(0.1f)]
     public float mazeNavReplanInterval = 0.5f;
 

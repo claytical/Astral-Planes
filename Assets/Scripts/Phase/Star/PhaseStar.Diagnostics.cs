@@ -41,6 +41,12 @@ public partial class PhaseStar
         return track.spawnedCollectables != null && track.spawnedCollectables.Count > 0;
     }
 
+    // True while ANY notes are floating or being carried (any track): an armed star is inert
+    // (pushable obstacle only) for this window. Global, not own-track only — otherwise a
+    // ready star of a different role ejects (and is destroyed) when bumped mid-pickup.
+    private bool IsPickupLocked() =>
+        OwnTrackCollectablesInFlight() || AnyCollectablesInFlightGlobal() || Vehicle.AnyVehicleCarrying();
+
     private void DBG(string msg)
     {
         if (GameFlowManager.VerboseLogging) Debug.Log($"[PSDBG] {msg} :: star={name} state={_state} interaction=({_interactionState.ToDebugString()}) " +

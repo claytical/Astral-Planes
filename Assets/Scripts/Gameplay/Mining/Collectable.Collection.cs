@@ -142,6 +142,8 @@ public partial class Collectable
 
         transform.SetParent(null, worldPositionStays: true);
         _trailWorldTarget = transform.position;
+        _coreAnchor = vehicle.NoteCoreAnchor;
+        _coreLocked = false;
         _trailFollowActive = true;
         _trailReleasePulse01 = 0f;
         _trailDriftPhase = UnityEngine.Random.Range(0f, Mathf.PI * 2f);

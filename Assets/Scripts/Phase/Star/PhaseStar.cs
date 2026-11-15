@@ -262,15 +262,25 @@ public partial class PhaseStar : MonoBehaviour
         _displayedCharge01 = 0f;
         TransitionZapState(ZapProgressState.Seeking, _previewRole, "phase-reset-initialize");
 
+        // Maze-aware navigation: the motif's maze decides HOW the star moves through it; the
+        // behavior profile stays the personality (speed/jitter) and is scaled by these.
+        // No motif/maze (e.g. interstitial) → defaults = legacy straight-line behavior.
+        var maze = _assignedMotif != null ? _assignedMotif.mazePattern : null;
+        var nav = maze != null && maze.starNavigation != null ? maze.starNavigation : StarNavigationParams.Default;
+        var navMode = nav.ResolveMode(maze != null ? maze.patternType : MazePatternType.FullFill);
+        if (maze == null && nav.mode == PhaseStarNavMode.Auto) navMode = PhaseStarNavMode.Direct;
+        var navGeom = MazeNavGeometry.Build(maze, drum, GameFlowManager.Instance?.dustGenerator);
+        Trace($"Initialize: nav mode={navMode} maze={(maze != null ? maze.name : "none")}");
+
         EnsureSubcomponents();
         if (visuals) visuals.Initialize();
-        if (motion) motion.Initialize(behaviorProfile, this);
-        if (cravingNavigator) cravingNavigator.Initialize(this, behaviorProfile);
+        if (motion) motion.Initialize(behaviorProfile, this, nav, navMode, navGeom);
+        if (cravingNavigator) cravingNavigator.Initialize(this, behaviorProfile, nav, navMode);
         if (motion && cravingNavigator) motion.SetCravingNavigator(cravingNavigator);
 
         if (dust)
         {
-            dust.Initialize(behaviorProfile, this);
+            dust.Initialize(behaviorProfile, this, nav, navMode);
             dust.OnAttuned += OnAttuned_SetRole;
         }
         if (drum != null && !_subscribedLoopBoundary)
@@ -306,6 +316,7 @@ public partial class PhaseStar : MonoBehaviour
         EnsureDormantSeedVisuals();
         UpdateDominantRole(dt);
         UpdateChargeVisuals(rotA, aLocked, rotB, bLocked);
+        UpdatePickupLockVisual();
     }
 
     private void SafeUnsubscribeAll()

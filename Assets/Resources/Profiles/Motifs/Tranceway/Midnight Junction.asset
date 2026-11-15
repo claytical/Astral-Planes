@@ -16,31 +16,33 @@ MonoBehaviour:
   displayName: Midnight Junction
   keyRootMidi: 60
   entryDrumLoops:
-  - {fileID: 8300000, guid: a3d75543643e94c08a9c329af1bdcb26, type: 3}
+  - {fileID: 8300000, guid: a9a20e9fe971c472089c314b966df47c, type: 3}
   intensityClipTags:
   - clip: {fileID: 8300000, guid: 654bb5b929c4c417baaf56d71057e3c7, type: 3}
     depth01: 0
     breadth01: 0
     pressure01: 0
     maxConsecutiveLoopSeconds: 0
-  - clip: {fileID: 8300000, guid: 8068d0b2d74874427a91f238a413496f, type: 3}
-    depth01: 0.33333334
-    breadth01: 0.33333334
-    pressure01: 0.33333334
+  - clip: {fileID: 8300000, guid: a6d0cc64946f74db8b546e2c16125bb0, type: 3}
+    depth01: 0
+    breadth01: 0.35
+    pressure01: 0.05
     maxConsecutiveLoopSeconds: 0
-  - clip: {fileID: 8300000, guid: 9d56afa31ad8e405794a38c66ab5f302, type: 3}
-    depth01: 0.6666667
-    breadth01: 0.6666667
-    pressure01: 0.6666667
+  - clip: {fileID: 8300000, guid: 42dde4d4b2ad6483f9e5187f5a96411b, type: 3}
+    depth01: 0.15
+    breadth01: 0.65
+    pressure01: 0.1
     maxConsecutiveLoopSeconds: 0
-  - clip: {fileID: 8300000, guid: 0fb896d4a09a64a01a6d2feb8945acf5, type: 3}
-    depth01: 1
-    breadth01: 1
-    pressure01: 1
+  - clip: {fileID: 8300000, guid: 3889f407768ba4c0dacb5884e974c0f3, type: 3}
+    depth01: 0.35
+    breadth01: 0.9
+    pressure01: 0.2
     maxConsecutiveLoopSeconds: 0
+  drumVolumeMultiplier: 0.49
   entryLoopCount: 1
   resetFirstCarryOnStart: 0
-  bridgeSamples: []
+  bridgeSamples:
+  - {fileID: 8300000, guid: ff8c03cecabbe415eb454cf97a448fc9, type: 3}
   bridgeSampleVolume: 1
   quantizeBridgeSampleToBeat: 1
   bpm: 161

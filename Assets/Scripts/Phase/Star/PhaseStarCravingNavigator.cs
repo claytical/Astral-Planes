@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -36,12 +37,42 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     private readonly HashSet<Vector2Int> _reservedCells = new();
     private readonly Dictionary<MusicalRole, float> _nearestSqDistPerRoleScratch = new(4);
 
+    // Maze-aware navigation (StarNavigationParams on the motif's MazePatternConfig).
+    [Header("Wander (pathing modes)")]
+    [Tooltip("When no colored dust is reachable, wander to an open cell at least this many steps away.")]
+    [SerializeField, Min(1)] private int wanderMinHops = 6;
+
+    private PhaseStarNavMode _navMode = PhaseStarNavMode.Direct;
+    private int _pathLookaheadCells = 2;
+    private readonly PhaseStarGridPathfinder _pathfinder = new();
+    private bool _pathIsWander;
+    private Vector2 _pathDir;
+    private Func<Vector2Int, bool> _isHuntTargetPredicate;
+    private CosmicDustGenerator _predicateGen;
+    private readonly HashSet<Vector2Int> _coloredCellSet = new();
+
+    public PhaseStarNavMode NavMode => _navMode;
+    private bool UsesPathing => StarNavigationParams.UsesPathing(_navMode);
+
     public void Initialize(
         PhaseStar star,
-        PhaseStarBehaviorProfile profile)
+        PhaseStarBehaviorProfile profile,
+        StarNavigationParams nav = null,
+        PhaseStarNavMode navMode = PhaseStarNavMode.Direct)
     {
-        if (profile != null)
-            replanIntervalSeconds = Mathf.Max(0.1f, profile.mazeNavReplanInterval);
+        nav ??= StarNavigationParams.Default;
+        float baseInterval = profile != null ? profile.mazeNavReplanInterval : replanIntervalSeconds;
+        replanIntervalSeconds = Mathf.Max(0.1f, baseInterval * nav.replanIntervalMultiplier);
+
+        _navMode = navMode == PhaseStarNavMode.Auto ? PhaseStarNavMode.Direct : navMode;
+        _pathLookaheadCells = Mathf.Max(1, nav.pathLookaheadCells);
+
+        // Cached so HuntTick doesn't allocate a closure every replan. The set check runs first:
+        // the BFS calls this for every neighbour it touches, and IsZapEligible does a
+        // component lookup.
+        _isHuntTargetPredicate ??= c => _predicateGen != null &&
+            _coloredCellSet.Contains(c) &&
+            IsZapEligible(_predicateGen, c, _attunedRole != MusicalRole.None ? _attunedRole : MusicalRole.None);
 
         _star = star;
         _active = true;
@@ -68,6 +99,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
             _hasTarget = false;
             _hasLockOnCell = false;
             _targetDir = Vector2.zero;
+            ClearPath();
         }
     }
 
@@ -157,6 +189,8 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
 
     public void NotifyDraining(Vector2Int cell)
     {
+        // Lock-on: the tentacle already reached the cell, so steer straight at it.
+        if (!_hasTarget || _targetCell != cell) ClearPath();
         _hasLockOnCell = true;
         _lockOnCell = cell;
         _hasTarget = true;
@@ -190,6 +224,11 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     {
         if (_huntingEnabled && (_hasLockOnCell || _hasTarget))
             return _hasTarget ? _targetDir : Vector2.zero;
+
+        // Pathing modes: the straight-line sniffer direction points into walls, so drift
+        // along the BFS path (to the nearest reachable dust, or a wander cell) instead.
+        if (UsesPathing && _pathfinder.HasPath)
+            return _pathDir;
 
         return _nearestColoredDustDir;
     }
@@ -233,7 +272,30 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         {
             _hasTarget = false;
             _targetDir = Vector2.zero;
+            if (UsesPathing) EnsureWanderPath(drum);
+            else ClearPath();
             return;
+        }
+
+        if (UsesPathing)
+        {
+            _predicateGen = gen;
+            _coloredCellSet.Clear();
+            for (int i = 0; i < _coloredCellsScratch.Count; i++)
+                _coloredCellSet.Add(_coloredCellsScratch[i]);
+
+            Vector2Int starCell = drum.WorldToGridPosition(transform.position);
+            if (_pathfinder.TryFindPathToAny(drum, starCell, _isHuntTargetPredicate, out var pathTarget))
+            {
+                _pathIsWander = false;
+                _hasTarget = true;
+                _targetCell = pathTarget;
+                RefreshTargetDir();
+                return;
+            }
+            // Nothing reachable through open cells: fall through to straight-line selection so
+            // the star never stalls (it may still scrape a wall, which the unstick impulse handles).
+            ClearPath();
         }
 
         Vector2 starWorld = transform.position;
@@ -263,12 +325,48 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         {
             _hasTarget = false;
             _targetDir = Vector2.zero;
+            if (UsesPathing) EnsureWanderPath(drum);
             return;
         }
 
         _hasTarget = true;
         _targetCell = bestCell;
         RefreshTargetDir();
+    }
+
+    // Keeps an idle corridor-following wander path alive while nothing is huntable.
+    private void EnsureWanderPath(DrumTrack drum)
+    {
+        if (_pathIsWander && _pathfinder.HasPath && _pathfinder.Waypoints.Count > 0) return;
+
+        Vector2Int starCell = drum.WorldToGridPosition(transform.position);
+        _pathIsWander = _pathfinder.TryPickWanderTarget(drum, starCell, wanderMinHops, out _);
+        RefreshPathDir(drum);
+    }
+
+    private void ClearPath()
+    {
+        _pathfinder.Clear();
+        _pathIsWander = false;
+        _pathDir = Vector2.zero;
+    }
+
+    // Advances past reached waypoints and aims at the one pathLookaheadCells ahead.
+    // Returns false when the path is exhausted.
+    private bool RefreshPathDir(DrumTrack drum)
+    {
+        if (!_pathfinder.HasPath || drum == null) { _pathDir = Vector2.zero; return false; }
+
+        Vector2 starWorld = transform.position;
+        _pathfinder.AdvancePast(drum.WorldToGridPosition(starWorld));
+
+        var wps = _pathfinder.Waypoints;
+        if (wps.Count == 0) { _pathDir = Vector2.zero; return false; }
+
+        int idx = Mathf.Min(_pathLookaheadCells - 1, wps.Count - 1);
+        Vector2 dir = (Vector2)drum.GridToWorldPosition(wps[idx]) - starWorld;
+        _pathDir = dir.sqrMagnitude > 0.0001f ? dir.normalized : Vector2.zero;
+        return true;
     }
 
     private void SnifferTick()
@@ -335,17 +433,27 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
 
     private void RefreshTargetDir()
     {
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var drum = _gfm?.activeDrumTrack;
+
         if (!_hasTarget)
+        {
+            _targetDir = Vector2.zero;
+            if (_pathIsWander && !RefreshPathDir(drum)) ClearPath();
+            return;
+        }
+
+        if (drum == null)
         {
             _targetDir = Vector2.zero;
             return;
         }
 
-        if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var drum = _gfm?.activeDrumTrack;
-        if (drum == null)
+        // Pathing modes: follow the BFS route; once it's exhausted the star is adjacent to the
+        // target and the straight-line direction below is wall-free.
+        if (UsesPathing && !_pathIsWander && RefreshPathDir(drum))
         {
-            _targetDir = Vector2.zero;
+            _targetDir = _pathDir;
             return;
         }
 
@@ -362,6 +470,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
             _hasTarget = false;
             _targetDir = Vector2.zero;
             _replanTimer = 0f;
+            if (!_pathIsWander) ClearPath();
             return;
         }
 
@@ -370,6 +479,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
             _hasTarget = false;
             _targetDir = Vector2.zero;
             _replanTimer = 0f;
+            if (!_pathIsWander) ClearPath();
         }
     }
 
@@ -381,6 +491,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         _targetDir = Vector2.zero;
         _hasLockOnCell = false;
         _huntingEnabled = false;
+        ClearPath();
 
         if (clearSniffer)
         {
@@ -441,6 +552,24 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         {
             Gizmos.color = Color.cyan;
             Gizmos.DrawRay(transform.position, kvp.Value * 0.8f);
+        }
+
+        if (_pathfinder.HasPath)
+        {
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            var drumForPath = _gfm?.activeDrumTrack;
+            if (drumForPath != null)
+            {
+                Gizmos.color = _pathIsWander ? Color.gray : Color.green;
+                Vector3 prev = transform.position;
+                var wps = _pathfinder.Waypoints;
+                for (int i = 0; i < wps.Count; i++)
+                {
+                    Vector3 p = drumForPath.GridToWorldPosition(wps[i]);
+                    Gizmos.DrawLine(prev, p);
+                    prev = p;
+                }
+            }
         }
     }
 #endif

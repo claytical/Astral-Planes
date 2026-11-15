@@ -277,6 +277,9 @@ public partial class MotifRingGlyphApplicator
         float elapsed = 0f;
         while (elapsed < duration)
         {
+            // Ring (and its contour) may be torn down mid-tween; bail without touching the
+            // destroyed LineRenderer, but still fire onComplete so waiters don't stall.
+            if (lr == null) { onComplete?.Invoke(); yield break; }
             elapsed += Time.deltaTime;
             float t = Mathf.Clamp01(elapsed / duration);
             for (int i = 0; i < from.Count; i++)

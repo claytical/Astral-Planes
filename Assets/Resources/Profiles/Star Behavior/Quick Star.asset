@@ -16,7 +16,7 @@ MonoBehaviour:
   starKeepClearRadiusCells: 5
   collectableClearTimeoutLoops: 2
   starDriftSpeed: 10
-  starHungrySpeed: 2.5
+  starHungrySpeed: 12.5
   starDriftJitter: 0.2
   orbitBias: 0
   mazeNavReplanInterval: 0.5

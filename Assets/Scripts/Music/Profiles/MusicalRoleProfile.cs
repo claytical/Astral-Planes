@@ -92,8 +92,7 @@ public class MusicalRoleProfile : ScriptableObject
     public int highestNote = 84;
 
     [Header("Audio Mix")]
-    [Tooltip("Mixer bus this role's MidiStreamPlayer AudioSource routes to (ProceduralMixer's per-role groups). Leave unassigned to keep whatever the scene's shared MidiStreamPlayer template is already routed to.")]
-    public AudioMixerGroup outputMixerGroup;
+    // Mixer bus is per role, not per profile: see AudioMixConfig (Resources/Config/AudioMixConfig).
     [Range(0f, 2f)]
     [Tooltip("Per-role MPTK channel volume trim (pure gain multiply, applied per note without altering velocity/timbre). 1 = unchanged.")]
     public float volumeMultiplier = 1f;

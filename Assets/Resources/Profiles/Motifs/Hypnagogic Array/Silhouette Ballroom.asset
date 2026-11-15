@@ -43,6 +43,7 @@ MonoBehaviour:
     breadth01: 0.5
     pressure01: 0.386
     maxConsecutiveLoopSeconds: 0
+  drumVolumeMultiplier: 2
   entryLoopCount: 8
   resetFirstCarryOnStart: 0
   bridgeSamples:

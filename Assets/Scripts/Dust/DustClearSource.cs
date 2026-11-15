@@ -15,4 +15,5 @@ public enum DustClearSource
     CollectableDiscard,  // detonation blast of a discarded carried note
     TrackFilled,         // role-wide sweep held until that InstrumentTrack's notes ascend
     CollectableBombBlast, // detonation blast of a time bomb collectable
+    StarBurrow,          // PhaseStar tunnelling through dust (StarNavigationParams Burrow mode)
 }

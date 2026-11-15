@@ -7,10 +7,16 @@ using UnityEngine;
 /// Plays back a saved MotifSnapshot as a looping MIDI preview in the PhaseLibraryCarousel.
 /// Uses per-role MIDI channels so each instrument sounds correct, and resolves
 /// timing from the MotifProfile rather than requiring a DrumTrack in the scene.
+///
+/// Mixes like the live game: each role gets its own MidiStreamPlayer (cloned from the serialized
+/// template at Awake) routed to that role's AudioMixConfig bus, and volumeMultiplier is applied as
+/// MPTK channel gain (same as MidiVoice.SetGainTrim), not velocity. Can optionally run the motif's
+/// drum loops underneath (off by default; the AudioBalanceDebugPanel turns it on).
 /// </summary>
 [DisallowMultipleComponent]
 public class RingPreviewPlayer : MonoBehaviour
 {
+    [Tooltip("Template player. Cloned once per role that AudioMixConfig maps to a bus; unmapped roles play on it directly.")]
     [SerializeField] private MidiStreamPlayer midiStreamPlayer;
     [SerializeField] private PhaseLibrary phaseLibrary;
     [Tooltip("Same RingGlyphConfig asset the carousel slots' MotifRingGlyphApplicator use — keeps " +
@@ -62,6 +68,247 @@ public class RingPreviewPlayer : MonoBehaviour
     // Preset per channel, cached so FireStep can re-assert without a library call each frame.
     private int[] _channelPresets;
 
+    // ── Per-role players (mixer routing) ─────────────────────────────────────────
+    private readonly Dictionary<MusicalRole, MidiStreamPlayer> _rolePlayers = new();
+    private readonly List<MidiStreamPlayer> _allPlayers = new();
+    private readonly List<GameObject> _clonedPlayers = new();
+
+    // ── Gain trim ────────────────────────────────────────────────────────────────
+    // Profile resolved per role for the current motif; its volumeMultiplier is read live every
+    // prime so balance edits are heard on the next note. Snapshot value is the fallback.
+    private readonly Dictionary<MusicalRole, MusicalRoleProfile> _roleProfiles = new();
+    private readonly Dictionary<MusicalRole, float> _snapshotTrims = new();
+    private readonly List<MusicalRole> _activeRoles = new();
+
+    // ── Drum loop decks ──────────────────────────────────────────────────────────
+    private const double kScheduleLeadSec = 0.1;
+    private AudioSource _drumActive, _drumIdle;
+    private readonly List<AudioClip> _drumLoops = new();
+    private MotifProfile _motif;
+    private int _drumLoopIndex;
+    private bool _drumsEnabled;
+
+    public MotifProfile CurrentMotif => _motif;
+    public bool IsPlaying => _playing;
+
+    /// <summary>Roles that have notes in the current snapshot, in RoleChannel order.</summary>
+    public IReadOnlyList<MusicalRole> ActiveRoles => _activeRoles;
+
+    /// <summary>The profile whose volumeMultiplier is applied to this role's preview channel.</summary>
+    public MusicalRoleProfile GetRoleProfile(MusicalRole role) =>
+        _roleProfiles.TryGetValue(role, out var p) ? p : null;
+
+    /// <summary>The current motif's drum loops: entryDrumLoops then intensityClipTags, de-duplicated.</summary>
+    public IReadOnlyList<AudioClip> DrumLoops => _drumLoops;
+    public int DrumLoopIndex => _drumLoopIndex;
+
+    /// <summary>Drum loop under the preview. Off by default so the player-facing carousel is MIDI only.</summary>
+    public bool DrumsEnabled
+    {
+        get => _drumsEnabled;
+        set
+        {
+            if (_drumsEnabled == value) return;
+            _drumsEnabled = value;
+            if (value && _playing) ScheduleDrumLoop(_drumLoopIndex);
+            else if (!value) StopDrums();
+        }
+    }
+
+    /// <summary>When set, each newly previewed motif starts on a medium/high-intensity loop
+    /// (PickHighIntensityLoopIndex) instead of its first entry loop. Driven by the player beat toggle.</summary>
+    public bool PreferHighIntensity { get; private set; }
+
+    /// <summary>Player-facing beat toggle: on = drums under the preview on a medium/high-intensity loop.</summary>
+    public void SetBeat(bool on)
+    {
+        PreferHighIntensity = on;
+        if (on)
+        {
+            int idx = PickHighIntensityLoopIndex();
+            if (idx >= 0) _drumLoopIndex = idx;
+        }
+        DrumsEnabled = on;
+    }
+
+    /// <summary>
+    /// A random clip from the back half (ceil(n/2)) of the motif's intensityClipTags — the array is
+    /// authored low → high intensity — as an index into DrumLoops. Falls back to the last loop when
+    /// the motif has no intensity tags; -1 when it has no loops at all.
+    /// </summary>
+    public int PickHighIntensityLoopIndex()
+    {
+        if (_drumLoops.Count == 0) return -1;
+
+        var tagged = new List<AudioClip>();
+        if (_motif != null && _motif.intensityClipTags != null)
+            foreach (var t in _motif.intensityClipTags)
+                if (t.clip != null) tagged.Add(t.clip);
+
+        if (tagged.Count == 0) return _drumLoops.Count - 1;
+
+        int take  = (tagged.Count + 1) / 2;
+        var clip  = tagged[tagged.Count - take + Random.Range(0, take)];
+        int index = _drumLoops.IndexOf(clip);
+        return index >= 0 ? index : _drumLoops.Count - 1;
+    }
+
+    public void SetDrumLoop(int index)
+    {
+        if (_drumLoops.Count == 0) return;
+        _drumLoopIndex = ((index % _drumLoops.Count) + _drumLoops.Count) % _drumLoops.Count;
+        if (_drumsEnabled && _playing) ScheduleDrumLoop(_drumLoopIndex);
+    }
+
+    /// <summary>Re-applies the current motif's drum level (AudioMixConfig.drumVolume × motif.drumVolumeMultiplier) to both decks.</summary>
+    public void RefreshDrumVolume()
+    {
+        float volume = AudioMixConfig.DrumVolumeOrDefault(_motif, 0.79f);
+        if (_drumActive != null) _drumActive.volume = volume;
+        if (_drumIdle   != null) _drumIdle.volume   = volume;
+    }
+
+    private void Awake()
+    {
+        BuildRolePlayers();
+        BuildDrumDecks();
+    }
+
+    private void OnDestroy()
+    {
+        foreach (var go in _clonedPlayers)
+            if (go != null) Destroy(go);
+        _clonedPlayers.Clear();
+    }
+
+    // Live tracks each own a MidiStreamPlayer routed to their role's bus; the preview needs the
+    // same, because one AudioSource can only feed one mixer group.
+    private void BuildRolePlayers()
+    {
+        _rolePlayers.Clear();
+        _allPlayers.Clear();
+        if (midiStreamPlayer == null) return;
+
+        _allPlayers.Add(midiStreamPlayer);
+        var mix = AudioMixConfig.Instance;
+        foreach (var kvp in RoleChannel)
+        {
+            var group = mix != null ? mix.GetGroup(kvp.Key) : null;
+            if (group == null) { _rolePlayers[kvp.Key] = midiStreamPlayer; continue; }
+
+            var clone = Instantiate(midiStreamPlayer, midiStreamPlayer.transform.parent);
+            clone.name = $"{midiStreamPlayer.name} [{kvp.Key}]";
+            var src = clone.GetComponent<AudioSource>();
+            if (src != null) src.outputAudioMixerGroup = group;
+
+            _rolePlayers[kvp.Key] = clone;
+            _allPlayers.Add(clone);
+            _clonedPlayers.Add(clone.gameObject);
+        }
+    }
+
+    private MidiStreamPlayer PlayerFor(MusicalRole role) =>
+        _rolePlayers.TryGetValue(role, out var p) && p != null ? p : midiStreamPlayer;
+
+    private void BuildDrumDecks()
+    {
+        var mix = AudioMixConfig.Instance;
+        _drumActive = MakeDeck(mix);
+        _drumIdle   = MakeDeck(mix);
+    }
+
+    private AudioSource MakeDeck(AudioMixConfig mix)
+    {
+        var src = gameObject.AddComponent<AudioSource>();
+        src.playOnAwake  = false;
+        src.loop         = true;
+        src.spatialBlend = 0f;
+        src.volume       = mix != null ? mix.drumVolume : 0.79f;
+        if (mix != null && mix.drumsGroup != null) src.outputAudioMixerGroup = mix.drumsGroup;
+        return src;
+    }
+
+    private void RebuildDrumLoops(MotifProfile motif)
+    {
+        if (motif == _motif && _drumLoops.Count > 0) return; // same motif: keep the chosen loop
+        _drumLoops.Clear();
+        _drumLoopIndex = 0;
+        if (motif == null) return;
+
+        if (motif.entryDrumLoops != null)
+            foreach (var c in motif.entryDrumLoops)
+                if (c != null && !_drumLoops.Contains(c)) _drumLoops.Add(c);
+        if (motif.intensityClipTags != null)
+            foreach (var t in motif.intensityClipTags)
+                if (t.clip != null && !_drumLoops.Contains(t.clip)) _drumLoops.Add(t.clip);
+
+        // Drum clips import with preloadAudioData off (compressed). PlayScheduled on an undecoded
+        // clip starts late by the decode time, so decode them all up front — same as DrumTrack.PreloadClip.
+        foreach (var c in _drumLoops)
+            if (c.loadState == AudioDataLoadState.Unloaded) c.LoadAudioData();
+    }
+
+    // Loop waiting for its clip to finish decoding before it can be scheduled sample-accurately.
+    private int _pendingDrumIndex = -1;
+
+    private void TickPendingDrumLoop()
+    {
+        if (_pendingDrumIndex < 0) return;
+        if (!_drumsEnabled || !_playing) { _pendingDrumIndex = -1; return; }
+        var clip = _pendingDrumIndex < _drumLoops.Count ? _drumLoops[_pendingDrumIndex] : null;
+        if (clip == null || clip.loadState == AudioDataLoadState.Failed) { _pendingDrumIndex = -1; return; }
+        if (clip.loadState != AudioDataLoadState.Loaded) return;
+
+        int idx = _pendingDrumIndex;
+        _pendingDrumIndex = -1;
+        ScheduleDrumLoop(idx);
+    }
+
+    // Starts loop `index` on the idle deck at the next point on that clip's own length grid,
+    // measured from the preview's step 0, so it lands phase-aligned with the MIDI; the active deck
+    // is cut at the same instant (no gap, no overlap).
+    private void ScheduleDrumLoop(int index)
+    {
+        if (index < 0 || index >= _drumLoops.Count || _drumIdle == null) return;
+        var clip = _drumLoops[index];
+        if (clip == null || clip.length <= 0f) return;
+
+        if (clip.loadState != AudioDataLoadState.Loaded)
+        {
+            if (clip.loadState == AudioDataLoadState.Unloaded) clip.LoadAudioData();
+            _pendingDrumIndex = index; // TickPendingDrumLoop schedules it once decoded
+            return;
+        }
+        _pendingDrumIndex = -1;
+
+        double now = AudioSettings.dspTime + kScheduleLeadSec;
+        double at  = _loopStartDsp;
+        if (now > at)
+            at = _loopStartDsp + System.Math.Ceiling((now - _loopStartDsp) / clip.length) * clip.length;
+
+        _drumIdle.Stop();
+        _drumIdle.clip = clip;
+        _drumIdle.loop = true;
+        _drumIdle.PlayScheduled(at);
+        if (_drumActive != null && _drumActive.isPlaying) _drumActive.SetScheduledEndTime(at);
+
+        (_drumActive, _drumIdle) = (_drumIdle, _drumActive);
+    }
+
+    private void StopDrums()
+    {
+        _pendingDrumIndex = -1;
+        if (_drumActive != null) _drumActive.Stop();
+        if (_drumIdle   != null) _drumIdle.Stop();
+    }
+
+    // Live path parity: MusicalRoleProfile.volumeMultiplier → MPTK channel gain.
+    private float TrimFor(MusicalRole role)
+    {
+        if (_roleProfiles.TryGetValue(role, out var prof) && prof != null) return Mathf.Max(0f, prof.volumeMultiplier);
+        return _snapshotTrims.TryGetValue(role, out var t) ? Mathf.Max(0f, t) : 1f;
+    }
+
     public void Play(MotifSnapshot snap)
     {
         Stop();
@@ -75,9 +322,19 @@ public class RingPreviewPlayer : MonoBehaviour
             return;
         }
 
+        // Match on PhaseId AND the motif at MotifIndex, so phases that (wrongly) share an id can't
+        // resolve to the first one in the list — the carousel matches rings by (PhaseId, MotifId) too.
         PhaseLibrary.Phase phase = null;
         if (!string.IsNullOrEmpty(snap.PhaseId))
-            phase = phaseLibrary.phases.Find(p => p != null && p.phaseId == snap.PhaseId);
+        {
+            bool MotifMatches(PhaseLibrary.Phase p) =>
+                string.IsNullOrEmpty(snap.MotifId) ||
+                (p.motifs != null && snap.MotifIndex >= 0 && snap.MotifIndex < p.motifs.Count &&
+                 p.motifs[snap.MotifIndex] != null && p.motifs[snap.MotifIndex].motifId == snap.MotifId);
+
+            phase = phaseLibrary.phases.Find(p => p != null && p.phaseId == snap.PhaseId && MotifMatches(p))
+                 ?? phaseLibrary.phases.Find(p => p != null && p.phaseId == snap.PhaseId);
+        }
 
         if (phase == null)
         {
@@ -148,8 +405,16 @@ public class RingPreviewPlayer : MonoBehaviour
         _loopLengthSec = _totalSteps * _stepDurationSec;
         _stepsPerLoop  = stepsPerLoop;
 
+        bool motifChanged = motif != _motif;
+        RebuildDrumLoops(motif);
+        _motif = motif;
+        if (motifChanged && PreferHighIntensity) _drumLoopIndex = Mathf.Max(0, PickHighIntensityLoopIndex());
+        RefreshDrumVolume();
+
         // Cache presets per channel — use the motif's own roleProfile, fall back to library.
         _channelPresets = new int[16];
+        _roleProfiles.Clear();
+        _snapshotTrims.Clear();
         foreach (var kvp in RoleChannel)
         {
             MusicalRoleProfile roleProf = null;
@@ -158,13 +423,20 @@ public class RingPreviewPlayer : MonoBehaviour
                 roleProf = voiceProfile;
             else
                 roleProf = MusicalRoleProfileLibrary.GetProfile(kvp.Key);
+            if (roleProf != null) _roleProfiles[kvp.Key] = roleProf;
 
             // Saved playback profile (what was actually heard live) wins over re-derivation.
             int presetToUse = roleProf != null ? roleProf.midiPreset : 0;
             bool havePreset = roleProf != null;
             if (snap.TrackBins != null)
                 foreach (var tb in snap.TrackBins)
-                    if (tb.Role == kvp.Key && tb.HasPlaybackProfile) { presetToUse = tb.MidiPreset; havePreset = true; break; }
+                    if (tb.Role == kvp.Key && tb.HasPlaybackProfile)
+                    {
+                        presetToUse = tb.MidiPreset;
+                        havePreset = true;
+                        _snapshotTrims[kvp.Key] = tb.VolumeMultiplier;
+                        break;
+                    }
 
             if (havePreset && kvp.Value < 16)
             {
@@ -241,12 +513,24 @@ public class RingPreviewPlayer : MonoBehaviour
             }
         }
 
+        _activeRoles.Clear();
+        foreach (var kvp in RoleChannel)
+        {
+            bool has = false;
+            for (int s = 0; s < _totalSteps && !has; s++) has = HasRole(_stepTable[s], kvp.Key);
+            if (has) _activeRoles.Add(kvp.Key);
+        }
+
         PrimeChannels();
 
-        _loopStartDsp    = AudioSettings.dspTime;
+        // Small lead so the drum deck can be PlayScheduled sample-accurately on step 0;
+        // Update() waits while elapsed < 0.
+        _loopStartDsp    = AudioSettings.dspTime + kScheduleLeadSec;
         _lastStep        = -1;
         _currentBinIndex = -1;
         _playing         = true;
+
+        if (_drumsEnabled) ScheduleDrumLoop(_drumLoopIndex);
     }
 
     public void Stop()
@@ -259,8 +543,9 @@ public class RingPreviewPlayer : MonoBehaviour
 
         // Send NoteOff for any still-sounding notes so the synth's authored release plays out
         // rather than being left to ring indefinitely.
-        if (midiStreamPlayer != null)
-            midiStreamPlayer.MPTK_ClearAllSound();
+        foreach (var p in _allPlayers)
+            if (p != null) p.MPTK_ClearAllSound();
+        StopDrums();
 
         _currentBinIndex = -1;
         OnBinIndexChanged?.Invoke(-1);
@@ -276,23 +561,34 @@ public class RingPreviewPlayer : MonoBehaviour
     {
         Stop();
 
-        var src = midiStreamPlayer != null ? midiStreamPlayer.CoreAudioSource : null;
-        if (src == null) yield break;
+        var srcs = new List<AudioSource>();
+        var startVols = new List<float>();
+        foreach (var p in _allPlayers)
+        {
+            var src = p != null ? p.CoreAudioSource : null;
+            if (src == null) continue;
+            srcs.Add(src);
+            startVols.Add(src.volume);
+        }
+        if (srcs.Count == 0) yield break;
 
-        float startVol = src.volume;
         float t = 0f;
         while (t < kStopFadeSec)
         {
             t += Time.unscaledDeltaTime;
-            src.volume = Mathf.Lerp(startVol, 0f, Mathf.Clamp01(t / kStopFadeSec));
+            float k = Mathf.Clamp01(t / kStopFadeSec);
+            for (int i = 0; i < srcs.Count; i++)
+                if (srcs[i] != null) srcs[i].volume = Mathf.Lerp(startVols[i], 0f, k);
             yield return null;
         }
-        src.volume = 0f;
+        foreach (var src in srcs)
+            if (src != null) src.volume = 0f;
     }
 
     private void Update()
     {
-        if (!_playing || midiStreamPlayer == null || _stepTable == null) return;
+        TickPendingDrumLoop();
+        if (!_playing || _allPlayers.Count == 0 || _stepTable == null) return;
 
         double elapsed = AudioSettings.dspTime - _loopStartDsp;
         if (elapsed < 0.0) return;
@@ -412,7 +708,7 @@ public class RingPreviewPlayer : MonoBehaviour
 
         foreach (var (note, ch, vel127, durationMs, role) in notes)
         {
-            midiStreamPlayer.MPTK_PlayEvent(new MPTKEvent
+            PlayerFor(role).MPTK_PlayEvent(new MPTKEvent
             {
                 Command  = MPTKCommand.NoteOn,
                 Value    = note,
@@ -467,7 +763,8 @@ public class RingPreviewPlayer : MonoBehaviour
         return default;
     }
 
-    // Mirrors the live path: role [min,max] velocity range, then volumeMultiplier.
+    // Mirrors the live path: role [min,max] velocity range. volumeMultiplier is NOT applied here —
+    // it's channel gain (PrimeChannels), same as MidiVoice.SetGainTrim on live tracks.
     // Legacy rings (no saved profile) keep the old fixed 40–100 curve.
     private static int ComputeVelocity(List<MotifSnapshot.TrackBinData> trackBins, MusicalRole role, float v01)
     {
@@ -475,24 +772,31 @@ public class RingPreviewPlayer : MonoBehaviour
             foreach (var tb in trackBins)
             {
                 if (tb.Role != role || !tb.HasPlaybackProfile) continue;
-                float v = Mathf.Lerp(tb.MinVelocity, tb.MaxVelocity, Mathf.Clamp01(v01)) * tb.VolumeMultiplier;
+                float v = Mathf.Lerp(tb.MinVelocity, tb.MaxVelocity, Mathf.Clamp01(v01));
                 return Mathf.Clamp(Mathf.RoundToInt(v), 1, 127);
             }
         return Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(40f, 127f, v01)), 40, 100);
     }
 
+    // Re-asserted before every step (self-heals once MPTK_Channels exists): each role's channel on
+    // its own player gets its preset and its profile's live volumeMultiplier as channel gain.
     private void PrimeChannels()
     {
-        if (midiStreamPlayer == null || midiStreamPlayer.MPTK_Channels == null || _channelPresets == null)
-            return;
+        if (_channelPresets == null) return;
 
-        int len = Mathf.Min(_channelPresets.Length, midiStreamPlayer.MPTK_Channels.Length);
-        for (int i = 0; i < len; i++)
+        foreach (var kvp in RoleChannel)
         {
-            var ch = midiStreamPlayer.MPTK_Channels[i];
+            var player = PlayerFor(kvp.Key);
+            if (player == null || player.MPTK_Channels == null) continue;
+
+            int i = kvp.Value;
+            if (i < 0 || i >= player.MPTK_Channels.Length || i >= _channelPresets.Length) continue;
+
+            var ch = player.MPTK_Channels[i];
             if (ch == null) continue;
             ch.ForcedPreset = _channelPresets[i];
             ch.ForcedBank   = 0;
+            ch.Volume       = TrimFor(kvp.Key);
         }
     }
 }

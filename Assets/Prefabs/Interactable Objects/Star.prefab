@@ -120,7 +120,7 @@ MonoBehaviour:
   tentacleWidth: 0.08
   dissolveDuration: 1
   fallbackTentaclesPerRole: 8
-  tentacleMaterial: {fileID: 10306, guid: 0000000000000000f000000000000000, type: 0}
+  tentacleMaterial: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee, type: 2}
   invalidTargetRetryFrames: 3
   invalidTargetRetryMs: 120
   growingRootAlpha: 0.669
@@ -5051,7 +5051,7 @@ ParticleSystemRenderer:
   m_LightmapParameters: {fileID: 0}
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: -98977089
-  m_SortingLayer: 0
+  m_SortingLayer: -1
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_RenderMode: 0

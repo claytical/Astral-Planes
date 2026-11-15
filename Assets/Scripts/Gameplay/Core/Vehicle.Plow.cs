@@ -200,14 +200,27 @@ public partial class Vehicle
         Vector2 vel = rb.linearVelocity;
         var gen = gfm.dustGenerator;
         float cellSize  = Mathf.Max(0.001f, drumTrack.GetCellWorldSize());
-        Vector2 forward = vel.normalized;
         float fade      = Mathf.Max(0.01f, vehicleConfig.plowFadeSeconds);
         int halfW       = Mathf.Max(0, profile.plowHalfWidthCells);
         int depth       = Mathf.Max(0, profile.plowDepthCells);
         int chipAmount  = Mathf.Max(1, profile.plowChipAmount);
 
-        // Drain is felt regardless of speed; chipping requires min speed to carve.
-        bool canCarve = vel.magnitude >= profile.plowMinSpeed;
+        // At speed the plow faces along velocity. Below plowMinSpeed — including a dead stop
+        // when wedged in dust — it faces where the player is aiming (live stick, else last aim,
+        // else the hull's facing), so charging can always dig the vehicle out.
+        bool atSpeed = vel.magnitude >= profile.plowMinSpeed;
+        Vector2 forward;
+        if (atSpeed)
+            forward = vel.normalized;
+        else if (_moveInput.sqrMagnitude > 0.0001f)
+            forward = _moveInput.normalized;
+        else if (_lastNonZeroInput.sqrMagnitude > 0.0001f)
+            forward = _lastNonZeroInput;
+        else
+            forward = transform.up;
+
+        // Charging always carves; drain is still felt at every speed.
+        const bool canCarve = true;
         float totalVelocityDrain = 0f;
 
         ForEachFootprintCell(forward, 0, depth, halfW, cellSize,

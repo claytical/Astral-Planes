@@ -17,6 +17,12 @@ public class PhaseTransitionManager : MonoBehaviour
          && currentPhaseIndex >= 0 && currentPhaseIndex < chapterLibrary.phases.Count)
             ? chapterLibrary.phases[currentPhaseIndex].phaseId
             : null;
+
+    public string CurrentPhaseName =>
+        (chapterLibrary != null && chapterLibrary.phases != null
+         && currentPhaseIndex >= 0 && currentPhaseIndex < chapterLibrary.phases.Count)
+            ? chapterLibrary.phases[currentPhaseIndex].phaseName
+            : null;
     public int previousPhaseIndex { get; private set; } = -1;
     public MazeArchetype currentPhase => MazeArchetype.Windows; // compat stub — remove when MazeArchetype is fully gone
 
@@ -49,6 +55,14 @@ public class PhaseTransitionManager : MonoBehaviour
         var phases = chapterLibrary != null ? chapterLibrary.phases : null;
         if (phases == null || phaseIndex < 0 || phaseIndex >= phases.Count) return null;
         return phases[phaseIndex]?.phaseId;
+    }
+
+    /// <summary>Number of motif slots authored in a phase (0 if out of range). Entries may be null.</summary>
+    public int PeekMotifCount(int phaseIndex)
+    {
+        var phases = chapterLibrary != null ? chapterLibrary.phases : null;
+        if (phases == null || phaseIndex < 0 || phaseIndex >= phases.Count) return 0;
+        return phases[phaseIndex]?.motifs?.Count ?? 0;
     }
 
     /// <summary>Motif at (phaseIndex, motifIndex) in the library, without changing state. Null if out of range.</summary>

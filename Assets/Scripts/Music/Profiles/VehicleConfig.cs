@@ -30,6 +30,12 @@ public class VehicleConfig : ScriptableObject
     [Range(0f, 2f)]
     [Tooltip("After committing a note, briefly ignore collision with the motif ring's collider so depositing a note doesn't immediately break it via the vehicle's own follow-through collision (Vehicle.Damage.cs's TryBreakNextPendingTether hazard).")]
     public float postCommitRingCollisionImmunitySeconds = 0.5f;
+    [Min(0f)]
+    [Tooltip("Minimum impact speed (relative velocity) for a non-boosting collision with the motif ring to break a pending note. Boosting always breaks; slower bumps only bounce and play the denial shake.")]
+    public float ringBreakMinImpactSpeed = 8f;
+    [Range(0f, 1f)]
+    [Tooltip("Sprite alpha while the vehicle is phasing through a ring stack that appeared on top of it (see Vehicle.RingPhase.cs).")]
+    public float ringPhaseGhostAlpha = 0.45f;
 
     [Header("Plow")]
     [Tooltip("Fade duration when a cell is carved. Also controls how long cells stay in Clearing state, which sustains velocity drain on the vehicle.")]
@@ -107,13 +113,9 @@ public class VehicleConfig : ScriptableObject
         return Mathf.Max(manualReleaseArmAheadSteps, fromSeconds);
     }
 
-    [Header("Note Trail")]
-    [Tooltip("World-space spacing between queued notes trailing behind the vehicle.")]
-    public float trailSlotSpacing = 0.55f;
-    [Tooltip("How far behind the vehicle the first note trails (world units).")]
-    public float trailFirstSlotOffset = 0.7f;
-    [Tooltip("Number of historical positions stored for trail direction sampling.")]
-    public int trailHistoryCapacity = 48;
+    [Header("Note Carry")]
+    [Tooltip("Multiplier on the ship sprite's half-size where the note tether leaves the hull. <1 pulls the start inward, >1 pushes it outward.")]
+    public float tetherHullRadiusScale = 0.9f;
 
     [Header("Drain Feedback")]
     [Range(0.1f, 1f)]

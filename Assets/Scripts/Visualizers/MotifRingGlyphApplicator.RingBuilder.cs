@@ -10,7 +10,7 @@ public partial class MotifRingGlyphApplicator
         List<MotifSnapshot.NoteEntry> notes, int totalSteps,
         float? fillAlphaOverride = null, float? contourAlphaOverride = null,
         int? fillSortingOrderOverride = null, int? contourSortingOrderOverride = null,
-        float? contourWidthOverride = null, int ringOrdinal = 0, bool skipContour = false)
+        float? contourWidthOverride = null, int ringOrdinal = 0, bool skipContour = false, Material fillMaterialOverride = null)
     {
         var root = new GameObject(goName);
         root.transform.SetParent(transform, worldPositionStays: false);
@@ -27,7 +27,7 @@ public partial class MotifRingGlyphApplicator
         mf.sharedMesh = mesh;
 
         var mr               = fillGo.AddComponent<MeshRenderer>();
-        mr.sharedMaterial    = config.ringMeshMaterial;
+        mr.sharedMaterial    = fillMaterialOverride != null ? fillMaterialOverride : config.ringMeshMaterial;
         mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         mr.receiveShadows    = false;
         // Above the backdrop discs (see CreateBackgroundDisc) so the record reads as a solid

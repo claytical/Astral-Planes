@@ -141,15 +141,21 @@ public partial class CosmicDustGenerator
         int vehicleHoleRadiusCells = Mathf.Max(3, passRadiusCells);
         if (vehicleCells != null)
             foreach (var vehCell in vehicleCells)
-            {
                 CarvePermanentDisk(vehCell, vehicleHoleRadiusCells);
-                // The vehicle's carved hole has no guarantee of being reached by
-                // BuildPacManTunnels' DFS network — unlike exit gaps below, which always get this
-                // same connector walk. Without it, a vehicle spawned inside what would otherwise
-                // have been a solid wall block can end up sealed off from every exit by
-                // bypass-proof Solid dust. No-ops when the hole already touches open interior.
-                CarveConnectorToInterior(vehCell, w, h, passRadiusCells);
-            }
+
+        // Everything must connect to the first vehicle's region: neither a vehicle's hole nor an
+        // exit gap is guaranteed to touch BuildPacManTunnels' DFS network, and an open pocket
+        // that merely touches a gap isn't necessarily reachable from the players. Each connector
+        // walks to the region already reachable from vehicle 0, carving only the walls crossed.
+        Vector2Int seedCell = (vehicleCells != null && vehicleCells.Count > 0)
+            ? vehicleCells[0]
+            : new Vector2Int(w / 2, h / 2);
+        var reachable = FloodOpenInterior(seedCell, w, h);
+        if (vehicleCells != null)
+            for (int i = 1; i < vehicleCells.Count; i++)
+                if (!reachable.Contains(vehicleCells[i]) &&
+                    CarveConnectorToReachable(vehicleCells[i], null, reachable, w, h, passRadiusCells))
+                    reachable = FloodOpenInterior(seedCell, w, h);
 
         var exits = new List<PathExitInfo>(gapGroups.Count);
         foreach (var group in gapGroups)
@@ -162,7 +168,8 @@ public partial class CosmicDustGenerator
                 _permanentClearCells.Add(gapCell);
             }
 
-            CarveConnectorToInterior(group[0], w, h, passRadiusCells);
+            if (CarveConnectorToReachable(group[0], group, reachable, w, h, passRadiusCells))
+                reachable = FloodOpenInterior(seedCell, w, h);
 
             var anchor = group[0];
             exits.Add(new PathExitInfo
@@ -195,46 +202,105 @@ public partial class CosmicDustGenerator
         new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, 1), new Vector2Int(0, -1)
     };
 
-    // The porous border's exit gaps are placed independently of where BuildPacManTunnels' DFS
-    // corridor network actually reaches the edge (MazeTopologyService bulldozes and re-punches
-    // the whole perimeter after the tunnel pattern runs). A gap can open onto solid wall with no
-    // connected path to the interior at all. Walk inward through wall cells until the tunnel
-    // network is reached and carve every step, so a real, navigable route always exists from the
-    // gap to the interior. No-ops (0 iterations) when the gap already touches open interior.
-    private void CarveConnectorToInterior(Vector2Int gapCell, int w, int h, int radiusCells)
+    private static bool IsStrictInterior(Vector2Int c, int w, int h) =>
+        c.x > 0 && c.x < w - 1 && c.y > 0 && c.y < h - 1;
+
+    // Open = never grown as maze wall, or carved permanently clear since.
+    private bool IsOpenCell(Vector2Int c) =>
+        _mazePatternCells == null || !_mazePatternCells.Contains(c) || _permanentClearCells.Contains(c);
+
+    // Every open interior cell 4-connected to the seed. Border cells (walls and gaps) are excluded
+    // so an exit gap never counts as "reachable" just because it is open.
+    private HashSet<Vector2Int> FloodOpenInterior(Vector2Int seed, int w, int h)
     {
-        if (_mazePatternCells == null) return;
+        var reached = new HashSet<Vector2Int>();
+        if (!IsStrictInterior(seed, w, h) || !IsOpenCell(seed)) return reached;
 
-        var visited = new HashSet<Vector2Int> { gapCell };
-        var predecessor = new Dictionary<Vector2Int, Vector2Int>();
         var queue = new Queue<Vector2Int>();
-        queue.Enqueue(gapCell);
-
+        reached.Add(seed);
+        queue.Enqueue(seed);
         while (queue.Count > 0)
         {
             var cur = queue.Dequeue();
             foreach (var d in kCardinalDirs)
             {
                 var nb = cur + d;
-                if (nb.x < 0 || nb.x >= w || nb.y < 0 || nb.y >= h) continue;
-                if (!visited.Add(nb)) continue;
-
-                if (!_mazePatternCells.Contains(nb))
-                {
-                    // Reached open interior — carve every wall cell crossed to get here.
-                    var trace = cur;
-                    while (trace != gapCell)
-                    {
-                        CarvePermanentDisk(trace, radiusCells);
-                        _permanentClearCells.Add(trace);
-                        trace = predecessor[trace];
-                    }
-                    return;
-                }
-
-                predecessor[nb] = cur;
-                queue.Enqueue(nb);
+                if (!IsStrictInterior(nb, w, h) || !IsOpenCell(nb)) continue;
+                if (reached.Add(nb)) queue.Enqueue(nb);
             }
         }
+        return reached;
+    }
+
+    // The porous border's exit gaps are placed independently of where BuildPacManTunnels' DFS
+    // corridor network actually reaches the edge (MazeTopologyService bulldozes and re-punches
+    // the whole perimeter after the tunnel pattern runs), and a vehicle's hole may sit inside a
+    // solid block. Find the cheapest route (0-1 BFS: open cells free, wall cells cost 1) from
+    // <paramref name="start"/> to the region reachable from the players, then carve only the wall
+    // cells it crosses. The route may leave the border only through <paramref name="startGroup"/>
+    // (the exit's own gap cells), so it never trenches along the outer wall or treats a sibling
+    // gap cell as "interior". Returns true when anything was carved.
+    private bool CarveConnectorToReachable(
+        Vector2Int start, IReadOnlyList<Vector2Int> startGroup, HashSet<Vector2Int> reachable,
+        int w, int h, int radiusCells)
+    {
+        if (_mazePatternCells == null || reachable == null || reachable.Count == 0) return false;
+        if (reachable.Contains(start)) return false;
+
+        var cost = new Dictionary<Vector2Int, int> { [start] = 0 };
+        var predecessor = new Dictionary<Vector2Int, Vector2Int>();
+        var deque = new LinkedList<Vector2Int>();
+        deque.AddFirst(start);
+
+        Vector2Int? goal = null;
+        while (deque.Count > 0)
+        {
+            var cur = deque.First.Value;
+            deque.RemoveFirst();
+            if (reachable.Contains(cur)) { goal = cur; break; }
+
+            int curCost = cost[cur];
+            foreach (var d in kCardinalDirs)
+            {
+                var nb = cur + d;
+                if (nb.x < 0 || nb.x >= w || nb.y < 0 || nb.y >= h) continue;
+                bool inStartGroup = nb == start || (startGroup != null && Contains(startGroup, nb));
+                if (!IsStrictInterior(nb, w, h) && !inStartGroup) continue;
+
+                int step = IsOpenCell(nb) ? 0 : 1;
+                int nbCost = curCost + step;
+                if (cost.TryGetValue(nb, out int known) && known <= nbCost) continue;
+                cost[nb] = nbCost;
+                predecessor[nb] = cur;
+                if (step == 0) deque.AddFirst(nb); else deque.AddLast(nb);
+            }
+        }
+
+        if (goal == null)
+        {
+            Debug.LogWarning($"[MAZE] Interstitial: could not connect {start} to the players' region.");
+            return false;
+        }
+
+        bool carved = false;
+        var trace = goal.Value;
+        while (trace != start)
+        {
+            if (!IsOpenCell(trace))
+            {
+                CarvePermanentDisk(trace, radiusCells);
+                _permanentClearCells.Add(trace);
+                carved = true;
+            }
+            trace = predecessor[trace];
+        }
+        return carved;
+    }
+
+    private static bool Contains(IReadOnlyList<Vector2Int> list, Vector2Int c)
+    {
+        for (int i = 0; i < list.Count; i++)
+            if (list[i] == c) return true;
+        return false;
     }
 }

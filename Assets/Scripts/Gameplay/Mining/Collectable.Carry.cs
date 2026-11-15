@@ -4,8 +4,36 @@ using UnityEngine;
 
 public partial class Collectable
 {
-    /// <summary>Sets the world-space target position for this note in the vehicle trail.</summary>
-    public void SetTrailTarget(Vector3 worldPos) => _trailWorldTarget = worldPos;
+    /// <summary>
+    /// Sends the note toward a world-space target (e.g. an armed release flying to its marker).
+    /// Releases any core lock.
+    /// </summary>
+    public void SetTrailTarget(Vector3 worldPos)
+    {
+        _trailWorldTarget = worldPos;
+        _coreAnchor = null;
+        _coreLocked = false;
+    }
+
+    /// <summary>
+    /// Holds the note inside the vehicle's hollow core — rigidly locked to the anchor's
+    /// position with no lag or drift, like fuel sitting in a tank.
+    /// </summary>
+    public void HoldInCore(Transform anchor)
+    {
+        if (_coreAnchor != anchor) _coreLocked = false;
+        _coreAnchor = anchor;
+    }
+
+    private Vector3 CoreOrTrailTarget()
+    {
+        if (_coreAnchor == null) return _trailWorldTarget;
+        Vector3 p = _coreAnchor.position;
+        p.z = transform.position.z;
+        return p;
+    }
+
+    private const float CoreLockSnapDistance = 0.02f;
 
     /// <summary>
     /// Drives the visual urgency of this note (0 = just collected, 1 = release imminent).
@@ -22,20 +50,35 @@ public partial class Collectable
             float dt = Time.deltaTime;
             float pulse = _trailReleasePulse01;
 
-            // Radius shrinks as release approaches, focusing the energy like a coiling spring.
-            float focusedRadius = Mathf.Lerp(trailDriftRadius, trailDriftRadius * trailDriftFocusMul, pulse);
-            _trailDriftPhase += trailDriftSpeed * dt;
+            if (_coreAnchor != null)
+            {
+                // Carried in the vehicle core: rigid lock, no drift. If we're re-entering the
+                // core from afar (a cancelled armed release), ease back first, then hard-lock.
+                Vector3 core = CoreOrTrailTarget();
+                if (!_coreLocked && (transform.position - core).sqrMagnitude <= CoreLockSnapDistance * CoreLockSnapDistance)
+                    _coreLocked = true;
 
-            // Lissajous figure: x and y use slightly different frequencies for organic "restless" feel.
-            Vector3 driftOffset = new Vector3(
-                Mathf.Sin(_trailDriftPhase) * focusedRadius,
-                Mathf.Cos(_trailDriftPhase * 0.73f) * focusedRadius * 0.6f,
-                0f
-            );
+                transform.position = _coreLocked
+                    ? core
+                    : Vector3.Lerp(transform.position, core, Mathf.Clamp01(trailFollowLerp * dt));
+            }
+            else
+            {
+                // Radius shrinks as release approaches, focusing the energy like a coiling spring.
+                float focusedRadius = Mathf.Lerp(trailDriftRadius, trailDriftRadius * trailDriftFocusMul, pulse);
+                _trailDriftPhase += trailDriftSpeed * dt;
 
-            Vector3 desiredPos = _trailWorldTarget + driftOffset;
-            float lerpT = Mathf.Clamp01(trailFollowLerp * dt);
-            transform.position = Vector3.Lerp(transform.position, desiredPos, lerpT);
+                // Lissajous figure: x and y use slightly different frequencies for organic "restless" feel.
+                Vector3 driftOffset = new Vector3(
+                    Mathf.Sin(_trailDriftPhase) * focusedRadius,
+                    Mathf.Cos(_trailDriftPhase * 0.73f) * focusedRadius * 0.6f,
+                    0f
+                );
+
+                Vector3 desiredPos = _trailWorldTarget + driftOffset;
+                float lerpT = Mathf.Clamp01(trailFollowLerp * dt);
+                transform.position = Vector3.Lerp(transform.position, desiredPos, lerpT);
+            }
 
             if (_trailBaseScaleCaptured && energySprite != null)
             {
@@ -171,9 +214,11 @@ public partial class Collectable
 
     private IEnumerator AbsorbThenTrailFollowRoutine(Vehicle vehicle)
     {
-        // _trailWorldTarget is refreshed every frame elsewhere (Vehicle.TickNoteTrail), so
-        // reading it live each frame here tracks the vehicle instead of a stale snapshot.
-        yield return StartCoroutine(AbsorbIntoVehicleRoutine(vehicle, () => _trailWorldTarget));
+        // Destination is read live each frame: the vehicle core while carried, or the target
+        // Vehicle.TickNoteTrail refreshes (e.g. an armed release's marker).
+        yield return StartCoroutine(AbsorbIntoVehicleRoutine(vehicle, CoreOrTrailTarget));
+        // The absorb ends exactly on the core, so start hard-locked if still carried.
+        _coreLocked = _coreAnchor != null;
         yield return StartCoroutine(TrailFollowRoutine());
     }
 
@@ -203,12 +248,15 @@ public partial class Collectable
         {
             _carryParent = _collector;
 
-            Vector3 jitter = (carrySettings.localOffsetJitter > 0f)
-                ? (Vector3)(UnityEngine.Random.insideUnitCircle * carrySettings.localOffsetJitter)
-                : Vector3.zero;
-            Vector3 targetLocalPos = carrySettings.localOffset + jitter;
-
             _carryParent.TryGetComponent(out Vehicle vehicle);
+
+            // Carried in the vehicle's hollow core (its NoteCoreAnchor, or the pivot if none is
+            // authored) — rigid, no offset or jitter. The anchor is a child, so its offset in the
+            // vehicle's local space is constant.
+            Vector3 targetLocalPos = vehicle != null
+                ? _carryParent.InverseTransformPoint(vehicle.NoteCoreAnchor.position)
+                : Vector3.zero;
+            targetLocalPos.z = 0f;
             // TransformPoint is re-evaluated live each frame inside the routine (via this
             // closure) so the target tracks the vehicle's current position/rotation instead
             // of the point it happened to be at when the absorb effect started.

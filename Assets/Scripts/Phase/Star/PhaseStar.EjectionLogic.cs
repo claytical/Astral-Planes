@@ -7,6 +7,10 @@ public partial class PhaseStar
     {
         if (!coll.gameObject.TryGetComponent<Vehicle>(out _)) return;
 
+        // Charging: vehicle collisions are ignored by ghost drift, so this rarely fires (e.g. the
+        // tick a star enters Dormant); never a push, flash, or state change.
+        if (_state == PhaseStarState.Dormant) return;
+
         if (!_isArmed
             && _state == PhaseStarState.WaitingForPoke
             && !_ejectionInFlight)
@@ -15,10 +19,12 @@ public partial class PhaseStar
             return;
         }
 
-        if (OwnTrackCollectablesInFlight())
+        // Notes are being picked up: the star stays a visible, same-size, pushable obstacle.
+        // No disarm/hide/state change, and never an ejection.
+        if (IsPickupLocked())
         {
-            Disarm(PhaseStarDisarmReason.CollectablesInFlight, _lockedTint);
-            Trace("OnCollisionEnter2D: ignored poke because own-track collectables are still in flight");
+            HandleDisarmedVehicleHit(coll);
+            Trace("OnCollisionEnter2D: pickup-locked — pushed star, no eject");
             return;
         }
 

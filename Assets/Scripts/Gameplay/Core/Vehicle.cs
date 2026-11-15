@@ -103,14 +103,12 @@ public partial class Vehicle : MonoBehaviour
     [Tooltip("Optional VehicleReleaseCue component on this vehicle (or a child). Drives the ring fill and beat-dot countdown.")]
     [SerializeField] private VehicleReleaseCue releaseCue;
 
-    // ---- Note Trail Position History ----
-    // Ring buffer of recent world positions (populated in Update)
-    private Vector3[] _posHistory;
-    private int _posHistoryHead;
-    private int _posHistoryCount;
-    private float _posHistoryAccum; // distance accumulator for spacing
-    private Vector3 _posHistoryLast;
-    private Vector3 _lastTravelDir = Vector3.down; // fallback tail direction when stationary
+    [Header("Note Carry")]
+    [Tooltip("Optional child transform placed at the center of the sprite's transparent core. Carried notes lock here. Leave empty to use the vehicle's pivot.")]
+    [SerializeField] private Transform noteCoreAnchor;
+
+    /// <summary>Where carried notes sit: the authored core anchor, or the vehicle pivot if none is set.</summary>
+    public Transform NoteCoreAnchor => noteCoreAnchor != null ? noteCoreAnchor : transform;
 
     /// <summary>Per-player placement method; set by LocalPlayer at spawn from the ship-select choice.</summary>
     public NotePlacementMethod PlacementMethod { get; set; } = NotePlacementMethod.Manual;
@@ -364,7 +362,6 @@ public partial class Vehicle : MonoBehaviour
 
     private void Update()
     {
-        RecordPositionHistory();
         TickManualReleaseCue();
         TickNoteTrail();
     }
@@ -503,6 +500,7 @@ public partial class Vehicle : MonoBehaviour
     }
     void OnDisable()
     {
+        CancelRingPhase();
         if (gfm == null || gfm.dustGenerator == null) return;
 
         gfm.dustGenerator.ReleaseVehicleKeepClear(_id);
@@ -546,6 +544,23 @@ public partial class Vehicle : MonoBehaviour
     }
 
     public Bounds GetVisualBounds() => baseSprite != null ? baseSprite.bounds : default;
+
+    /// <summary>
+    /// World-space radius of the ship's hull, used to start the note tether at the hull edge.
+    /// Uses the sprite's local (unrotated) bounds so the radius stays stable as the ship turns.
+    /// </summary>
+    public float GetHullRadiusWorld()
+    {
+        float scale = vehicleConfig != null ? vehicleConfig.tetherHullRadiusScale : 1f;
+        if (baseSprite != null && baseSprite.sprite != null)
+        {
+            Vector3 ext = baseSprite.sprite.bounds.extents;
+            Vector3 ls = baseSprite.transform.lossyScale;
+            float r = Mathf.Min(ext.x * Mathf.Abs(ls.x), ext.y * Mathf.Abs(ls.y));
+            if (r > 0f) return r * scale;
+        }
+        return GetColliderBoundingRadiusWorld() * scale;
+    }
 
     public float GetColliderBoundingRadiusWorld()
     {

@@ -21,7 +21,7 @@ using System.Text;
 // already-retuned pitch that actually sounded for this completed motif, so it fully captures the
 // committed result without it.
 //
-// Per-role instrument/timbre (MusicalRoleProfile.midiPreset, volumeMultiplier, outputMixerGroup)
+// Per-role instrument/timbre (MusicalRoleProfile.midiPreset, volumeMultiplier; AudioMixConfig bus)
 // is deliberately NOT included: these are designer-authored mix/instrument settings, not something
 // the player did. KNOWN LIMITATION: for a motif using MusicalRoleProfile's RandomPerBin config
 // selection mode, the specific instrument config drawn is session-seeded (SessionGenome) and can

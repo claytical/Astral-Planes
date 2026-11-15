@@ -35,6 +35,8 @@ public sealed class DustTimingParams
     public float collectableBombBlastRegrowDelay = -1f;
     [Tooltip("Delay applied when a track-filled role sweep (SuperNode fill) releases its held cells.")]
     public float trackFilledRegrowDelay = -1f;
+    [Tooltip("Delay applied to cells a PhaseStar carves while burrowing (StarNavigationParams Burrow mode).")]
+    public float starBurrowRegrowDelay = -1f;
 
     /// <summary>Per-source delay, or -1 to fall back to the base regrowDelay.</summary>
     public float GetDelayFor(DustClearSource source) => source switch
@@ -49,6 +51,7 @@ public sealed class DustTimingParams
         DustClearSource.CollectableDiscard   => collectableDiscardRegrowDelay,
         DustClearSource.CollectableBombBlast => collectableBombBlastRegrowDelay,
         DustClearSource.TrackFilled          => trackFilledRegrowDelay,
+        DustClearSource.StarBurrow           => starBurrowRegrowDelay,
         _                                    => -1f,
     };
 
@@ -65,6 +68,95 @@ public sealed class DustTimingParams
         collectableDiscardRegrowDelay = Mathf.Max(-1f, collectableDiscardRegrowDelay);
         collectableBombBlastRegrowDelay = Mathf.Max(-1f, collectableBombBlastRegrowDelay);
         trackFilledRegrowDelay        = Mathf.Max(-1f, trackFilledRegrowDelay);
+        starBurrowRegrowDelay         = Mathf.Max(-1f, starBurrowRegrowDelay);
+    }
+}
+
+/// <summary>How a PhaseStar moves through a maze. Auto picks per MazePatternType (see ResolveMode).</summary>
+public enum PhaseStarNavMode
+{
+    Auto = 0,
+    Direct = 1,          // straight-line steering toward the nearest target (legacy behavior)
+    CorridorFollow = 2,  // BFS through open cells; steers along the path
+    LaneGlide = 3,       // straight-line target, motion biased onto the lane axis
+    RingOrbit = 4,       // BFS pathing plus a tangential swirl around the ring centre
+    Burrow = 5,          // straight-line target, carves a tunnel through dust ahead of it
+}
+
+/// <summary>
+/// Per-maze PhaseStar navigation. The motif's PhaseStarBehaviorProfile is the star's
+/// "personality" (base speed / jitter / orbit); these values describe how it moves through
+/// THIS maze and stack on top as multipliers/offsets. Defaults leave the profile unchanged.
+/// </summary>
+[System.Serializable]
+public sealed class StarNavigationParams
+{
+    public static readonly StarNavigationParams Default = new();
+
+    [Tooltip("Navigation style. Auto: FullFill→Burrow, ClearBoxes/CA/Tunnels→CorridorFollow, " +
+             "RingChokepoints→RingOrbit, DiagonalLanes→LaneGlide, DrunkenStrokes→Direct.")]
+    public PhaseStarNavMode mode = PhaseStarNavMode.Auto;
+
+    [Header("Profile Multipliers")]
+    [Min(0f)] public float speedMultiplier = 1f;
+    [Min(0f)] public float hungrySpeedMultiplier = 1f;
+    [Min(0f)] public float jitterMultiplier = 1f;
+    [Range(-1f, 1f), Tooltip("Added to the profile's orbitBias (result clamped 0..1).")]
+    public float orbitBiasOffset = 0f;
+    [Min(0.1f), Tooltip("Scales the profile's mazeNavReplanInterval.")]
+    public float replanIntervalMultiplier = 1f;
+    [Tooltip("Added to the profile's starKeepClearRadiusCells (result clamped >= 0).")]
+    public int keepClearRadiusOffset = 0;
+
+    [Header("Pathing (CorridorFollow / RingOrbit)")]
+    [Min(1), Tooltip("Steer toward the path waypoint this many cells ahead. Higher = smoother corner cutting, more wall scraping.")]
+    public int pathLookaheadCells = 2;
+
+    [Header("LaneGlide")]
+    [Range(0f, 1f), Tooltip("How strongly motion snaps onto the lane axis.")]
+    public float laneAlignStrength = 0.7f;
+
+    [Header("RingOrbit")]
+    [Range(0f, 1f), Tooltip("Tangential swirl around the ring centre, added on top of the path direction.")]
+    public float ringTangentialStrength = 0.6f;
+
+    [Header("Burrow")]
+    [Min(0), Tooltip("Radius in cells carved ahead of the star while it burrows.")]
+    public int burrowCarveRadiusCells = 1;
+    [Min(0.02f), Tooltip("Seconds between burrow carves.")]
+    public float burrowCarveInterval = 0.12f;
+
+    public PhaseStarNavMode ResolveMode(MazePatternType patternType)
+    {
+        if (mode != PhaseStarNavMode.Auto) return mode;
+        return patternType switch
+        {
+            MazePatternType.FullFill         => PhaseStarNavMode.Burrow,
+            MazePatternType.ClearBoxes       => PhaseStarNavMode.CorridorFollow,
+            MazePatternType.CellularAutomata => PhaseStarNavMode.CorridorFollow,
+            MazePatternType.RingChokepoints  => PhaseStarNavMode.RingOrbit,
+            MazePatternType.DrunkenStrokes   => PhaseStarNavMode.Direct,
+            MazePatternType.DiagonalLanes    => PhaseStarNavMode.LaneGlide,
+            MazePatternType.Tunnels          => PhaseStarNavMode.CorridorFollow,
+            _                                => PhaseStarNavMode.Direct,
+        };
+    }
+
+    public static bool UsesPathing(PhaseStarNavMode m) =>
+        m == PhaseStarNavMode.CorridorFollow || m == PhaseStarNavMode.RingOrbit;
+
+    public void Validate()
+    {
+        speedMultiplier = Mathf.Max(0f, speedMultiplier);
+        hungrySpeedMultiplier = Mathf.Max(0f, hungrySpeedMultiplier);
+        jitterMultiplier = Mathf.Max(0f, jitterMultiplier);
+        orbitBiasOffset = Mathf.Clamp(orbitBiasOffset, -1f, 1f);
+        replanIntervalMultiplier = Mathf.Max(0.1f, replanIntervalMultiplier);
+        pathLookaheadCells = Mathf.Max(1, pathLookaheadCells);
+        laneAlignStrength = Mathf.Clamp01(laneAlignStrength);
+        ringTangentialStrength = Mathf.Clamp01(ringTangentialStrength);
+        burrowCarveRadiusCells = Mathf.Max(0, burrowCarveRadiusCells);
+        burrowCarveInterval = Mathf.Max(0.02f, burrowCarveInterval);
     }
 }
 
@@ -326,6 +418,11 @@ public sealed class PorousBorderParams
     /// interstitial so each exit's edge matches the maze direction it leads in.</summary>
     public List<BoundaryWrap.BoundarySide> exitSides = new();
 
+    /// <summary>exitSides only: Top/Bottom gaps are kept within this centered fraction of the
+    /// edge's width (1 = anywhere along the edge). Left/Right gaps are unaffected.</summary>
+    [Tooltip("With exitSides: Top/Bottom exit gaps stay within this centered fraction of the grid width (1 = anywhere along the edge).")]
+    [Range(0.1f, 1f)] public float topBottomCenterBand = 1f;
+
     public void Validate()
     {
         exitCount = Mathf.Max(0, exitCount);
@@ -361,6 +458,10 @@ public class MazePatternConfig : ScriptableObject
     [Header("Porous Border")]
     public PorousBorderParams porousBorder = new();
 
+    [Header("Star Navigation")]
+    [Tooltip("How the PhaseStar moves through this maze. Stacks on the motif's PhaseStarBehaviorProfile.")]
+    public StarNavigationParams starNavigation = new();
+
     [Header("Generic Fill Floor")]
     [Range(0f, 1f), Tooltip("Minimum fraction of occupied maze cells guaranteed to be reserved as generic " +
         "MusicalRole.None dust for ANY motif using this pattern, regardless of that motif's own " +
@@ -379,6 +480,7 @@ public class MazePatternConfig : ScriptableObject
         diagonalLanes ??= new DiagonalLanesParams();
         tunnels ??= new TunnelsParams();
         porousBorder ??= new PorousBorderParams();
+        starNavigation ??= new StarNavigationParams();
 
         dustTiming.Validate();
         clearBoxes.Validate();
@@ -388,6 +490,7 @@ public class MazePatternConfig : ScriptableObject
         diagonalLanes.Validate();
         tunnels.Validate();
         porousBorder.Validate();
+        starNavigation.Validate();
 
         minGenericFillRatio01 = Mathf.Clamp01(minGenericFillRatio01);
     }

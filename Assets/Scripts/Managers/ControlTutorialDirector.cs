@@ -388,6 +388,15 @@ public partial class ControlTutorialDirector : MonoBehaviour
         // The confirmed-ship dim is only for the pre-tutorial wait; the tutorial owns the screen.
         if (Hangar.Instance != null) Hangar.Instance.SetSelectionVisible(false);
 
+        // "Place" (south button) is only relevant if someone manually releases notes.
+        // Skip it when every player chose Cozy Co-Pilot (Auto).
+        if (primaryInstance)
+        {
+            bool needsPlace = _tutorialPlayers.Count == 0
+                              || _tutorialPlayers.Any(p => p.PlacementMethod == NotePlacementMethod.Manual);
+            primaryInstance.ConfigureSequence(includeRelease: needsPlace);
+        }
+
         _desiredMode = useInputGatedTutorial
             ? PrimaryMode.TutorialSequenceInputGated
             : PrimaryMode.TutorialSequenceTimed;

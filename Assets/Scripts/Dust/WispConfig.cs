@@ -44,6 +44,12 @@ public class WispConfig : ScriptableObject
     [Tooltip("Minimum cells the wisp must spawn away from the assigned exit's anchor cell, along the route from the vehicle.")]
     [Min(0)] public int spawnMinCellsFromExit = 4;
 
+    [Tooltip("Band along the vehicle→exit route (0 = vehicle, 1 = exit) where the wisp may spawn. Low values keep it near the ships so it visibly leads through most of the maze. Still bounded by the two min-cell margins above.")]
+    public Vector2 spawnPathFraction = new Vector2(0.1f, 0.25f);
+
+    [Tooltip("Carried-over wisp (player took its exit without catching it): BFS step distance from the next maze's entry cell where it reappears, so it shows up deep in the maze instead of at the entry road.")]
+    public Vector2Int carrySpawnCellRange = new Vector2Int(10, 18);
+
     [Header("Consume — Maze Pulse")]
     [Tooltip("Seconds the whole maze rainbow-pulses for when this wisp is consumed.")]
     [Min(0f)] public float mazePulseSeconds = 1.2f;

@@ -35,7 +35,7 @@ MonoBehaviour:
   followUpDamageFloor: 10
   damageCeiling: 120
   capacity: 100
-  burnRate: 0.6
+  burnRate: 0.5
   boostSpoolUpSeconds: 0
   plowHalfWidthCells: 1
   vehicleKeepClearRadiusCells: 0

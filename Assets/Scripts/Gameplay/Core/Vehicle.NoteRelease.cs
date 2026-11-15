@@ -4,6 +4,7 @@ using System.Collections.Generic;
 public partial class Vehicle
 {
     public static bool AnyVehicleCarrying() => _s_vehiclesCarrying > 0;
+    public static int DebugCarryingCount() => _s_vehiclesCarrying;
     public static bool AnyVehicleCarryingTrack(InstrumentTrack track)
         => _s_vehiclesCarryingByTrack.TryGetValue(track, out var count) && count > 0;
 

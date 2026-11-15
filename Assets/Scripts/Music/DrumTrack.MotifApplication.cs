@@ -237,6 +237,7 @@ public partial class DrumTrack
 
             _activeDrum.clip = clip;
             _activeDrum.loop = true;
+            _activeDrum.volume = MotifDrumVolume();
             _clipLengthSec = Mathf.Max(clip.length, 0f);
 
             double dspStart = AudioSettings.dspTime + 0.05;
@@ -399,6 +400,7 @@ public partial class DrumTrack
         _inactiveDrum.PlayScheduled(crossStart);
 
         _crossfadeBaseVolume = _activeDrum.volume;
+        _crossfadeTargetVolume = MotifDrumVolume(); // incoming loop belongs to the (already committed) current motif
         _crossfadeStartDsp = crossStart;
         _crossfadeEndDsp = swapDsp;
 
@@ -472,6 +474,19 @@ public partial class DrumTrack
         // Deck A is ALWAYS the inspector-assigned drumAudioSource.
         if (_drumA == null) _drumA = drumAudioSource;
 
+        // Bus + level come from AudioMixConfig (shared with the carousel preview). Applied once,
+        // to deck A before deck B clones it — this method re-runs per motif, and re-applying the
+        // volume later would stomp an in-flight crossfade's deck levels. Per-motif level changes
+        // after this are applied by the restart paths and the crossfade target.
+        var mix = _mixConfigApplied ? null : AudioMixConfig.Instance;
+        if (!_mixConfigApplied)
+        {
+            _sceneDrumVolume = _drumA.volume;
+            _drumA.volume = MotifDrumVolume();
+        }
+        if (mix != null && mix.drumsGroup != null) _drumA.outputAudioMixerGroup = mix.drumsGroup;
+        _mixConfigApplied = true;
+
         var go = _drumA.gameObject;
         var all = go.GetComponents<AudioSource>();
 
@@ -507,6 +522,7 @@ public partial class DrumTrack
         }
 
         _drumB = candidateB;
+        if (mix != null && mix.drumsGroup != null) _drumB.outputAudioMixerGroup = mix.drumsGroup;
 
         if (_activeDrum == null) _activeDrum = _drumA;
         if (_activeDrum != _drumA && _activeDrum != _drumB) _activeDrum = _drumA;

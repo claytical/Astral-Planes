@@ -67,4 +67,59 @@ public class WispExitPathfinder
         HasPath = path.Count > 0;
         return HasPath;
     }
+
+    /// <summary>
+    /// BFS flood over dust-free cells from <paramref name="fromCell"/>; picks a random cell whose
+    /// step distance lies in [minSteps, maxSteps]. If none does, falls back to the farthest cell
+    /// reached, provided it is more than 3 steps away. Does not touch Waypoints/HasPath.
+    /// </summary>
+    public bool TryFindCellAtDistance(DrumTrack drumTrack, Vector2Int fromCell, int minSteps, int maxSteps, out Vector2Int cell)
+    {
+        cell = fromCell;
+        int w = drumTrack.GetSpawnGridWidth();
+        int h = drumTrack.GetSpawnGridHeight();
+        if (w <= 0 || h <= 0) return false;
+
+        fromCell.x = Mathf.Clamp(fromCell.x, 0, w - 1);
+        fromCell.y = Mathf.Clamp(fromCell.y, 0, h - 1);
+
+        var queue = new Queue<Vector2Int>();
+        var dist = new Dictionary<Vector2Int, int> { [fromCell] = 0 };
+        queue.Enqueue(fromCell);
+
+        var inRange = new List<Vector2Int>();
+        Vector2Int farthest = fromCell;
+        int farthestDist = 0;
+        int visited = 0;
+        while (queue.Count > 0 && visited < kBfsBudget)
+        {
+            var cur = queue.Dequeue();
+            visited++;
+            int d = dist[cur];
+            if (d >= minSteps && d <= maxSteps) inRange.Add(cur);
+            if (d > farthestDist) { farthestDist = d; farthest = cur; }
+            if (d >= maxSteps) continue;
+
+            for (int i = 0; i < kNeighbours4.Length; i++)
+            {
+                var nb = cur + kNeighbours4[i];
+                if (nb.x < 0 || nb.y < 0 || nb.x >= w || nb.y >= h) continue;
+                if (dist.ContainsKey(nb) || drumTrack.HasDustAt(nb)) continue;
+                dist[nb] = d + 1;
+                queue.Enqueue(nb);
+            }
+        }
+
+        if (inRange.Count > 0)
+        {
+            cell = inRange[Random.Range(0, inRange.Count)];
+            return true;
+        }
+        if (farthestDist > 3)
+        {
+            cell = farthest;
+            return true;
+        }
+        return false;
+    }
 }

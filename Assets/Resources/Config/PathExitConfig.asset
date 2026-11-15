@@ -1,0 +1,119 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2ed028e710af04bdeb7580d1266649c2, type: 3}
+  m_Name: PathExitConfig
+  m_EditorClassIdentifier: Assembly-CSharp::PathExitConfig
+  topBottomExitCenterBand: 0.33333334
+  leftRightExitInset: 0
+  captureDepthCells: 4
+  roadInnerLength: 0.25
+  newPhase:
+    palette: 0
+    monochrome: 0
+    pattern: 0
+    widthScale: 1
+    roadAlpha: 1
+    highlight: 0.5
+    flowSpeed: 1.3
+    streamerRate: 30
+    streamerSize: 0.06
+    streamerLength: 0.6
+    streamerAlpha: 0.3
+    haloRate: 11
+    haloSize: 0.09
+    haloFallSeconds: 1.1
+    haloSwirl: 0.6
+    haloNoise: 0.6
+    haloStrayFraction: 0.12
+    particleAlpha: 1
+  visitedPhase:
+    palette: 0
+    monochrome: 1
+    pattern: 0
+    widthScale: 1
+    roadAlpha: 0.8
+    highlight: 0.3
+    flowSpeed: 0.9
+    streamerRate: 12
+    streamerSize: 0.03
+    streamerLength: 0.5
+    streamerAlpha: 0.2
+    haloRate: 6
+    haloSize: 0.08
+    haloFallSeconds: 1.4
+    haloSwirl: 0.4
+    haloNoise: 0.5
+    haloStrayFraction: 0.15
+    particleAlpha: 0.8
+  newMotif:
+    palette: 1
+    monochrome: 0
+    pattern: 1
+    widthScale: 0.7
+    roadAlpha: 0.95
+    highlight: 0.4
+    flowSpeed: 1
+    streamerRate: 18
+    streamerSize: 0.07
+    streamerLength: 0.5
+    streamerAlpha: 0.25
+    haloRate: 7
+    haloSize: 0.07
+    haloFallSeconds: 1.4
+    haloSwirl: 0.4
+    haloNoise: 0.5
+    haloStrayFraction: 0.15
+    particleAlpha: 0.95
+  visitedMotif:
+    palette: 1
+    monochrome: 1
+    pattern: 1
+    widthScale: 0.7
+    roadAlpha: 0.75
+    highlight: 0.25
+    flowSpeed: 0.7
+    streamerRate: 10
+    streamerSize: 0.05
+    streamerLength: 0.4
+    streamerAlpha: 0.15
+    haloRate: 4
+    haloSize: 0.06
+    haloFallSeconds: 1.8
+    haloSwirl: 0.3
+    haloNoise: 0.4
+    haloStrayFraction: 0.2
+    particleAlpha: 0.75
+  stripeBlend: 0.35
+  coreGlow: 0.55
+  corePower: 2.2
+  textureTilesPerUnit: 0.5
+  offscreenTailLength: 6
+  edgeFeather: 0.14
+  vibrationAmplitude: 0.07
+  vibrationFrequency: 1.6
+  vibrationSpeed: 3.5
+  swallowWidthScale: 1.147
+  captureEmissionBoost: 4
+  captureBurst: 40
+  pullAcceleration: 18
+  centerPull: 10
+  shrinkStartProgress: 0.35
+  spitSpeed: 9
+  openSeconds: 0.5
+  swallowSeconds: 0.6
+  sealFadeSeconds: 0.35
+  closeSeconds: 0.6
+  dissolveSeconds: 0.5
+  postSwallowBeatSeconds: 0.2
+  entryRoadCloseSeconds: 0.6
+  offscreenMargin: 2
+  travelTimeoutSeconds: 3

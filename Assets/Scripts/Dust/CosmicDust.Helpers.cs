@@ -6,6 +6,9 @@ public struct DustVisualSettings {
     [Header("Sizing (prefab baseline)")]
     public Vector3 prefabReferenceScale; // authored prefab baseline (cell-driven scale overrides at runtime)
     public ParticleSystem particleSystem;
+    [Tooltip("0 = legacy (particle size is in prefab units, ignores cell size). >0 = each particle's rest diameter is this fraction of one cell tile, " +
+             "and the emitter radius shrinks to match. Use ~0.5-0.9 for the plasma look.")]
+    public float particleCellFraction;
 }
 [System.Serializable]
 public struct DustVisualTimings

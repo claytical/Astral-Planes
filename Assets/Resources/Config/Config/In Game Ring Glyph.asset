@@ -13,38 +13,63 @@ MonoBehaviour:
   m_Name: In Game Ring Glyph
   m_EditorClassIdentifier: Assembly-CSharp::RingGlyphConfig
   innerRadius: 0.1
-  ringThickness: 0.03
+  ringThickness: 1
   ringSpacing: 0.3
+  interBinSpacing: 0.1
+  segments: 256
+  ringStartAngleOffset: 1.5707964
   fitPaddingFraction: 0.05
   ringMeshMaterial: {fileID: 2100000, guid: db6f88bb6fd04da5bdaac2167f76440b, type: 2}
   ringAlpha: 0.339
   contourAlpha: 1
-  remainingRingColor: {r: 0.6, g: 0.6, b: 0.6, a: 1}
-  remainingRingAlpha: 0.4
-  remainingContourAlpha: 0.25
-  nextUpColorCycleDuration: 0.5
-  recordHoldDuration: 5
-  recordFadeOutDuration: 0.75
-  backgroundDiscColor: {r: 0, g: 0, b: 0, a: 1}
-  placedBackgroundAlpha: 0.388
-  fullBackgroundAlpha: 0.692
-  lineWidth: 0.02
-  segments: 256
+  lineWidth: 0.15
+  recordLineWidth: 0.01
   tugDepthFraction: 0.25
   tugHalfWidthRad: 0.75
+  highlightScaleMultiplier: 1.15
+  highlightBrightness: 0.5
+  playingBinToOuter: 1
+  binSwapDuration: 0.5
+  highlightPulseDuration: 0.15
+  nonHighlightedTransitionDuration: 0.15
+  nonHighlightedDarkenAmount: 0.6
+  nonHighlightedAlphaMultiplier: 0.35
+  remainingRingColor: {r: 0.6, g: 0.6, b: 0.6, a: 1}
+  remainingRingAlpha: 0.4
+  remainingRingLineWidth: 0.2
+  remainingRingMaterial: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee,
+    type: 2}
+  nextUpColorCycleDuration: 0.5
   ringDrawInDuration: 0.5
   ringStaggerDelay: 0.08
   rotSpeedBase: 25
   rotSpeedMax: 174
+  directionMatchRatioThreshold: 0.5
+  waveRestDepth: -0.4
+  notePulseAttackSec: 0.03
+  notePulseMinSec: 0.12
+  notePulseLatencySec: 0
+  notePulseRotateToTop: 1
+  notePulseCueDeg: 180
   noteDotRadius: 0.01
   noteTravelDuration: 1
-  noteTetherGrowDuration: 0.25
-  rollOffDuration: 2
-  ringAppearDuration: 0.1
   launchSfx: {fileID: 8300000, guid: 16b44a33b73884ed08017ba01d7f61bc, type: 3}
   launchSfxVolume: 0.115
   impactSfx: {fileID: 8300000, guid: bc570d14f72164a12a7c8adccbb03ca8, type: 3}
   impactSfxVolume: 0.135
+  noteTetherTransitionDuration: 0.25
+  backgroundDiscColor: {r: 0, g: 0, b: 0, a: 1}
+  placedBackgroundAlpha: 0.388
+  fullBackgroundAlpha: 0.692
   spinOffDuration: 2
+  rollOffDuration: 2
   tiltXDegrees: 75
   scaleDownDuration: 3
+  breakShakeDuration: 0.35
+  breakShakeAmplitude: 0.18
+  breakShakeFrequency: 18
+  denialShakeDuration: 0.14
+  denialShakeAmplitude: 0.07
+  denialShakeFrequency: 40
+  recordHoldDuration: 5
+  recordFadeOutDuration: 0.75

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using MidiPlayerTK;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -35,6 +36,8 @@ public sealed class SceneFlowCoordinator
     private const float RecordHoldDurationFallback = 1.5f;
 
     private CanvasGroup _screenFadeOverlay;
+    private Coroutine _motifBannerRoutine;
+    private readonly List<GameObject> _bannerHidden = new();
 
     public SceneFlowCoordinator(GameFlowManager gameFlow, SessionStateCoordinator session, BridgeCoordinator bridge)
     {
@@ -205,12 +208,14 @@ public sealed class SceneFlowCoordinator
         {
             _gameFlow.phaseTransitionManager.AdvancePhase("GFM/StartNextMotifInPhase(Exhausted)");
             yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
-            yield return RevealAndFadeRecordAfterMaze();
+            _gameFlow.StartCoroutine(RevealAndFadeRecordAfterMaze());
             yield break;
         }
 
         yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
-        yield return RevealAndFadeRecordAfterMaze();
+        // Not yielded — mirrors StartChosenMotifOrPhase: the name → record sequence plays
+        // over gameplay instead of holding up the bridge.
+        _gameFlow.StartCoroutine(RevealAndFadeRecordAfterMaze());
     }
 
     // Ordinary/path-choice motif transitions: the new maze has already fully finished
@@ -219,6 +224,10 @@ public sealed class SceneFlowCoordinator
     // instead of being synced to maze-generation duration.
     private IEnumerator RevealAndFadeRecordAfterMaze()
     {
+        // Name fades in, holds, and fades out first; the record ring only appears after.
+        var banner = ShowMotifNameBanner();
+        if (banner != null) yield return banner;
+
         var binRings = _gameFlow.GetBinRingController();
         binRings?.ShowInitialRecord();
         yield return new WaitForSeconds(binRings?.GetRecordHoldDuration(RecordHoldDurationFallback) ?? RecordHoldDurationFallback);
@@ -268,8 +277,6 @@ public sealed class SceneFlowCoordinator
             yield break;
         }
 
-        yield return _gameFlow.StartCoroutine(PlayIntroScreenSequenceAsync());
-
         var shipProfiles = _session.Players
             .Select(p => ShipMusicalProfileLoader.GetProfile(p.GetSelectedShipName()))
             .ToList();
@@ -286,6 +293,12 @@ public sealed class SceneFlowCoordinator
         {
             _gameFlow.phaseTransitionManager.StartChapter(_gameFlow.phaseTransitionManager.FirstPhaseIndex, "GFM/Setup");
         }
+
+        // Runs after the chapter/motif is resolved so the intro shows the actual starting
+        // motif's name. Transport hasn't started yet (ManualStart below), so nothing plays
+        // underneath it.
+        yield return _gameFlow.StartCoroutine(PlayIntroScreenSequenceAsync());
+
         _gameFlow.noteViz.Initialize();
         _gameFlow.harmony.Initialize(_gameFlow.activeDrumTrack, _gameFlow.controller);
         _gameFlow.activeDrumTrack.ManualStart();
@@ -319,27 +332,65 @@ public sealed class SceneFlowCoordinator
 
     private IEnumerator PlayIntroScreenSequenceAsync()
     {
-        GameObject introGo = null;
-        foreach (var root in SceneManager.GetActiveScene().GetRootGameObjects())
-        {
-            var match = root.GetComponentsInChildren<Transform>(includeInactive: true)
-                            .FirstOrDefault(t => t.name == "Intro Screen");
-            if (match != null) { introGo = match.gameObject; break; }
-        }
-
+        var introGo = FindIntroScreen();
         if (introGo == null)
         {
             Debug.LogWarning("[SceneFlow] 'Intro Screen' not found — skipping intro sequence.");
             yield break;
         }
 
+        ApplyCurrentMotifName(introGo);
+        yield return FadeIntroScreen(introGo, motifNameOnly: false);
+    }
+
+    /// <summary>
+    /// Mid-session motif start: fades the Intro Screen's "Motif Name" text in with the new
+    /// motif's name, holds, and fades it out. Other Intro Screen children stay hidden so only
+    /// the name shows over gameplay. Not yielded by callers; a newer banner cancels an older one.
+    /// </summary>
+    private Coroutine ShowMotifNameBanner()
+    {
+        var introGo = FindIntroScreen();
+        if (introGo == null) return null;
+        if (ApplyCurrentMotifName(introGo) == null) return null;
+
+        if (_motifBannerRoutine != null)
+        {
+            _gameFlow.StopCoroutine(_motifBannerRoutine);
+            RestoreBannerHidden();
+        }
+        _motifBannerRoutine = _gameFlow.StartCoroutine(FadeIntroScreen(introGo, motifNameOnly: true));
+        return _motifBannerRoutine;
+    }
+
+    private IEnumerator FadeIntroScreen(GameObject introGo, bool motifNameOnly)
+    {
         var cg = introGo.GetComponent<CanvasGroup>() ?? introGo.AddComponent<CanvasGroup>();
+
+        // When showing just the name, temporarily hide every Intro Screen child that isn't on
+        // the Motif Name branch, restoring their prior active state afterwards.
+        var hidden = _bannerHidden;
+        hidden.Clear();
+        var nameText = FindMotifNameText(introGo);
+        if (motifNameOnly && nameText != null)
+        {
+            foreach (Transform child in introGo.transform)
+            {
+                if (!child.gameObject.activeSelf) continue;
+                if (nameText.transform == child || nameText.transform.IsChildOf(child)) continue;
+                child.gameObject.SetActive(false);
+                hidden.Add(child.gameObject);
+            }
+        }
+        if (nameText != null) nameText.gameObject.SetActive(true);
+
         introGo.SetActive(true);
         cg.alpha = 0f;
 
         float elapsed = 0f;
         while (elapsed < IntroFadeInDuration)
         {
+            if (!introGo) yield break;
             elapsed += Time.deltaTime;
             cg.alpha = Mathf.Clamp01(elapsed / IntroFadeInDuration);
             yield return null;
@@ -351,12 +402,63 @@ public sealed class SceneFlowCoordinator
         elapsed = 0f;
         while (elapsed < IntroFadeOutDuration)
         {
+            if (!introGo) yield break;
             elapsed += Time.deltaTime;
             cg.alpha = 1f - Mathf.Clamp01(elapsed / IntroFadeOutDuration);
             yield return null;
         }
+        if (!introGo) yield break;
         cg.alpha = 0f;
         introGo.SetActive(false);
+
+        RestoreBannerHidden();
+        if (motifNameOnly) _motifBannerRoutine = null;
+    }
+
+    private void RestoreBannerHidden()
+    {
+        foreach (var go in _bannerHidden)
+            if (go) go.SetActive(true);
+        _bannerHidden.Clear();
+    }
+
+    private static GameObject FindIntroScreen()
+    {
+        foreach (var root in SceneManager.GetActiveScene().GetRootGameObjects())
+        {
+            var match = root.GetComponentsInChildren<Transform>(includeInactive: true)
+                            .FirstOrDefault(t => t.name == "Intro Screen");
+            if (match != null) return match.gameObject;
+        }
+        return null;
+    }
+
+    // Prefers a TMP text named "Motif Name"; falls back to the first TMP text under Intro Screen.
+    private static TMP_Text FindMotifNameText(GameObject introGo)
+    {
+        var texts = introGo.GetComponentsInChildren<TMP_Text>(includeInactive: true);
+        return texts.FirstOrDefault(t => t.name == "Motif Name") ?? texts.FirstOrDefault();
+    }
+
+    private TMP_Text ApplyCurrentMotifName(GameObject introGo)
+    {
+        var text = FindMotifNameText(introGo);
+        if (text == null)
+        {
+            Debug.LogWarning("[SceneFlow] No 'Motif Name' TMP text under 'Intro Screen'.");
+            return null;
+        }
+
+        var ptm = _gameFlow.phaseTransitionManager;
+        var motif = ptm != null ? ptm.currentMotif : null;
+        if (motif != null)
+        {
+            string motifName = !string.IsNullOrEmpty(motif.displayName) ? motif.displayName : motif.motifId;
+            string phaseName = ptm.CurrentPhaseName;
+            if (string.IsNullOrEmpty(phaseName)) phaseName = ptm.CurrentPhaseId;
+            text.text = string.IsNullOrEmpty(phaseName) ? motifName : $"{motifName}\n{phaseName}";
+        }
+        return text;
     }
 
     private void BindSceneVoicesToTimingAuthority()
@@ -456,15 +558,23 @@ public sealed class SceneFlowCoordinator
         var lockedOwners = new List<LocalPlayer>();
         var entryCells = StageVehiclesOffscreenAtEdge(entryEdge, exitAnchorCell, lockedOwners);
 
-        // A matching black hole opens on the mirrored edge while the new maze grows, so the
-        // vehicles' exit has an entrance instead of the field going empty and popping in.
-        var entryPortal = SpawnEntryPortal(entryEdge, entryCells, phaseIndex, motifIndex, entryKind);
+        // A matching rainbow road opens on the mirrored edge while the new maze grows; the
+        // vehicles ride in on it and are spat out of its inner end into the new motif.
+        var entryPortal = SpawnEntryPortal(entryEdge, entryCells, phaseIndex, motifIndex, entryKind, out var entryGeo);
 
         yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false, vehicleCellOverrides: entryCells));
-        yield return _gameFlow.StartCoroutine(DriveVehiclesInFromOffscreen(entryCells));
+        entryPortal?.Swallow();   // road surges to life as the vehicles come through
+        yield return _gameFlow.StartCoroutine(DriveVehiclesInFromOffscreen(entryCells, entryPortal, entryGeo));
 
         if (entryPortal != null)
             entryPortal.CloseAndDestroy(_gameFlow.PathEntryPortalCloseSeconds);
+
+        // An uncaught wisp whose exit the player followed reappears now (despawns at first loop boundary).
+        Vector2Int wispEntryCell = default;
+        bool haveEntryCell = false;
+        if (entryCells != null)
+            foreach (var kv in entryCells) { wispEntryCell = kv.Value; haveEntryCell = true; break; }
+        Wisp.BeginPendingCarry(haveEntryCell ? _gameFlow.activeDrumTrack : null, entryEdge, wispEntryCell);
 
         foreach (var lp in lockedOwners)
             lp?.SetInputLocked(false);
@@ -497,6 +607,32 @@ public sealed class SceneFlowCoordinator
         if (v == null) return;
         var col = v.GetComponent<Collider2D>();
         if (col != null) col.enabled = solid;
+    }
+
+    /// <summary>
+    /// Snaps a vehicle toward a road's centre line (the line through <paramref name="linePoint"/>
+    /// along the road, i.e. perpendicular to <paramref name="tangent"/>): its sideways offset and
+    /// sideways velocity both decay at <paramref name="strength"/> per second, so it locks onto
+    /// the middle of the road without fighting its motion along it. Used both while being sucked
+    /// out of the interstitial and while riding the entry road into the next motif.
+    /// </summary>
+    public static void PullOntoRoadCenter(Vehicle v, Vector2 linePoint, Vector2 tangent, float strength)
+    {
+        if (v == null || strength <= 0f) return;
+        float k = 1f - Mathf.Exp(-strength * Time.deltaTime);
+        Vector2 pos = v.transform.position;
+        float offset = Vector2.Dot(linePoint - pos, tangent);
+        Vector2 shift = tangent * (offset * k);
+        if (v.rb != null)
+        {
+            v.rb.position += shift;
+            float lateralVel = Vector2.Dot(v.rb.linearVelocity, tangent);
+            v.rb.linearVelocity -= tangent * (lateralVel * k);
+        }
+        else
+        {
+            v.transform.position = pos + shift;
+        }
     }
 
     // World-space direction pointing away from the maze through `side` — the negation of
@@ -645,7 +781,7 @@ public sealed class SceneFlowCoordinator
             // Teleporting would otherwise draw a trail line across the screen, and the vehicle
             // stays shrunk (from being swallowed) until it emerges from the entry hole.
             v.ClearTrailForWrap();
-            VehicleSwallowScale.Apply(v, 0.15f);
+            VehicleSwallowScale.Apply(v, VehicleSwallowScale.Swallowed);
 
             foreach (var lp in _session.Players)
             {
@@ -662,20 +798,25 @@ public sealed class SceneFlowCoordinator
     }
 
     // Drives each staged vehicle from its off-screen point (set by StageVehiclesOffscreenAtEdge)
-    // in to its real entry cell, mirroring PathChoiceCoordinator's exit-carry loop so entry and
-    // exit read as the same kind of scripted travel rather than two different mechanisms.
-    private IEnumerator DriveVehiclesInFromOffscreen(Dictionary<Vehicle, Vector2Int> entryCells)
+    // in along the entry road — the mirror of PathChoiceCoordinator's exit-carry: locked onto the
+    // road's centre line, growing back to full size by the maze wall, and then spat out of the
+    // road's inner end into the new maze with a burst of speed (it's solid again from there).
+    private IEnumerator DriveVehiclesInFromOffscreen(
+        Dictionary<Vehicle, Vector2Int> entryCells, PathExitPortal road, PathExitGeometry geo)
     {
         var drums = _gameFlow.activeDrumTrack;
         if (drums == null || entryCells.Count == 0) yield break;
 
-        const float arriveDistanceSq = 0.75f * 0.75f;
+        var cfg = _gameFlow.PathExitConfig;
+        bool haveRoad = geo.OpeningWidth > 0f;
+        Vector2 inward = haveRoad ? geo.Inward : -OutwardDirection(geo.Side);
+        // Where the road ends inside the maze (screen-edge anchor + its inner length): the spit point.
+        float roadInnerDist = road != null ? road.InnerDistance : (haveRoad ? geo.ScreenEdgeDistance + geo.CaptureDepth * cfg.roadInnerLength : 0f);
+        float wallDist = haveRoad ? geo.ScreenEdgeDistance : 0f;
+        float margin = _gameFlow.PathTransitionOffscreenMargin;
+
         float timeout = _gameFlow.PathTransitionTravelTimeout;
         var pending = new List<Vehicle>(entryCells.Keys);
-        var startDist = new Dictionary<Vehicle, float>();
-        foreach (var pv in pending)
-            if (pv != null)
-                startDist[pv] = Mathf.Max(0.5f, Vector2.Distance(pv.transform.position, drums.GridToWorldPosition(entryCells[pv])));
         float elapsed = 0f;
 
         while (elapsed < timeout && pending.Count > 0)
@@ -685,42 +826,65 @@ public sealed class SceneFlowCoordinator
                 var v = pending[i];
                 if (v == null) { pending.RemoveAt(i); continue; }
 
-                Vector2 targetWorld = drums.GridToWorldPosition(entryCells[v]);
-                Vector2 toTarget = targetWorld - (Vector2)v.transform.position;
-                if (toTarget.sqrMagnitude <= arriveDistanceSq)
+                if (!haveRoad)
                 {
-                    SnapVehicleTo(v, targetWorld);
-                    VehicleSwallowScale.Restore(v);
-                    SetVehicleSolid(v, true);
+                    // No road geometry: just drive to the entry cell.
+                    Vector2 target = drums.GridToWorldPosition(entryCells[v]);
+                    Vector2 to = target - (Vector2)v.transform.position;
+                    if (to.sqrMagnitude <= 0.75f * 0.75f) { SpitOut(v, Vector2.zero, 0f); pending.RemoveAt(i); continue; }
+                    v.Move(to.normalized);
+                    continue;
+                }
+
+                // Distance travelled in from the screen edge along the road.
+                float along = Vector2.Dot((Vector2)v.transform.position - geo.VisualCenter, inward);
+                if (along >= roadInnerDist)
+                {
+                    SpitOut(v, inward, cfg.spitSpeed);
                     pending.RemoveAt(i);
                     continue;
                 }
 
-                // Emerge from the hole: grow back to full size as the vehicle travels in.
-                float progress = 1f - Mathf.Clamp01(toTarget.magnitude / startDist[v]);
-                VehicleSwallowScale.Apply(v, Mathf.Lerp(0.15f, 1f, Mathf.SmoothStep(0f, 1f, progress * 1.4f)));
-                v.Move(toTarget.normalized);
+                // Emerge: grow from swallowed (off-screen) to full size by the maze wall.
+                float grow = Mathf.InverseLerp(-margin, Mathf.Max(wallDist, 0.01f), along);
+                VehicleSwallowScale.Apply(v, Mathf.Lerp(VehicleSwallowScale.Swallowed, 1f, Mathf.SmoothStep(0f, 1f, grow)));
+
+                PullOntoRoadCenter(v, geo.Center, geo.Tangent, cfg.centerPull);
+                v.Move(inward);
             }
             elapsed += Time.deltaTime;
             yield return null;
         }
 
-        // Timeout safety net: don't leave anyone stranded just outside the maze.
+        // Timeout safety net: don't leave anyone stranded on the road or outside the maze.
         foreach (var v in pending)
         {
             if (v == null) continue;
-            SnapVehicleTo(v, drums.GridToWorldPosition(entryCells[v]));
-            VehicleSwallowScale.Restore(v);
-            SetVehicleSolid(v, true);
+            Vector2 landing = haveRoad
+                ? geo.VisualCenter + inward * roadInnerDist
+                : drums.GridToWorldPosition(entryCells[v]);
+            SnapVehicleTo(v, landing);
+            SpitOut(v, inward, haveRoad ? cfg.spitSpeed : 0f);
         }
     }
 
-    // Opens the entry black hole on the mirrored edge, at the along-edge position the vehicles
-    // will enter from. Colors come from the motif being entered; it is a fresh (not played) look.
+    // Off the end of the entry road: full size, solid again, flung into the maze.
+    private static void SpitOut(Vehicle v, Vector2 direction, float speed)
+    {
+        VehicleSwallowScale.Restore(v);
+        SetVehicleSolid(v, true);
+        if (v.rb != null && speed > 0f)
+            v.rb.linearVelocity = direction * speed;
+    }
+
+    // Opens the entry rainbow road on the mirrored edge, at the along-edge position the vehicles
+    // will enter from. Colors come from the motif being entered; the look matches the kind of
+    // road the vehicles left through (colour vs. B&W, motif vs. phase).
     private PathExitPortal SpawnEntryPortal(
         BoundaryWrap.BoundarySide edge, Dictionary<Vehicle, Vector2Int> entryCells,
-        int phaseIndex, int motifIndex, PathExitKind kind)
+        int phaseIndex, int motifIndex, PathExitKind kind, out PathExitGeometry geo)
     {
+        geo = default;
         var drums = _gameFlow.activeDrumTrack;
         if (drums == null || entryCells.Count == 0) return null;
 
@@ -730,13 +894,14 @@ public sealed class SceneFlowCoordinator
         float cellSize = Mathf.Max(0.01f, drums.GetCellWorldSize());
         float opening = 4f * cellSize;   // gap span + carve radius, same as an exit's passable opening
         float depth = Mathf.Max(cellSize, _gameFlow.PathExitCaptureDepthCells * cellSize);
-        var geo = PathExitGeometryFactory.Create(edge, drums.GridToWorldPosition(cell), opening, depth);
+        geo = PathExitGeometryFactory.Create(edge, drums.GridToWorldPosition(cell), opening, depth,
+            _gameFlow.PathExitConfig.leftRightExitInset);
 
         var motif = _gameFlow.phaseTransitionManager != null
             ? _gameFlow.phaseTransitionManager.PeekMotif(phaseIndex, motifIndex)
             : null;
         var root = PathExitParticleBuilder.Build(
-            geo, kind, motif?.GetActiveRoleColors(), false, _gameFlow.PathExitParticleStyle, null);
+            geo, kind, motif?.GetActiveRoleColors(), _gameFlow.PathExitConfig, null, entry: true);
         root.name = "PathEntryVisual";
         return root.GetComponent<PathExitPortal>();
     }

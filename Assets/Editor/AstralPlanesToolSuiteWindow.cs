@@ -127,11 +127,11 @@ public partial class AstralPlanesToolSuiteWindow : EditorWindow
         EditorGUILayout.LabelField("Existing Tools", EditorStyles.boldLabel);
         using (new EditorGUILayout.HorizontalScope())
         {
-            if (GUILayout.Button("Generate Chord Progression Profiles"))
-                EditorApplication.ExecuteMenuItem("Tools/Astral Planes/Generate Chord Progression Profiles (C Library)");
-
             if (GUILayout.Button("MIDI → Riff Importer"))
                 GetWindow<MidiToRiffImporterWindow>("MIDI → Riff Importer");
+
+            if (GUILayout.Button("Ring Session Manager"))
+                RingSessionManagerWindow.Open();
         }
     }
 

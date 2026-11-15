@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Waiting-Groove-NoteSetConfig-1
   m_EditorClassIdentifier: Assembly-CSharp::RoleMotifNoteSetConfig
   id: waiting-lightkeys-1
-  roleProfile: {fileID: 11400000, guid: f14614a90e0be4510a7af454c069c369, type: 2}
+  roleProfile: {fileID: 11400000, guid: 0f46b04e2fa0e4cd59303e70785afbb8, type: 2}
   riff: {fileID: 11400000, guid: 6ce0451e46360439696a083e5fd5b479, type: 2}
   mineNodeExpireAfterLoops: 8
   ascendLoops: 4

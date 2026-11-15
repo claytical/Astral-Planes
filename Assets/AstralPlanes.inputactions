@@ -306,6 +306,15 @@
                     "initialStateCheck": false
                 },
                 {
+                    "name": "Pause",
+                    "type": "Button",
+                    "id": "737ebc63-feac-45f2-9032-3940b6252872",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "West",
                     "type": "Button",
                     "id": "57517f6e-0d8b-40fb-a67f-7082933bab5e",
@@ -624,6 +633,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "Quit",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "b4583e4c-8c76-446d-8422-24b61177c9aa",
+                    "path": "<Gamepad>/select",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
+                    "action": "Pause",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },

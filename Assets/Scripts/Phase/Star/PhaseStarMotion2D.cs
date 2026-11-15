@@ -103,6 +103,10 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
             // place (X-agong stuck-on-dormant-star bug). FixedUpdate settles shoves back to rest.
             _rb.constraints = RigidbodyConstraints2D.FreezeRotation;
         }
+        else if (!frozen && _enabled && _rb)
+        {
+            _rb.constraints = RigidbodyConstraints2D.FreezeRotation;
+        }
     }
 
     [Serializable]
@@ -167,11 +171,34 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         _navigator = navigator;
     }
 
-    public void Initialize(PhaseStarBehaviorProfile profile, PhaseStar star)
+    // Maze-aware navigation (StarNavigationParams on the motif's MazePatternConfig). The
+    // profile is the star's personality; these stack on top for the current maze.
+    private StarNavigationParams _nav = StarNavigationParams.Default;
+    private PhaseStarNavMode _navMode = PhaseStarNavMode.Direct;
+    private MazeNavGeometry _geom;
+
+    private float EffDriftSpeed  => Mathf.Max(0f, _profile.starDriftSpeed)  * _nav.speedMultiplier;
+    private float EffHungrySpeed => Mathf.Max(0f, _profile.starHungrySpeed) * _nav.hungrySpeedMultiplier;
+    private float EffJitter      => Mathf.Max(0f, _profile.starDriftJitter) * _nav.jitterMultiplier;
+    private float EffOrbitBias   => Mathf.Clamp01((_profile != null ? _profile.orbitBias : 0f) + _nav.orbitBiasOffset);
+
+    // Pathing modes steer around walls, so a brief scrape on a corner is expected; always arm
+    // the unstick nudge for them regardless of the prefab's enableUnstickImpulse.
+    private bool UnstickEnabled => enableUnstickImpulse || StarNavigationParams.UsesPathing(_navMode);
+
+    public void Initialize(
+        PhaseStarBehaviorProfile profile,
+        PhaseStar star,
+        StarNavigationParams nav = null,
+        PhaseStarNavMode navMode = PhaseStarNavMode.Direct,
+        MazeNavGeometry geom = default)
     {
         _profile = profile;
         _enabled = true;
         _star = star;
+        _nav = nav ?? StarNavigationParams.Default;
+        _navMode = navMode == PhaseStarNavMode.Auto ? PhaseStarNavMode.Direct : navMode;
+        _geom = geom;
 
 
         VehiclePositionsProvider ??= DefaultVehiclePositionsProvider;
@@ -217,7 +244,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         }
 
         SoftContainInsideScreen();
-        _rb.constraints = RigidbodyConstraints2D.FreezeRotation;
+        _rb.constraints = RigidbodyConstraints2D.FreezeRotation; // frozen stays pushable — see SetFrozen
     }
 
     private void FixedUpdate()
@@ -242,13 +269,9 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
         float dt = Time.fixedDeltaTime;
         float hunger = (_star != null) ? _star.GetHungerLevel() : 0f;
-        float speed = Mathf.Lerp(
-            Mathf.Max(0f, _profile.starDriftSpeed),
-            Mathf.Max(0f, _profile.starHungrySpeed),
-            hunger
-        ) * _speedMul;
+        float speed = Mathf.Lerp(EffDriftSpeed, EffHungrySpeed, hunger) * _speedMul;
 
-        float jitter = Mathf.Max(0f, _profile.starDriftJitter) * _speedMul;
+        float jitter = EffJitter * _speedMul;
 
         Vector2 huntDir = _navigator != null ? _navigator.GetDensitySteerDir() : Vector2.zero;
         bool isHunting = huntDir.sqrMagnitude > 0.0001f;
@@ -281,7 +304,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     private Vector2 ResolveDesiredHuntDirection(Vector2 huntDir, Vector2 currentPos)
     {
         Vector2 avoid = ComputeVehicleAvoidance(currentPos);
-        Vector2 desiredDir = huntDir;
+        Vector2 desiredDir = ShapeForMaze(huntDir, currentPos);
 
         if (avoid.sqrMagnitude > 0.0001f)
             desiredDir = (huntDir + avoid * avoidance.strength * avoidance.huntWeight).normalized;
@@ -319,7 +342,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
         Vector2 avoidDrift = ComputeVehicleAvoidance(currentPos);
         Vector2 avoidTangent = (avoidDrift.sqrMagnitude > 0.0001f)
-            ? Vector2.Perpendicular(avoidDrift).normalized * Mathf.Clamp01(_profile.orbitBias)
+            ? Vector2.Perpendicular(avoidDrift).normalized * EffOrbitBias
             : Vector2.zero;
 
         Vector2 navContrib = Vector2.zero;
@@ -333,6 +356,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         Vector2 baseDrift = navContrib.sqrMagnitude > 0.0001f
             ? navContrib.normalized
             : drift;
+        baseDrift = ShapeForMaze(baseDrift, currentPos);
 
         Vector2 desiredDirDrift = baseDrift + avoidDrift * avoidance.strength + avoidTangent;
 
@@ -347,6 +371,46 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
             desiredDirDrift.Normalize();
 
         return desiredDirDrift;
+    }
+
+    // Per-maze direction shaping (before vehicle avoidance / edge repulsion).
+    //   LaneGlide: snap toward whichever lane axis is closest to the desired heading.
+    //   RingOrbit: add a swirl around the ring centre, faded out when the heading is radial
+    //              (i.e. the path is threading a gap between rings).
+    private Vector2 ShapeForMaze(Vector2 dir, Vector2 pos)
+    {
+        if (dir.sqrMagnitude < 0.0001f) return dir;
+
+        switch (_navMode)
+        {
+            case PhaseStarNavMode.LaneGlide when _geom.HasLaneAxis:
+            {
+                Vector2 axis = _geom.LaneAxis;
+                if (_geom.HasSecondLaneAxis &&
+                    Mathf.Abs(Vector2.Dot(dir, _geom.LaneAxis2)) > Mathf.Abs(Vector2.Dot(dir, axis)))
+                    axis = _geom.LaneAxis2;
+
+                float sign = Vector2.Dot(dir, axis) >= 0f ? 1f : -1f;
+                Vector2 shaped = Vector2.Lerp(dir, axis * sign, _nav.laneAlignStrength);
+                return shaped.sqrMagnitude > 0.0001f ? shaped.normalized : dir;
+            }
+
+            case PhaseStarNavMode.RingOrbit when _geom.HasRingCentre:
+            {
+                Vector2 radial = pos - _geom.RingCentre;
+                if (radial.sqrMagnitude < 0.0001f) return dir;
+                radial.Normalize();
+
+                Vector2 tangent = Vector2.Perpendicular(radial);
+                float sign = Vector2.Dot(dir, tangent) >= 0f ? 1f : -1f;
+                float tangentialness = 1f - Mathf.Abs(Vector2.Dot(dir, radial));
+                Vector2 shaped = dir + tangent * sign * _nav.ringTangentialStrength * tangentialness;
+                return shaped.sqrMagnitude > 0.0001f ? shaped.normalized : dir;
+            }
+
+            default:
+                return dir;
+        }
     }
 
     private Vector2 ApplyPushVelocity(Vector2 baseVelocity, float dt)
@@ -372,7 +436,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
     private void HandleUnstickImpulse(Vector2 huntDir, float speed, float dt)
     {
-        if (!enableUnstickImpulse || bounds.kinematicMode || unstickImpulseSpeed <= 0.001f)
+        if (!UnstickEnabled || bounds.kinematicMode || unstickImpulseSpeed <= 0.001f)
         {
             _stuckTimer = 0f;
             return;
@@ -650,10 +714,24 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         return false;
     }
 
+    private bool AnyVehicleOverlapping(out Vehicle vehicle)
+    {
+        vehicle = null;
+        for (int i = 0; i < _ghostIgnoredVehicleCols.Count; i++)
+        {
+            var vc = _ghostIgnoredVehicleCols[i];
+            if (!vc || !vc.enabled || vc.isTrigger) continue;
+            if (!OverlapsStar(vc)) continue;
+            vehicle = vc.GetComponentInParent<Vehicle>();
+            if (vehicle != null) return true;
+        }
+        return false;
+    }
+
     private void PickNewDriftDir()
     {
         Vector2 rnd = Random.insideUnitCircle.normalized;
-        float bias = Mathf.Clamp01(_profile != null ? _profile.orbitBias : 0f);
+        float bias = EffOrbitBias;
         _driftDir = Vector2.Lerp(rnd, Vector2.Perpendicular(rnd).normalized, bias).normalized;
         _rechooseTimer = Random.Range(1.2f, 2.4f);
     }

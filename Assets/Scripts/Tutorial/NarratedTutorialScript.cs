@@ -25,6 +25,10 @@ public class TutorialStage
     [NonSerialized] public TutorialGate gate;
     [Tooltip("Index of a line that becomes a Now!/Here! placement-window cue loop while the player carries a note. -1 = none.")]
     public int cueLineIndex = -1;
+    [Tooltip("Optional replacement lines used when the active vehicle(s) are Cozy Co-Pilot (auto placement). Empty = use 'lines'.")]
+    public string[] linesAuto;
+    [Tooltip("Cue line index within linesAuto. -1 = none (auto placement has no release window).")]
+    public int cueLineIndexAuto = -1;
 }
 
 [Serializable]
@@ -131,6 +135,12 @@ public class NarratedTutorialScript : ScriptableObject
             {
                 Debug.LogWarning($"[NarratedTutorial] Stage '{label}' cueLineIndex {st.cueLineIndex} is outside its {st.lines.Length} lines; cue disabled.");
                 st.cueLineIndex = -1;
+            }
+            if (st.linesAuto != null && st.linesAuto.Length > 0 &&
+                (st.cueLineIndexAuto < -1 || st.cueLineIndexAuto >= st.linesAuto.Length))
+            {
+                Debug.LogWarning($"[NarratedTutorial] Stage '{label}' cueLineIndexAuto {st.cueLineIndexAuto} is outside its {st.linesAuto.Length} linesAuto; cue disabled.");
+                st.cueLineIndexAuto = -1;
             }
         }
 

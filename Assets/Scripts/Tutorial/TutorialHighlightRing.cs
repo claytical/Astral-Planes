@@ -62,7 +62,7 @@ public class TutorialHighlightRing : MonoBehaviour
 
         float expandT = Mathf.Clamp01(_t / _expand);
         float eased = 1f - Mathf.Pow(1f - expandT, 3f);           // ease-out
-        float diameter = Mathf.Lerp(0.1f, radius * 2f, eased);
+        float diameter = Mathf.Lerp(0.1f, radius * 1.5f, eased);
         transform.localScale = new Vector3(diameter, diameter, 1f);
 
         float alpha = 1f;

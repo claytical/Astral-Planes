@@ -234,6 +234,8 @@ GameObject:
   - component: {fileID: 6462711525076251061}
   - component: {fileID: 2282495354990635995}
   - component: {fileID: 3751250523553378462}
+  - component: {fileID: 5120934871236640917}
+  - component: {fileID: 6230418857312906424}
   m_Layer: 0
   m_Name: PhaseLibraryCarousel
   m_TagString: Untagged
@@ -329,6 +331,35 @@ MonoBehaviour:
   midiStreamPlayer: {fileID: 0}
   phaseLibrary: {fileID: 11400000, guid: 4660cb6f322234453bcc49b92f037354, type: 2}
   ringGlyphConfig: {fileID: 0}
+--- !u!114 &5120934871236640917
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2018841000974329430}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2aee74c687ba412db2806421abeabada, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AudioBalanceDebugPanel
+  previewPlayer: {fileID: 3751250523553378462}
+  toggleKey: 18
+  panelWidth: 420
+--- !u!114 &6230418857312906424
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2018841000974329430}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 05bf645786434dccb9026b6b9470b4d4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PreviewBeatToggle
+  previewPlayer: {fileID: 3751250523553378462}
+  toggleKey: 16
 --- !u!1 &2861694913563882912
 GameObject:
   m_ObjectHideFlags: 0

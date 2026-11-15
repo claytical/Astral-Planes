@@ -10,15 +10,23 @@ public static class PathExitGeometryFactory
     /// <summary>
     /// Builds geometry for an opening on <paramref name="side"/> whose along-wall position is that
     /// of <paramref name="alongWallWorld"/> (its normal-axis coordinate is ignored and snapped).
+    /// Left/Right exits are moved <paramref name="leftRightInset"/> world units in from the side
+    /// wall (PathExitConfig.leftRightExitInset) so they sit on-screen; the gap between the moved
+    /// face and the true edge becomes part of ScreenEdgeDistance, so the road still runs out to it.
     /// </summary>
     public static PathExitGeometry Create(
-        BoundaryWrap.BoundarySide side, Vector2 alongWallWorld, float openingWidth, float captureDepth)
+        BoundaryWrap.BoundarySide side, Vector2 alongWallWorld, float openingWidth, float captureDepth,
+        float leftRightInset = 0f)
     {
         Vector2 center = SnapToPhysicalBoundary(alongWallWorld, side);
 
-        // Distance from the reachable wall face to the true screen edge: 0 on Left/Right, the
-        // UI-bar band on Top/Bottom.
         Vector2 outward = SceneFlowCoordinator.OutwardDirection(side);
+        bool leftRight = side == BoundaryWrap.BoundarySide.Left || side == BoundaryWrap.BoundarySide.Right;
+        if (leftRight && leftRightInset > 0f)
+            center -= outward * leftRightInset;
+
+        // Distance from the (possibly inset) exit face to the true screen edge: the inset on
+        // Left/Right, the UI-bar band on Top/Bottom.
         float edgeDist = Mathf.Clamp(
             Vector2.Dot(SceneFlowCoordinator.OffscreenPointAlong(center, side, 0f) - center, outward), 0f, 20f);
 

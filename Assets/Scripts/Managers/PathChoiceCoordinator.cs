@@ -56,7 +56,23 @@ public sealed class PathChoiceCoordinator
         // Exits come from the motif maze: inward and/or outward along the current motif's arm
         // (or all four arms from the hub), each on the screen edge matching its direction. Only
         // a library with nothing to move to (a lone hub) skips the interstitial.
+        _playedKeys = new HashSet<(string, string)>();
+        foreach (var r in RingSessionStore.LoadAllRingsFromDisk())
+            _playedKeys.Add((r.PhaseId, r.MotifId));
+
         var mazeExits = ptm.GetMazeExits();
+
+        // Phase-change exits (Up/Down) only appear once EVERY motif of the current phase has a
+        // recorded ring. (The tutorial phase has one motif, so its Up road opens right away.)
+        if (!AllMotifsRecordedInPhase(ptm))
+            mazeExits.RemoveAll(e => e.Dir == MazeArm.Up || e.Dir == MazeArm.Down);
+
+        // No travelling back out of phase 1: MotifMazeGraph's inward move from phase 1 wraps to
+        // the outermost orbit (and the tutorial below it is gone once played). Scoped here, not
+        // in the graph, because PhaseLibraryCarousel browses with that same graph.
+        if (ptm.CurrentPhaseIndex <= 1)
+            mazeExits.RemoveAll(e => e.Dir == MazeArm.Down);
+
         if (mazeExits.Count == 0)
         {
             yield return _gameFlow.StartCoroutine(_sceneFlow.StartNextMotifInPhase());
@@ -96,12 +112,9 @@ public sealed class PathChoiceCoordinator
         pattern.tunnels.corridorWidth = corridorWidth;
         pattern.tunnels.corridorStep = corridorWidth + 3; // thick-dust walls around the vehicle
         pattern.porousBorder.exitCount = mazeExits.Count;
+        pattern.porousBorder.topBottomCenterBand = _gameFlow.PathExitConfig.topBottomExitCenterBand;
         foreach (var e in mazeExits)
             pattern.porousBorder.exitSides.Add(MotifMaze.SideOf(e.Dir));
-
-        _playedKeys = new HashSet<(string, string)>();
-        foreach (var r in RingSessionStore.LoadAllRingsFromDisk())
-            _playedKeys.Add((r.PhaseId, r.MotifId));
 
         _allExits.Clear();
         _winnerExit = null;
@@ -147,6 +160,7 @@ public sealed class PathChoiceCoordinator
             foreach (var exit in _allExits)
                 if (exit != null) Object.Destroy(exit.gameObject);
             _allExits.Clear();
+            ResolveWispAtMazeEnd(null);
             Boundaries.SetWrapEnabled(prevWrap);
             yield break;
         }
@@ -169,27 +183,72 @@ public sealed class PathChoiceCoordinator
             if (e != exit) e.SetSealed(true);
     }
 
-    // Spawns one wisp (not one per exit) targeting a randomly chosen exit among those just
-    // created. Purely additive/decorative to the path-choice mechanic: touching the wisp
-    // never resolves the choice itself, only OnVehicleReachedExit does that — see Wisp.cs.
+    // Wisp the current interstitial spawned (null once consumed/destroyed/carried).
+    private Wisp _wisp;
+
+    // Spawns one wisp (not one per exit) targeting the "correct" exit — see PickWispExit. Touching
+    // the wisp never resolves the choice itself, only OnVehicleReachedExit does that.
     private void SpawnWisp(DrumTrack drums, List<Vector2Int> vehicleCells, PhaseTransitionManager ptm)
     {
         var prefab = _gameFlow.WispPrefab;
         if (prefab == null || _allExits.Count == 0 || vehicleCells.Count == 0) return;
 
-        var targetExit = _allExits[UnityEngine.Random.Range(0, _allExits.Count)];
+        var targetExit = PickWispExit();
+        if (targetExit == null) return;
 
-        // Same peek pattern as CreateExitTrigger's role-color preview: resolve the wisp's
-        // bridging sample from the motif its assigned exit actually leads into, not the
-        // outgoing motif. Falls back to the current motif if the peek misses, rather than
-        // leaving the bridge sample null.
+        // Resolve the bridging sample from the motif the assigned exit leads into (not the
+        // outgoing motif). Falls back to the current motif if the peek misses.
         MotifProfile targetMotif = ptm.PeekMotif(targetExit.TargetPhaseIndex, targetExit.TargetMotifIndex) ?? ptm.currentMotif;
 
         var go = Object.Instantiate(prefab, Vector3.zero, Quaternion.identity);
         bool placed = go.TryGetComponent<Wisp>(out var wisp) &&
-                      wisp.Initialize(drums, vehicleCells[0], targetExit.AnchorCell, targetMotif);
+                      wisp.Initialize(drums, vehicleCells[0], targetExit.AnchorCell, targetMotif,
+                                      targetExit.TargetPhaseIndex, targetExit.TargetMotifIndex);
         if (!placed)
+        {
             Object.Destroy(go);
+            return;
+        }
+
+        _wisp = wisp;
+        Debug.Log($"[Wisp] assigned to {targetExit.Side} exit -> phase {targetExit.TargetPhaseIndex} motif {targetExit.TargetMotifIndex} kind={targetExit.Kind}");
+    }
+
+    // The wisp leads toward the path that hasn't been explored in this phase (Right/next-in-ring
+    // preferred over Left). Once the phase is exhausted it leads to the next-phase (Up) exit.
+    private MazePathExit PickWispExit()
+    {
+        var rightSide = MotifMaze.SideOf(MazeArm.Right);
+        var upSide = MotifMaze.SideOf(MazeArm.Up);
+
+        MazePathExit unexploredRight = null, unexploredOther = null, up = null, any = null;
+        foreach (var e in _allExits)
+        {
+            if (e == null) continue;
+            any ??= e;
+            if (e.Kind == PathExitKind.NewMotif)
+            {
+                if (e.Side == rightSide) unexploredRight ??= e;
+                else unexploredOther ??= e;
+            }
+            else if (e.Kind == PathExitKind.NewPhase && e.Side == upSide)
+                up ??= e;
+        }
+        return unexploredRight ?? unexploredOther ?? up ?? any;
+    }
+
+    // Called once the winning exit is known and the maze is about to be left behind. An uncaught
+    // wisp rides along only if the player took the exit it was leading toward.
+    private void ResolveWispAtMazeEnd(MazePathExit winnerExit)
+    {
+        var wisp = _wisp;
+        _wisp = null;
+        if (wisp == null) return;
+
+        if (winnerExit != null && wisp.IsAssignedTo(winnerExit.TargetPhaseIndex, winnerExit.TargetMotifIndex))
+            wisp.CarryOverToNextMotif();
+        else
+            wisp.Dismiss();
     }
 
     private MazePathExit CreateExitTrigger(DrumTrack drums, CosmicDustGenerator.PathExitInfo info, int phaseIdx, int motifIdx, PathExitKind kind)
@@ -199,22 +258,27 @@ public sealed class PathChoiceCoordinator
         var go = new GameObject($"PathExit_{info.Side}_{info.AnchorCell.x}_{info.AnchorCell.y}");
         go.transform.position = geo.Center;
 
-        // Trigger, particle lane and carry-out line all come from `geo`: the trigger covers the
-        // full carved opening (not just the span between the two gap-cell centers) and reaches
-        // CaptureDepth inward from the wall face, exactly the rectangle the particles fill.
+        // Particle lane and carry-out line come from `geo`. The capture trigger is deliberately
+        // smaller than that lane: flush with the wall face, centred on the road, only
+        // triggerDepthCells deep and triggerWidthFraction of the opening wide — so ships flying
+        // past a side exit (e.g. on the way to the top one) don't get captured by brushing it.
+        var exitCfg = _gameFlow.PathExitConfig;
+        float cellSize = Mathf.Max(0.01f, drums.GetCellWorldSize());
+        float trigDepth = Mathf.Max(cellSize * 0.5f, exitCfg.triggerDepthCells * cellSize);
+        float trigWidth = Mathf.Max(cellSize * 0.5f, geo.OpeningWidth * exitCfg.triggerWidthFraction);
         var col = go.AddComponent<BoxCollider2D>();
         col.isTrigger = true;
         col.size = geo.HorizontalWall
-            ? new Vector2(geo.OpeningWidth, geo.CaptureDepth)
-            : new Vector2(geo.CaptureDepth, geo.OpeningWidth);
-        col.offset = geo.Inward * (geo.CaptureDepth * 0.5f);
+            ? new Vector2(trigWidth, trigDepth)
+            : new Vector2(trigDepth, trigWidth);
+        col.offset = geo.Inward * (trigDepth * 0.5f);
 
         var targetMotif = _gameFlow.phaseTransitionManager.PeekMotif(phaseIdx, motifIdx);
         var visualInstance = PathExitParticleBuilder.Build(
-            geo, kind, targetMotif?.GetActiveRoleColors(), IsPlayed(phaseIdx, motifIdx),
-            _gameFlow.PathExitParticleStyle, go.transform);
+            geo, kind, targetMotif?.GetActiveRoleColors(), _gameFlow.PathExitConfig, go.transform);
 
-        Debug.Log($"[PathExit] {info.Side} -> phase {phaseIdx} motif {motifIdx} ('{targetMotif?.name}') kind={kind}");
+        if (GameFlowManager.VerboseLogging)
+            Debug.Log($"[PathExit] {info.Side} -> phase {phaseIdx} motif {motifIdx} ('{targetMotif?.name}') kind={kind}");
 
         var exit = go.AddComponent<MazePathExit>();
         exit.Configure(this, info.AnchorCell, new List<Vector2Int>(info.GapCells), info.Side, phaseIdx, motifIdx,
@@ -253,7 +317,8 @@ public sealed class PathChoiceCoordinator
         int passRadius = Mathf.Max(1, info.PassRadiusCells);
         float opening = (n + 2 * passRadius) * pitch;
         float depth = Mathf.Max(cellSize, _gameFlow.PathExitCaptureDepthCells * cellSize);
-        return PathExitGeometryFactory.Create(info.Side, (min + max) * 0.5f, opening, depth);
+        return PathExitGeometryFactory.Create(info.Side, (min + max) * 0.5f, opening, depth,
+            _gameFlow.PathExitConfig.leftRightExitInset);
     }
 
     // ── Exit kind (revisit / new motif / new phase) ───────────────────────────
@@ -266,12 +331,35 @@ public sealed class PathChoiceCoordinator
         return motif != null && phaseId != null && _playedKeys.Contains((phaseId, motif.motifId));
     }
 
+    private bool AllMotifsRecordedInPhase(PhaseTransitionManager ptm)
+    {
+        int phase = ptm.CurrentPhaseIndex;
+        int count = ptm.PeekMotifCount(phase);
+        for (int i = 0; i < count; i++)
+        {
+            if (ptm.PeekMotif(phase, i) == null) continue;   // empty library slot
+            if (!IsPlayed(phase, i)) return false;
+        }
+        return true;
+    }
+
+    // A phase counts as visited once any of its motifs has a recorded ring.
+    private bool IsPhaseVisited(int phaseIdx)
+    {
+        var phaseId = _gameFlow.phaseTransitionManager.PeekPhaseId(phaseIdx);
+        if (phaseId == null) return false;
+        foreach (var key in _playedKeys)
+            if (key.phaseId == phaseId) return true;
+        return false;
+    }
+
+    // Two axes: scope (motif in this phase vs. a phase change) x explored (colour vs. B&W road).
     private PathExitKind ClassifyExit(MotifMazeGraph.Exit exit)
     {
         var ptm = _gameFlow.phaseTransitionManager;
         if (exit.Phase != ptm.CurrentPhaseIndex || exit.Dir == MazeArm.Up || exit.Dir == MazeArm.Down)
-            return PathExitKind.NewPhase;
-        return IsPlayed(exit.Phase, exit.Motif) ? PathExitKind.Revisit : PathExitKind.NewMotif;
+            return IsPhaseVisited(exit.Phase) ? PathExitKind.VisitedPhase : PathExitKind.NewPhase;
+        return IsPlayed(exit.Phase, exit.Motif) ? PathExitKind.VisitedMotif : PathExitKind.NewMotif;
     }
 
     // Travel-lane radius sized to the widest active hull; reused when redirecting losers.
@@ -322,11 +410,15 @@ public sealed class PathChoiceCoordinator
                 }
             }
 
-            // Going non-solid immediately only helps the winner: it glides freely through
-            // corridor-side wall cells while straightening, instead of waiting for "arrival"
-            // like losers converging in from elsewhere in the maze.
+            // The winner is already in the trigger: it's sucked straight onto the road (non-solid
+            // so it glides through corridor-side wall cells while the centre pull locks it on).
+            // Losers converging from elsewhere in the maze align first, then get carried.
             if (v == winnerVehicle)
+            {
                 SceneFlowCoordinator.SetVehicleSolid(v, false);
+                carrying.Add(v);
+                continue;
+            }
 
             aligning.Add(v);
         }
@@ -335,8 +427,13 @@ public sealed class PathChoiceCoordinator
         // Quarter of the opening each side of center — tight enough that the carry starts
         // visibly inside the lit lane, loose enough that bang-bang alignment settles quickly.
         float arriveTangentialOffset = Mathf.Max(0.12f, geo.OpeningWidth * 0.25f);
-        const float lateralGain = 3f;
-        const float lateralDamping = 0.15f;
+        // Outward acceleration added on top of the vehicle's own drive while it rides the rainbow
+        // road, ramping up with road progress so it reads as being sucked out.
+        var exitCfg = _gameFlow.PathExitConfig;
+        float pullAccel = exitCfg.pullAcceleration;
+        float shrinkStart = exitCfg.shrinkStartProgress;
+        float centerPull = exitCfg.centerPull;
+        float roadInnerDist = Mathf.Max(0.1f, winnerExit.RoadInnerDistance);
         float elapsed = 0f;
         while (elapsed < timeout && (aligning.Count > 0 || carrying.Count > 0))
         {
@@ -363,21 +460,27 @@ public sealed class PathChoiceCoordinator
 
                 if (SceneFlowCoordinator.IsPastOffscreenThreshold(v.transform.position, side, offscreenMargin))
                 {
+                    VehicleSwallowScale.Apply(v, VehicleSwallowScale.Swallowed);
+                    v.ClearTrailForWrap();
                     carrying.RemoveAt(i);
                     continue;
                 }
 
-                // Shrink into the mass as the vehicle nears the hole's center, so it reads as
-                // being swallowed rather than just driving off-screen.
-                float massR = Mathf.Max(0.1f, winnerExit.PortalRadius);
-                float distToHole = Vector2.Distance(v.transform.position, geo.VisualCenter);
-                float closeness = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(massR * 1.3f, massR * 0.2f, distToHole));
-                VehicleSwallowScale.Apply(v, Mathf.Lerp(1f, 0.15f, closeness));
+                // Progress along the rainbow road: 0 at its inner end, 1 at the screen edge where
+                // it vanishes. The vehicle keeps full size for the first stretch, then shrinks into
+                // the vanishing point so it reads as being pulled down the road, not driving off.
+                float toEdge = Vector2.Dot(geo.VisualCenter - (Vector2)v.transform.position, outward);
+                float progress = Mathf.InverseLerp(roadInnerDist, 0f, toEdge);
+                float shrink = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(shrinkStart, 1f, progress));
+                VehicleSwallowScale.Apply(v, Mathf.Lerp(1f, VehicleSwallowScale.Swallowed, shrink));
+                if (progress > 0.9f) v.ClearTrailForWrap();
 
-                float offset = geo.OffsetToCenter(v.transform.position);
-                float lateralVel = v.rb != null ? Vector2.Dot(v.rb.linearVelocity, tangentialAxis) : 0f;
-                float lateral = Mathf.Clamp(offset * lateralGain - lateralVel * lateralDamping, -1.5f, 1.5f);
-                v.Move((outward + tangentialAxis * lateral).normalized);
+                // Locked onto the middle of the road, driving straight down it, accelerating as
+                // it's sucked out (collider is already off, so nothing pushes back).
+                SceneFlowCoordinator.PullOntoRoadCenter(v, geo.Center, tangentialAxis, centerPull);
+                v.Move(outward);
+                if (v.rb != null)
+                    v.rb.linearVelocity += outward * (pullAccel * (0.3f + progress) * Time.deltaTime);
             }
 
             elapsed += Time.deltaTime;
@@ -392,7 +495,7 @@ public sealed class PathChoiceCoordinator
         // Anyone the timeout backstop teleported is still full-size/visible-scaled: hide it
         // inside the hole's scale too. (Input stays locked — staging for the next motif owns the unlock.)
         foreach (var v in _gameFlow.GetVehicles())
-            if (v != null) VehicleSwallowScale.Apply(v, 0.15f);
+            if (v != null) { VehicleSwallowScale.Apply(v, VehicleSwallowScale.Swallowed); v.ClearTrailForWrap(); }
 
         // The vehicles are gone: let the swallow land for a beat, then close the winning hole
         // and dissolve the old maze TOGETHER, so nothing on screen pops out in a single frame.
@@ -404,7 +507,8 @@ public sealed class PathChoiceCoordinator
 
         winnerExit.BeginClose(closeSeconds);
         dust.DissolveAllVisuals(dissolveSeconds);
-        Debug.Log($"[PathExitFade] carry-out took {elapsed:F2}s; closing winner over {closeSeconds:F2}s, dissolving maze over {dissolveSeconds:F2}s");
+        if (GameFlowManager.VerboseLogging)
+            Debug.Log($"[PathExitFade] carry-out took {elapsed:F2}s; closing winner over {closeSeconds:F2}s, dissolving maze over {dissolveSeconds:F2}s");
         yield return new WaitForSeconds(Mathf.Max(closeSeconds, dissolveSeconds, _gameFlow.PathExitSealFadeSeconds));
 
         int chosenPhase = winnerExit.TargetPhaseIndex;
@@ -412,6 +516,8 @@ public sealed class PathChoiceCoordinator
         var chosenKind = winnerExit.Kind;
         var mirroredEdge = SceneFlowCoordinator.MirrorSide(winnerExit.Side);
         var exitAnchorCell = winnerExit.AnchorCell;
+
+        ResolveWispAtMazeEnd(winnerExit);
 
         foreach (var exit in _allExits)
             if (exit != null) Object.Destroy(exit.gameObject);

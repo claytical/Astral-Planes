@@ -26,6 +26,9 @@ public class MotifProfile : ScriptableObject
     [Tooltip("Intensity loops tagged with a target (depth, breadth, pressure) point. Selection picks whichever tag is nearest the live-computed axis values.")]
     public List<IntensityClipTag> intensityClipTags = new();
 
+    [Range(0f, 2f), Tooltip("Per-motif drum level: multiplies AudioMixConfig.drumVolume for every drum loop of this motif (live and carousel preview). 1 = unchanged. The resulting AudioSource volume caps at 1.")]
+    public float drumVolumeMultiplier = 1f;
+
     [Min(0), Tooltip("How many full drum loops to stay in the entry loop(s) before mapping intensity.")]
     public int entryLoopCount = 1;
 

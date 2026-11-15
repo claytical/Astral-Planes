@@ -744,7 +744,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
         // ShouldSuppressInput (not just IsOpen) also covers the same frame the panel just closed
         // on this exact press — Close() runs synchronously inside the Confirm callback, earlier
         // in this same frame, which would otherwise clear IsOpen before this Update() runs.
-        if (SettingsPanelController.ShouldSuppressInput) return;
+        if (ModalMenu.ShouldSuppressInput) return;
 
         bool right = false, left = false, up = false, down = false, confirm = false;
 

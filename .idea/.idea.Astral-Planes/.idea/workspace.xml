@@ -6,641 +6,286 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/bass-bounce.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/bass-bounce.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/groove-bounce.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/groove-bounce.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/harmony-bounce-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/harmony-bounce-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/harmony-bounce.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/harmony-bounce.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/lead-bounce-alt.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/lead-bounce-alt.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/lead-bounce.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Riffs/Bass/lead-bounce.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/MIDI Import/Bass/herewego-hiphop-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/MIDI Import/Bass/herewego-hiphop-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/MIDI Import/Bass/herewego-hiphop-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/MIDI Import/Bass/herewego-hiphop-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/MIDI Import/Bass/herewego-hiphop-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/MIDI Import/Bass/herewego-hiphop-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Bass-NoteSetConfig-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Bass-NoteSetConfig-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Bass-NoteSetConfig-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Bass-NoteSetConfig-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Bass-NoteSetConfig-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Bass-NoteSetConfig-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Groove-NoteSetConfig-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Groove-NoteSetConfig-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Groove-NoteSetConfig-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Groove-NoteSetConfig-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Groove-NoteSetConfig-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Groove-NoteSetConfig-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Harmony-NoteSetConfig-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Harmony-NoteSetConfig-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Harmony-NoteSetConfig-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Harmony-NoteSetConfig-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Harmony-NoteSetConfig-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Harmony-NoteSetConfig-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Lead-NoteSetConfig-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Lead-NoteSetConfig-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Lead-NoteSetConfig-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Lead-NoteSetConfig-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Lead-NoteSetConfig-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Circus-Lead-NoteSetConfig-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Bass-NoteSetConfig-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Bass-NoteSetConfig-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Bass-NoteSetConfig-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Bass-NoteSetConfig-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Bass-NoteSetConfig-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Bass-NoteSetConfig-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Groove-NoteSetConfig-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Groove-NoteSetConfig-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Groove-NoteSetConfig-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Groove-NoteSetConfig-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Groove-NoteSetConfig-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Groove-NoteSetConfig-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Harmony-NoteSetConfig-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Harmony-NoteSetConfig-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Harmony-NoteSetConfig-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Harmony-NoteSetConfig-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Harmony-NoteSetConfig-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Harmony-NoteSetConfig-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Lead-NoteSetConfig-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Lead-NoteSetConfig-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Lead-NoteSetConfig-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Lead-NoteSetConfig-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Lead-NoteSetConfig-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Lead-NoteSetConfig-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Lead-NoteSetConfig-3.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/HereWeGo-Lead-NoteSetConfig-3.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Intro-Tutorial-Notes.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Intro-Tutorial-Notes.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Two-Bass-NoteSetConfig-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Two-Bass-NoteSetConfig-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Two-Bass-NoteSetConfig-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Two-Bass-NoteSetConfig-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Two-Harmony-NoteSetConfig-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Two-Harmony-NoteSetConfig-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Two-Harmony-NoteSetConfig-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Two-Harmony-NoteSetConfig-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Two-Lead-NoteSetConfig-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Two-Lead-NoteSetConfig-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Bass-NoteSetConfig-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Bass-NoteSetConfig-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Bass-NoteSetConfig-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Bass-NoteSetConfig-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Bass-NoteSetConfig-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Bass-NoteSetConfig-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-3.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-3.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-4.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Groove-NoteSetConfig-4.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Harmony-NoteSetConfig-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Harmony-NoteSetConfig-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Harmony-NoteSetConfig-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Harmony-NoteSetConfig-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Harmony-NoteSetConfig-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Harmony-NoteSetConfig-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Harmony-NoteSetConfig-3.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Harmony-NoteSetConfig-3.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Lead-NoteSetConfig-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Lead-NoteSetConfig-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Lead-NoteSetConfig-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Lead-NoteSetConfig-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Lead-NoteSetConfig-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Lead-NoteSetConfig-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Lead-NoteSetConfig-3.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/NoteSets/Waiting-Lead-NoteSetConfig-3.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Bass-4Bars-C1-162.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Bass-4Bars-C1-162.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Bass-4bars-shift-F1-162.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Bass-4bars-shift-F1-162.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Groove-4Bars-G3-162.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Groove-4Bars-G3-162.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Groove-4bars-shift-F3-162.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Groove-4bars-shift-F3-162.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Harmony-4Bars-D3-162.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Harmony-4Bars-D3-162.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Harmony-4bars-shift-E3-162.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Harmony-4bars-shift-E3-162.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Lead-4Bars-C3-162-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Lead-4Bars-C3-162-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Lead-4Bars-C3-162-2.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Lead-4Bars-C3-162-2.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Lead-4bars-shift-C4-162.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/4 Bars/Lead-4bars-shift-C4-162.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/A-Riff-RootA-Bass.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/A-Riff-RootA-Bass.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Bounce.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Bounce/BassFloor-Bounce-175.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Bounce/BassFloor-Bounce-175.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Bounce/LightKeys-Bounce-175.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Bounce/LightKeys-Bounce-175.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Bounce/SteelJazz-Bounce-175.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Bounce/SteelJazz-Bounce-175.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Bounce/SteelJazz-Bounce-175alt.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Bounce/SteelJazz-Bounce-175alt.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Bounce/StillSky-Bounce-175.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Bounce/StillSky-Bounce-175.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/C-D.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/C-D.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Chord Test.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Chord Test/A-Minor-A3.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Chord Test/A-Minor-A3.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Chord Test/A-Minor-C4.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Chord Test/A-Minor-C4.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Chord Test/A-Minor-E4.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Chord Test/A-Minor-E4.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Chord Test/chords-amin-C4.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Chord Test/chords-amin-C4.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Chord Test/chords-amin-E4.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Chord Test/chords-amin-E4.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Chord Test/chords-amin-a3.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Chord Test/chords-amin-a3.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/bass-c2-descent.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/bass-c2-descent.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/bassfloor-C2.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/bassfloor-C2.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/lightkeys-C3.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/lightkeys-C3.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/lightkeys-C4.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/lightkeys-C4.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/lightkeys-c3-descent.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/lightkeys-c3-descent.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/lightkeys-c4-descent.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/lightkeys-c4-descent.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/palm-c3-descent.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/palm-c3-descent.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/palm-d3-descent.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/palm-d3-descent.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/palmguitar-C3.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/palmguitar-C3.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/palmguitar-D3.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/palmguitar-D3.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/stillsky-D3.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/stillsky-D3.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/stillsky-d3-descent.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Descent/stillsky-d3-descent.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Dos-1-A1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Dos-1-A1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Dos-2-A1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Dos-2-A1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/Bass-G1-Folding-alt.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/Bass-G1-Folding-alt.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/Bass-G1-Folding.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/Bass-G1-Folding.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/Rob-A4-Folding.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/Rob-A4-Folding.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/SteelJazz-G3-Folding-Alt.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/SteelJazz-G3-Folding-Alt.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/SteelJazz-G3-Folding.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/SteelJazz-G3-Folding.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/StillSky-G3-Folding.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/StillSky-G3-Folding.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/folding-bass-g1-alt.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/folding-bass-g1-alt.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/folding-bass-g1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/folding-bass-g1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/folding-robotto-a4.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/folding-robotto-a4.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/folding-steeljazz-g3-alt.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/folding-steeljazz-g3-alt.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/folding-steeljazz-g3.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/folding-steeljazz-g3.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/folding-stillsky-g3.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Folding/folding-stillsky-g3.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-A2-Funkit-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-A2-Funkit-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-A2-Funkit-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-A2-Funkit-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-A2-Funkit-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-A2-Funkit-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-G2-Funkit-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-G2-Funkit-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-G2-Funkit-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-G2-Funkit-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-G2-Funkit-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-G2-Funkit-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-G2-Funkit-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-G2-Funkit-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-G2-Funkit-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-G2-Funkit-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-G2-Funkit-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Guitar-G2-Funkit-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-A3-Funkit-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-A3-Funkit-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-A3-Funkit-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-A3-Funkit-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-A3-Funkit-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-A3-Funkit-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-C4-Funkit-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-C4-Funkit-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-C4-Funkit-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-C4-Funkit-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-C4-Funkit-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-C4-Funkit-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-F3-Funkit-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-F3-Funkit-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-F3-Funkit-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-F3-Funkit-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-F3-Funkit-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/Rhythm-F3-Funkit-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/SpaceTrumpet-F3-Funkit-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/SpaceTrumpet-F3-Funkit-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/SpaceTrumpet-F3-Funkit-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/SpaceTrumpet-F3-Funkit-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/SpaceTrumpet-F3-Funkit-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/SpaceTrumpet-F3-Funkit-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/SpaceTrumpet-F3-Funkit-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/SpaceTrumpet-F3-Funkit-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/SpaceTrumpet-F3-Funkit-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/SpaceTrumpet-F3-Funkit-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/SpaceTrumpet-F3-Funkit-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/SpaceTrumpet-F3-Funkit-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-2-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-2-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-2.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Funk It/UprightBass-G1-Funkit-2.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind-2-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind-2-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind-2.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind-2.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Bass/FingerBass-E1-4bars-grind.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Harmony.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Harmony/Soul-E3-4bars-grind-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Harmony/Soul-E3-4bars-grind-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Harmony/Soul-E3-4bars-grind-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Harmony/Soul-E3-4bars-grind-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Harmony/Soul-E3-4bars-grind-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Harmony/Soul-E3-4bars-grind-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Harmony/Soul-E3-4bars-grind-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Harmony/Soul-E3-4bars-grind-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Harmony/Soul-E3-4bars-grind-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Harmony/Soul-E3-4bars-grind-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Harmony/Soul-E3-4bars-grind-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Harmony/Soul-E3-4bars-grind-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Lead.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Lead/LeadGuitar-E4-4bars-grind-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Lead/LeadGuitar-E4-4bars-grind-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Lead/LeadGuitar-E4-4bars-grind-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Lead/LeadGuitar-E4-4bars-grind-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Lead/LeadGuitar-E4-4bars-grind-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Lead/LeadGuitar-E4-4bars-grind-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Lead/LeadGuitar-E4-4bars-grind-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Lead/LeadGuitar-E4-4bars-grind-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Lead/LeadGuitar-E4-4bars-grind-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Lead/LeadGuitar-E4-4bars-grind-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Lead/LeadGuitar-E4-4bars-grind-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Lead/LeadGuitar-E4-4bars-grind-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-B2-4bars-grind-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-B2-4bars-grind-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-B2-4bars-grind-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-B2-4bars-grind-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-B2-4bars-grind-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-B2-4bars-grind-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-E2-4bars-grind-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-E2-4bars-grind-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-E2-4bars-grind-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-E2-4bars-grind-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-E2-4bars-grind-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-E2-4bars-grind-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-G2-4bars-grind-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-G2-4bars-grind-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-G2-4bars-grind-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-G2-4bars-grind-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-G2-4bars-grind-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Grind/Rhythm/Rhythm-G2-4bars-grind-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-2-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-2-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-2.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-2.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-3-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-3-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-3.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-3.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-3.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-3.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-4-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-4-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-4.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-4.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-4.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Bass/FingerBass-D2-2bars-32Step-4.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Groove.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Groove/Subwoofer-D4-32Step-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Groove/Subwoofer-D4-32Step-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Groove/Subwoofer-D4-32Step-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Groove/Subwoofer-D4-32Step-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Groove/Subwoofer-D4-32Step-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Groove/Subwoofer-D4-32Step-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-2 1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-2 1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-2 2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-2 2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-2-NoteSetConfig 1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-2-NoteSetConfig 1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-2-NoteSetConfig 2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-2-NoteSetConfig 2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-2-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-2-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-2.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-2.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-3 1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-3 1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-3 2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-3 2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-3-NoteSetConfig 1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-3-NoteSetConfig 1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-3-NoteSetConfig 2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-3-NoteSetConfig 2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-3-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-3-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-3.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-3.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-3.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-C4-32Step-3.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-D3-32Step-1 1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-D3-32Step-1 1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-D3-32Step-1 2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-D3-32Step-1 2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-D3-32Step-1-NoteSetConfig 1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-D3-32Step-1-NoteSetConfig 1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-D3-32Step-1-NoteSetConfig 2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-D3-32Step-1-NoteSetConfig 2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-D3-32Step-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-D3-32Step-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-D3-32Step-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-D3-32Step-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-D3-32Step-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Harmony/SoulOohs-D3-32Step-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/Lead-Electric-D3-2bars-32Step-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/Lead-Electric-D3-2bars-32Step-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/Lead-Electric-D3-2bars-32Step-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/Lead-Electric-D3-2bars-32Step-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/Lead-Electric-D3-2bars-32Step-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/Lead-Electric-D3-2bars-32Step-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-2-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-2-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-2.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-2.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-3-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-3-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-3.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-3.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-3.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Lead/LesPaul-D3-2bars-32Step-3.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/RhythmGuitar-2nd-F3-2bars-32Step-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/RhythmGuitar-2nd-F3-2bars-32Step-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/RhythmGuitar-2nd-F3-2bars-32Step-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/RhythmGuitar-2nd-F3-2bars-32Step-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/RhythmGuitar-2nd-F3-2bars-32Step-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/RhythmGuitar-2nd-F3-2bars-32Step-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/RhythmGuitar-Root-D3-2bars-32Step-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/RhythmGuitar-Root-D3-2bars-32Step-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/RhythmGuitar-Root-D3-2bars-32Step-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/RhythmGuitar-Root-D3-2bars-32Step-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/RhythmGuitar-Root-D3-2bars-32Step-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/RhythmGuitar-Root-D3-2bars-32Step-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/RhythmGuitar-Third-A3-2bars-32Step-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/RhythmGuitar-Third-A3-2bars-32Step-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/RhythmGuitar-Third-A3-2bars-32Step-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/RhythmGuitar-Third-A3-2bars-32Step-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/rhythmguitar-third-a3.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Next Phase/Rhythm/rhythmguitar-third-a3.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Quatro-G1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Quatro-G1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D1-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D1-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D1-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D1-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D1-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D1-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D2-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D2-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D2-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D2-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D2-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D2-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D2-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D2-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D2-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D2-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D2-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/FingerBass-Sunday-D2-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-A3-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-A3-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-A3-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-A3-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-A3-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-A3-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-A3-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-A3-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-A3-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-A3-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-A3-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-A3-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-D4-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-D4-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-D4-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-D4-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-D4-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-D4-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-F3-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-F3-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-F3-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-F3-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-F3-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Jazz-Sunday-F3-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-A2-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-A2-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-A2-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-A2-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-A2-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-A2-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-A3-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-A3-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-A3-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-A3-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-A3-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-A3-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-C4-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-C4-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-C4-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-C4-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-C4-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-C4-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-D3-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-D3-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-D3-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-D3-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-D3-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-D3-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-D3-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-D3-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-D3-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-D3-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-D3-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-D3-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-F3-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-F3-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-F3-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-F3-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-F3-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/LesPaul-Sunday-F3-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-A3-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-A3-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-A3-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-A3-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-A3-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-A3-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-A3-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-A3-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-A3-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-A3-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-A3-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-A3-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-D4-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-D4-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-D4-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-D4-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-D4-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Mood-Sunday-D4-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-A3-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-A3-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-A3-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-A3-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-A3-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-A3-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-D3-0-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-D3-0-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-D3-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-D3-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-D3-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-D3-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-D3-1-NoteSetConfig.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-D3-1-NoteSetConfig.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-D3-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-D3-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-D3-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Sunday/Soul-Sunday-D3-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Tres-E0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Tres-E0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Uno-1-C1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Uno-1-C1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Uno-2-C1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Uno-2-C1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Yidz.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Yidz/LeadGuitar-D3-yidz-0.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Yidz/LeadGuitar-D3-yidz-0.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Yidz/LeadGuitar-D3-yidz-1.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Yidz/LeadGuitar-D3-yidz-1.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Yidz/LeadGuitar-D3-yidz-2.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Yidz/LeadGuitar-D3-yidz-2.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Yidz/leadguitar-yidz-0.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Yidz/leadguitar-yidz-0.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Yidz/leadguitar-yidz-1.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Yidz/leadguitar-yidz-1.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Yidz/leadguitar-yidz-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/Yidz/leadguitar-yidz-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/bass-newgroove-145bpm-64steps.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/bass-newgroove-145bpm-64steps.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/bass-newgroove.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/bass-newgroove.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/detroit-newgroove-145bpm-64step.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/detroit-newgroove-145bpm-64step.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/detroit-newgroove.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/detroit-newgroove.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/palm-newgroove-145bpm-64step.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/palm-newgroove-145bpm-64step.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/palm-newgroove.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/palm-newgroove.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/steel-newgroove-145bpm-64steps.mid" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/steel-newgroove-145bpm-64steps.mid.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/steel-newgroove.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/MIDI/steel-newgroove.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/AstralPlanes.inputactions" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/AstralPlanes.inputactions" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Audio/ProceduralMixer.mixer" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Audio/ProceduralMixer.mixer" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Editor/AstralPlanesToolSuiteWindow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Editor/AstralPlanesToolSuiteWindow.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Editor/ChordProgressionGenerator.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Editor/ChordProgressionGenerator.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Fonts/Fort Foundry - RiftSoft-Demi SDF.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Fonts/Fort Foundry - RiftSoft-Demi SDF.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Materials/Ring Mesh Dark Fill.mat" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Materials/Ring Mesh Dark Fill.mat" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Materials/RingLineEthereal.mat" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Materials/RingLineEthereal.mat" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Chonk.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Chonk.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Howler.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Howler.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Sandwave.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Sandwave.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Scuttle.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Scuttle.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Tumble.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Tumble.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/X-agong.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/X-agong.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Zip.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Zip.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Cosmic Potential.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Cosmic Potential.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Note.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Note.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Star.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Star.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/UI/PhaseLibraryCarousel.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/UI/PhaseLibraryCarousel.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/UI/Player Select Ship.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/UI/Player Select Ship.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/UI/QuitConfirmationModal.prefab" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/UI/QuitConfirmationModal.prefab.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/UI/Settings Panel.prefab" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/UI/Settings Panel.prefab.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/In Game Ring Glyph.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Config/In Game Ring Glyph.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/RingGlyph Canvas.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Config/RingGlyph Canvas.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/Config/TelemetryConfig.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/Config/TelemetryConfig.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/PathExitParticleStyle.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/PathExitConfig.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/PathExitParticleStyle.asset.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/PathExitConfig.asset.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Demo/MIDI Import/Still Sky/intro-tutorial-harmony-0.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Demo/MIDI Import/Still Sky/intro-tutorial-harmony-0.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-A2-Funkit-0-NoteSetConfig.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-A2-Funkit-0-NoteSetConfig.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-A2-Funkit-0.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-A2-Funkit-0.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-A2-Funkit-0.mid" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-A2-Funkit-0.mid.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-G2-Funkit-0-NoteSetConfig.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-G2-Funkit-0-NoteSetConfig.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-G2-Funkit-0.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-G2-Funkit-0.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-G2-Funkit-0.mid" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-G2-Funkit-0.mid.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-G2-Funkit-1-NoteSetConfig.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-G2-Funkit-1-NoteSetConfig.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-G2-Funkit-1.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-G2-Funkit-1.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-G2-Funkit-1.mid" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Guitar-G2-Funkit-1.mid.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-A3-Funkit-0-NoteSetConfig.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-A3-Funkit-0-NoteSetConfig.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-A3-Funkit-0.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-A3-Funkit-0.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-A3-Funkit-0.mid" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-A3-Funkit-0.mid.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-C4-Funkit-0-NoteSetConfig.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-C4-Funkit-0-NoteSetConfig.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-C4-Funkit-0.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-C4-Funkit-0.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-C4-Funkit-0.mid" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-C4-Funkit-0.mid.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-F3-Funkit-0-NoteSetConfig.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-F3-Funkit-0-NoteSetConfig.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-F3-Funkit-0.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-F3-Funkit-0.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-F3-Funkit-0.mid" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/Rhythm-F3-Funkit-0.mid.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/SpaceTrumpet-F3-Funkit-0-NoteSetConfig.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/SpaceTrumpet-F3-Funkit-0-NoteSetConfig.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/SpaceTrumpet-F3-Funkit-0.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/SpaceTrumpet-F3-Funkit-0.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/SpaceTrumpet-F3-Funkit-0.mid" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/SpaceTrumpet-F3-Funkit-0.mid.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/SpaceTrumpet-F3-Funkit-1-NoteSetConfig.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/SpaceTrumpet-F3-Funkit-1-NoteSetConfig.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/SpaceTrumpet-F3-Funkit-1.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/SpaceTrumpet-F3-Funkit-1.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/SpaceTrumpet-F3-Funkit-1.mid" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/SpaceTrumpet-F3-Funkit-1.mid.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-0-NoteSetConfig.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-0-NoteSetConfig.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-0.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-0.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-0.mid" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-0.mid.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-1-NoteSetConfig.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-1-NoteSetConfig.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-1.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-1.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-1.mid" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-1.mid.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-2-NoteSetConfig.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-2-NoteSetConfig.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-2.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-2.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-2.mid" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/UprightBass-G1-Funkit-2.mid.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/lead-descent-alt.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Motifs/Funk It/lead-descent-alt.asset.meta" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Resources/Phase Library.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Phase Library.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Riffs/4bar-riff-bass.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Riffs/4bar-riff-bass.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Riffs/bass-bounce.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Riffs/bass-bounce.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Riffs/groove-bounce.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Riffs/groove-bounce.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Riffs/harmony-bounce-2.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Riffs/harmony-bounce-2.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Riffs/harmony-bounce.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Riffs/harmony-bounce.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Riffs/lead-bounce-alt.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Riffs/lead-bounce-alt.asset.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Riffs/lead-bounce.asset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Riffs/lead-bounce.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Fugue Frontier/Rooftop Hop.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Fugue Frontier/Rooftop Hop.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Hypnagogic Array/Parlallax Garden.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Hypnagogic Array/Parlallax Garden.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Hypnagogic Array/Silhouette Ballroom.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Hypnagogic Array/Silhouette Ballroom.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Hypnagogic Array/Silhouette Ballroom/Two-Bass-NoteSetConfig-0.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Hypnagogic Array/Silhouette Ballroom/Two-Bass-NoteSetConfig-0.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Hypnagogic Array/Silhouette Ballroom/Two-Bass-NoteSetConfig-1.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Hypnagogic Array/Silhouette Ballroom/Two-Bass-NoteSetConfig-1.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Hypnagogic Array/Silhouette Ballroom/Two-Harmony-NoteSetConfig-0.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Hypnagogic Array/Silhouette Ballroom/Two-Harmony-NoteSetConfig-0.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Hypnagogic Array/Silhouette Ballroom/Two-Harmony-NoteSetConfig-1.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Hypnagogic Array/Silhouette Ballroom/Two-Harmony-NoteSetConfig-1.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Hypnagogic Array/Silhouette Ballroom/Two-Lead-NoteSetConfig-0.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Hypnagogic Array/Silhouette Ballroom/Two-Lead-NoteSetConfig-0.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Reverie Cluster/Funhouse Stumble.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Reverie Cluster/Funhouse Stumble.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Bass-NoteSetConfig-0.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Bass-NoteSetConfig-0.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Bass-NoteSetConfig-1.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Bass-NoteSetConfig-1.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Bass-NoteSetConfig-2.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Bass-NoteSetConfig-2.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Groove-NoteSetConfig-0.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Groove-NoteSetConfig-0.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Groove-NoteSetConfig-1.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Groove-NoteSetConfig-1.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Groove-NoteSetConfig-2.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Groove-NoteSetConfig-2.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Harmony-NoteSetConfig-0.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Harmony-NoteSetConfig-0.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Harmony-NoteSetConfig-1.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Harmony-NoteSetConfig-1.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Harmony-NoteSetConfig-2.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Harmony-NoteSetConfig-2.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Lead-NoteSetConfig-0.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Lead-NoteSetConfig-0.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Lead-NoteSetConfig-1.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Lead-NoteSetConfig-1.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Lead-NoteSetConfig-2.asset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/Circus-Lead-NoteSetConfig-2.asset.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/NoteSetConfig/Waiting-Groove-NoteSetConfig-0.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/NoteSetConfig/Waiting-Groove-NoteSetConfig-0.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/NoteSetConfig/Waiting-Groove-NoteSetConfig-1.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/NoteSetConfig/Waiting-Groove-NoteSetConfig-1.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/NoteSetConfig/Waiting-Groove-NoteSetConfig-2.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/NoteSetConfig/Waiting-Groove-NoteSetConfig-2.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/NoteSetConfig/Waiting-Groove-NoteSetConfig-3.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/NoteSetConfig/Waiting-Groove-NoteSetConfig-3.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/NoteSetConfig/Waiting-Groove-NoteSetConfig-4.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Last Light Boogie/NoteSetConfig/Waiting-Groove-NoteSetConfig-4.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Platform Zero.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Platform Zero.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Switchyard.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Somnambulist Station/Switchyard.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Tranceway/Assembly Line Shuffle.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Tranceway/Assembly Line Shuffle.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Tranceway/Machine Room.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Tranceway/Machine Room.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Tranceway/Midnight Junction.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Tranceway/Midnight Junction.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Tranceway/Phantom Strut.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Tranceway/Phantom Strut.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Tutorial Motif.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Motifs/Tutorial Motif.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass - Indigo/Dope.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass - Indigo/Dope.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass - Indigo/Finger Bass.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass - Indigo/Finger Bass.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass - Indigo/Upright Bass.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Bass - Indigo/Upright Bass.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Groove - Blues/Block Groove.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Groove - Blues/Block Groove.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Groove - Blues/Blocks.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Groove - Blues/Blocks.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Groove - Blues/Rob Otto.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Groove - Blues/Rob Otto.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Groove - Blues/Space Trumpet.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Groove - Blues/Space Trumpet.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony - Greens/Soul Oohs.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony - Greens/Soul Oohs.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony - Greens/Still Sky.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony - Greens/Still Sky.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony - Greens/Under Pad.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Harmony - Greens/Under Pad.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead - Pinks/Dark Les Paul.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead - Pinks/Dark Les Paul.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead - Pinks/Electric Guitar.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead - Pinks/Electric Guitar.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead - Pinks/Guitar Wah.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead - Pinks/Guitar Wah.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead - Pinks/Palm Guitar.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Lead - Pinks/Palm Guitar.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Rhythm - Orange and Yellow/Jazz Key Bends.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Rhythm - Orange and Yellow/Jazz Key Bends.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Rhythm - Orange and Yellow/Jazz Keys.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Musical Roles/Rhythm - Orange and Yellow/Jazz Keys.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Star Behavior/Quick Star.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Star Behavior/Quick Star.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Chonky.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Chonky.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Cruz.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Cruz.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Howler.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Howler.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Swoop.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Swoop.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Zip.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Profiles/Vehicles/Zip.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Resources/Tutorial/NarratedTutorial.json" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Tutorial/NarratedTutorial.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/Main.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/Main.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/TrackSelection.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/TrackSelection.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.Helpers.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.Helpers.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.SpriteScale.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.SpriteScale.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.Interstitial.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.Interstitial.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.MazeGeneration.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.MazeGeneration.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustMazePatterns.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustMazePatterns.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/DustClearSource.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/DustClearSource.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/MazePathExit.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/MazePathExit.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/MazePatternConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/MazePatternConfig.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/MazeTopologyService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/MazeTopologyService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/PathExitGeometryFactory.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/PathExitGeometryFactory.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/PathExitParticleBuilder.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/PathExitParticleBuilder.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/PathExitParticleStyle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/PathExitConfig.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/PathExitParticleStyle.cs.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/PathExitConfig.cs.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/PathExitPortal.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/PathExitPortal.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/Wisp.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/Wisp.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/WispConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/WispConfig.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/WispExitPathfinder.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/WispExitPathfinder.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.Damage.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.Damage.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.NoteRelease.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.NoteRelease.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.NoteTrailVisuals.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.NoteTrailVisuals.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.Plow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.Plow.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.Recovery.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.Recovery.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/VehicleSwallowScale.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/VehicleSwallowScale.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.Carry.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.Carry.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.Collection.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.Collection.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.Movement.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.Movement.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/ControlTutorialHighlight.InputGatedTutorial.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/ControlTutorialHighlight.InputGatedTutorial.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/ControlTutorialHighlight.TutorialSequence.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/ControlTutorialHighlight.TutorialSequence.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/ControlTutorialHighlight.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/ControlTutorialHighlight.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/BridgeCoordinator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/BridgeCoordinator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/ControlTutorialDirector.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/ControlTutorialDirector.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.QuitFlow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.QuitFlow.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/PathChoiceCoordinator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/PathChoiceCoordinator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/SceneFlowCoordinator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/SceneFlowCoordinator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.MotifApplication.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.MotifApplication.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.Transport.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.Transport.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/DrumTrack.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.CollectionResolution.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.CollectionResolution.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.HarmonyChord.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.HarmonyChord.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.Lifecycle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.Lifecycle.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.SuperNodeInstant.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.SuperNodeInstant.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/InstrumentTrack.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Motif/MotifProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Motif/MotifProfile.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Profiles/MusicalRoleProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Profiles/MusicalRoleProfile.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Profiles/ShipMusicalProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Profiles/ShipMusicalProfile.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Profiles/VehicleConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Profiles/VehicleConfig.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/PhaseLibrary.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/PhaseLibrary.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/PhaseTransitionManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/PhaseTransitionManager.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.ArmingState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.ArmingState.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.Diagnostics.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.Diagnostics.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.DormantState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.DormantState.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.EjectionLogic.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.EjectionLogic.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.VisualUpdate.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.VisualUpdate.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarBehaviorProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarBehaviorProfile.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarCravingNavigator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarCravingNavigator.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarDustAffect.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarDustAffect.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarMotion2D.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStarMotion2D.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/StarPool.Spawning.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/StarPool.Spawning.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Telemetry/MotifSolutionCanonicalizer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Telemetry/MotifSolutionCanonicalizer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Telemetry/TelemetryConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Telemetry/TelemetryConfig.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Tutorial/NarratedTutorialController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Tutorial/NarratedTutorialController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Tutorial/NarratedTutorialScript.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Tutorial/NarratedTutorialScript.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Tutorial/TutorialEvents.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Tutorial/TutorialEvents.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Tutorial/TutorialHighlightRing.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Tutorial/TutorialHighlightRing.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/GlobalEscapeQuitListener.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/GlobalEscapeQuitListener.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.ConfirmFlow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.ConfirmFlow.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.Input.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.Input.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.LeaveFlow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.LeaveFlow.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/PhaseLibraryCarousel.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/PhaseLibraryCarousel.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/PublishSettingsPanel.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/PublishSettingsPanel.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/QuitConfirmationController.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/QuitConfirmationController.cs.meta" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/RingPreviewPlayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/RingPreviewPlayer.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/SettingsPanelController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/SettingsPanelController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/SolarSystemRecordDisplay.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/SolarSystemRecordDisplay.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/IntroInputHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/IntroInputHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MidiVoice.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MidiVoice.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.Animation.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.Animation.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.GameplayRings.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.GameplayRings.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.RecordRings.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.RecordRings.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.RingBuilder.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.RingBuilder.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.SpinOff.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/MotifRingGlyphApplicator.SpinOff.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteTether.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/Notes/NoteTether.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Visualizers/RingGlyphConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Visualizers/RingGlyphConfig.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Settings/2D URP Renderer_Renderer.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Settings/2D URP Renderer_Renderer.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Settings/TelemetryConfig.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Settings/TelemetryConfig.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Drifter.png" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Sprites/Drifter.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Drifter.png.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Sprites/Drifter.png.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sprites/HeartDrive.png" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Sprites/HeartDrive.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sprites/HeartDrive.png.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Sprites/HeartDrive.png.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Howler.png" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Sprites/Howler.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Howler.png.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Sprites/Howler.png.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Sandwave.png" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Sprites/Sandwave.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Sandwave.png.meta" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Sprites/Sandwave.png.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ECOSYSTEM.md" beforeDir="false" afterPath="$PROJECT_DIR$/ECOSYSTEM.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ProjectSettings/Physics2DSettings.asset" beforeDir="false" afterPath="$PROJECT_DIR$/ProjectSettings/Physics2DSettings.asset" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -946,7 +591,8 @@
       <workItem from="1790088069128" duration="2171000" />
       <workItem from="1793551912644" duration="95905000" />
       <workItem from="1794097582056" duration="11857000" />
-      <workItem from="1794154242572" duration="46408000" />
+      <workItem from="1794154242572" duration="47007000" />
+      <workItem from="1794367896347" duration="81723000" />
     </task>
     <servers />
   </component>

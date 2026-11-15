@@ -75,20 +75,6 @@ public partial class Collectable : MonoBehaviour
     public Transform ribbonMarker;           // assigned when spawned
     public int intendedStep = -1;       // set at spawn (authoritative target)
 
-    [Header("Carry (Parented)")]
-    [SerializeField] private CarrySettings carrySettings = new CarrySettings();
-
-    [Serializable]
-    public class CarrySettings
-    {
-        [Tooltip("Local hover offset while parented to the collector.")]
-        public Vector3 localOffset = new Vector3(0f, 0.65f, 0f);
-
-        [Tooltip("Small randomized wobble applied to the carry offset.")]
-        [Range(0f, 0.2f)]
-        public float localOffsetJitter = 0.05f;
-    }
-
     private float absorbGrowSeconds => tuning.absorbVfx.absorbGrowSeconds;
     private float absorbHoldSeconds => tuning.absorbVfx.absorbHoldSeconds;
     private float absorbShrinkSeconds => tuning.absorbVfx.absorbShrinkSeconds;
@@ -129,6 +115,15 @@ public partial class Collectable : MonoBehaviour
     {
         _s_inDepositFlight.RemoveWhere(c => c == null);
         return _s_inDepositFlight.Count > 0;
+    }
+
+    // Diagnostic only: summary of leak-prone static counters (see drum boundary log).
+    public static string DebugLiveSummary()
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var kv in _s_liveByTrack)
+            if (kv.Value > 0) sb.Append(kv.Key != null ? kv.Key.name : "null").Append('=').Append(kv.Value).Append(' ');
+        return $"live[{sb}] depositFlight={_s_inDepositFlight.Count}";
     }
 
     public static bool AnyLiveForTrack(InstrumentTrack track)
@@ -200,6 +195,10 @@ public partial class Collectable : MonoBehaviour
 
     private Vector3 _trailWorldTarget;
     private bool _trailFollowActive;
+    // When set, the note rides locked at this transform's position (the vehicle's hollow
+    // core) instead of easing toward _trailWorldTarget. Cleared by SetTrailTarget.
+    private Transform _coreAnchor;
+    private bool _coreLocked; // true once the note has settled into the core (hard lock, no lerp)
     private float _trailReleasePulse01; // 0=idle, 1=release imminent
     private Coroutine _trailFollowRoutine;
     private Vector3 _trailBaseScale;

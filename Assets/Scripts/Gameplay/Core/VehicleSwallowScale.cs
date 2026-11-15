@@ -8,6 +8,9 @@ using UnityEngine;
 /// </summary>
 public static class VehicleSwallowScale
 {
+    /// <summary>Scale factor at which a swallowed vehicle is effectively invisible.</summary>
+    public const float Swallowed = 0.02f;
+
     private static readonly Dictionary<Vehicle, Vector3> s_original = new();
 
     /// <summary>Scales the vehicle to <paramref name="factor"/> of its authored scale (captured on first use).</summary>
@@ -19,7 +22,7 @@ public static class VehicleSwallowScale
             orig = v.transform.localScale;
             s_original[v] = orig;
         }
-        v.transform.localScale = orig * Mathf.Max(0.01f, factor);
+        v.transform.localScale = orig * Mathf.Max(Swallowed, factor);
     }
 
     /// <summary>Restores the authored scale and forgets it. No-op if never scaled.</summary>

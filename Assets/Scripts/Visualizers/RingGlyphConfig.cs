@@ -151,6 +151,10 @@ public class RingGlyphConfig : ScriptableObject
              "ringThickness. Applies to gameplay remaining rings and carousel locked-preview rings.")]
     public float remainingRingLineWidth = 0.012f;
 
+    [Tooltip("Optional material for placeholder ring fills (e.g. RingLineEthereal.mat for the soft-edged " +
+             "carousel look). Falls back to ringMeshMaterial when null.")]
+    public Material remainingRingMaterial;
+
     [Tooltip("Seconds to lerp from one active role color to the next on the next-up placeholder ring.")]
     public float nextUpColorCycleDuration = 1.5f;
 

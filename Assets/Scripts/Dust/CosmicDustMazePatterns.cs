@@ -1067,13 +1067,16 @@ public static class CosmicDustMazePatterns
     /// Like BuildPorousBorderCells, but the border is the full rectangle (bottom row included)
     /// and each entry of <paramref name="sides"/> gets exactly one 2-cell gap on that edge, never
     /// on a corner. <paramref name="gapGroupsOut"/> lines up with <paramref name="sides"/> by index.
+    /// Top/Bottom gaps stay within the centered <paramref name="topBottomCenterBand"/> fraction of
+    /// the width (1 = anywhere); Left/Right gaps can land anywhere off the corners.
     /// </summary>
     public static HashSet<Vector2Int> BuildPorousBorderCellsForSides(
         int width,
         int height,
         IReadOnlyList<BoundaryWrap.BoundarySide> sides,
         Func<int, int, bool> isCellAvailable,
-        out List<List<Vector2Int>> gapGroupsOut)
+        out List<List<Vector2Int>> gapGroupsOut,
+        float topBottomCenterBand = 1f)
     {
         gapGroupsOut = new List<List<Vector2Int>>();
 
@@ -1087,7 +1090,14 @@ public static class CosmicDustMazePatterns
             int along = horizontal ? width : height;
 
             // Gap spans [start, start + 1] along the edge, both strictly inside the corners.
-            int start = Random.Range(1, along - 2);
+            int lo = 1, hi = along - 3;
+            if (horizontal && topBottomCenterBand < 0.999f)
+            {
+                float half = Mathf.Clamp01(topBottomCenterBand) * 0.5f;
+                lo = Mathf.Max(1, Mathf.CeilToInt(along * (0.5f - half)));
+                hi = Mathf.Min(along - 3, Mathf.FloorToInt(along * (0.5f + half)) - 2);
+            }
+            int start = lo <= hi ? Random.Range(lo, hi + 1) : Mathf.Clamp(along / 2 - 1, 1, along - 3);
             var group = new List<Vector2Int>(2);
             for (int k = 0; k < 2; k++)
             {

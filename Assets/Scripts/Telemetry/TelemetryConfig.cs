@@ -50,9 +50,12 @@ public class TelemetryConfig : ScriptableObject
              "phaseId isn't listed here is refused rather than guessed at.")]
     public List<PhaseIdMappingEntry> phaseIdMapping = new List<PhaseIdMappingEntry>
     {
-        new PhaseIdMappingEntry { phaseId = "2cfde5cf3d2048b8910ab984b7267338", phaseNumber = 1 }, // Steam Demo
-        new PhaseIdMappingEntry { phaseId = "e80b2c210dcf4b40ba9f3f3542b20d69", phaseNumber = 2 }, // EP
-        new PhaseIdMappingEntry { phaseId = "7372954664d149969c3d8cf05cef0823", phaseNumber = 3 }, // Next
+        // Library order, Tutorial excluded. 4 is reserved for a phase not yet in the PhaseLibrary.
+        new PhaseIdMappingEntry { phaseId = "883cf97b56fd40de8b345caeb71fc5c1", phaseNumber = 1 }, // Somnambulist Station
+        new PhaseIdMappingEntry { phaseId = "e80b2c210dcf4b40ba9f3f3542b20d69", phaseNumber = 2 }, // Tranceway
+        new PhaseIdMappingEntry { phaseId = "7372954664d149969c3d8cf05cef0823", phaseNumber = 3 }, // Hypnagogic Array
+        new PhaseIdMappingEntry { phaseId = "51f6563141e540d483dc88fd8705740d", phaseNumber = 5 }, // Reverie Cluster
+        new PhaseIdMappingEntry { phaseId = "7ef88fd6fd4148fd80ddc5cda9d667f9", phaseNumber = 6 }, // Fugue Frontier
     };
 
     public string PublishUrl => string.IsNullOrEmpty(baseUrl) ? null : baseUrl.TrimEnd('/') + "/api/publish.php";

@@ -65,7 +65,8 @@ public sealed partial class StarPool
     // escaped/empty-burst outcomes clear _mineNodePending without spending, so refunds
     // keep working.
     private bool CanStarCommitEjection(bool isSuperNode)
-        => !_mineNodePending && (isSuperNode || _remainingEjectionsTotal > 0);
+        => !_mineNodePending && !HasUnresolvedMineNodeSequence()
+           && (isSuperNode || _remainingEjectionsTotal > 0);
 
     // ── Star spawning ─────────────────────────────────────────────────────────
 

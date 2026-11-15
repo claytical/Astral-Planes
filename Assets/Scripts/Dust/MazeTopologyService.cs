@@ -153,7 +153,8 @@ public sealed class MazeTopologyService
         if (config != null && config.porousBorder.exitSides.Count > 0)
         {
             var sideBorder = CosmicDustMazePatterns.BuildPorousBorderCellsForSides(
-                width, height, config.porousBorder.exitSides, context.IsCellAvailable, out gapGroupsOut);
+                width, height, config.porousBorder.exitSides, context.IsCellAvailable, out gapGroupsOut,
+                config.porousBorder.topBottomCenterBand);
 
             // The sides variant walls the full rectangle (bottom row too), so clear every edge
             // cell the pattern may have left before re-adding the walled ones.

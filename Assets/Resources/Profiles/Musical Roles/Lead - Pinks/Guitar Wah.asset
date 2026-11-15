@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MusicalRoleProfile
   role: 2
   dustColors:
-    baseColor: {r: 0.8867924, g: 0, b: 0.69552344, a: 0.7607843}
-    shadowColor: {r: 0.8018868, g: 0, b: 0.63559693, a: 1}
+    baseColor: {r: 1, g: 0.4, b: 0.4862745, a: 0.7607843}
+    shadowColor: {r: 0.603, g: 0.24119999, b: 0.29322347, a: 1}
   baseAlpha: 0.25
   maxEnergyUnits: 1
   carveResistance01: 0.7
@@ -36,9 +36,7 @@ MonoBehaviour:
   midiPreset: 26
   lowestNote: 45
   highestNote: 84
-  outputMixerGroup: {fileID: 733832146008888724, guid: 07985bf4f6d469340930e958ef313c14,
-    type: 2}
-  volumeMultiplier: 1
+  volumeMultiplier: 0.34
   minVelocity: 60
   maxVelocity: 120
   regrowthDelay: 1

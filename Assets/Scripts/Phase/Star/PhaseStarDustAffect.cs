@@ -144,8 +144,24 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
     private readonly List<Vector2Int> _seededTargetsScratch = new();
     private readonly HashSet<Vector2Int> _excludedCellsScratch = new();
 
-    public void Initialize(PhaseStarBehaviorProfile profile, PhaseStar star)
+    // Maze-aware navigation (StarNavigationParams on the motif's MazePatternConfig).
+    private StarNavigationParams _nav = StarNavigationParams.Default;
+    private PhaseStarNavMode _navMode = PhaseStarNavMode.Direct;
+    private float _burrowTimer;
+    private Rigidbody2D _rb;
+    private readonly HashSet<Vector2Int> _burrowCellsScratch = new();
+
+    public void Initialize(
+        PhaseStarBehaviorProfile profile,
+        PhaseStar star,
+        StarNavigationParams nav = null,
+        PhaseStarNavMode navMode = PhaseStarNavMode.Direct)
     {
+        _nav = nav ?? StarNavigationParams.Default;
+        _navMode = navMode;
+        _burrowTimer = 0f;
+        _rb = GetComponent<Rigidbody2D>();
+
         _attunedRole = MusicalRole.None;
         _profile = profile;
         _star = star;
@@ -268,6 +284,17 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
 
     private void Update()
     {
+        // Burrow runs whenever the star moves (drifting or hunting), not just while tentacles are out.
+        if (_navMode == PhaseStarNavMode.Burrow)
+        {
+            _burrowTimer += Time.deltaTime;
+            if (_burrowTimer >= _nav.burrowCarveInterval)
+            {
+                _burrowTimer = 0f;
+                TickBurrow();
+            }
+        }
+
         if (!_tentaclesActive)
             return;
 
@@ -339,7 +366,49 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
         if (gen == null || drum == null) return;
 
         Vector2Int center = drum.WorldToGridPosition(transform.position);
-        gen.SetStarKeepClear(center, _profile.starKeepClearRadiusCells, forceRemoveExisting: false);
+        int radius = Mathf.Max(0, _profile.starKeepClearRadiusCells + _nav.keepClearRadiusOffset);
+        gen.SetStarKeepClear(center, radius, forceRemoveExisting: false);
+    }
+
+    // Burrow nav mode: carve a small disk one cell ahead of the star's heading so it can tunnel
+    // through mazes with no corridors (FullFill). Regrows normally via DustClearSource.StarBurrow.
+    // Leaves the attuned role's cells and any tentacle-reserved cells alone — those are the
+    // star's own zap targets and carving them would throw away their energy.
+    private void TickBurrow()
+    {
+        if (_rb == null) return;
+        Vector2 vel = _rb.linearVelocity;
+        if (vel.sqrMagnitude < 0.01f) return;
+
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var gen  = _gfm?.dustGenerator;
+        var drum = _gfm?.activeDrumTrack;
+        if (gen == null || drum == null) return;
+
+        int w = drum.GetSpawnGridWidth();
+        int h = drum.GetSpawnGridHeight();
+        if (w <= 0 || h <= 0) return;
+
+        Vector2Int starCell = drum.WorldToGridPosition(transform.position);
+        Vector2 dir = vel.normalized;
+        var ahead = new Vector2Int(
+            starCell.x + Mathf.RoundToInt(dir.x),
+            starCell.y + Mathf.RoundToInt(dir.y));
+
+        _burrowCellsScratch.Clear();
+        DustGridMath.FillDisk(_burrowCellsScratch, ahead, _nav.burrowCarveRadiusCells, w, h);
+
+        foreach (var cell in _burrowCellsScratch)
+        {
+            if (_reservedCells.ContainsKey(cell)) continue;
+            if (!gen.HasDustAt(cell)) continue;
+            if (_attunedRole != MusicalRole.None &&
+                gen.TryGetDustAt(cell, out var dust) && dust != null && dust.Role == _attunedRole)
+                continue;
+
+            gen.CarveCell(cell, fadeSeconds: 0.2f, scheduleRegrow: true,
+                source: DustClearSource.StarBurrow, runPreExplode: false);
+        }
     }
 
     private void AllocateTentacleBuffers(Tentacle tentacle)

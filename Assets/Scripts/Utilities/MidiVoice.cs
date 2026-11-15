@@ -26,6 +26,15 @@ public class MidiVoice : MonoBehaviour
     // once MPTK_Channels exists, the same way preset/bank already do.
     private float _volume = 1f;
 
+    // Per-role gain trim (MusicalRoleProfile.volumeMultiplier), pushed live by the owning
+    // track before each note. Multiplies _volume (the base/ramp level) into the MPTK channel
+    // volume, which is a linear amplitude multiply at voice start — unlike velocity, it
+    // doesn't depend on the SoundFont's vel2att modulators or velocity layers.
+    private float _gainTrim = 1f;
+    private float EffectiveChannelVolume => _volume * _gainTrim;
+
+    public void SetGainTrim(float gain) => _gainTrim = Mathf.Max(0f, gain);
+
     // Optional callback so trimming logic can use track’s windowing model.
     private System.Func<float> _remainingActiveWindowSec;
 
@@ -109,7 +118,7 @@ public class MidiVoice : MonoBehaviour
             return;
         }
 
-        midiStreamPlayer.MPTK_Channels[channel].Volume = volume;
+        midiStreamPlayer.MPTK_Channels[channel].Volume = EffectiveChannelVolume;
     }
 
     private Coroutine _rampInCoroutine;
@@ -201,7 +210,7 @@ public class MidiVoice : MonoBehaviour
         }
         midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = preset;
         midiStreamPlayer.MPTK_Channels[channel].ForcedBank = bank;
-        midiStreamPlayer.MPTK_Channels[channel].Volume = _volume;
+        midiStreamPlayer.MPTK_Channels[channel].Volume = EffectiveChannelVolume;
 
         float v127 = (velocity <= 1.01f) ? (velocity * 127f) : velocity;
 
@@ -240,7 +249,7 @@ public class MidiVoice : MonoBehaviour
         // override before the note is actually rendered.
         midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = overridePreset;
         midiStreamPlayer.MPTK_Channels[channel].ForcedBank   = overrideBank;
-        midiStreamPlayer.MPTK_Channels[channel].Volume       = _volume;
+        midiStreamPlayer.MPTK_Channels[channel].Volume       = EffectiveChannelVolume;
 
         var ev = new MPTKEvent
         {
@@ -265,7 +274,7 @@ public class MidiVoice : MonoBehaviour
 
         midiStreamPlayer.MPTK_Channels[channel].ForcedPreset = preset;
         midiStreamPlayer.MPTK_Channels[channel].ForcedBank = bank;
-        midiStreamPlayer.MPTK_Channels[channel].Volume = _volume;
+        midiStreamPlayer.MPTK_Channels[channel].Volume = EffectiveChannelVolume;
 
         int v = Mathf.Clamp(Mathf.RoundToInt(velocity01 * 0.45f), 1, 80);
 

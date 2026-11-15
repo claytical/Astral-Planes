@@ -17,9 +17,11 @@ public partial class InstrumentTrack
         trackShadowColor = prof.GetShadowColor();
         preset           = prof.midiPreset;
         midiVoice?.SetPreset(prof.midiPreset);
-        // volumeMultiplier is applied live per-note in PlayNote127, not cached on the channel here.
+        // Base channel level only; volumeMultiplier is pushed live per-note as a gain trim
+        // (MidiVoice.SetGainTrim in PlayNote127) and multiplied into the channel volume there.
         midiVoice?.SetVolume(1f);
-        midiVoice?.SetMixerGroup(prof.outputMixerGroup);
+        // Bus is per role (AudioMixConfig), not per profile, so every instrument of a role mixes alike.
+        midiVoice?.SetMixerGroup(AudioMixConfig.Instance?.GetGroup(assignedRole));
     }
 
     void Awake()

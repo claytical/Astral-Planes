@@ -130,7 +130,14 @@ public partial class DrumTrack : MonoBehaviour
 
     private double _crossfadeStartDsp = -1.0;
     private double _crossfadeEndDsp = -1.0;
-    private float _crossfadeBaseVolume = 1f;
+    private float _crossfadeBaseVolume = 1f;   // outgoing deck's level at crossfade start
+    private float _crossfadeTargetVolume = 1f; // incoming deck's level (its motif's drum volume)
+    private bool _mixConfigApplied;
+    private float _sceneDrumVolume = -1f;      // inspector level of deck A; fallback if AudioMixConfig is missing
+
+    // Level for the current motif's drum loops: AudioMixConfig.drumVolume × motif.drumVolumeMultiplier.
+    private float MotifDrumVolume() =>
+        AudioMixConfig.DrumVolumeOrDefault(_motif, _sceneDrumVolume >= 0f ? _sceneDrumVolume : 1f);
 
     // Owns world↔grid coordinate mapping and spawn-grid delegation; fully decoupled from
     // DSP/motif state, mirroring how CosmicDustGenerator owns CosmicDustCellRegistry.
@@ -275,6 +282,7 @@ public partial class DrumTrack : MonoBehaviour
         _activeDrum.clip = initialClip;
         _activeDrum.loop = true;
         _activeDrum.playOnAwake = false;
+        _activeDrum.volume = MotifDrumVolume();
 
         _clipLengthSec = Mathf.Max(initialClip.length, 0f);
 

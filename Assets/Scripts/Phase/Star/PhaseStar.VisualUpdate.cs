@@ -134,11 +134,46 @@ public partial class PhaseStar
                 visuals?.LerpBodyColor(roleColor, _displayedCharge01);
             }
         }
-        else if (visuals != null && !_burstOffScreen && _disarmReason != PhaseStarDisarmReason.SiblingActive)
+        else if (visuals != null && !_burstOffScreen && !_pickupLockVisual && _disarmReason != PhaseStarDisarmReason.SiblingActive)
         {
             Color bodyColor = _previewRole != MusicalRole.None ? _previewColor : Color.gray;
             visuals.LerpBodyColor(bodyColor, _displayedCharge01);
         }
+    }
+
+    private bool _pickupLockVisual;
+    private float _nextPickupLockCheck;
+
+    // Proactive "locked" look while an armed star is inert during note pickup. Scale is
+    // never touched; only tint/particles dim, then restore when the notes clear.
+    private void UpdatePickupLockVisual()
+    {
+        bool eligible = _isArmed
+                        && _state == PhaseStarState.WaitingForPoke
+                        && !_burstOffScreen
+                        && _disarmReason != PhaseStarDisarmReason.SiblingActive;
+
+        bool want = false;
+        if (eligible)
+        {
+            if (Time.unscaledTime >= _nextPickupLockCheck)
+            {
+                _nextPickupLockCheck = Time.unscaledTime + 0.1f;
+                want = IsPickupLocked();
+            }
+            else
+            {
+                want = _pickupLockVisual;
+            }
+        }
+
+        if (want == _pickupLockVisual) return;
+        _pickupLockVisual = want;
+
+        if (want)
+            SetVisual(VisualMode.Dim, ResolvePreviewColorByReadiness());
+        else if (eligible)
+            SetVisual(VisualMode.Bright, ResolvePreviewColorByReadiness());
     }
 
     private void EnsureDormantSeedVisuals()

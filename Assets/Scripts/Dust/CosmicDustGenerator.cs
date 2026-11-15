@@ -720,7 +720,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 return dust.CurrentTint;
         }
 
-        // Default: current phase maze tint (PhaseStarBehaviorProfile.mazeColor).
+        // Default: current maze tint (CosmicDustGeneratorConfig.mazeTint).
         return config.mazeTint;
     }
 

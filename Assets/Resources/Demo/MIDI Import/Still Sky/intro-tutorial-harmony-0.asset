@@ -20,11 +20,11 @@ MonoBehaviour:
     - step: 4
       midiNote: 52
       durSteps: 8
-      velocity01: 0.78740156
+      velocity01: 0.5
     - step: 12
       midiNote: 59
       durSteps: 8
-      velocity01: 0.78740156
+      velocity01: 0.5
     overlapPolicy: 1
     octaveShift: 0
     stepsPerBar: 0

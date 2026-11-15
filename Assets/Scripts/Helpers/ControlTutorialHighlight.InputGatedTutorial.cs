@@ -32,7 +32,7 @@ public partial class ControlTutorialHighlight
 
         while (_tutorialActive && _inputGatedActive && gameObject.activeInHierarchy)
         {
-            if (_tutorialIndex >= (tutorialSequence?.Length ?? 0)) break;
+            if (_tutorialIndex >= (ActiveSequence?.Length ?? 0)) break;
 
             Func<bool> predicate = (_tutorialIndex >= 0 && _tutorialIndex < (predicates?.Length ?? 0))
                 ? predicates[_tutorialIndex] : null;
@@ -45,7 +45,7 @@ public partial class ControlTutorialHighlight
             if (stepConfirmClip && _audioSource)
                 _audioSource.PlayOneShot(stepConfirmClip, stepConfirmVolume);
 
-            bool isLastStep = _tutorialIndex >= (tutorialSequence?.Length ?? 0) - 1;
+            bool isLastStep = _tutorialIndex >= (ActiveSequence?.Length ?? 0) - 1;
 
             if (isLastStep)
             {
@@ -66,10 +66,10 @@ public partial class ControlTutorialHighlight
             else
             {
                 bool isAdditive = _tutorialIndex >= 0
-                    && _tutorialIndex < (tutorialSequence?.Length ?? 0)
-                    && tutorialSequence[_tutorialIndex] == Instruction.Drift
-                    && _tutorialIndex + 1 < (tutorialSequence?.Length ?? 0)
-                    && tutorialSequence[_tutorialIndex + 1] == Instruction.Boost;
+                    && _tutorialIndex < (ActiveSequence?.Length ?? 0)
+                    && ActiveSequence[_tutorialIndex] == Instruction.Drift
+                    && _tutorialIndex + 1 < (ActiveSequence?.Length ?? 0)
+                    && ActiveSequence[_tutorialIndex + 1] == Instruction.Boost;
 
                 bool done = AdvanceTutorial(immediate: false, additive: isAdditive);
                 if (done) break;

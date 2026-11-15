@@ -154,26 +154,26 @@ public partial class MotifRingGlyphApplicator
         int totalRingCount = _gameplayRings.Count + _remainingRings.Count;
         RefreshPlayAreaFit(totalRingCount);
         UpdateBackgroundDiscRadii(_gameplayRings.Count, totalRingCount);
-        EnableRingColliderAndEject();
+        EnableRingColliderAndPhase();
     }
 
     // The collider follows the visible, flat ring stack: enable it (sized to the current stack)
-    // only when the stack is shown at full scale, and push out any ship it just engulfed.
-    private void EnableRingColliderAndEject()
+    // only when the stack is shown at full scale, and let any ship it just engulfed phase out.
+    private void EnableRingColliderAndPhase()
     {
         EnsureRingCollider();
         if (_gameplayRings.Count == 0) return;
         _ringCollider.enabled = true;
         UpdateRingColliderRadius(_gameplayRings.Count);
-        EjectVehiclesFromRing();
+        PhaseVehiclesInsideRing();
     }
 
-    // Guards against a vehicle getting fully engulfed the instant this collider is enabled or
-    // grows to newly enclose it — Box2D's solver can't push out something that's entirely inside
-    // a solid collider (only edge-overlap separations resolve reliably), so without this a
-    // vehicle near center would stay trapped, and each stray contact while trapped would
-    // incorrectly fire Vehicle.Damage.cs's ring-hit handler (TryBreakNextPendingTether).
-    private void EjectVehiclesFromRing()
+    // The stack snaps to near-full play-area height when a bin completes, so it routinely appears
+    // on top of a ship. Box2D can't cleanly resolve a body fully inside a solid collider, and any
+    // contact would fire Vehicle.Damage.cs's ring-hit handler — so overlapping ships (including
+    // ones straddling the rim) ignore the ring and render ghosted until they drive out on their
+    // own (Vehicle.RingPhase.cs). No teleport: movement stays predictable regardless of dust.
+    private void PhaseVehiclesInsideRing()
     {
         if (_ringCollider == null || !_ringCollider.enabled) return;
         var vehicles = GameFlowManager.Instance?.GetVehicles();
@@ -182,7 +182,7 @@ public partial class MotifRingGlyphApplicator
         Vector2 center = _ringCollider.bounds.center;
         float   radius = _ringCollider.bounds.extents.x;
         foreach (var v in vehicles)
-            if (v != null) v.EjectFromCircleIfInside(center, radius);
+            if (v != null && v.OverlapsCircle(center, radius)) v.BeginRingPhase(_ringCollider);
     }
 
     /// <summary>
@@ -436,7 +436,8 @@ public partial class MotifRingGlyphApplicator
             var entry = BuildRingEntry($"RemainingRing_{i}", innerR, outerR, segs,
                 config.remainingRingColor, default, -1,
                 null, 0,
-                config.remainingRingAlpha, 0f, ringOrdinal: idx, skipContour: true);
+                config.remainingRingAlpha, 0f, ringOrdinal: idx, skipContour: true,
+                fillMaterialOverride: config.remainingRingMaterial);
             _remainingRings.Add(entry);
 
             StartCoroutine(AnimateMeshFill(
@@ -450,7 +451,7 @@ public partial class MotifRingGlyphApplicator
         RefreshPlayAreaFit(totalRingCount);
         UpdateRingColliderRadius(_gameplayRings.Count);
         UpdateBackgroundDiscRadii(_gameplayRings.Count, totalRingCount);
-        EjectVehiclesFromRing();
+        PhaseVehiclesInsideRing();
 
         // Innermost not-yet-filled ring previews the motif's active role palette instead of
         // staying flat gray — static if the motif has one role, cycling if it has several.

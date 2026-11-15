@@ -43,11 +43,12 @@ MonoBehaviour:
     breadth01: 0.142
     pressure01: 0.707
     maxConsecutiveLoopSeconds: 0
+  drumVolumeMultiplier: 1.66
   entryLoopCount: 1
   resetFirstCarryOnStart: 0
   bridgeSamples:
-  - {fileID: 8300000, guid: f23da9bdd93984e1ca9418797de0778a, type: 3}
-  bridgeSampleVolume: 1
+  - {fileID: 8300000, guid: 2d5783025575d4b4eb3ed7fabf9ffff5, type: 3}
+  bridgeSampleVolume: 0.168
   quantizeBridgeSampleToBeat: 1
   bpm: 160
   stepsPerLoop: 32

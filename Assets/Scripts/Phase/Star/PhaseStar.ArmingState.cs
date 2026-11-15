@@ -149,8 +149,6 @@ public partial class PhaseStar
         _disarmReason = reason;
         if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar] Disarm reason={reason} star={name}");
 
-        DisableColliders();
-
         // CollectablesInFlight: move off-screen for the burst duration.
         if (reason == PhaseStarDisarmReason.CollectablesInFlight)
             HideInPlaceForBurst();
@@ -163,14 +161,21 @@ public partial class PhaseStar
         // Also hide completely if a DiscoveryTrackNode/SuperNode is still live, regardless of reason
         // (e.g. ExpansionPending fires on a loop boundary while a node is active).
         // All other reasons: show dim so the star is faintly visible while waiting.
+        // Colliders follow visibility: a hidden star is never an invisible wall, a visible
+        // (dim) star stays solid.
+        bool hidden = _burstOffScreen;
         if (!_burstOffScreen)
         {
             bool nodeIsAlive = _activeNode != null || _activeSuperNode != null;
             bool hideCompletely = reason == PhaseStarDisarmReason.NodeResolving
                                || nodeIsAlive;
+            hidden = hideCompletely;
             SetVisual(hideCompletely ? VisualMode.Hidden : VisualMode.Dim,
                       tintOverride ?? ResolvePreviewColorByReadiness());
         }
+
+        if (hidden) DisableColliders();
+        else        EnableColliders();
 
         OnDisarmed?.Invoke(this);
     }
@@ -262,6 +267,14 @@ public partial class PhaseStar
 
     private bool HandleGlobalGateCheck(bool anyCollectables, bool anyExpansion)
     {
+        // Armed, solid star during pickup: stay visible and armed (pushable, inert) instead of
+        // being disarmed and hidden. Re-evaluated each boundary; unlocks once notes clear.
+        if (anyCollectables && _isArmed && _state == PhaseStarState.WaitingForPoke && !_burstOffScreen)
+        {
+            if (GameFlowManager.VerboseLogging) Debug.Log("[PS:LB] pickup-locked — holding armed, visible");
+            return true;
+        }
+
         bool shouldDisarmForGate = _stateController?.ShouldDisarmForGlobalGates(BuildInteractionSnapshot(anyCollectables, anyExpansion)) ?? false;
 
         if (shouldDisarmForGate)

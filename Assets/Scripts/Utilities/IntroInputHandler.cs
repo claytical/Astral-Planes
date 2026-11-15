@@ -23,7 +23,7 @@ public class IntroInputHandler : MonoBehaviour
         // a Choose/South press meant to confirm a button in that panel must not also register
         // here as "any input" and skip straight to ship selection. ShouldSuppressInput (not just
         // IsOpen) also covers the same frame the panel just closed on this exact press.
-        if (SettingsPanelController.ShouldSuppressInput) return;
+        if (ModalMenu.ShouldSuppressInput) return;
 
         inputReceived = true;
         if (ControlTutorialDirector.Instance != null)

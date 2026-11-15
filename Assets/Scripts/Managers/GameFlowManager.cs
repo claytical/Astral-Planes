@@ -29,51 +29,41 @@ public partial class GameFlowManager : MonoBehaviour
     [SerializeField, Min(0f)] private float vehiclePhaseInDelaySeconds = 1.2f;
 
     [Header("Path Choice")]
-    [Tooltip("Optional per-kind (revisit / new motif / new phase) particle look for path exits. " +
-             "Exits are built procedurally; unassigned = built-in defaults.")]
-    [SerializeField] private PathExitParticleStyle pathExitParticleStyle;
-    public PathExitParticleStyle PathExitParticleStyle => pathExitParticleStyle;
+    [Tooltip("Everything about path-choice exits — placement, the four road looks, feel and " +
+             "timing — lives on this one asset. Unassigned = Resources/Config/PathExitConfig, " +
+             "then built-in defaults.")]
+    [UnityEngine.Serialization.FormerlySerializedAs("pathExitParticleStyle")]
+    [SerializeField] private PathExitConfig pathExitConfig;
+    private PathExitConfig _pathExitConfigFallback;
 
-    [Tooltip("Seconds to fade a losing exit's particle visual after it's sealed, before " +
-             "deactivating it. Keeps the tunnel closing from reading as an instant pop.")]
-    [SerializeField, Min(0f)] private float pathExitSealFadeSeconds = 0.35f;
-    public float PathExitSealFadeSeconds => pathExitSealFadeSeconds;
+    /// <summary>The assigned path-exit config, else Resources/Config/PathExitConfig, else defaults. Never null.</summary>
+    public PathExitConfig PathExitConfig
+    {
+        get
+        {
+            if (pathExitConfig != null) return pathExitConfig;
+            if (_pathExitConfigFallback == null)
+            {
+                _pathExitConfigFallback = Resources.Load<PathExitConfig>("Config/PathExitConfig");
+                if (_pathExitConfigFallback == null)
+                {
+                    _pathExitConfigFallback = ScriptableObject.CreateInstance<PathExitConfig>();
+                    _pathExitConfigFallback.hideFlags = HideFlags.HideAndDontSave;
+                }
+            }
+            return _pathExitConfigFallback;
+        }
+    }
 
-    [Tooltip("Seconds the winning black hole takes to close after the vehicles have been swallowed.")]
-    [SerializeField, Min(0f)] private float pathExitCloseSeconds = 0.6f;
-    public float PathExitCloseSeconds => pathExitCloseSeconds;
-
-    [Tooltip("Seconds the old interstitial maze's dust takes to dissolve (instead of popping out) " +
-             "after the vehicles are swallowed. Runs alongside the hole closing.")]
-    [SerializeField, Min(0f)] private float pathExitDissolveSeconds = 0.5f;
-    public float PathExitDissolveSeconds => pathExitDissolveSeconds;
-
-    [Tooltip("Beat of held stillness after the vehicles vanish into the hole, before it closes.")]
-    [SerializeField, Min(0f)] private float pathExitPostSwallowBeatSeconds = 0.2f;
-    public float PathExitPostSwallowBeatSeconds => pathExitPostSwallowBeatSeconds;
-
-    [Tooltip("Seconds the entry black hole at the next maze's mirrored edge takes to close once " +
-             "the vehicles have emerged and arrived.")]
-    [SerializeField, Min(0f)] private float pathEntryPortalCloseSeconds = 0.6f;
-    public float PathEntryPortalCloseSeconds => pathEntryPortalCloseSeconds;
-
-    [Tooltip("World units past the true screen edge a vehicle must clear before it counts as " +
-             "off-screen — used both when carrying vehicles out through a chosen exit and when " +
-             "staging them for their off-screen entry into the next maze.")]
-    [SerializeField, Min(0f)] private float pathTransitionOffscreenMargin = 2f;
-    public float PathTransitionOffscreenMargin => pathTransitionOffscreenMargin;
-
-    [Tooltip("Max seconds to drive a vehicle off-screen through a chosen exit, or in from " +
-             "off-screen at the start of the next maze, before giving up and proceeding anyway.")]
-    [SerializeField, Min(0f)] private float pathTransitionTravelTimeout = 3f;
-    public float PathTransitionTravelTimeout => pathTransitionTravelTimeout;
-
-    [Tooltip("How many cells deep (along the boundary-normal axis, inward from the wall) an " +
-             "exit's capture trigger reaches. Deeper means a vehicle gets pulled in and starts " +
-             "aligning to the aisle well before it's near the screen edge, instead of only once " +
-             "it's already touching the wall.")]
-    [SerializeField, Min(1)] private int pathExitCaptureDepthCells = 4;
-    public int PathExitCaptureDepthCells => pathExitCaptureDepthCells;
+    // Forwarders kept so existing callers don't change; the values live on PathExitConfig.
+    public float PathExitSealFadeSeconds => PathExitConfig.sealFadeSeconds;
+    public float PathExitCloseSeconds => PathExitConfig.closeSeconds;
+    public float PathExitDissolveSeconds => PathExitConfig.dissolveSeconds;
+    public float PathExitPostSwallowBeatSeconds => PathExitConfig.postSwallowBeatSeconds;
+    public float PathEntryPortalCloseSeconds => PathExitConfig.entryRoadCloseSeconds;
+    public float PathTransitionOffscreenMargin => PathExitConfig.offscreenMargin;
+    public float PathTransitionTravelTimeout => PathExitConfig.travelTimeoutSeconds;
+    public int PathExitCaptureDepthCells => PathExitConfig.captureDepthCells;
 
     [Tooltip("Wisp prefab spawned once per multi-exit path-choice interstitial maze — leads " +
              "the vehicle toward a randomly chosen exit and plays a one-shot bridging sample " +
@@ -285,7 +275,11 @@ public partial class GameFlowManager : MonoBehaviour
     {
         InstrumentTrackController itc = FindAnyObjectByType<InstrumentTrackController>(); 
         NoteVisualizer visualizer = FindAnyObjectByType<NoteVisualizer>();
-        
+
+        // Before BeginGameOverFade: it stretches every loop note to 1920 ticks, which would
+        // corrupt the unfinished record TrackFinished plays back.
+        BridgeFlow?.CaptureUnfinishedSnapshot();
+
         itc?.BeginGameOverFade();
 
         yield return new WaitForSeconds(2f);

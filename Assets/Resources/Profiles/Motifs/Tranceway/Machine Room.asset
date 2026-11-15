@@ -40,7 +40,8 @@ MonoBehaviour:
     maxConsecutiveLoopSeconds: 0
   entryLoopCount: 1
   resetFirstCarryOnStart: 0
-  bridgeSamples: []
+  bridgeSamples:
+  - {fileID: 8300000, guid: 9462c445749c841b08e23b7506e90f77, type: 3}
   bridgeSampleVolume: 1
   quantizeBridgeSampleToBeat: 1
   bpm: 189

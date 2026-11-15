@@ -86,11 +86,22 @@ public partial class ControlTutorialHighlight : MonoBehaviour
     private RectTransform _rootRectTransform;
     private Vector2       _originPosition;
 
-    public Instruction[] TutorialSequence => tutorialSequence;
+    private Instruction[] _activeSequence;
+    private Instruction[] ActiveSequence => _activeSequence ?? tutorialSequence;
+    public Instruction[] TutorialSequence => ActiveSequence;
+
+    /// <summary>Builds the runtime sequence from the authored one, optionally dropping the Release ("Place") step.</summary>
+    public void ConfigureSequence(bool includeRelease)
+    {
+        if (tutorialSequence == null) { _activeSequence = null; return; }
+        _activeSequence = includeRelease
+            ? (Instruction[])tutorialSequence.Clone()
+            : System.Array.FindAll(tutorialSequence, i => i != Instruction.Release);
+    }
 
     private Instruction CurrentInstruction =>
-        (_tutorialActive && _tutorialIndex >= 0 && _tutorialIndex < (tutorialSequence?.Length ?? 0))
-            ? tutorialSequence[_tutorialIndex]
+        (_tutorialActive && _tutorialIndex >= 0 && _tutorialIndex < (ActiveSequence?.Length ?? 0))
+            ? ActiveSequence[_tutorialIndex]
             : Instruction.None;
 
     private void Awake()

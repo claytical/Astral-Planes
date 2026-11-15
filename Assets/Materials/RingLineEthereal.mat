@@ -25,10 +25,12 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _DstBlend: 6
+    - _DstBlend: 3
     - _EdgePower: 1
     - _EdgeSoftness: 1
+    - _Radial: 0
     - _SrcBlend: 5
+    - _TipFade: 0
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}

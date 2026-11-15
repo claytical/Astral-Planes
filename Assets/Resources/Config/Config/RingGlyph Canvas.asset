@@ -36,7 +36,8 @@ MonoBehaviour:
   nonHighlightedAlphaMultiplier: 0.5
   remainingRingColor: {r: 0.6132076, g: 0.6132076, b: 0.6132076, a: 1}
   remainingRingAlpha: 0.734
-  remainingRingLineWidth: 0.012
+  remainingRingMaterial: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee, type: 2}
+  remainingRingLineWidth: 0.03
   nextUpColorCycleDuration: 1.5
   ringDrawInDuration: 0
   ringStaggerDelay: 0

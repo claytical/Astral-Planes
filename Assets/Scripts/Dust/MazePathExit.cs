@@ -52,15 +52,21 @@ public class MazePathExit : MonoBehaviour
         _sealFadeSeconds = sealFadeSeconds;
     }
 
-    /// <summary>This exit won: the mass swells well past the boundary (through the UI band and
-    /// beyond the screen edge) while the dust is pulled in faster.</summary>
+    /// <summary>This exit won: the rainbow road widens, brightens and flows faster while the
+    /// streamers race outward.</summary>
     public void BeginSwallow() => _portal?.Swallow();
 
-    /// <summary>Current mass radius of this exit's black hole (0 if it has none).</summary>
-    public float PortalRadius => _portal != null ? _portal.Radius : 0f;
+    /// <summary>Current width of this exit's rainbow road (0 if it has none).</summary>
+    public float PortalWidth => _portal != null ? _portal.Width : 0f;
 
-    /// <summary>Closes the hole gracefully from any state (including mid-swallow): the mass
-    /// shrinks and fades while the dust fades out. The caller destroys the exit afterwards.</summary>
+    /// <summary>Distance from the screen edge (Geometry.VisualCenter) back along Inward to where the
+    /// rainbow road starts. Falls back to the capture lane's inner end if there is no road.</summary>
+    public float RoadInnerDistance => _portal != null
+        ? _portal.InnerDistance
+        : Geometry.ScreenEdgeDistance + Geometry.CaptureDepth;
+
+    /// <summary>Closes the road gracefully from any state (including mid-swallow): it narrows
+    /// and fades while the dust fades out. The caller destroys the exit afterwards.</summary>
     public void BeginClose(float seconds)
     {
         if (_visualInstance == null) return;
@@ -79,10 +85,11 @@ public class MazePathExit : MonoBehaviour
             // Fade the losing tunnel's marker out instead of cutting it on the same frame it
             // seals, so a losing exit doesn't visibly pop off mid-effect while
             // PathChoiceCoordinator's carry-out sequence still has seconds left to run.
-            Debug.Log($"[PathExitFade] SetSealed(true) on {name}: visual={_visualInstance.name}, fadeSeconds={_sealFadeSeconds}, alreadyFading={_sealFadeRoutine != null}");
+            if (GameFlowManager.VerboseLogging)
+                Debug.Log($"[PathExitFade] SetSealed(true) on {name}: visual={_visualInstance.name}, fadeSeconds={_sealFadeSeconds}, alreadyFading={_sealFadeRoutine != null}");
             if (_sealFadeRoutine == null)
             {
-                _portal?.Collapse(_sealFadeSeconds);   // the mass closes while its dust fades
+                _portal?.Collapse(_sealFadeSeconds);   // the road narrows away while its dust fades
                 _sealFadeRoutine = StartCoroutine(SealFadeRoutine(_sealFadeSeconds));
             }
         }
@@ -138,7 +145,8 @@ public class MazePathExit : MonoBehaviour
                 baseSize[i][particle.randomSeed] = use3DSize[i] ? particle.startSize3D : Vector3.one * particle.startSize;
             }
         }
-        Debug.Log($"[PathExitFade] {name}: {particleSystems.Length} ParticleSystem(s) found, {totalSnapshotted} live particle(s) snapshotted, use3DSize={string.Join(",", use3DSize)}");
+        if (GameFlowManager.VerboseLogging)
+            Debug.Log($"[PathExitFade] {name}: {particleSystems.Length} ParticleSystem(s) found, {totalSnapshotted} live particle(s) snapshotted, use3DSize={string.Join(",", use3DSize)}");
 
         float duration = Mathf.Max(0.01f, seconds);
         float t = 0f;
@@ -181,7 +189,8 @@ public class MazePathExit : MonoBehaviour
             yield return null;
         }
 
-        Debug.Log($"[PathExitFade] {name}: fade complete after {t:F2}s, deactivating visual");
+        if (GameFlowManager.VerboseLogging)
+            Debug.Log($"[PathExitFade] {name}: fade complete after {t:F2}s, deactivating visual");
         if (_visualInstance != null) _visualInstance.SetActive(false);
         _sealFadeRoutine = null;
     }
@@ -202,9 +211,14 @@ public class MazePathExit : MonoBehaviour
         Gizmos.DrawWireCube(laneCenter, size);
         if (_portal != null)
         {
+            // Magenta = on-screen part of the rainbow road (inner end -> screen edge).
+            float inner = _portal.InnerDistance;
+            Vector2 roadCenter = g.VisualCenter + g.Inward * (inner * 0.5f);
+            Vector3 roadSize = g.HorizontalWall
+                ? new Vector3(_portal.BaseWidth, inner, 0.01f)
+                : new Vector3(inner, _portal.BaseWidth, 0.01f);
             Gizmos.color = Color.magenta;
-            Gizmos.DrawWireSphere(g.VisualCenter, _portal.BaseRadius);
-            Gizmos.DrawWireSphere(g.VisualCenter, _portal.BaseRadius * 2.2f);
+            Gizmos.DrawWireCube(roadCenter, roadSize);
         }
         Gizmos.color = Color.yellow;
         Gizmos.DrawLine(g.Center, g.LaneInnerPoint);

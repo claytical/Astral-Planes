@@ -23,7 +23,33 @@ public sealed class BridgeCoordinator
 
     public IReadOnlyList<MotifSnapshot> MotifSnapshots => _motifSnapshots;
 
-    public void ClearSessionMotifs() => _motifSnapshots.Clear();
+    /// <summary>
+    /// The motif that was in progress when the run ended (all players out of energy), or null if
+    /// no notes had been placed in it. Display-only for TrackFinished — never added to
+    /// MotifSnapshots or saved to disk, so it doesn't count as a completed motif.
+    /// </summary>
+    public MotifSnapshot UnfinishedSnapshot { get; private set; }
+
+    public void ClearSessionMotifs()
+    {
+        _motifSnapshots.Clear();
+        UnfinishedSnapshot = null;
+    }
+
+    /// <summary>
+    /// Game over: records the in-progress motif's loop as an unfinished record. Must run before
+    /// InstrumentTrackController.BeginGameOverFade (which rewrites every loop note's duration)
+    /// and before the scene unload destroys the tracks.
+    /// </summary>
+    public void CaptureUnfinishedSnapshot()
+    {
+        var allTracks = (_gameFlow.controller?.tracks != null)
+            ? _gameFlow.controller.tracks.Where(t => t != null).ToList()
+            : new List<InstrumentTrack>();
+
+        var snap = BuildPhaseSnapshotForBridge(allTracks, _gameFlow.activeDrumTrack);
+        UnfinishedSnapshot = snap.CollectedNotes != null && snap.CollectedNotes.Count > 0 ? snap : null;
+    }
 
     /// <param name="endMatchAfterSpin">Competitive motif mode: after the ring spins off, show the match results instead of the interstitial maze.</param>
     public IEnumerator PlayMotifBridgeAndRestart(bool endMatchAfterSpin = false)
@@ -69,11 +95,17 @@ public sealed class BridgeCoordinator
         // (guarded by _spinOffPending, which also suppresses the ordinary per-bin auto-hide
         // for the whole wait) before it starts the visual spin/roll — see that method.
         var rings = _gameFlow.GetMotifRingGlyphApplicator();
+        float spinDur = rings != null ? (rings.config?.spinOffDuration ?? 0.45f) : 0f;
+        float rollDur = rings != null ? (rings.config?.rollOffDuration ?? 1.5f) : 0f;
+
+        // A wisp bridge sample still playing from this motif fades out with the record
+        // animation (rest of loop + spin + roll), so the next maze starts audio-clean and its
+        // own wisp/sample isn't fighting this one.
+        Wisp.FadeOutActiveBridgeSamples(remainingInLoop + spinDur + rollDur);
+
         if (rings != null)
         {
-            float spinDur = rings.config?.spinOffDuration ?? 0.45f;
-            yield return _gameFlow.StartCoroutine(
-                rings.SpinAndRollOffActiveRings(spinDur, rings.config?.rollOffDuration ?? 1.5f));
+            yield return _gameFlow.StartCoroutine(rings.SpinAndRollOffActiveRings(spinDur, rollDur));
         }
 
         // Final safety sweep for any stray tether that didn't already retract gracefully
@@ -113,7 +145,7 @@ public sealed class BridgeCoordinator
         snapshot.Pattern = _gameFlow.phaseTransitionManager != null
             ? _gameFlow.phaseTransitionManager.currentPhase
             : MazeArchetype.Windows;
-        snapshot.Color = _gameFlow.dustGenerator.MazeColor();
+        snapshot.Color = _gameFlow.dustGenerator != null ? _gameFlow.dustGenerator.MazeColor() : Color.white;
         snapshot.TotalSteps = (drum != null && drum.totalSteps > 0) ? drum.totalSteps : 16;
         snapshot.Bpm = (drum != null && drum.drumLoopBPM > 0f) ? drum.drumLoopBPM : 120f;
         snapshot.StepDurationSec = drum != null ? drum.GetAuthoredStepSeconds() : 0f; // 0 ⇒ preview falls back
@@ -197,6 +229,10 @@ public sealed class BridgeCoordinator
 
         foreach (var c in Object.FindObjectsByType<Collectable>(FindObjectsSortMode.None))
             if (c != null) Object.Destroy(c.gameObject);
+
+        // A carried wisp lives only until its motif's first loop ends; never into the next bridge.
+        foreach (var w in Object.FindObjectsByType<Wisp>(FindObjectsSortMode.None))
+            if (w != null) w.Dismiss();
 
         foreach (var n in Object.FindObjectsByType<DiscoveryTrackNode>(FindObjectsSortMode.None))
         {

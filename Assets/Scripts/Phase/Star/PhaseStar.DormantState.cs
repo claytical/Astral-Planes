@@ -60,7 +60,9 @@ public partial class PhaseStar
         visuals?.ShowDim(ResolvePreviewColorByReadiness());
         _dormantSeedVisualPrimed = true;
 
-        DisableColliders();
+        // Colliders stay on for dust/world contact, but PhaseStarMotion2D's ghost drift
+        // ignores vehicle collisions while Dormant (ships pass through and get buffeted).
+        EnableColliders();
         _hasReceivedEnergy = false;
 
         // Navigator active immediately, but tentacles wait a beat so the star

@@ -174,31 +174,6 @@ public partial class Vehicle
            pos.y < area.bottom - margin || pos.y > area.top + margin;
 }
 
-    /// <summary>
-    /// Immediately relocates the vehicle to just outside a circular region if it's currently
-    /// inside — e.g. a ring collider that just activated/grew and happened to enclose it.
-    /// Unlike TryEjectFromVoid, this is instant (not animated): the vehicle was never meant to
-    /// be inside this collider, so snapping out now — before Physics2D's next step ever sees
-    /// an overlap — means no spurious OnCollisionEnter2D fires against it.
-    /// </summary>
-    public void EjectFromCircleIfInside(Vector2 center, float radius, float margin = 0.15f)
-{
-    if (rb == null) return;
-    Vector2 pos = rb.position;
-    if ((pos - center).sqrMagnitude >= radius * radius) return; // not inside, no-op
-
-    Vector2 away = pos - center;
-    away = away.sqrMagnitude < 0.0001f ? Random.insideUnitCircle.normalized : away.normalized;
-
-    Vector2 targetWorld = center + away * (radius + margin);
-    if (drumTrack != null &&
-        TryFindNearbyEmptyCell(drumTrack.WorldToGridPosition(targetWorld), 4, out var emptyCell))
-        targetWorld = drumTrack.GridToWorldPosition(emptyCell);
-
-    rb.position = targetWorld;
-    rb.linearVelocity = away * Mathf.Max(rb.linearVelocity.magnitude, 1f);
-}
-
     private void UpdateVoidEnergyRecovery(float dt)
 {
     if (vehicleConfig.voidEnergyRecoveryPerSecond <= 0f) return;

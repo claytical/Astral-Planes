@@ -297,6 +297,14 @@ public partial class InstrumentTrack
         return authoredRoot != int.MinValue ? authoredRoot : GetAuthoredRootMidiExact();
     }
 
+    // Same pitch class as `pitch`, in the octave closest to `anchor` (signed pc distance -5..+6).
+    private static int NearestOctaveTo(int pitch, int anchor)
+    {
+        int d = ((pitch - anchor) % 12 + 12) % 12;
+        if (d > 6) d -= 12;
+        return anchor + d;
+    }
+
     /// <summary>
     /// Moves a MIDI note by octaves to fit this track's playable range.
     /// If the range is narrower than one octave and no exact octave fit exists,
@@ -382,7 +390,9 @@ public partial class InstrumentTrack
             if (GameFlowManager.VerboseLogging && retuned != note) Debug.Log(
                 $"[RETUNE_CHANGED] track={name} step={step} bin={bin} noteIn={note} authoredRoot={authoredRoot} " +
                 $"chordRoot={chord.rootNote} rootDelta={rootDelta} retuned={retuned}");
-            modified.Add((step, retuned, dur, vel, authoredRoot));
+            // Re-anchor to the chord this note is now voiced against. Keeping the old
+            // authoredRoot made every later retune re-apply the same rootDelta (cumulative drift).
+            modified.Add((step, retuned, dur, vel, chord.rootNote));
         }
 
         RebuildLoopFromModifiedNotes(modified, transform.position);

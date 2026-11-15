@@ -149,6 +149,7 @@ public partial class LocalPlayer
 
     private void HandlePlayLeavePressed()
     {
+        if (ModalMenu.ShouldSuppressInput) return; // East backs out of the pause menu; it must not start give-up
         if (_playLeaveHoldCo == null)
             _playLeaveHoldCo = StartCoroutine(HoldToAbortGameplayRoutine());
     }

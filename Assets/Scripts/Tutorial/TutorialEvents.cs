@@ -14,7 +14,8 @@ public static class TutorialEvents
     public static event Action DiscoveryBurst;
     public static event Action DiscoveryEscaped;
     public static event Action<Collectable> FirstNoteSpawned;   // first note of a burst to launch
-    public static event Action<Collectable> NoteCaught;
+    public static event Action<Collectable> NoteSounded;        // every burst note, as it launches and sounds
+    public static event Action<Collectable, Vehicle> NoteCaught;
     public static event Action NotePlaced;
     public static event Action NoteDiscarded;
     public static event Action RingCompleted;
@@ -28,7 +29,8 @@ public static class TutorialEvents
     public static void RaiseDiscoveryBurst()      => DiscoveryBurst?.Invoke();
     public static void RaiseDiscoveryEscaped()    => DiscoveryEscaped?.Invoke();
     public static void RaiseFirstNoteSpawned(Collectable c) => FirstNoteSpawned?.Invoke(c);
-    public static void RaiseNoteCaught(Collectable c)       => NoteCaught?.Invoke(c);
+    public static void RaiseNoteSounded(Collectable c) => NoteSounded?.Invoke(c);
+    public static void RaiseNoteCaught(Collectable c, Vehicle v) => NoteCaught?.Invoke(c, v);
     public static void RaiseNotePlaced()          => NotePlaced?.Invoke();
     public static void RaiseNoteDiscarded()       => NoteDiscarded?.Invoke();
     public static void RaiseRingCompleted()       => RingCompleted?.Invoke();

@@ -9,6 +9,18 @@ public partial class CosmicDustGenerator
 {
     private List<MazeRoleGeoConfig> _roleGeoConfigs;
     private MazePatternType _activePatternType = MazePatternType.FullFill;
+
+    // The star cell the current phase maze was built around (ring centre for RingChokepoints).
+    // Read by PhaseStar navigation (MazeNavGeometry) — not cleared by ClearMaze, overwritten
+    // by the next GenerateMazeForPhaseWithPaths.
+    private Vector2Int _lastMazeAnchorCell;
+    private bool _hasMazeAnchorCell;
+
+    public bool TryGetMazeAnchorCell(out Vector2Int cell)
+    {
+        cell = _lastMazeAnchorCell;
+        return _hasMazeAnchorCell;
+    }
     private DustMotifDensitySnapshot _densitySnapshot;
     private float _genericFillNeverRegrowRatio = 1f;
     private float _genericFillRatio01 = 0f;
@@ -966,6 +978,8 @@ public partial class CosmicDustGenerator
         if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] Maze grid size: {w}x{h}");
 
         _activeMazePattern = phaseTransitionManager?.currentMotif?.mazePattern;
+        _lastMazeAnchorCell = starCell;
+        _hasMazeAnchorCell = true;
         _runtimeVoidOnlyDustCreation = false;
         var reserved = new HashSet<Vector2Int> { starCell };
 

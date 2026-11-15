@@ -78,7 +78,11 @@ public partial class Vehicle
         var ringApplicator = coll.gameObject.GetComponent<MotifRingGlyphApplicator>();
         if (ringApplicator != null)
         {
-            if (!ringApplicator.TryBreakNextPendingTether(coll.contacts[0].point))
+            // Only a deliberate hit breaks a note: boosting, or a hard enough impact.
+            // relativeVelocity is the pre-solve impact speed (rb.linearVelocity is already post-bounce here).
+            float minImpact = vehicleConfig != null ? vehicleConfig.ringBreakMinImpactSpeed : 0f;
+            bool intentional = boosting || coll.relativeVelocity.magnitude >= minImpact;
+            if (!intentional || !ringApplicator.TryBreakNextPendingTether(coll.contacts[0].point))
                 ringApplicator.PlayDenialShake();
         }
 }
@@ -102,6 +106,7 @@ public partial class Vehicle
         float duration = vehicleConfig.postCommitRingCollisionImmunitySeconds;
         if (duration <= 0f) return;
 
+        _postCommitRingImmuneUntil = Mathf.Max(_postCommitRingImmuneUntil, Time.time + duration);
         Physics2D.IgnoreCollision(vehicleCollider, ringCollider, true);
         StartCoroutine(RestoreRingCollisionAfterDelay(vehicleCollider, ringCollider, duration));
     }
@@ -109,6 +114,9 @@ public partial class Vehicle
     private System.Collections.IEnumerator RestoreRingCollisionAfterDelay(Collider2D vehicleCollider, Collider2D ringCollider, float delay)
     {
         yield return new WaitForSeconds(delay);
+        // A later commit extended the window, or a ring phase owns the ignore — whichever ends
+        // last restores collision (see Vehicle.RingPhase.cs).
+        if (_ringPhasing || Time.time < _postCommitRingImmuneUntil - 0.01f) yield break;
         if (vehicleCollider != null && ringCollider != null)
             Physics2D.IgnoreCollision(vehicleCollider, ringCollider, false);
     }

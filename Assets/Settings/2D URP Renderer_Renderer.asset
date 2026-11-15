@@ -1,5 +1,71 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-5558837264417269189
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5aee3c51e8324a5a9bd2498adfec2cf, type: 3}
+  m_Name: CosmicPlasmaFeature
+  m_EditorClassIdentifier: Assembly-CSharp::CosmicPlasmaFeature
+  m_Active: 1
+  settings:
+    debugView: 0
+    logOnce: 1
+    layerMask:
+      serializedVersion: 2
+      m_Bits: 128
+    renderPassEvent: 500
+    resolutionScale: 0.5
+    threshold: 0.35
+    edgeSoftness: 0.08
+    maxAlpha: 1
+    blurRadius: 2
+    rimWidth: 0.15
+    rimStrength: 0.5
+    coreBoost: 0.5
+    rimColor: {r: 1, g: 1, b: 1, a: 1}
+    brightness: 2.02
+    liftToWhite: 0.25
+    saturation: 1.1
+  compositeShader: {fileID: 4800000, guid: 279d2668b1b734f249daa531eb4eb2e7, type: 3}
+--- !u!114 &-4867592587814142297
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5aee3c51e8324a5a9bd2498adfec2cf, type: 3}
+  m_Name: CosmicPlasmaFeature
+  m_EditorClassIdentifier: Assembly-CSharp::CosmicPlasmaFeature
+  m_Active: 1
+  settings:
+    debugView: 0
+    logOnce: 1
+    layerMask:
+      serializedVersion: 2
+      m_Bits: 4294967295
+    renderPassEvent: 500
+    resolutionScale: 0.5
+    threshold: 0.45
+    edgeSoftness: 0.05
+    maxAlpha: 0.75
+    blurRadius: 1
+    rimWidth: 0.15
+    rimStrength: 0.25
+    coreBoost: 0.25
+    rimColor: {r: 1, g: 1, b: 1, a: 1}
+    brightness: 1.6
+    liftToWhite: 0
+    saturation: 1.2
+  compositeShader: {fileID: 4800000, guid: 279d2668b1b734f249daa531eb4eb2e7, type: 3}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11,7 +77,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 11145981673336645838492a2d98e247, type: 3}
   m_Name: 2D URP Renderer_Renderer
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.2D.Runtime::UnityEngine.Rendering.Universal.Renderer2DData
   debugShaders:
     debugReplacementPS: {fileID: 4800000, guid: cf852408f2e174538bcd9b7fda1c5ae7,
       type: 3}
@@ -26,9 +92,12 @@ MonoBehaviour:
     probeSamplingDebugMesh: {fileID: 0}
     probeSamplingDebugTexture: {fileID: 0}
     probeVolumeBlendStatesCS: {fileID: 0}
-  m_RendererFeatures: []
-  m_RendererFeatureMap: 
-  m_UseNativeRenderPass: 0
+  m_RendererFeatures:
+  - {fileID: -4867592587814142297}
+  m_RendererFeatureMap: a77e03bc54d672bc
+  m_LayerMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
   m_TransparencySortMode: 0
   m_TransparencySortAxis: {x: 0, y: 1, z: 0}
   m_HDREmulationScale: 1
@@ -52,7 +121,7 @@ MonoBehaviour:
   m_CameraSortingLayerDownsamplingMethod: 0
   m_MaxLightRenderTextureCount: 16
   m_MaxShadowRenderTextureCount: 1
-  m_PostProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
+  m_PostProcessData: {fileID: 0}
   m_DefaultMaterialType: 0
   m_DefaultCustomMaterial: {fileID: 2100000, guid: a97c105638bdf8b4a8650670310a4cd3,
     type: 2}

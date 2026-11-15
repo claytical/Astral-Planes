@@ -38,6 +38,7 @@ public class NarratedTutorialController : MonoBehaviour
     // Placement-window cue state.
     int _placedSinceCue;
     int _cueCompletedStage = -1;
+    Vehicle _lastCatcher;   // decides the copy variant on mixed Cozy Co-Pilot / Groove Commander tables
     Vehicle[] _vehicleCache = System.Array.Empty<Vehicle>();
     float _vehicleCacheTime = -10f;
 
@@ -57,22 +58,48 @@ public class NarratedTutorialController : MonoBehaviour
 
     void OnIntroRecordHidden() => _introHidden = true;
 
+    // True when started on demand (pause menu): skips the Phase 0 restriction and the intro-ring wait.
+    bool _manualStart;
+
+    /// <summary>
+    /// Restarts the tutorial from the first stage on whatever motif is playing. Replaces any running
+    /// instance; latches start empty so every gate must be earned again.
+    /// </summary>
+    public static NarratedTutorialController RunNow()
+    {
+        var existing = FindFirstObjectByType<NarratedTutorialController>();
+        if (existing != null)
+        {
+            existing.StopAllCoroutines();
+            existing.enabled = false;
+            Destroy(existing.gameObject);
+        }
+        var go = new GameObject("NarratedTutorialController");
+        var c = go.AddComponent<NarratedTutorialController>();
+        c._manualStart = true;
+        return c;
+    }
+
     IEnumerator Start()
     {
         // Subscribe immediately: the rings can finish fading while we are still loading below.
         TutorialEvents.IntroRecordHidden += OnIntroRecordHidden;
 
-        // Only run on the Phase 0 tutorial motif. Wait for the phase manager to apply the motif.
-        PhaseTransitionManager ptm = null;
-        float waited = 0f;
-        while (waited < 15f)
+        // Auto-start only runs on the Phase 0 tutorial motif. Wait for the phase manager to apply the motif.
+        // An on-demand start (pause menu) runs on any motif.
+        if (!_manualStart)
         {
-            if (ptm == null) ptm = FindFirstObjectByType<PhaseTransitionManager>();
-            if (ptm != null && ptm.CurrentPhaseIndex >= 0) break;
-            waited += Time.unscaledDeltaTime;
-            yield return null;
+            PhaseTransitionManager ptm = null;
+            float waited = 0f;
+            while (waited < 15f)
+            {
+                if (ptm == null) ptm = FindFirstObjectByType<PhaseTransitionManager>();
+                if (ptm != null && ptm.CurrentPhaseIndex >= 0) break;
+                waited += Time.unscaledDeltaTime;
+                yield return null;
+            }
+            if (ptm == null || ptm.CurrentPhaseIndex != 0) { Destroy(gameObject); yield break; }
         }
-        if (ptm == null || ptm.CurrentPhaseIndex != 0) { Destroy(gameObject); yield break; }
 
         _script = NarratedTutorialScript.Load();
         if (_script == null) { Destroy(gameObject); yield break; } // Load() already logged why
@@ -82,17 +109,20 @@ public class NarratedTutorialController : MonoBehaviour
         _gfm = GameFlowManager.Instance;
         if (_gfm != null) _gfm.OnMotifCompleted += HandleRecordComplete;
 
-        // Hold the first message until the intro rings have disappeared.
-        float introWait = 0f;
-        while (!_introHidden && introWait < IntroHiddenTimeout)
+        if (!_manualStart)
         {
-            introWait += Time.unscaledDeltaTime;
-            yield return null;
+            // Hold the first message until the intro rings have disappeared.
+            float introWait = 0f;
+            while (!_introHidden && introWait < IntroHiddenTimeout)
+            {
+                introWait += Time.unscaledDeltaTime;
+                yield return null;
+            }
+            if (!_introHidden)
+                Debug.LogWarning("[NarratedTutorial] Intro rings never reported hidden; starting the tutorial anyway.");
+            else if (_script.introSettleSeconds > 0f)
+                yield return new WaitForSecondsRealtime(_script.introSettleSeconds);
         }
-        if (!_introHidden)
-            Debug.LogWarning("[NarratedTutorial] Intro rings never reported hidden; starting the tutorial anyway.");
-        else if (_script.introSettleSeconds > 0f)
-            yield return new WaitForSecondsRealtime(_script.introSettleSeconds);
 
         yield return Run();
     }
@@ -147,6 +177,7 @@ public class NarratedTutorialController : MonoBehaviour
         TutorialEvents.StarPoked           += OnStarPoked;
         TutorialEvents.DiscoveryBurst      += OnBurst;
         TutorialEvents.FirstNoteSpawned    += OnFirstNoteSpawned;
+        TutorialEvents.NoteSounded         += OnNoteSounded;
         TutorialEvents.NoteCaught          += OnCaught;
         TutorialEvents.NotePlaced          += OnPlaced;
         TutorialEvents.RingCompleted       += OnRing;
@@ -163,6 +194,7 @@ public class NarratedTutorialController : MonoBehaviour
         TutorialEvents.StarPoked           -= OnStarPoked;
         TutorialEvents.DiscoveryBurst      -= OnBurst;
         TutorialEvents.FirstNoteSpawned    -= OnFirstNoteSpawned;
+        TutorialEvents.NoteSounded         -= OnNoteSounded;
         TutorialEvents.NoteCaught          -= OnCaught;
         TutorialEvents.NotePlaced          -= OnPlaced;
         TutorialEvents.RingCompleted       -= OnRing;
@@ -195,12 +227,26 @@ public class NarratedTutorialController : MonoBehaviour
 
     void OnFirstNoteSpawned(Collectable c)
     {
+        // Remember it only; the highlight itself is driven by OnNoteSounded so it appears when
+        // the note actually plays rather than the instant it spawns.
         _firstNote = c != null ? c.transform : null;
-        if (!_latched.Contains(TutorialGate.NoteCaught)) Pulse(_firstNote);
     }
 
-    void OnCaught(Collectable c)
+    // While the player is on the "Can you hear it?" stage, the highlight follows whichever
+    // note is sounding as it launches, so it matches what they hear.
+    void OnNoteSounded(Collectable c)
     {
+        if (c == null || _script == null) return;
+        if (_latched.Contains(TutorialGate.NoteCaught)) return;
+        if (GateOf(ComputeStage()) != TutorialGate.NoteCaught) return;
+        _firstNote = c.transform;
+        TutorialHighlightRing.CancelAll();   // one ring at a time: the highlight moves with the sound
+        Pulse(_firstNote);
+    }
+
+    void OnCaught(Collectable c, Vehicle catcher)
+    {
+        if (catcher != null) _lastCatcher = catcher;
         _placeholder = c != null ? c.ribbonMarker : null;
         if (!_latched.Contains(TutorialGate.NotePlaced)) Pulse(_placeholder);
         _latched.Add(TutorialGate.NoteCaught);
@@ -256,6 +302,28 @@ public class NarratedTutorialController : MonoBehaviour
     }
 
     // ---- stage helpers ------------------------------------------------------------------
+
+    // Cozy Co-Pilot = Auto placement; Groove Commander = Manual. All Auto -> auto copy, all Manual -> original,
+    // mixed -> whichever mode the last note-catching vehicle uses (original until someone has caught a note).
+    bool UseAutoCopy()
+    {
+        var vehicles = GameFlowManager.Instance != null ? GameFlowManager.Instance.GetVehicles() : null;
+        if (vehicles == null || vehicles.Count == 0) return false;
+        bool anyAuto = false, anyManual = false;
+        for (int i = 0; i < vehicles.Count; i++)
+        {
+            var v = vehicles[i];
+            if (v == null) continue;
+            if (v.PlacementMethod == NotePlacementMethod.Auto) anyAuto = true; else anyManual = true;
+        }
+        if (anyAuto && !anyManual) return true;
+        if (!anyAuto) return false;
+        return _lastCatcher != null && _lastCatcher.PlacementMethod == NotePlacementMethod.Auto;
+    }
+
+    bool HasAutoVariant(TutorialStage st) => st.linesAuto != null && st.linesAuto.Length > 0 && UseAutoCopy();
+    string[] LinesFor(TutorialStage st) => HasAutoVariant(st) ? st.linesAuto : st.lines;
+    int CueIndexFor(TutorialStage st) => HasAutoVariant(st) ? st.cueLineIndexAuto : st.cueLineIndex;
 
     TutorialGate GateOf(int stage) =>
         (stage >= 0 && stage < _script.stages.Length) ? _script.stages[stage].gate : TutorialGate.None;
@@ -317,19 +385,21 @@ public class NarratedTutorialController : MonoBehaviour
         while (_stage < stages.Length)
         {
             var st = stages[_stage];
-            if (st.lines == null || st.lines.Length == 0) { _stage++; continue; }
-            int last = st.lines.Length - 1;
+            var stLines = LinesFor(st);
+            if (stLines == null || stLines.Length == 0) { _stage++; continue; }
+            int last = stLines.Length - 1;
             line = Mathf.Clamp(line, 0, last);
+            int stCue = CueIndexFor(st);
 
-            yield return ShowLine(st.lines[line], eventDriven);
+            yield return ShowLine(stLines[line], eventDriven);
             eventDriven = false;
             if (line == last) PulseForGate(st.gate);
 
-            if (line == st.cueLineIndex && _cueCompletedStage != _stage)
+            if (line == stCue && _cueCompletedStage != _stage)
             {
                 // Instruction line that cycles Now!/Here! with the real release window while a
                 // note is carried. Ends on placement, an interruption, or the stage being superseded.
-                yield return CueLoop(st.lines[line]);
+                yield return CueLoop(stLines[line]);
             }
             else if (line < last)
             {
@@ -339,7 +409,21 @@ public class NarratedTutorialController : MonoBehaviour
             else if (st.gate == TutorialGate.None)
             {
                 // Final instruction (stage 09): stays up until an interruption or the record completes.
-                while (_pending == Interruption.None) yield return null;
+                // A replay started from the pause menu has no reason to linger until the motif
+                // ends (it can be a long wait), so it holds one interval, fades out, and finishes.
+                if (_manualStart)
+                {
+                    for (float t = 0f; t < _script.holdSeconds && _pending == Interruption.None; t += Time.unscaledDeltaTime)
+                        yield return null;
+                    if (_pending == Interruption.None)
+                    {
+                        yield return _view.Hide();
+                        Destroy(gameObject);
+                        yield break;
+                    }
+                }
+                else
+                    while (_pending == Interruption.None) yield return null;
             }
             else
             {
@@ -352,7 +436,7 @@ public class NarratedTutorialController : MonoBehaviour
                 yield return PlayInterruption();
                 _stage = ComputeStage();   // resume the instruction the player actually needs now
                 // Resume at the cue line if that stage has one still in progress, else its final line.
-                int cue = _stage < stages.Length ? stages[_stage].cueLineIndex : -1;
+                int cue = _stage < stages.Length ? CueIndexFor(stages[_stage]) : -1;
                 line = (cue >= 0 && _cueCompletedStage != _stage) ? cue : int.MaxValue;
                 eventDriven = true;
                 continue;

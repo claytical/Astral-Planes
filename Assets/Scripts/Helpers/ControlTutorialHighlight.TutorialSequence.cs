@@ -15,7 +15,7 @@ public partial class ControlTutorialHighlight
     {
         if (!_tutorialActive) return true;
 
-        if (tutorialSequence == null || tutorialSequence.Length == 0)
+        if (ActiveSequence == null || ActiveSequence.Length == 0)
         {
             EndTutorial();
             return true;
@@ -23,13 +23,13 @@ public partial class ControlTutorialHighlight
 
         _tutorialIndex++;
 
-        if (_tutorialIndex >= tutorialSequence.Length)
+        if (_tutorialIndex >= ActiveSequence.Length)
         {
             EndTutorial();
             return true;
         }
 
-        HighlightInstruction(tutorialSequence[_tutorialIndex], immediate, additive);
+        HighlightInstruction(ActiveSequence[_tutorialIndex], immediate, additive);
         return false;
     }
 
@@ -85,7 +85,7 @@ public partial class ControlTutorialHighlight
     {
         while (_tutorialActive && gameObject.activeInHierarchy)
         {
-            if (_tutorialIndex >= (tutorialSequence?.Length ?? 0))
+            if (_tutorialIndex >= (ActiveSequence?.Length ?? 0))
                 break;
 
             yield return new WaitForSecondsRealtime(stepSeconds);
@@ -113,7 +113,7 @@ public partial class ControlTutorialHighlight
         while (_tutorialActive && gameObject.activeInHierarchy)
         {
             // If tutorial already completed, break.
-            if (_tutorialIndex >= (tutorialSequence?.Length ?? 0))
+            if (_tutorialIndex >= (ActiveSequence?.Length ?? 0))
                 break;
 
             yield return new WaitForSecondsRealtime(stepSeconds);

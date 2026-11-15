@@ -47,7 +47,7 @@
       "cueLineIndex": -1,
       "lines": [
         "That's it!",
-        "Tease out that melody!"
+        "Smash it and tease out that melody!"
       ]
     },
     {
@@ -66,6 +66,10 @@
       "lines": [
         "Listen. The note you caught has gone quiet where it used to play.",
         "That note won't be heard again unless you place it."
+      ],
+      "cueLineIndexAuto": -1,
+      "linesAuto": [
+        "And the cosmos take care of the rest..."
       ]
     },
     {
@@ -78,6 +82,13 @@
         "Now catch some more.",
         "Place them anywhere there's an open spot.",
         "If you miss the timing window... watch out!"
+      ],
+      "cueLineIndexAuto": -1,
+      "linesAuto": [
+        "Now it's part of the loop!",
+        "You hear it play as it wraps around?",
+        "Now catch some more.",
+        "The cosmos will place them for you."
       ]
     },
     {

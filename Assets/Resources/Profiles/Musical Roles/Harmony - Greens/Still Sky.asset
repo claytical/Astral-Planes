@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   role: 1
   dustColors:
-    baseColor: {r: 0, g: 0.745283, b: 0.08437164, a: 1}
-    shadowColor: {r: 0.028435374, g: 0.6698113, b: 0.51024956, a: 1}
+    baseColor: {r: 0.7137255, g: 0.627451, b: 0.9098039, a: 1}
+    shadowColor: {r: 0.31143963, g: 0.27379313, b: 0.397, a: 1}
   baseAlpha: 0.5
   maxEnergyUnits: 2
   carveResistance01: 0.475
@@ -36,9 +36,7 @@ MonoBehaviour:
   midiPreset: 19
   lowestNote: 35
   highestNote: 84
-  outputMixerGroup: {fileID: -7502792225068152454, guid: 07985bf4f6d469340930e958ef313c14,
-    type: 2}
-  volumeMultiplier: 1
+  volumeMultiplier: 0.59
   minVelocity: 60
   maxVelocity: 117
   regrowthDelay: 2

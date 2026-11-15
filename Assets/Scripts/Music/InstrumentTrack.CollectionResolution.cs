@@ -18,7 +18,7 @@ public partial class InstrumentTrack
     {
         if (collectable == null || collectable.assignedInstrumentTrack != this) return false;
         controller.NotifyCollected(this);
-        TutorialEvents.RaiseNoteCaught(collectable);
+        TutorialEvents.RaiseNoteCaught(collectable, vehicle);
         NoteCollectedForRound(vehicle, collectable.burstId);
 
         if (drumTrack != null)
@@ -179,9 +179,14 @@ public partial class InstrumentTrack
         bool crossBinComposition = spawnBin != targetBin;
 
         // Cross-bin: the collected note was authored for another bin's chord; use the target
-        // step's authored note. Same-bin: keep the raw collected note.
+        // step's authored pitch class, voiced in the octave nearest the collected note so the
+        // committed note stays in the register the player heard (bins' riffs can sit in
+        // different registers). Same-bin: keep the raw collected note.
         if (crossBinComposition)
-            chosenMidi = GetAuthoredNoteAtAbsStep(targetAbsStep);
+        {
+            int targetAuthored = GetAuthoredNoteAtAbsStep(targetAbsStep);
+            chosenMidi = ShiftByOctavesIntoTrackRange(NearestOctaveTo(targetAuthored, p.collectedMidi));
+        }
 
         chosenMidi = AvoidClashAtStep(targetAbsStep, chosenMidi);
 
@@ -230,7 +235,7 @@ public partial class InstrumentTrack
     {
         if (vehicle == null || collectable == null || collectable.assignedInstrumentTrack != this) return;
 
-        TutorialEvents.RaiseNoteCaught(collectable);
+        TutorialEvents.RaiseNoteCaught(collectable, vehicle);
         NoteCollectedForRound(vehicle, collectable.burstId);
 
         // Free the vacated grid cell (same as normal pickup path).

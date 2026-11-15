@@ -10,93 +10,9 @@ public partial class Vehicle
     /// </summary>
     public void ClearTrailForWrap()
     {
-        // Reset ring buffer — RecordPositionHistory seeds itself from the new position next Update.
-        _posHistoryCount = 0;
-        _posHistoryHead  = 0;
-        _posHistoryAccum = 0f;
-        _posHistoryLast  = transform.position;
-
         // Clear the rendered trail geometry.
         if (_activeTrailRenderer != null)
             _activeTrailRenderer.Clear();
-    }
-
-    // ---- Note Trail Management ----
-    private void RecordPositionHistory()
-    {
-        int cap = Mathf.Max(8, vehicleConfig.trailHistoryCapacity);
-        if (_posHistory == null || _posHistory.Length != cap)
-        {
-            _posHistory = new Vector3[cap];
-            _posHistoryHead = 0;
-            _posHistoryCount = 0;
-            _posHistoryLast = transform.position;
-        }
-
-        Vector3 cur = transform.position;
-        float moved = Vector3.Distance(cur, _posHistoryLast);
-        _posHistoryAccum += moved;
-        if (moved > 0.001f)
-            _lastTravelDir = (cur - _posHistoryLast).normalized;
-        _posHistoryLast = cur;
-
-        // Record at a density of ~4 samples per slot-spacing so we have smooth curve data
-        float sampleDist = Mathf.Max(0.01f, vehicleConfig.trailSlotSpacing * 0.25f);
-        if (_posHistoryAccum >= sampleDist)
-        {
-            _posHistoryAccum -= sampleDist;
-            _posHistory[_posHistoryHead] = cur;
-            _posHistoryHead = (_posHistoryHead + 1) % cap;
-            if (_posHistoryCount < cap) _posHistoryCount++;
-        }
-    }
-    /// <summary>
-    /// Walks back through the position history to find a world point at arc-length <paramref name="distance"/>
-    /// behind the vehicle head. Returns the vehicle position if history is too short.
-    /// </summary>
-    private Vector3 SampleTrailPosition(float distance)
-    {
-        Vector3 vehiclePos = transform.position;
-
-        if (_posHistory == null || _posHistoryCount < 2)
-            return vehiclePos - _lastTravelDir * distance;
-
-        float remaining = distance;
-        // Start from the newest entry (head-1) and walk backwards.
-        // The newest entry may lag behind the actual vehicle position if it hasn't
-        // moved far enough to trigger a new sample, so we prepend a virtual segment
-        // from vehiclePos to the newest history point.
-        int idx = (_posHistoryHead - 1 + _posHistory.Length) % _posHistory.Length;
-        Vector3 prev = vehiclePos; // always start from the live vehicle position
-        Vector3 newest = _posHistory[idx];
-
-        // Walk: vehiclePos → newest → older samples
-        for (int i = 0; i <= _posHistoryCount; i++)
-        {
-            Vector3 next = (i == 0) ? newest : default;
-            if (i > 0)
-            {
-                int nextIdx = (idx - 1 + _posHistory.Length) % _posHistory.Length;
-                next = _posHistory[nextIdx];
-                idx = nextIdx;
-            }
-
-            float seg = Vector3.Distance(prev, next);
-            if (seg <= 0f) { prev = next; continue; }
-
-            if (remaining <= seg)
-                return Vector3.Lerp(prev, next, remaining / seg);
-
-            remaining -= seg;
-            prev = next;
-
-            if (i == _posHistoryCount - 1)
-                break;
-        }
-
-        // Ran out of history — extrapolate straight back from the last known point
-        // along the last travel direction so the tail keeps hanging naturally.
-        return prev - _lastTravelDir * remaining;
     }
     // ── Shared timing helpers ──────────────────────────────────────────────
 
@@ -220,9 +136,8 @@ public partial class Vehicle
 
         UpdateVehiclePlacementResonance(pulse01, cueTrack, isAuthoritative);
 
-        // Armed notes: fly orb toward its target marker.
+        // Armed notes: fly orb toward its target marker (or stay in the core until it exists).
         int armedSlot = 0;
-        float bunchDist = vehicleConfig.trailFirstSlotOffset;
         foreach (var ar in _armedReleases)
         {
             if (ar.note.collectable == null) { armedSlot++; continue; }
@@ -240,31 +155,22 @@ public partial class Vehicle
             if (hasMarkerPos)
                 ar.note.collectable.SetTrailTarget(markerWorld);
             else
-            {
-                float dist = bunchDist;
-                ar.note.collectable.SetTrailTarget(SampleTrailPosition(dist));
-            }
+                ar.note.collectable.HoldInCore(NoteCoreAnchor);
 
             ar.note.collectable.SetReleasePulse(armedSlot == 0 ? pulse01 : 0f);
             armedSlot++;
         }
 
-        // Pending notes: mounted at a fixed vehicle-relative slot instead of a point sampled
-        // from the vehicle's position-history wake. Wake-sampling read as "drifting behind the
-        // vehicle's path" (incidental) rather than "captured and held" — a rigid, live-tracked
-        // local-space slot reads as mounted instead, stacking further back per queued note.
+        // Pending notes: carried rigidly in the vehicle's hollow core, like fuel in a tank —
+        // no trailing slot, no lag, no drift.
         int slot = armedSlot;
-        int pendingIndex = 0;
         foreach (var p in _pendingNotes)
         {
-            if (p.collectable == null) { slot++; pendingIndex++; continue; }
+            if (p.collectable == null) { slot++; continue; }
 
-            float pendingOffset = vehicleConfig.trailFirstSlotOffset + pendingIndex * vehicleConfig.trailSlotSpacing;
-            Vector3 pendingSlotWorld = transform.TransformPoint(new Vector3(0f, -pendingOffset, 0f));
-            p.collectable.SetTrailTarget(pendingSlotWorld);
+            p.collectable.HoldInCore(NoteCoreAnchor);
             p.collectable.SetReleasePulse(slot == 0 && _armedReleases.Count == 0 ? pulse01 : 0f);
             slot++;
-            pendingIndex++;
         }
 
         // Single Vehicle-owned tether: create, update, or destroy.
@@ -289,7 +195,8 @@ public partial class Vehicle
 
             if (_vehicleTether != null)
             {
-                _vehicleTether.SetStartWorldPos(SampleTrailPosition(vehicleConfig.trailFirstSlotOffset));
+                // Tether leaves from the hull edge on the side facing its placeholder step.
+                _vehicleTether.SetStartAnchorCircle(transform.position, GetHullRadiusWorld());
                 UpdateVehicleTether(viz);
 
                 if (_vehicleTether.IsShown)

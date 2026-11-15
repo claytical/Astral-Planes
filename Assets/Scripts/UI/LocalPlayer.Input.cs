@@ -115,12 +115,14 @@ public partial class LocalPlayer
             }
         }
 
-        if (!_inputLocked) plane.Move(_virtualStick * friction);
+        if (!_inputLocked && !ModalMenu.IsOpen) plane.Move(_virtualStick * friction);
     }
 
     private void Update()
     {
         if (plane == null) return;
+
+        if (ModalMenu.IsOpen) return;
 
         if (Keyboard.current != null)
         {
@@ -149,6 +151,7 @@ public partial class LocalPlayer
     public void OnThrust(InputValue value)
     {
         float v = value.Get<float>();
+        if (v > 0 && ModalMenu.ShouldSuppressInput) return;
         if (v > 0) plane?.TurnOnBoost(v);
         else plane?.TurnOffBoost();
         if (GameFlowManager.VerboseLogging) Debug.Log($"[VEHICLE] Thrusting stopped at {v}");
@@ -169,6 +172,7 @@ public partial class LocalPlayer
         // HandleConfirm. Guard it the same way so it doesn't quit out from under the Living
         // Score publish-consent prompt on the same press that answers it.
         if (LivingScorePanel.ShouldSuppressConfirm) return;
+        if (ModalMenu.ShouldSuppressInput) return;
 
         // Competitive match end: MatchResultsPanel handles "any button -> main menu" itself.
         if (GameFlowManager.Instance.MatchEnded) return;

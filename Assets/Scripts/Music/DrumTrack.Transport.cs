@@ -79,6 +79,7 @@ public partial class DrumTrack
             double boundaryDsp = leaderStartDspTime;
 
             if (logBeatSeqGates) Debug.Log($"[DRUM] Loop boundary dsp={boundaryDsp:F3}");
+            if (logBeatSeqGates) Debug.Log($"[DRUM][GateDiag] carryLatched={_carryLatched} pendingSwapDsp={_pendingDrumLoopDspStart:F3} vehiclesCarrying={Vehicle.DebugCarryingCount()} {Collectable.DebugLiveSummary()}");
             HandleBeatSequencingAtLoopBoundary((float)effLen);
 
             OnLoopBoundary?.Invoke();
@@ -116,12 +117,12 @@ public partial class DrumTrack
         float t = span > 0.0001 ? Mathf.Clamp01((float)((dspNow - _crossfadeStartDsp) / span)) : 1f;
 
         if (_activeDrum != null)   _activeDrum.volume   = Mathf.Lerp(_crossfadeBaseVolume, 0f, t);
-        if (_inactiveDrum != null) _inactiveDrum.volume  = Mathf.Lerp(0f, _crossfadeBaseVolume, t);
+        if (_inactiveDrum != null) _inactiveDrum.volume  = Mathf.Lerp(0f, _crossfadeTargetVolume, t);
 
         if (t >= 1f)
         {
             if (_activeDrum != null)   _activeDrum.volume   = 0f;
-            if (_inactiveDrum != null) _inactiveDrum.volume  = _crossfadeBaseVolume;
+            if (_inactiveDrum != null) _inactiveDrum.volume  = _crossfadeTargetVolume;
             if (GameFlowManager.VerboseLogging) Debug.LogWarning($"[DRUM][TRACE] Crossfade ramp complete: active(pre-swap)={_activeDrum?.name}(vol={_activeDrum?.volume:F3}) " +
                 $"inactive(pre-swap, about to become active)={_inactiveDrum?.name}(vol={_inactiveDrum?.volume:F3},playing={_inactiveDrum?.isPlaying},mute={_inactiveDrum?.mute})");
             _crossfadeStartDsp = -1.0;
@@ -147,7 +148,7 @@ public partial class DrumTrack
         if (_crossfadeStartDsp > 0.0)
         {
             if (_activeDrum != null)   _activeDrum.volume   = 0f;
-            if (_inactiveDrum != null) _inactiveDrum.volume  = _crossfadeBaseVolume;
+            if (_inactiveDrum != null) _inactiveDrum.volume  = _crossfadeTargetVolume;
             _crossfadeStartDsp = -1.0;
         }
 

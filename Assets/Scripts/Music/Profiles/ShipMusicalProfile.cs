@@ -89,7 +89,7 @@ public class ShipMusicalProfile : ScriptableObject
     [Tooltip("Forward depth of the plow (cells). Combined with plowHalfWidthCells, sets total role-capture area per boost pass. " +
              "0 = center cell only.")]
     public int plowDepthCells = 2;
-    [Tooltip("Minimum speed (world units/s) before the plow chips cells. Drag is still felt below this threshold.")]
+    [Tooltip("Speed (world units/s) at which the plow aims along the vehicle's velocity. Below it (including a dead stop) the plow aims where the player is steering, so charging can always dig out. Charging carves at any speed.")]
     public float plowMinSpeed = 2f;
     [Min(1)]
     [Tooltip("HP removed per plow tick (before resistance). Higher values chip through thick cells faster " +
@@ -114,7 +114,7 @@ public class ShipMusicalProfile : ScriptableObject
              "Drifter: ~0.2. Needle: ~0.95. Plow base: ~0.85 (further reduced by plowSteeringPenalty01 while carving).")]
     [Range(0.05f, 1f)] public float directionalAuthority01 = 1f;
 
-    [Tooltip("Plow: additional authority reduction WHILE actively carving (boosting + speed ≥ plowMinSpeed). " +
+    [Tooltip("Plow: additional authority reduction WHILE actively carving (boosting and chipping dust). " +
              "Effective authority while plowing = directionalAuthority01 × (1 - plowSteeringPenalty01). Plow: ~0.65. Others: 0.")]
     [Range(0f, 1f)] public float plowSteeringPenalty01 = 0f;
 
