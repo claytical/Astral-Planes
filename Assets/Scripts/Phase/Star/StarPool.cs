@@ -115,6 +115,28 @@ public sealed partial class StarPool : MonoBehaviour
         return _activeMotif?.GetActiveRoles();
     }
 
+    // Role the player is currently working: the ejected role while its node/burst is live,
+    // else the attuned role of the most-progressed live star. None if nothing is attuned.
+    // Read-only — drives the drum pressure axis (DrumTrack.BeatIntensity.cs).
+    public MusicalRole GetDrivingRole()
+    {
+        if (_mineNodePending && _lastEjectedRole != MusicalRole.None) return _lastEjectedRole;
+
+        MusicalRole best = MusicalRole.None;
+        float bestProgress = -1f;
+        foreach (var star in _activeStars.Values)
+        {
+            if (star == null || star.AttunedRole == MusicalRole.None) continue;
+            float p = star.ZapProgress01;
+            if (p > bestProgress)
+            {
+                bestProgress = p;
+                best = star.AttunedRole;
+            }
+        }
+        return best;
+    }
+
     // ── Phase plan ────────────────────────────────────────────────────────────
 
     private void BuildPhasePlan()

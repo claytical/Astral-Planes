@@ -122,11 +122,14 @@ public partial class CosmicDustGenerator
         // color the player is actually looking at for an as-yet-unrevealed cell.
         Color? explosionTint = null;
         MusicalRole prospectiveRole = GetProspectiveRegrowRole(cell);
+        MusicalRoleProfile roleProfile = null;
         if (prospectiveRole != MusicalRole.None)
         {
-            var roleProfile = _roleDensity.GetResolvedRoleProfile(prospectiveRole);
+            roleProfile = _roleDensity.GetResolvedRoleProfile(prospectiveRole);
             if (roleProfile != null) explosionTint = roleProfile.GetBaseColor();
         }
+        // Drum intensity throttle: every vehicle carve (filler/None dust included) pumps energy.
+        _carveEnergy.Register(DrumIntensityTuning.CarveWeight(roleProfile, prospectiveRole));
 
         _colliderSuppression.ClearSuppression(cell);
         _imprints.EnsureAllocated();

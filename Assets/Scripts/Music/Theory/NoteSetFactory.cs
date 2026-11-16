@@ -214,7 +214,10 @@ public class NoteSetFactory : MonoBehaviour
         int step = e.step;
         if (step < 0 || step >= totalSteps) continue;
 
-        int midi = Mathf.Clamp(e.midiNote + delta + groupFoldOffset, track.lowestAllowedNote, track.highestAllowedNote);
+        // Per-note octave fold (not clamp): when the whole riff's span can't fit the range at any
+        // octave, a straggler moves by an octave and keeps its pitch class. Clamping turned e.g.
+        // C48 into C#49 on a 49–72 lead — a chromatic, out-of-key note.
+        int midi = ShiftIntoRange(e.midiNote + delta + groupFoldOffset, track.lowestAllowedNote, track.highestAllowedNote);
 
         int durTicks = Mathf.Max(ticksPerStep, e.durSteps * ticksPerStep);
         float vel127 = Mathf.Clamp01(e.velocity01) * 127f;

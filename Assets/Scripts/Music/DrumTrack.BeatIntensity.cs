@@ -2,19 +2,59 @@ using UnityEngine;
 
 public partial class DrumTrack
 {
-    // LoopBoundary-mode entry point. In BinFill mode this is a no-op passthrough —
-    // OnAnyTrackBinFilled (DrumTrack.BinFillPolling.cs) owns evaluation instead.
+    private float _nextIntensityPollTime;
+
+    // Called every loop boundary regardless of poll mode. Owns the entry-window countdown
+    // (one tick per loop — it used to tick inside EvaluateAndScheduleClip, which BinFill and
+    // Continuous polling would burn through in seconds). In BinFill mode evaluation is owned by
+    // OnAnyTrackBinFilled (DrumTrack.BinFillPolling.cs); LoopBoundary and Continuous also
+    // evaluate here.
     private void HandleBeatSequencingAtLoopBoundary(float loopSeconds)
     {
+        // A held bass drop owns clip selection (DrumTrack.BassDrop.cs).
+        if (TickBassDropAtLoopBoundary()) return;
+
+        if (_entryLoopsRemaining > 0)
+        {
+            _entryLoopsRemaining--;
+            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] entry window tick remain={_entryLoopsRemaining} motif={(_motif ? _motif.motifId : "null")}");
+            return;
+        }
         if (config != null && config.clipPollMode == ClipPollMode.BinFill) return;
         EvaluateAndScheduleClip();
     }
 
-    // Computes depth/breadth/pressure, selects the nearest-match intensity clip, and
-    // schedules it. Shared by both LoopBoundary and BinFill poll modes.
+    // Continuous poll mode: re-evaluate on a short timer so carving moves the drums on the
+    // next leader boundary rather than one loop later. Existing guards (armed/scheduled swap,
+    // min-dwell, bar-quantized arming) still prevent thrash.
+    private void TickContinuousIntensityPoll()
+    {
+        if (config == null || config.clipPollMode != ClipPollMode.Continuous) return;
+        if (config.intensityPollIntervalSeconds <= 0f) return;
+        if (Time.time < _nextIntensityPollTime) return;
+        _nextIntensityPollTime = Time.time + config.intensityPollIntervalSeconds;
+        EvaluateAndScheduleClip();
+    }
+
+    // Static role defaults read by CosmicDustGenerator at carve time (DrumIntensityTuning).
+    private void PushDrumIntensityDefaults()
+    {
+        if (config == null) return;
+        DrumIntensityTuning.BassCarveWeight    = config.bassCarveWeight;
+        DrumIntensityTuning.OtherCarveWeight   = config.otherCarveWeight;
+        DrumIntensityTuning.OtherRoleCeiling01 = config.otherRoleCeiling01;
+    }
+
+    // Computes depth/breadth/intensity, selects the nearest-match intensity clip, and
+    // schedules it. Shared by all poll modes.
     private void EvaluateAndScheduleClip()
     {
         // --- hard gates (log on exit) ---
+        if (BassDropActive)
+        {
+            if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: bass drop holding clip={_bassDropClip.name} remain={_bassDropLoopsRemaining}");
+            return;
+        }
         if (!_driveFromDensity)
         {
             if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: driveFromDensity=false motif={(_motif ? _motif.motifId : "null")}");
@@ -31,11 +71,10 @@ public partial class DrumTrack
             return;
         }
 
-        // 1) Respect entry window
+        // 1) Respect entry window (counted down per loop in HandleBeatSequencingAtLoopBoundary)
         if (_entryLoopsRemaining > 0)
         {
             if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: entry window active remain={_entryLoopsRemaining} motif={_motif.motifId}");
-            _entryLoopsRemaining--;
             return;
         }
 
@@ -60,12 +99,22 @@ public partial class DrumTrack
             if (logBeatSeqGates) Debug.Log($"[DRUM][BeatSeq] exit: _dust==null motif={_motif.motifId}");
             return;
         }
-        float depth01    = SmoothAxis(ComputeDepth01(),        ref _lastDepth01,    config.axisSmoothFactor, config.axisHysteresis);
-        float breadth01  = SmoothAxis(ComputeBreadth01(),      ref _lastBreadth01,  config.axisSmoothFactor, config.axisHysteresis);
-        float pressure01 = SmoothAxis(ComputeDrumPressure01(), ref _lastPressure01, config.axisSmoothFactor, config.axisHysteresis);
+        float rawDepth01   = SmoothAxis(ComputeDepth01(),   ref _lastDepth01,   config.axisSmoothFactor, config.axisHysteresis);
+        float rawBreadth01 = SmoothAxis(ComputeBreadth01(), ref _lastBreadth01, config.axisSmoothFactor, config.axisHysteresis);
+        float rawIntensity01 = ComputeIntensity01(out var drivingRole, out float energy01, out float ceiling01);
+        // Half the axis dead-zone so the smoothed value can actually settle near 0 when idle.
+        float intensity01 = SmoothAxis(rawIntensity01, ref _lastPressure01, config.intensitySmoothFactor, config.axisHysteresis * 0.5f);
+
+        // Carving is the throttle: depth/breadth only add flavor in proportion to intensity,
+        // so an idle player drains to the clip tagged nearest (0,0,0) no matter how long the
+        // loop or how full the bins. Intensity itself occupies the pressure01 tag axis.
+        float depth01    = rawDepth01 * intensity01;
+        float breadth01  = rawBreadth01 * intensity01;
+        float pressure01 = intensity01;
 
         if (logBeatSeqGates) Debug.Log(
-            $"[DRUM][BeatSeq] motif={_motif.motifId} depth={depth01:F3} breadth={breadth01:F3} pressure={pressure01:F3} tags={tagCt}"
+            $"[DRUM][BeatSeq] motif={_motif.motifId} intensity={intensity01:F3} (raw={rawIntensity01:F3} energy={energy01:F3} ceiling={ceiling01:F3} role={drivingRole}) " +
+            $"depth={rawDepth01:F3}->{depth01:F3} breadth={rawBreadth01:F3}->{breadth01:F3} tags={tagCt}"
         );
 
         var audibleClip = drumAudioSource != null ? drumAudioSource.clip : null;
@@ -163,20 +212,45 @@ public partial class DrumTrack
         return _trackController != null ? _trackController.GetBinCompletionFraction() : 0f;
     }
 
-    // Pressure: weighted blend of maze dust density (high = high pressure) and fleet fuel
-    // scarcity (low fuel = high pressure). Deliberately named to avoid confusion with
-    // Vehicle._lastPressureFactor, an unrelated physical steering concept.
-    private float ComputeDrumPressure01()
+    // Intensity = carve energy (throttle) × driving role's ceiling.
+    // - Energy: pooled, role-weighted, leaky count of recent vehicle carves
+    //   (CosmicDustGenerator.GetCarveEnergy01). Stop carving and it drains to 0.
+    // - Driving role: ready PhaseStar's role (StarPool.GetDrivingRole), sticky between stars.
+    // - Ceiling: Bass = full ("all-out drums"); other roles are capped (DrumIntensityTuning)
+    //   and lifted toward 1 as the Bass track's bins fill — adding bass unlocks the top.
+    private float ComputeIntensity01(out MusicalRole role, out float energy01, out float ceiling01)
     {
-        float dust01 = _dust != null ? _dust.GetSolidFraction() : 0f;
-        float fuelScarcity01 = 1f - Vehicle.GetFleetFuelRatio01();
-        float wSum = Mathf.Max(0.0001f, config.pressureDustWeight + config.pressureFuelWeight);
-        return Mathf.Clamp01((dust01 * config.pressureDustWeight + fuelScarcity01 * config.pressureFuelWeight) / wSum);
+        role = _starPool != null ? _starPool.GetDrivingRole() : MusicalRole.None;
+        if (role != MusicalRole.None) _lastDrivingRole = role;
+        else role = _lastDrivingRole;
+
+        energy01 = _dust != null
+            ? _dust.GetCarveEnergy01(config.carveActivityHalfLifeSeconds, config.carveActivitySaturation)
+            : 0f;
+
+        var track = (_trackController != null && role != MusicalRole.None) ? _trackController.FindTrackForRole(role) : null;
+        var profile = (track != null ? track.ActiveProfile : null)
+                      ?? (role != MusicalRole.None ? MusicalRoleProfileLibrary.GetProfile(role) : null);
+        float roleCeiling01 = DrumIntensityTuning.Ceiling01(profile, role);
+
+        if (role == MusicalRole.Bass)
+        {
+            ceiling01 = roleCeiling01;
+        }
+        else
+        {
+            float bassFill01 = _trackController != null ? _trackController.GetRoleBinFill01(MusicalRole.Bass) : 0f;
+            ceiling01 = Mathf.Lerp(roleCeiling01, 1f, bassFill01);
+        }
+
+        return Mathf.Clamp01(energy01 * ceiling01);
     }
 
     public void ResetBeatSequencingState(string who)
     {
         // Do NOT clear _motif or loop lists. This is a state reset, not a motif reset.
+        _lastDrivingRole = MusicalRole.None;
+        ClearBassDropState();
         _lastDepth01 = 0f;
         _lastBreadth01 = 0f;
         _lastPressure01 = 0f;

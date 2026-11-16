@@ -45,3 +45,6 @@ MonoBehaviour:
   configSelectionMode: 2
   chordVoiceColors: []
   sameRootAcrossBins: 0
+  overrideDrumIntensity: 0
+  drumCarveWeight: 1
+  drumIntensityCeiling01: 1

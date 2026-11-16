@@ -36,7 +36,7 @@ MonoBehaviour:
   midiPreset: 34
   lowestNote: 36
   highestNote: 84
-  volumeMultiplier: 0.4
+  volumeMultiplier: 0.557
   minVelocity: 60
   maxVelocity: 110
   regrowthDelay: 4
@@ -48,3 +48,6 @@ MonoBehaviour:
   - {r: 0.26238856, g: 0.72156864, b: 0, a: 1}
   - {r: 0.44440573, g: 1, b: 0.12099999, a: 1}
   sameRootAcrossBins: 0
+  overrideDrumIntensity: 0
+  drumCarveWeight: 1
+  drumIntensityCeiling01: 1

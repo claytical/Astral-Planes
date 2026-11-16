@@ -14,6 +14,7 @@ public class MidiToRiffImporterWindow : EditorWindow
     private string _riffId = "riff";
     private int _authoredRootMidi = 60;  // C4 default
     private int _stepsPerBar = 16;
+    private int _clipBars = 0;          // 0 = auto (loop length from last note end); >0 = fixed clip length in bars
 
     private int _channelFilter = -1;    // -1 = any
     private bool _clampToBar = false;   // only import within first bar (0..15)
@@ -25,7 +26,14 @@ public class MidiToRiffImporterWindow : EditorWindow
     // ---------------- Batch tab ----------------
     private DefaultAsset _batchFolder;
     private int _motifRootMidi = 60;    // target root for the whole motif — pitch class is what matters
-    private int _batchStepsPerBar = 16;
+    // Batch grid is set by clip length, not Steps/Bar: every clip in a motif folder is exported at the
+    // same length and must fill exactly one DrumTrack bin (32 steps). Steps/Bar is derived from these.
+    // Loop length can't be read off the .mid itself — DAW exports trim trailing silence (e.g. a 2-bar
+    // groove clip whose last note ends at beat 3 exports as 0.75 bar).
+    private int _batchClipBars = 2;
+    private int _batchLoopSteps = DefaultBinSteps;
+    private const int DefaultBinSteps = 32; // DrumTrack totalSteps — one bin
+    private int _batchStepsPerBar => _batchClipBars > 0 ? _batchLoopSteps / _batchClipBars : 0;
     private int _batchChannelFilter = -1;
     private bool _batchClampToBar = false;
     private bool _batchClampDurToNextOnset = true;
@@ -65,6 +73,7 @@ public class MidiToRiffImporterWindow : EditorWindow
         public int detectedFirstNoteMidi = -1;
         public bool pitchClassMatch;
         public int octaveShift;
+        public int? existingOctaveShift; // from a RiffAsset already at the output path — preserves by-ear tuning on re-import
 
         // Second-stage config wiring (only used if _batchTargetMotif is assigned).
         public MusicalRoleProfile roleProfile;
@@ -101,6 +110,12 @@ public class MidiToRiffImporterWindow : EditorWindow
 
         _stepsPerBar = EditorGUILayout.IntField("Steps/Bar", _stepsPerBar);
         EditorGUILayout.HelpBox("Assumes 4/4 time throughout this pipeline. Steps/Bar sets quantization resolution only (16 = 16th notes, 32 = 32nd notes).", MessageType.Info);
+        _clipBars = Mathf.Max(0, EditorGUILayout.IntField("Clip Length (bars, 0 = auto)", _clipBars));
+        if (_clipBars > 0)
+        {
+            int loop = _clipBars * _stepsPerBar;
+            EditorGUILayout.LabelField($"Loop Steps: {loop}" + (loop != DefaultBinSteps ? $"  ⚠ bin is {DefaultBinSteps}" : ""));
+        }
 
         _channelFilter = EditorGUILayout.IntSlider("Channel Filter (-1 = any)", _channelFilter, -1, 15);
 
@@ -136,6 +151,7 @@ public class MidiToRiffImporterWindow : EditorWindow
             assetPath, _riffId, _authoredRootMidi, octaveShift: 0, stepsPerBar: _stepsPerBar,
             channelFilter: _channelFilter, clampToBar: _clampToBar, clampDurToNextOnset: _clampDurToNextOnset,
             dedupeSameStepSameNote: _dedupeSameStepSameNoteKeepLoudest, verboseLog: _verboseLog,
+            fixedLoopSteps: _clipBars > 0 ? _clipBars * _stepsPerBar : 0,
             ticksPerQuarterUsed: out int ticksPerQuarter);
 
         var asset = CreateRiffAsset(assetPath, _riffId, riff);
@@ -181,9 +197,17 @@ public class MidiToRiffImporterWindow : EditorWindow
 
         using (new EditorGUILayout.HorizontalScope())
         {
-            _batchStepsPerBar = EditorGUILayout.IntField("Steps/Bar", _batchStepsPerBar);
-            _batchChannelFilter = EditorGUILayout.IntSlider("Channel Filter", _batchChannelFilter, -1, 15);
+            _batchClipBars = Mathf.Max(1, EditorGUILayout.IntField("Clip Length (bars)", _batchClipBars));
+            _batchLoopSteps = Mathf.Max(1, EditorGUILayout.IntField("Loop Steps", _batchLoopSteps));
         }
+        _batchChannelFilter = EditorGUILayout.IntSlider("Channel Filter", _batchChannelFilter, -1, 15);
+        string gridError = BatchGridError();
+        if (gridError != null)
+            EditorGUILayout.HelpBox(gridError, MessageType.Error);
+        else
+            EditorGUILayout.LabelField(
+                $"→ Steps/Bar: {_batchStepsPerBar}" + (_batchLoopSteps != DefaultBinSteps ? $"   ⚠ Loop Steps ≠ bin size ({DefaultBinSteps})" : ""),
+                EditorStyles.miniBoldLabel);
         _batchClampToBar = EditorGUILayout.ToggleLeft("Clamp to first bar (0..15 steps)", _batchClampToBar);
         _batchClampDurToNextOnset = EditorGUILayout.ToggleLeft("Clamp duration to next onset (monophonic-friendly)", _batchClampDurToNextOnset);
         _batchDedupe = EditorGUILayout.ToggleLeft("Dedupe same step+note (keep loudest)", _batchDedupe);
@@ -217,7 +241,7 @@ public class MidiToRiffImporterWindow : EditorWindow
         {
             int shift = ComputeGlobalOctaveShift();
             foreach (var e in _batchClips)
-                e.octaveShift = shift;
+                e.octaveShift = e.existingOctaveShift ?? shift;
             foreach (var folder in _batchFolderOctaveShiftPickers.Keys.ToList())
                 _batchFolderOctaveShiftPickers[folder] = shift;
             _lastAppliedReferenceIndex = _batchReferenceIndex;
@@ -330,7 +354,7 @@ public class MidiToRiffImporterWindow : EditorWindow
         string buttonLabel = _batchTargetMotif != null
             ? $"Import Batch → Create {importable} RiffAsset(s), wire {configurable} into {_batchTargetMotif.name}"
             : $"Import Batch → Create {importable} RiffAsset(s)";
-        GUI.enabled = importable > 0;
+        GUI.enabled = importable > 0 && gridError == null;
         if (GUILayout.Button(buttonLabel))
         {
             try { ImportBatch(); }
@@ -397,6 +421,10 @@ public class MidiToRiffImporterWindow : EditorWindow
                 }
             }
 
+            var existing = AssetDatabase.LoadAssetAtPath<RiffAsset>(RiffAssetPathFor(assetPath, entry.riffId));
+            if (existing != null) // Riff is a struct — never null
+                entry.existingOctaveShift = existing.riff.octaveShift;
+
             _batchClips.Add(entry);
         }
 
@@ -450,8 +478,13 @@ public class MidiToRiffImporterWindow : EditorWindow
 
     private void ImportBatch()
     {
+        string gridError = BatchGridError();
+        if (gridError != null) throw new InvalidOperationException(gridError);
+
         int created = 0;
         int wired = 0;
+        int reusedConfigs = 0;
+        var offBinRiffs = new List<string>();
         var createdAssets = new List<UnityEngine.Object>();
         // Grouped by role so within-role order (Order column) can be applied before appending —
         // this is what determines voice index for ByVoice roles, not scan/creation order overall.
@@ -464,13 +497,23 @@ public class MidiToRiffImporterWindow : EditorWindow
             var riff = BuildRiff(
                 e.midiAssetPath, e.riffId, e.detectedFirstNoteMidi, e.octaveShift, _batchStepsPerBar,
                 _batchChannelFilter, _batchClampToBar, _batchClampDurToNextOnset, _batchDedupe, _batchVerboseLog,
+                fixedLoopSteps: _batchLoopSteps,
                 ticksPerQuarterUsed: out _);
 
             var riffAsset = CreateRiffAsset(e.midiAssetPath, e.riffId, riff);
             createdAssets.Add(riffAsset);
             created++;
+            if (riff.loopSteps != DefaultBinSteps) offBinRiffs.Add($"{e.riffId}({riff.loopSteps})");
 
-            Debug.Log($"[MIDI→RIFF Batch] Created {AssetDatabase.GetAssetPath(riffAsset)} authoredRootMidi={riff.authoredRootMidi} octaveShift={riff.octaveShift} events={riff.events?.Count ?? 0} loopSteps={riff.loopSteps}");
+            Debug.Log($"[MIDI→RIFF Batch] Wrote {AssetDatabase.GetAssetPath(riffAsset)} authoredRootMidi={riff.authoredRootMidi} octaveShift={riff.octaveShift} events={riff.events?.Count ?? 0} loopSteps={riff.loopSteps} stepsPerBar={riff.stepsPerBar}");
+
+            // Re-import: a config already pointing at this (in-place-updated) riff stays as-is —
+            // creating/appending another would duplicate the voice in the motif.
+            if (_batchTargetMotif != null && e.roleProfile != null && FindConfigReferencing(riffAsset) != null)
+            {
+                reusedConfigs++;
+                continue;
+            }
 
             if (_batchTargetMotif != null && e.roleProfile != null)
             {
@@ -505,8 +548,44 @@ public class MidiToRiffImporterWindow : EditorWindow
         if (createdAssets.Count > 0)
             Selection.objects = createdAssets.ToArray();
 
-        string wiredMsg = _batchTargetMotif != null ? $", wired {wired} into {_batchTargetMotif.name}" : "";
-        Debug.Log($"[MIDI→RIFF Batch] Done. Created {created}/{_batchClips.Count} RiffAsset(s){wiredMsg}.");
+        string wiredMsg = _batchTargetMotif != null ? $", wired {wired} new config(s) into {_batchTargetMotif.name}, kept {reusedConfigs} existing" : "";
+        Debug.Log($"[MIDI→RIFF Batch] Done. Wrote {created}/{_batchClips.Count} RiffAsset(s){wiredMsg}.");
+        if (offBinRiffs.Count > 0)
+            Debug.LogWarning($"[MIDI→RIFF Batch] {offBinRiffs.Count} riff(s) have loopSteps ≠ bin size ({DefaultBinSteps}); steps past the bin fold onto earlier steps at spawn time and lose their pitch: {string.Join(", ", offBinRiffs)}");
+    }
+
+    private string BatchGridError()
+    {
+        if (_batchClipBars <= 0) return "Clip Length must be ≥ 1 bar.";
+        if (_batchLoopSteps % _batchClipBars != 0)
+            return $"Loop Steps ({_batchLoopSteps}) must divide evenly by Clip Length ({_batchClipBars} bars).";
+        int spb = _batchStepsPerBar;
+        if (spb < 4 || spb % 4 != 0)
+            return $"Derived Steps/Bar ({spb}) must be a multiple of 4 (runtime duration math assumes whole steps per beat).";
+        return null;
+    }
+
+    private static string RiffAssetPathFor(string sourceMidiAssetPath, string riffId)
+    {
+        string dir = Path.GetDirectoryName(sourceMidiAssetPath)?.Replace("\\", "/") ?? "Assets";
+        return $"{dir}/{riffId}.asset";
+    }
+
+    /// <summary>Any RoleMotifNoteSetConfig in the target motif, or in the riff's own folder, whose riff is this asset.</summary>
+    private RoleMotifNoteSetConfig FindConfigReferencing(RiffAsset riffAsset)
+    {
+        if (_batchTargetMotif != null && _batchTargetMotif.roleNoteConfigs != null)
+            foreach (var c in _batchTargetMotif.roleNoteConfigs)
+                if (c != null && c.riff == riffAsset) return c;
+
+        string dir = Path.GetDirectoryName(AssetDatabase.GetAssetPath(riffAsset))?.Replace("\\", "/");
+        if (string.IsNullOrEmpty(dir)) return null;
+        foreach (var guid in AssetDatabase.FindAssets("t:RoleMotifNoteSetConfig", new[] { dir }))
+        {
+            var c = AssetDatabase.LoadAssetAtPath<RoleMotifNoteSetConfig>(AssetDatabase.GUIDToAssetPath(guid));
+            if (c != null && c.riff == riffAsset) return c;
+        }
+        return null;
     }
 
     private static RoleMotifNoteSetConfig CreateRoleMotifNoteSetConfig(RiffAsset riffAsset, string riffId, MusicalRoleProfile roleProfile)
@@ -529,7 +608,7 @@ public class MidiToRiffImporterWindow : EditorWindow
     private static Riff BuildRiff(
         string midiAssetPath, string riffId, int authoredRootMidi, int octaveShift, int stepsPerBar,
         int channelFilter, bool clampToBar, bool clampDurToNextOnset, bool dedupeSameStepSameNote,
-        bool verboseLog, out int ticksPerQuarterUsed)
+        bool verboseLog, int fixedLoopSteps, out int ticksPerQuarterUsed)
     {
         if (stepsPerBar <= 0)
             throw new InvalidOperationException("Steps/Bar must be > 0 (e.g., 16).");
@@ -560,6 +639,22 @@ public class MidiToRiffImporterWindow : EditorWindow
             loopSteps = Mathf.Max(stepsPerBar, bars * stepsPerBar);
         }
 
+        // Fixed clip length: the authored loop is exactly fixedLoopSteps, regardless of where the
+        // last note ends (DAW exports trim trailing silence, so the file can't tell us).
+        if (fixedLoopSteps > 0 && !clampToBar && notes != null)
+        {
+            loopSteps = fixedLoopSteps;
+            int dropped = notes.RemoveAll(n => n.step >= loopSteps);
+            if (dropped > 0)
+                Debug.LogWarning($"[MIDI→RIFF] '{riffId}': dropped {dropped} note(s) starting at/after step {loopSteps} — clip is longer than the set Clip Length.");
+            for (int i = 0; i < notes.Count; i++)
+            {
+                var n = notes[i];
+                n.durSteps = Mathf.Clamp(n.durSteps, 1, loopSteps - n.step);
+                notes[i] = n;
+            }
+        }
+
         if (clampDurToNextOnset)
             ClampDurationsToNextOnset(notes, loopSteps);
 
@@ -583,8 +678,17 @@ public class MidiToRiffImporterWindow : EditorWindow
 
     private static RiffAsset CreateRiffAsset(string sourceMidiAssetPath, string riffId, Riff riff)
     {
-        string dir = Path.GetDirectoryName(sourceMidiAssetPath)?.Replace("\\", "/") ?? "Assets";
-        string outPath = AssetDatabase.GenerateUniqueAssetPath($"{dir}/{riffId}.asset");
+        string outPath = RiffAssetPathFor(sourceMidiAssetPath, riffId);
+
+        // Re-import overwrites in place, keeping the GUID so NoteSetConfigs referencing it stay wired.
+        var existing = AssetDatabase.LoadAssetAtPath<RiffAsset>(outPath);
+        if (existing != null)
+        {
+            Undo.RecordObject(existing, "Re-import Riff");
+            existing.riff = riff;
+            EditorUtility.SetDirty(existing);
+            return existing;
+        }
 
         var asset = ScriptableObject.CreateInstance<RiffAsset>();
         asset.riff = riff;

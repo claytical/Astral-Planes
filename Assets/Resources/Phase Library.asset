@@ -43,6 +43,7 @@ MonoBehaviour:
     phaseId: 51f6563141e540d483dc88fd8705740d
     motifs:
     - {fileID: 11400000, guid: 3a813a514b2474c8ca82c09409defe85, type: 2}
+    - {fileID: 11400000, guid: f6b2361908e424bbc835e854f4079c33, type: 2}
     loopMotifs: 0
   - phaseName: Fugue Frontier
     phaseId: 7ef88fd6fd4148fd80ddc5cda9d667f9

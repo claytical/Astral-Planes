@@ -78,6 +78,7 @@ public partial class DrumTrack : MonoBehaviour
 
     private int _entryLoopsRemaining;
     private bool _carryLatched; // one-way: set once any vehicle carries a collectable (or auto-deposits one)
+    private MusicalRole _lastDrivingRole = MusicalRole.None; // sticky driving role for the pressure axis (DrumTrack.BeatIntensity.cs)
 
     /// <summary>Auto placement never "carries" via the vehicle lock; latch the intro hold on first catch instead.</summary>
     public void NotifyFirstCollect() { _carryLatched = true; }

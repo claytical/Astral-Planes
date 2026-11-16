@@ -9,12 +9,15 @@ public partial class DrumTrack
     // 5) Guards are consolidated so we don’t early-return before finalizing a swap.
     private void Update()
     {
+        PushDrumIntensityDefaults();
+
         if (_gfm == null || !_gfm.ReadyToPlay())
             return;
 
         TickMotifLateBind();
         TickGridValidation();
         EnsureBinFillSubscription();
+        EnsureBurstClearedSubscription();
 
         if (drumAudioSource == null || totalSteps <= 0)
             return;
@@ -28,6 +31,7 @@ public partial class DrumTrack
             _carryLatched = true;
 
         TickLoopBoundaries();
+        TickContinuousIntensityPoll();
         TickDeckCrossfade();
         TickDeckSwap();
         if (!TickStepAndBinIndexing()) return;

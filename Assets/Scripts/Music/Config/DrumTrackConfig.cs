@@ -15,12 +15,30 @@ public class DrumTrackConfig : ScriptableObject
     [Header("Beat Timing")]
     public float timingWindowSteps = 0.25f;
 
-    [Header("Axis Tuning (depth / breadth / pressure)")]
-    [Tooltip("Weight of dust density in drumPressure01. Paired with pressureFuelWeight; both are normalized internally so they need not sum to 1.")]
-    public float pressureDustWeight = 0.5f;
-    [Tooltip("Weight of fleet fuel scarcity in drumPressure01. Paired with pressureDustWeight.")]
-    public float pressureFuelWeight = 0.5f;
-    [Tooltip("Exponential smoothing factor applied to each of depth01/breadth01/pressure01 per evaluation (0-1, higher = faster response).")]
+    [Header("Carve-Driven Intensity")]
+    [Min(0.1f), Tooltip("Half-life (seconds) of the pooled carve-energy accumulator — how fast the beat drains back to the idle clip after the player stops carving.")]
+    public float carveActivityHalfLifeSeconds = 3f;
+    [Min(0.1f), Tooltip("Weighted carves (within ~one half-life) needed to reach ~63% energy. Higher = more carving needed to push the drums.")]
+    public float carveActivitySaturation = 12f;
+    [Min(0f), Tooltip("Default energy each carved Bass cell adds (role profiles can override).")]
+    public float bassCarveWeight = 1f;
+    [Min(0f), Tooltip("Default energy each carved non-Bass cell (incl. filler) adds (role profiles can override).")]
+    public float otherCarveWeight = 0.5f;
+    [Range(0f, 1f), Tooltip("Default intensity ceiling while a non-Bass role drives. Lifted toward 1 as the Bass track's bins fill. Bass's ceiling is always 1 unless overridden on its profile.")]
+    public float otherRoleCeiling01 = 0.6f;
+    [Min(0f), Tooltip("Continuous poll mode: seconds between intensity re-evaluations. The swap itself still lands on the next leader-loop boundary.")]
+    public float intensityPollIntervalSeconds = 0.5f;
+    [Range(0.01f, 1f), Tooltip("Exponential smoothing factor applied to the carve-driven intensity per evaluation. Higher = drums follow carving faster. The carve pool's half-life already smooths, so this can stay high.")]
+    public float intensitySmoothFactor = 0.6f;
+
+    [Header("Bass Drop")]
+    [Tooltip("When the last note of a Bass collectable burst commits, jump straight to the motif's highest-pressure intensity clip on the next loop boundary.")]
+    public bool bassDropEnabled = true;
+    [Min(1), Tooltip("Loop boundaries the drop clip holds once audible before carve-driven selection resumes.")]
+    public int bassDropHoldLoops = 2;
+
+    [Header("Axis Smoothing")]
+    [Tooltip("Exponential smoothing factor applied to depth01/breadth01 per evaluation (0-1, higher = faster response). Intensity uses intensitySmoothFactor.")]
     public float axisSmoothFactor = 0.35f;
     [Tooltip("Minimum change in a smoothed axis value required before it's allowed to move (dead-zone, prevents flicker).")]
     public float axisHysteresis = 0.08f;
@@ -39,4 +57,4 @@ public class DrumTrackConfig : ScriptableObject
     public float deckCrossfadeSeconds = 0.15f;
 }
 
-public enum ClipPollMode { LoopBoundary, BinFill }
+public enum ClipPollMode { LoopBoundary, BinFill, Continuous }

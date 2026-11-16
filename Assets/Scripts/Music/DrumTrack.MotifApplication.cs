@@ -132,7 +132,9 @@ public partial class DrumTrack
         // OR when restartTransport forces hard-reset semantics.
         if (motifChanged || restartTransport)
         {
-            _entryLoopsRemaining  = _motif != null ? Mathf.Max(0, _motif.entryLoopCount) : 0;
+            _lastDrivingRole      = MusicalRole.None;
+            ClearBassDropState();
+            _entryLoopsRemaining  =_motif != null ? Mathf.Max(0, _motif.entryLoopCount) : 0;
             // Preserve intensity when timing is identical — same BPM/steps means no perceptual
             // discontinuity and resetting would cause a spurious intensity dip.
             if (stepsChanged || bpmChanged)
@@ -325,7 +327,12 @@ public partial class DrumTrack
             double t = swapDsp - leaderStartDspTime;
             if (t < 0) t = 0;
 
-            double bars = System.Math.Ceiling(t / barLen);
+            // Tolerance: t is BPM-derived (float EffectiveLoopLengthSec) while barLen is the clip's
+            // own float length. When they describe the same bar but t lands 1 ulp above barLen,
+            // a bare Ceiling rounds 1.0000001 up to 2 and the swap slips a full bar (a whole loop
+            // when clip == loop) late. 5ms is far below any real bar but well above float drift.
+            const double kBarAlignToleranceSec = 0.005;
+            double bars = System.Math.Ceiling(System.Math.Max(0.0, t - kBarAlignToleranceSec) / barLen);
             swapDsp = leaderStartDspTime + bars * barLen;
         }
 

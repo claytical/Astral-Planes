@@ -13,6 +13,28 @@ public enum MusicalRole
 }
 
 public enum RoleConfigSelectionMode { ByBin, ByVoice, RandomPerBin }
+
+// Resolves per-role drum intensity tuning: profile override if set, else role defaults.
+// Defaults are pushed from DrumTrackConfig by DrumTrack each frame (PushDrumIntensityDefaults),
+// so CosmicDustGenerator can weigh carves without holding a drum config reference.
+public static class DrumIntensityTuning
+{
+    public static float BassCarveWeight   = 1f;
+    public static float OtherCarveWeight  = 0.5f;
+    public static float OtherRoleCeiling01 = 0.6f;
+
+    public static float CarveWeight(MusicalRoleProfile profile, MusicalRole role)
+    {
+        if (profile != null && profile.overrideDrumIntensity) return Mathf.Max(0f, profile.drumCarveWeight);
+        return role == MusicalRole.Bass ? BassCarveWeight : OtherCarveWeight;
+    }
+
+    public static float Ceiling01(MusicalRoleProfile profile, MusicalRole role)
+    {
+        if (profile != null && profile.overrideDrumIntensity) return Mathf.Clamp01(profile.drumIntensityCeiling01);
+        return role == MusicalRole.Bass ? 1f : OtherRoleCeiling01;
+    }
+}
 [System.Serializable]
 public struct DustColorSet
 {
@@ -120,6 +142,14 @@ public class MusicalRoleProfile : ScriptableObject
     public Color[] chordVoiceColors;
     [Tooltip("If true, every bin's riff for this role anchors to the motif's first/tonic chord root (chordRegion[0]) instead of walking the chord progression bin-by-bin. Lets a role hold one harmonic center across bins — e.g. a solo/lead pieced together from distinct per-bin riffs, or an arpeggio that shouldn't re-root each bin. Authored per-bin chord overrides still take priority. Only the bin-0-resolved profile governs this for the whole motif — same rule as configSelectionMode.")]
     public bool sameRootAcrossBins = false;
+
+    [Header("Drum Intensity")]
+    [Tooltip("Off: use DrumTrackConfig's role defaults (Bass = bassCarveWeight / full ceiling; others = otherCarveWeight / otherRoleCeiling01). On: use the two fields below.")]
+    public bool overrideDrumIntensity = false;
+    [Min(0f), Tooltip("How much carving one cell of this role's dust pumps the drum energy pool.")]
+    public float drumCarveWeight = 1f;
+    [Range(0f, 1f), Tooltip("Max drum intensity while this role is the driving role (ready PhaseStar's role). Non-Bass ceilings are lifted toward 1 as the Bass track fills.")]
+    public float drumIntensityCeiling01 = 1f;
 
     // ---------- Color helpers (authority) ----------
 

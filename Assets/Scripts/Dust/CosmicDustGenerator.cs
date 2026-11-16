@@ -775,7 +775,13 @@ public partial class CosmicDustGenerator : MonoBehaviour
     {
         _roleDensity.SetActiveRoles(motif?.GetActiveRoles());
         _roleDensity.SetActiveVoices(motif);
+        _carveEnergy.Reset();
     }
+
+    // Pooled, role-weighted recent vehicle-carve energy (0..1) — the drum intensity throttle.
+    private readonly CarveEnergyAccumulator _carveEnergy = new CarveEnergyAccumulator();
+    public float GetCarveEnergy01(float halfLifeSeconds, float saturation)
+        => _carveEnergy.GetEnergy01(halfLifeSeconds, saturation);
 
     public MusicalRole GetZoneRole(Vector2Int cell) => _registry.GetZoneRole(cell);
 

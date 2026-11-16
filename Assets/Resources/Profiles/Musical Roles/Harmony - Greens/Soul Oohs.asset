@@ -36,7 +36,7 @@ MonoBehaviour:
   midiPreset: 18
   lowestNote: 48
   highestNote: 96
-  volumeMultiplier: 0.41
+  volumeMultiplier: 0.8
   minVelocity: 60
   maxVelocity: 117
   regrowthDelay: 2
@@ -45,3 +45,6 @@ MonoBehaviour:
   configSelectionMode: 2
   chordVoiceColors: []
   sameRootAcrossBins: 0
+  overrideDrumIntensity: 0
+  drumCarveWeight: 1
+  drumIntensityCeiling01: 1
