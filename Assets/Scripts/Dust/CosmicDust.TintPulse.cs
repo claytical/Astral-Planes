@@ -18,8 +18,11 @@ public partial class CosmicDust
     [SerializeField] private Color _denyColor = Color.magenta;
     private Color _hiddenHintColor; // Color.clear = no hint stored
     private bool _hasFeedbackColors = false;
-    public bool regrowAlphaCapped = false;
-    private const float kRegrowAlphaCap = 0.40f;
+    // Grow-in brightness ramp (0 → 1 over the spawn/regrow grow duration), applied at the single
+    // particle-color sink (SetDustColorAllParticles) so every writer — charge lane, base lane,
+    // collider-enable mirror, pulses — fades in together. Replaces the old binary regrow alpha
+    // cap, whose release at collider-enable (0.2s into a 1s grow) snapped the whole cell bright.
+    private float _growInAlpha01 = 1f;
     [SerializeField] private float colliderDisabledAlpha = 0.08f;
 
 // Single managed tint pulse lane (charge + deny both use this).
@@ -69,11 +72,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
     private void ApplyDisplayedTint(Color tint)
     {
         _displayTint = tint;
-
-        Color applied = tint;
-        if (regrowAlphaCapped)
-            applied.a = Mathf.Min(applied.a, kRegrowAlphaCap);
-        SetDustColorAllParticles(applied);
+        SetDustColorAllParticles(tint);
     }
     private void SetBaseTint(Color tint, bool applyImmediatelyIfNoPulse = true)
     {
@@ -132,6 +131,8 @@ private void ClearRainbowParticleDirtyIfNeeded()
     private void SetDustColorAllParticles(Color target)
     {
         if (visual.particleSystem == null) return;
+
+        target.a *= _growInAlpha01;
 
         var ps = visual.particleSystem;
         var main = ps.main;
@@ -526,11 +527,17 @@ private void ClearRainbowParticleDirtyIfNeeded()
         _particles.EnsureBaseParticleEmissionCaptured();
         var main = visual.particleSystem.main;
 
-        _baseColor = main.startColor.color;
+        // Color/alpha are captured ONCE (first call is Awake, before any tint write) — every
+        // tint path rewrites main.startColor afterwards, so re-reading it on later spawns made
+        // _baseAlpha drift with the cell's history (and the grow-in ramp scales it too).
+        if (!_baseCaptured)
+        {
+            _baseColor = main.startColor.color;
+            _baseAlpha = _baseColor.a;
+        }
+        // Size is safe to refresh: cell-relative sizing (SetCellSizeDrivenScale) rewrites it.
         _baseSize  = main.startSize.constant / Mathf.Max(0.0001f, _blockSizeMul); // block form is layered on top
-        _baseAlpha = _baseColor.a;
         _baseCaptured = true;
-
     }
     private void ApplyWorkShaderParamsParticlesOnly(Color roleColor, float workSigned01)
     {

@@ -137,6 +137,7 @@ public partial class Vehicle
     private const float kApproachPollSeconds = 0.05f;
     private float _nextApproachPoll;
     private bool _approachHas;
+    private bool _approachOpen;
     private float _approachSecondsUntilOpen;
     private float _approachPolledAt;
     private Color _approachColor = Color.white;
@@ -164,15 +165,18 @@ public partial class Vehicle
         }
         releaseCue.centerAnchor = NoteCoreAnchor;
 
-        bool eligible = !_isDead && ManualNoteReleaseEnabled && _pendingNotes.Count > 0 && _armedReleases.Count == 0;
+        // Armed releases don't block the cue: the window state skips armed steps, so it reports the
+        // NEXT queued note — keeping the open fill up through a quick run of notes while held.
+        bool eligible = !_isDead && ManualNoteReleaseEnabled && _pendingNotes.Count > 0;
         if (!eligible) { _approachHas = false; releaseCue.Hide(); return; }
 
         if (Time.time >= _nextApproachPoll)
         {
             _nextApproachPoll = Time.time + kApproachPollSeconds;
-            _approachHas = TryGetReleaseWindowState(out var w) && w.track != null && !w.isOpen;
+            _approachHas = TryGetReleaseWindowState(out var w) && w.track != null;
             if (_approachHas)
             {
+                _approachOpen = w.isOpen;
                 _approachSecondsUntilOpen = w.secondsUntilOpen;
                 _approachPolledAt = Time.time;
                 _approachColor = w.track.DisplayColor;
@@ -181,9 +185,17 @@ public partial class Vehicle
 
         if (!_approachHas) { releaseCue.Hide(); return; }
 
-        float lookahead = Mathf.Max(0.05f, vehicleConfig.releaseApproachLookaheadSeconds);
         float secs = _approachSecondsUntilOpen - (Time.time - _approachPolledAt); // extrapolate between polls
-        if (secs > lookahead || secs <= 0f) { releaseCue.Hide(); return; }
+        if (_approachOpen || secs <= 0f)
+        {
+            // Window open (or opened since the last poll): filled pulsing disc = press / hold now.
+            releaseCue.SetOpen(_approachColor, GetShipSpriteRadiusWorld());
+            return;
+        }
+
+        // Approach outline only when nothing is armed, so it doesn't fight the armed note's tether.
+        float lookahead = Mathf.Max(0.05f, vehicleConfig.releaseApproachLookaheadSeconds);
+        if (_armedReleases.Count > 0 || secs > lookahead) { releaseCue.Hide(); return; }
         releaseCue.SetApproach(_approachColor, 1f - secs / lookahead, GetShipSpriteRadiusWorld());
     }
 }

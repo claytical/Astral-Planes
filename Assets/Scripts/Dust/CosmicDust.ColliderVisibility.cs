@@ -45,9 +45,8 @@ public partial class CosmicDust
         Color mirroredTint = _displayTint;
         if (enabled)
         {
-            // Restore authoritative tint alpha — do not cap at kRegrowAlphaCap here,
-            // which would cause a visible brightness drop on cells that are already at
-            // proper alpha when their collider is re-enabled after spawn or regrowth.
+            // Restore authoritative tint alpha. Mid-grow cells still fade: the grow-in ramp
+            // scales this write at the particle sink (SetDustColorAllParticles).
             mirroredTint.a = _currentTint.a;
         }
         else
@@ -71,6 +70,10 @@ public partial class CosmicDust
 
         // Cosmic Block form: the role is walled off this ring — never star food.
         if (IsBlockForm)
+            return false;
+
+        // Passage form: a gray doorway through the walled role — carvable, never star food.
+        if (IsPassageForm)
             return false;
 
         if (visual.particleSystem == null)

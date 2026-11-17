@@ -36,7 +36,7 @@ MonoBehaviour:
   recoveryReturnSeconds: 0.6
   voidEjectExitSpeedMultiplier: 0.35
   voidProbeRadiusWorld: 0.6
-  voidEnergyRecoveryPerSecond: 1
+  voidEnergyRecoveryPerSecond: 5
   useVehiclePlacementResonance: 1
   vehiclePlacementColorLerpSpeed: 10
   vehiclePlacementMinTint: 0.08

@@ -144,9 +144,12 @@ public sealed class CosmicDustRegrowthController
         {
             _lastStepGateStep = stepNow;
             // Accumulate: add the new step's allocation on top of any unspent budget
-            // rather than discarding it. This prevents waste when the queue is momentarily
-            // empty but fills later in the same step window.
-            _stepGateBudget += Mathf.Max(0, _getRegrowCellsPerStep());
+            // rather than discarding it, so a queue that fills later in the same step window
+            // isn't starved. Capped at two steps' worth: an unbounded bank (built up while the
+            // queue sat empty) let a whole carved line commit in one frame — a burst arrival
+            // instead of a beat-staggered regrow.
+            int perStep = Mathf.Max(0, _getRegrowCellsPerStep());
+            _stepGateBudget = Mathf.Min(_stepGateBudget + perStep, perStep * 2);
         }
 
         while (_stepGateBudget > 0 && _pendingStepRegrow.Count > 0)

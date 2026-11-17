@@ -76,7 +76,7 @@ private GameFlowManager _gfm;
             _currentTint = Color.white;
             _undrainedRgb = Color.white;
             _displayTint = _currentTint;
-            _displayTint.a = kRegrowAlphaCap;
+            _displayTint.a = 0.40f;
             _dustSpriteBaseLocalPos = visual.particleSystem.transform.localPosition;
 
             // Apply tint to particle material/gradient.

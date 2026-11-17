@@ -32,6 +32,10 @@ public partial class CosmicDustGenerator
 
     private MusicalRole _blockedRole = MusicalRole.None;
     private readonly HashSet<Vector2Int> _roleBlockedCells = new HashSet<Vector2Int>();
+    // Cells of the blocked role left carvable (doorways, ship overlap, trap-avoiding regrows):
+    // shown as inert gray passage and never star food, so the walled role has nothing to charge.
+    private readonly HashSet<Vector2Int> _rolePassageCells = new HashSet<Vector2Int>();
+    private readonly List<Vector2Int> _doorwayScratch = new List<Vector2Int>(64);
     private readonly DustReachability _reach = new DustReachability();
     private readonly List<Vector2Int> _reachSeeds = new List<Vector2Int>(4);
     private readonly List<Vector2Int> _reachTargets = new List<Vector2Int>(64);
@@ -77,9 +81,12 @@ public partial class CosmicDustGenerator
             ClearCellFlag(cell, CellFlags.RoleBlocked);
             if (TryGetDustAt(cell, out var dust)) dust.SetBlockForm(false);
         }
-        if (logRoleBlocks && _roleBlockedCells.Count > 0)
-            Debug.Log($"[ROLE_BLOCK] released {_roleBlockedCells.Count} {_blockedRole} block(s)", this);
+        foreach (var cell in _rolePassageCells)
+            if (TryGetDustAt(cell, out var dust)) dust.SetPassageForm(false);
+        if (logRoleBlocks && (_roleBlockedCells.Count > 0 || _rolePassageCells.Count > 0))
+            Debug.Log($"[ROLE_BLOCK] released {_roleBlockedCells.Count} {_blockedRole} block(s), {_rolePassageCells.Count} passage(s)", this);
         _roleBlockedCells.Clear();
+        _rolePassageCells.Clear();
         _blockedRole = MusicalRole.None;
         _reachCacheFrame = -1;
     }
@@ -100,29 +107,35 @@ public partial class CosmicDustGenerator
         {
             if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
             var gp = new Vector2Int(x, y);
+            if (!IsBlockCandidateRole(gp, role)) continue;
             // A ship plowing through this cell right now would be wedged inside a wall — leave it
-            // as dust (it can still join the wall later if it regrows while this role is blocked).
-            if (IsVehicleOverlappingCell(gp)) continue;
-            if (IsBlockCandidateRole(gp, role)) candidates.Add(gp);
+            // as gray passage (it can still join the wall later if it regrows while this role is blocked).
+            if (IsVehicleOverlappingCell(gp)) { MakePassage(gp); continue; }
+            candidates.Add(gp);
         }
 
-        int doorways = CarveDoorways(candidates);
+        _doorwayScratch.Clear();
+        int doorways = CarveDoorways(candidates, _doorwayScratch);
+        foreach (var gp in _doorwayScratch) MakePassage(gp);
         foreach (var gp in candidates) BlockCell(gp);
 
         _reachCacheFrame = -1;
         if (logRoleBlocks)
-            Debug.Log($"[ROLE_BLOCK] {role}: blocked={candidates.Count} doorway cells={doorways} clearance={_reach.ClearanceCells}", this);
+            Debug.Log($"[ROLE_BLOCK] {role}: blocked={candidates.Count} doorway cells={doorways} passages={_rolePassageCells.Count} clearance={_reach.ClearanceCells}", this);
     }
 
     private bool IsBlockCandidateRole(Vector2Int gp, MusicalRole role)
     {
         if (HasCellFlag(gp, CellFlags.Solid)) return false; // interstitial walls are already walls
         if (_imprints != null && _imprints.TryGetValue(gp, out var imp) && imp.hiddenRoleIsGenericFill) return false;
-        return GetProspectiveRegrowRole(gp) == role;
+        if (GetProspectiveRegrowRole(gp) == role) return true;
+        // Stars target by the live dust role, so a cell whose imprint disagrees must still wall.
+        return TryGetDustAt(gp, out var dust) && dust != null && dust.Role == role;
     }
 
     private void BlockCell(Vector2Int gp)
     {
+        RevertPassage(gp);
         SetCellFlag(gp, CellFlags.RoleBlocked);
         _roleBlockedCells.Add(gp);
         _colliderSuppression.ClearSuppression(gp);   // a block is always a wall
@@ -134,12 +147,26 @@ public partial class CosmicDustGenerator
         }
     }
 
+    // An opened block becomes gray passage, not plain role dust: carvable, never star food.
     private void UnblockCell(Vector2Int gp)
     {
         if (!_roleBlockedCells.Remove(gp)) return;
         ClearCellFlag(gp, CellFlags.RoleBlocked);
         if (TryGetDustAt(gp, out var dust)) dust.SetBlockForm(false);
+        MakePassage(gp);
         _reachCacheFrame = -1;
+    }
+
+    private void MakePassage(Vector2Int gp)
+    {
+        if (!_rolePassageCells.Add(gp)) return;
+        if (TryGetDustAt(gp, out var dust)) dust.SetPassageForm(true);
+    }
+
+    private void RevertPassage(Vector2Int gp)
+    {
+        if (!_rolePassageCells.Remove(gp)) return;
+        if (TryGetDustAt(gp, out var dust)) dust.SetPassageForm(false);
     }
 
     // Registry solid-transition hook (CosmicDustGenerator.cs). A cell of the blocked role that
@@ -151,11 +178,13 @@ public partial class CosmicDustGenerator
             // Defensive: a block should never stop being Solid (every clear path is gated),
             // but if teardown code does it directly, drop the stale flag.
             if (_roleBlockedCells.Remove(gp)) ClearCellFlag(gp, CellFlags.RoleBlocked);
+            // A carved passage cell is reset by PrepareForReuse on regrow; just forget it.
+            _rolePassageCells.Remove(gp);
             return;
         }
         if (_blockedRole == MusicalRole.None) return;
         if (!IsBlockCandidateRole(gp, _blockedRole)) return;
-        if (!CanBlockWithoutTrapping(gp)) return;
+        if (!CanBlockWithoutTrapping(gp)) { MakePassage(gp); return; }
         BlockCell(gp);
         _reachCacheFrame = -1;
     }
@@ -223,9 +252,9 @@ public partial class CosmicDustGenerator
         return true;
     }
 
-    // Leaves ship-wide doorways through `candidates` (removing those cells from it) so every
+    // Leaves ship-wide doorways through `candidates` (moving those cells into `doorways`) so every
     // target stays reachable once the candidates become walls. Returns the doorway cell count.
-    private int CarveDoorways(HashSet<Vector2Int> candidates)
+    private int CarveDoorways(HashSet<Vector2Int> candidates, List<Vector2Int> doorways)
     {
         if (candidates.Count == 0 || !GatherReachSeedsAndTargets()) return 0;
         int rc = ComputeShipClearanceCells();
@@ -238,7 +267,7 @@ public partial class CosmicDustGenerator
             if (!_reach.TryGetBestNear(_reachTargets[i], out var node, out int cost) || cost <= 0) continue;
             _reach.TracePath(node, _reachPath);
             foreach (var step in _reachPath)
-                _reach.ForEachInClearance(step, p => { if (candidates.Remove(p)) opened++; });
+                _reach.ForEachInClearance(step, p => { if (candidates.Remove(p)) { doorways.Add(p); opened++; } });
         }
         return opened;
     }

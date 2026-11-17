@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Opalite
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: opalite
-  displayName: 
+  displayName: Deja Vu Disco
   keyRootMidi: 36
   entryDrumLoops:
   - {fileID: 8300000, guid: 3c9f309705dc04044a30b93a95c1f602, type: 3}
@@ -51,9 +51,7 @@ MonoBehaviour:
   starBehavior: {fileID: 11400000, guid: 9dd08ed983d384107aaff4f28fa8803d, type: 2}
   mazePattern: {fileID: 11400000, guid: b7575def175c4ad98551ea61cd752881, type: 2}
   roleGeoConfigs: []
-  genericFillNeverRegrowRatio: 1
   genericFillRatio01: 0
-  genericFillRegrowSoftenMultiplier01: 1
   chordProgression: {fileID: 11400000, guid: c3c2e15d9d18a464ab502159301b64a9, type: 2}
   alternateChordProgressionProfile: {fileID: 11400000, guid: 991c67d1ca5c243d6ac378f043d7169a,
     type: 2}
@@ -74,5 +72,4 @@ MonoBehaviour:
   spawnVehicleTrap: 0
   trapShape: 0
   trapRadius: 3
-  trapGrowSeconds: 0.4
   trapRole: 4

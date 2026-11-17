@@ -150,6 +150,14 @@ public partial class PhaseStarDustAffect
             return false;
         }
 
+        // The role walled by the last completed ring (CosmicDustGenerator.Blocks.cs) is never
+        // star food — catches any stray cell of that role the wall/passage pass missed.
+        if (gen.BlockedRole != MusicalRole.None && dust.Role == gen.BlockedRole)
+        {
+            reason = "role walled";
+            return false;
+        }
+
         if (dust.currentEnergyUnits <= 0)
         {
             reason = "energy 0";

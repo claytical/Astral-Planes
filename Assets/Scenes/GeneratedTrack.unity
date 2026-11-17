@@ -10821,6 +10821,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10df134e68a684e7fa84763b72dde178, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CosmicDustGenerator
+  roleBlockParticleSizeMul: 4
+  logRoleBlocks: 0
   dustPrefab: {fileID: 1781116594832268, guid: a986e36244edb4025b376db19f27984c, type: 3}
   activeDustRoot: {fileID: 823134540}
   config: {fileID: 11400000, guid: 587d53622e0ba4950b2686c0a418ab89, type: 2}
@@ -11196,7 +11198,7 @@ MonoBehaviour:
     type: 3}
   mineNodePrefab: {fileID: 1781116594832268, guid: 577767025cf464ef59c10aec253ee9c8,
     type: 3}
-  logBeatSeqGates: 1
+  logBeatSeqGates: 0
   drumLoopBPM: 120
   totalSteps: 32
   drumAudioSource: {fileID: 1354683685}
@@ -11608,21 +11610,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3e2fddc41b73942fc9e727130432d583, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CosmicBlockField
-  blockPrefab: {fileID: 5503135883883691938, guid: 7f36972273dd8486d9280b01b27f6504,
-    type: 3}
-  fillSeconds: 0.6
-  minVehicleDistanceCells: 2
-  maxCandidates: 64
-  originSearchRadius: 2
-  echoSparkPrefab: {fileID: 1113209529470810508, guid: e563eb7a83fde45d6bb2664a054d9041,
-    type: 3}
-  echoTravelSeconds: 0.5
-  echoArcFraction: 0.25
-  fallbackSparkCells: 0.35
-  heartbeatEnabled: 1
-  pulseTimelineMarker: 1
-  flashRingDent: 1
-  verboseLogging: 1
+  shimmerEnabled: 1
+  shimmerIntervalSlow: 0.4
+  shimmerIntervalFast: 0.08
+  shimmerMaxShare: 0.15
+  shimmerFlashSeconds: 0.7
+  shimmerFloor01: 0.15
 --- !u!1 &1373048477
 GameObject:
   m_ObjectHideFlags: 0
@@ -11701,8 +11694,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 50, y: 100}
-  m_SizeDelta: {x: 1000, y: 300}
+  m_AnchoredPosition: {x: 50, y: 180}
+  m_SizeDelta: {x: 1000, y: 140}
   m_Pivot: {x: 0, y: 0}
 --- !u!114 &1379178346
 MonoBehaviour:
@@ -11754,20 +11747,20 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 56
-  m_fontSizeBase: 56
+  m_fontSize: 48
+  m_fontSizeBase: 48
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
   m_fontSizeMax: 87.3
-  m_fontStyle: 0
+  m_fontStyle: 1
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 256
   m_textAlignment: 65535
-  m_characterSpacing: 11.4
+  m_characterSpacing: 0
   m_characterHorizontalScale: 1
-  m_wordSpacing: 36.87
-  m_lineSpacing: 0
+  m_wordSpacing: 0
+  m_lineSpacing: -32
   m_lineSpacingMax: 0
   m_paragraphSpacing: 0
   m_charWidthMaxAdj: 0

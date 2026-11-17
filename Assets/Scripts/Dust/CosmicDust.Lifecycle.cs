@@ -5,7 +5,7 @@ using UnityEngine;
 public partial class CosmicDust
 {
     private bool _isDespawned;
-    private Coroutine  _fadeRoutine, _growInRoutine;
+    private Coroutine  _fadeRoutine, _growInRoutine, _growInAlphaRoutine;
     private float _growInOverride = -1f;
     private Coroutine _emissionMulRoutine;
 
@@ -58,6 +58,12 @@ public partial class CosmicDust
     }
     internal void RunSpawnVisuals(float growSeconds)
     {
+        // Brightness rides the same grow curve as scale/emission — starts dark, every particle
+        // color write in between is scaled by the ramp (SetDustColorAllParticles).
+        if (!_baseCaptured) CaptureBaseVisual(); // before the ramp dims startColor
+        _growInAlpha01 = 0f;
+        if (_growInAlphaRoutine != null) StopCoroutine(_growInAlphaRoutine);
+        _growInAlphaRoutine = StartCoroutine(GrowInAlphaRoutine(growSeconds));
         SetVisualsEnabled(true);
         SetColorVariance();
         CaptureBaseVisual();
@@ -67,8 +73,31 @@ public partial class CosmicDust
         SetEmissionMultiplier(Role != MusicalRole.None ? revealedEmissionMultiplier : 1f, seconds: growSeconds);
         ApplyTintVisual(_currentTint);
     }
+    private IEnumerator GrowInAlphaRoutine(float seconds)
+    {
+        seconds = Mathf.Max(0.01f, seconds);
+        float t = 0f;
+        while (t < seconds)
+        {
+            t += Time.deltaTime;
+            _growInAlpha01 = Mathf.SmoothStep(0f, 1f, t / seconds);
+            // Re-push whatever is currently displayed so the fade advances even when no other
+            // writer touches the particles this frame.
+            ApplyDisplayedTint(_displayTint);
+            yield return null;
+        }
+        _growInAlpha01 = 1f;
+        ApplyDisplayedTint(_displayTint);
+        _growInAlphaRoutine = null;
+    }
+    private void EndGrowInAlphaRamp()
+    {
+        if (_growInAlphaRoutine != null) { StopCoroutine(_growInAlphaRoutine); _growInAlphaRoutine = null; }
+        _growInAlpha01 = 1f;
+    }
     internal void RunClearVisuals(float fadeSeconds)
     {
+        EndGrowInAlphaRamp();
         // The clear owns the visuals from here: a still-running drain buildup would
         // stomp the scale-out through SetBaseSpriteScale. Stop it without restoring.
         HideFlower();
@@ -98,6 +127,7 @@ public partial class CosmicDust
     {
         if (_fadeRoutine        != null) { StopCoroutine(_fadeRoutine);        _fadeRoutine        = null; }
         if (_growInRoutine      != null) { StopCoroutine(_growInRoutine);      _growInRoutine      = null; }
+        if (_growInAlphaRoutine != null) { StopCoroutine(_growInAlphaRoutine); _growInAlphaRoutine = null; }
         if (_spriteScaleRoutine != null) { StopCoroutine(_spriteScaleRoutine); _spriteScaleRoutine = null; }
         if (_emissionMulRoutine != null) { StopCoroutine(_emissionMulRoutine); _emissionMulRoutine = null; }
         if (_drainBuildupRoutine != null) { StopCoroutine(_drainBuildupRoutine); _drainBuildupRoutine = null; }
@@ -116,10 +146,12 @@ public partial class CosmicDust
         // would otherwise carry a stray hue into its next reuse in the following motif.
         ClearRainbowParticleDirtyIfNeeded();
         _isBreaking = false;
-        regrowAlphaCapped = false;
+        if (!_baseCaptured) CaptureBaseVisual(); // before the ramp dims startColor
+        _growInAlpha01 = 0f; // invisible until Begin() starts the grow-in ramp
         _isDespawned = false;
         HideFlower();
         ResetBlockFormImmediate();
+        ResetPassageFormImmediate();
         _nonBoostClearSeconds = 0f;
         _growInOverride = -1f;
         _hiddenHintColor = Color.clear;
@@ -191,6 +223,7 @@ public partial class CosmicDust
         // for solid cells that may never go through PrepareForReuse if they aren't in the new maze.
         HideFlower();
         StopAllVisualCoroutines();
+        EndGrowInAlphaRamp();
 
         // Disable collisions immediately.
         SetTerrainColliderEnabled(false);

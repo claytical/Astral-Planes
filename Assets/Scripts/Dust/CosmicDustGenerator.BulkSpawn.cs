@@ -128,9 +128,8 @@ public partial class CosmicDustGenerator
 
                         // Critical: keep collider OFF during bulk topology changes.
                         // PrepareForReuse already disables the collider; this is a safety guard for
-                        // edge cases. regrowAlphaCapped is intentionally NOT set here — Begin() already
-                        // set sprite alpha to _currentTint.a, and the physics phase restores that same
-                        // value, so no cap is needed (and setting it would cause a visible pop on lift).
+                        // edge cases. Begin() runs the grow-in alpha ramp; the physics phase restores
+                        // _currentTint.a through the same ramped sink, so there's no pop on lift.
                         SetDustCollision(dust, false);
                         spawnedDust.Add(dust);
                     }
@@ -199,7 +198,7 @@ public partial class CosmicDustGenerator
 
 // At this point, it is legitimately solid terrain.
                     // SetTerrainColliderEnabled(true) now restores _currentTint.a directly, so
-                    // regrowAlphaCapped and EnsureMinSolidAlpha are not needed here.
+                    // EnsureMinSolidAlpha is not needed here.
                     SetDustCollision(d, true);
                 }
 

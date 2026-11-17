@@ -381,7 +381,6 @@ public partial class CosmicDustGenerator
             dust.ApplyRoleAndCharge(role, tintWithAlpha, tintWithAlpha.a);
             if (role == MusicalRole.None) _imprints.ApplyHiddenHintToDust(gp, dust, _resolveRoleProfileDelegate);
             dust.SetFeedbackColors(Color.white, Color.darkGray);
-            dust.regrowAlphaCapped = true;
             dust.Begin();
 
             // Organic grow-in: start at maze gray and fade to role color over the full visual duration.
@@ -437,7 +436,6 @@ public partial class CosmicDustGenerator
         SetCellState(gp, DustCellState.Solid);
         if (dust != null)
         {
-            dust.regrowAlphaCapped = false;
             dust.EnsureMinSolidAlpha(0.30f);
             SetDustCollision(dust, true);
         }

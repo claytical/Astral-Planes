@@ -283,7 +283,6 @@ public partial class CosmicDustGenerator
         if (go.TryGetComponent<CosmicDust>(out var dust) && dust != null)
         {
             SetDustCollision(dust, false);
-            dust.regrowAlphaCapped = false;
             dust.HideFlower();
             dust.HideVisualsInstant();
         }
@@ -295,7 +294,6 @@ public partial class CosmicDustGenerator
         if (go.TryGetComponent<CosmicDust>(out var dust) && dust != null)
         {
             SetDustCollision(dust, false);
-            dust.regrowAlphaCapped = false;
             dust.HideFlower();
             dust.DissipateAndHideVisualOnly(.5f);
         }

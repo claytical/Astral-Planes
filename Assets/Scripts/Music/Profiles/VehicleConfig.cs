@@ -70,8 +70,10 @@ public class VehicleConfig : ScriptableObject
 
     [Header("Gravity Void Detection")]
     public float voidProbeRadiusWorld = 0.6f;
-    [Tooltip("Energy recovered per second while a vehicle is near/inside a gravity void.")]
-    public float voidEnergyRecoveryPerSecond = 1f;
+
+    [Header("Gravity Void Refuel")]
+    [Min(0f), Tooltip("Fuel recovered per second while a vehicle is inside a gravity void (flat units, same scale as ship capacity 50–175). 0 disables void refuel.")]
+    public float voidEnergyRecoveryPerSecond = 5f;
 
     [Header("Vehicle Resonance")]
     public bool useVehiclePlacementResonance = true;

@@ -541,10 +541,9 @@ public partial class CosmicDustGenerator : MonoBehaviour
             var resistance = ResolveResistanceProfile(gp, regrowRole, context: "CommitRegrowCell");
             dust.clearing.drainResistance01 = resistance.drainResistance01;
             int maxUnits = roleProfile != null ? roleProfile.maxEnergyUnits : config.noneMaxEnergyUnits;
-            // Must be armed before ApplyRoleAndCharge/BloomFlower below — both snap to full
-            // brightness with no fade in this same frame, and this cap is what's supposed to
-            // dim that initial flash. Arming it after (as before) left the flash unprotected.
-            dust.regrowAlphaCapped = true;
+            // Brightness: PrepareForReuse zeroed the grow-in alpha ramp and Begin() below runs it
+            // over the grow duration, so the full-brightness writes below (and the collider-enable
+            // write after the settle delay) all fade in instead of popping.
             // Regrow at full charge. baseAlpha is a rendering knob, not a charge fraction —
             // passing regrowTint.a here previously let baseAlpha*maxEnergyUnits round to 0
             // energy for some role profiles, leaving them permanently un-driveable.
@@ -599,7 +598,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
         SetCellState(gp, DustCellState.Solid); // solid-transition callback clears pending source/delay
         if (dust != null)
         {
-            dust.regrowAlphaCapped = false;
             dust.EnsureMinSolidAlpha(0.30f);
             SetDustCollision(dust, true);
         }

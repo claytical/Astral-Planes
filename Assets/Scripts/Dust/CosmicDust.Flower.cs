@@ -55,7 +55,7 @@ public partial class CosmicDust
                 _flowerRootBaseRot = flowerRoot.transform.localRotation;
                 _flowerRootTransformCaptured = true;
             }
-            flowerRoot.SetActive(!IsBlockForm); // a Cosmic Block keeps its bloom hidden until it reverts
+            flowerRoot.SetActive(!IsBlockForm && !IsPassageForm); // blocks/passages keep the bloom hidden until they revert
             if (_flowerGrowInRoutine != null) StopCoroutine(_flowerGrowInRoutine);
             _flowerGrowInRoutine = StartCoroutine(FlowerGrowInRoutine());
         }

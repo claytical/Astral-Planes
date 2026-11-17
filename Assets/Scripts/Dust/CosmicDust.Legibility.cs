@@ -37,6 +37,8 @@ public partial class CosmicDust
 
     private Color ResolveLegibleRgb(Color raw)
     {
+        if (IsPassageForm) return PassageGray(raw); // walled role's doorway: carvable, never star food
+
         if (Role != MusicalRole.None)
             return (HasBloomedFlower && !IsBlockForm) ? raw : DarkenLatent(raw); // blocks are never star food
 

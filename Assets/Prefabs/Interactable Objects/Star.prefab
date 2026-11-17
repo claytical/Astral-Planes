@@ -117,10 +117,10 @@ MonoBehaviour:
   drainBuildupSeconds: 0.35
   siphonTravelSeconds: 0.5
   siphonBrightness: 0.85
-  tentacleGrowSpeed: 1.2
+  tentacleGrowSpeed: 1.5
   tentacleRetractSpeed: 4
-  tentacleFlowSpeed: 0.15
-  tentacleWidth: 0.2
+  tentacleFlowSpeed: 0.5
+  tentacleWidth: 0.15
   dissolveDuration: 1
   fallbackTentaclesPerRole: 8
   tentacleMaterial: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee, type: 2}
