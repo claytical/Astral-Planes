@@ -50,7 +50,7 @@ public class SuperNodeTrackNode : TrackNode
 
     [Header("Dust Carving")]
     [SerializeField] private float dustFadeSeconds = 0.15f;
-    [Tooltip("-1 = use the maze pattern's superNodeRegrowDelay; >= 0 overrides it.")]
+    [Tooltip("-1 = the carved cell's role regrowthDelay (maze base for role-less cells); >= 0 overrides it.")]
     [SerializeField] private float dustRegrowDelay = -1f;
 
     [Header("Visual")]

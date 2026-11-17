@@ -69,6 +69,10 @@ public partial class CosmicDust
         if (!HasBloomedFlower)
             return false;
 
+        // Cosmic Block form: the role is walled off this ring — never star food.
+        if (IsBlockForm)
+            return false;
+
         if (visual.particleSystem == null)
             return false;
 

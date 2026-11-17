@@ -1,141 +1,175 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class PhaseStarDustAffect
 {
     // ---------------------------------------------------------------------------
-    // NoteTether-style Bezier rendering
+    // Vine rendering. The drawn points are pinned to the route's corners: every
+    // segment past the first fixed corner is built only from fixed corners, so it
+    // holds its shape no matter how the star moves. Only the star-end segment
+    // (star → first corner) is rebuilt each frame, and it springs toward its new
+    // shape so a bumped star whips the near end like a vine.
     // ---------------------------------------------------------------------------
 
-    private void RebuildNoteTetherCurve(Tentacle tentacle, Vector2 starPos)
+    private const int kVineSubdivisions = 8;
+    private readonly List<Vector2> _vineDense = new List<Vector2>(256);
+    private readonly List<float> _vineDenseFromTip = new List<float>(256);
+
+    private static Vector2 CatmullRom(Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3, float t)
     {
-        if (_cam == null) _cam = Camera.main;
-        var cam = _cam;
-        Vector3 aW = new Vector3(starPos.x, starPos.y, transform.position.z);
-        Vector3 dW = new Vector3(tentacle.targetWorldPos.x, tentacle.targetWorldPos.y, transform.position.z);
-
-        if (cam == null)
-        {
-            for (int i = 0; i < SplinePoints; i++)
-            {
-                float u = i / (float)(SplinePoints - 1);
-                tentacle.linePts[i] = Vector3.Lerp(aW, dW, u);
-            }
-            return;
-        }
-
-        float depth = cam.orthographic
-            ? 0f
-            : Mathf.Abs(aW.z - cam.transform.position.z);
-
-        Vector3 aS = cam.WorldToScreenPoint(new Vector3(aW.x, aW.y, cam.orthographic ? 0f : aW.z));
-        Vector3 dS = cam.WorldToScreenPoint(new Vector3(dW.x, dW.y, cam.orthographic ? 0f : dW.z));
-        aS.z = depth;
-        dS.z = depth;
-
-        Vector2 delta = (Vector2)(dS - aS);
-        float dist = delta.magnitude;
-        if (dist < 1f) dist = 1f;
-
-        float sagPx = sag * 120f;
-        sagPx = Mathf.Clamp(sagPx, 12f, 160f);
-
-        Vector2 dir = delta / dist;
-        Vector2 n   = new Vector2(-dir.y, dir.x);
-
-        const float margin = 24f;
-        float midY = (aS.y + dS.y) * 0.5f;
-        float upY  = midY + sagPx;
-        float dnY  = midY - sagPx;
-        float top  = Screen.height - margin;
-        float bot  = margin;
-
-        float bendSign = 1f;
-        if      (upY > top && dnY >= bot) bendSign = -1f;
-        else if (dnY < bot && upY <= top) bendSign =  1f;
-        else bendSign = (midY < Screen.height * 0.5f) ? 1f : -1f;
-
-        Vector2 bend   = n * (sagPx * bendSign);
-        float   c1Dist = Mathf.Clamp(dist * 0.10f, 18f, 120f);
-        float   c2Dist = Mathf.Clamp(dist * 0.12f, 22f, 160f);
-
-        Vector2 bS = (Vector2)aS + dir * c1Dist + bend;
-        Vector2 cS = (Vector2)dS - dir * c2Dist + bend * 0.35f;
-
-        float time = Time.time * noiseSpeed + tentacle.flowOffset * 10f;
-        float weaveAmpPx = weaveAmplitude * 80f;
-        float weaveCycles = dist / Mathf.Max(0.01f, weaveWavelength * 100f);
-        float weavePhase = tentacle.lineIndexInRole * Mathf.PI * 0.8f;
-        float weaveTime = Time.time * weaveSpeed;
-
-        for (int i = 0; i < SplinePoints; i++)
-        {
-            float u  = i / (float)(SplinePoints - 1);
-            float t  = Mathf.Pow(u, 2.2f);
-            float it = 1f - t;
-
-            Vector2 pS =
-                it * it * it * (Vector2)aS +
-                3f * it * it * t * bS +
-                3f * it * t  * t * cS +
-                t  * t  * t  * (Vector2)dS;
-
-            float wob      = (Mathf.PerlinNoise(i * 0.17f, time) - 0.5f) * 2f;
-            float wobTaper = 1f;
-            const float wobOffAt = 0.80f;
-            if (u > wobOffAt)
-                wobTaper = 1f - Mathf.InverseLerp(wobOffAt, 1f, u);
-
-            pS += n * wob * (noiseAmp * 35f) * wobTaper;
-
-            float weave = Mathf.Sin((u * Mathf.PI * 2f * weaveCycles) + weaveTime + weavePhase);
-            float weaveTaper = Mathf.Sin(u * Mathf.PI); // zero at root/tip
-            pS += n * (weave * weaveAmpPx * weaveTaper);
-
-            pS.x = Mathf.Clamp(pS.x, margin, Screen.width  - margin);
-            pS.y = Mathf.Clamp(pS.y, margin, Screen.height - margin);
-
-            Vector3 pW = cam.ScreenToWorldPoint(new Vector3(pS.x, pS.y, depth));
-            pW.z = aW.z;
-            tentacle.linePts[i] = pW;
-        }
+        float t2 = t * t, t3 = t2 * t;
+        return 0.5f * ((2f * p1) + (-p0 + p2) * t +
+                       (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 +
+                       (-p0 + 3f * p1 - 3f * p2 + p3) * t3);
     }
 
-    private static float ComputeCurveLength(Vector3[] pts)
+    private static Vector2 Hermite(Vector2 p0, Vector2 m0, Vector2 p1, Vector2 m1, float t)
+    {
+        float t2 = t * t, t3 = t2 * t;
+        return (2f * t3 - 3f * t2 + 1f) * p0 + (t3 - 2f * t2 + t) * m0 +
+               (-2f * t3 + 3f * t2) * p1 + (t3 - t2) * m1;
+    }
+
+    // Outgoing tangent at fixed corner i (i ≥ 1), using only fixed corners.
+    private static Vector2 FixedTangent(List<Vector2> n, int i)
+    {
+        int last = n.Count - 1;
+        if (i >= last) return n[last] - n[last - 1];
+        if (i + 1 >= last || i == 1) return n[i + 1] - n[i];
+        return 0.5f * (n[i + 1] - n[i - 1]);
+    }
+
+    private void RebuildVineCurve(Tentacle tentacle, Vector2 starPos, float dt)
+    {
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        float cell = CellWorld(_gfm?.activeDrumTrack);
+        float z = transform.position.z;
+        var route = tentacle.route;
+        const int sub = kVineSubdivisions;
+
+        _vineDense.Clear();
+        int frontSeg; float frontT;
+        if (route.Count >= 2)
+        {
+            var n = route.nodes;
+            int count = n.Count;
+            route.Locate(route.GrownLength, out frontSeg, out frontT);
+
+            // Star-end segment: Hermite star → first corner, matching the fixed tangent there.
+            Vector2 c1 = n[1];
+            Vector2 m1 = FixedTangent(n, 1);
+            Vector2 m0 = c1 - starPos;
+            var rootPts = tentacle.rootRenderPts;
+            float k = dt > 0f ? 1f - Mathf.Exp(-vineFollowSharpness * dt) : 1f;
+            for (int s = 0; s <= sub; s++)
+            {
+                float t = s / (float)sub;
+                Vector2 desired = Hermite(starPos, m0, c1, m1, t);
+                Vector3 d3 = new Vector3(desired.x, desired.y, z);
+                // Pinned at both ends; the middle lags and settles.
+                float stiff = Mathf.Lerp(1f, 0.35f, Mathf.Sin(t * Mathf.PI));
+                if (!tentacle.rootRenderInit || s == 0 || s == sub)
+                    rootPts[s] = d3;
+                else
+                    rootPts[s] = Vector3.Lerp(rootPts[s], d3, 1f - Mathf.Pow(1f - k, stiff));
+                if (s < sub) _vineDense.Add(rootPts[s]);
+            }
+            tentacle.rootRenderInit = true;
+
+            // Fixed segments: Catmull-Rom style, built from fixed corners only.
+            for (int i = 1; i < count - 1; i++)
+            {
+                Vector2 a = n[i], b = n[i + 1];
+                Vector2 ma = FixedTangent(n, i), mb = FixedTangent(n, i + 1);
+                for (int s = 0; s < sub; s++)
+                    _vineDense.Add(Hermite(a, ma, b, mb, s / (float)sub));
+            }
+            _vineDense.Add(n[count - 1]);
+        }
+        else
+        {
+            frontSeg = 0; frontT = 1f;
+            _vineDense.Add(starPos);
+            _vineDense.Add(tentacle.targetWorldPos);
+        }
+
+        // Drawn length: up to the grow front (dense index = segment * sub + fraction).
+        int denseLast = _vineDense.Count - 1;
+        float frontIdx = route.Count >= 2 ? Mathf.Min(denseLast, (frontSeg + frontT) * sub) : denseLast;
+        int full = Mathf.FloorToInt(frontIdx);
+        float frac = frontIdx - full;
+        int drawCount = full + 1 + (frac > 1e-4f && full < denseLast ? 1 : 0);
+        drawCount = Mathf.Max(2, drawCount);
+
+        if (tentacle.linePts == null || tentacle.linePts.Length < drawCount)
+            tentacle.linePts = new Vector3[Mathf.Max(drawCount, SplinePoints) * 2];
+
+        // Distance of each drawn point from the tip end, measured along the fixed geometry, so the
+        // wobble/weave pattern is anchored to the vine instead of sliding when the root moves.
+        _vineDenseFromTip.Clear();
+        for (int i = 0; i < drawCount; i++) _vineDenseFromTip.Add(0f);
+        Vector2 Pt(int i) => i <= full ? _vineDense[i] : Vector2.Lerp(_vineDense[full], _vineDense[Mathf.Min(full + 1, denseLast)], frac);
+        float acc = 0f;
+        for (int i = drawCount - 2; i >= 0; i--)
+        {
+            acc += Vector2.Distance(Pt(i), Pt(i + 1));
+            _vineDenseFromTip[i] = acc;
+        }
+        float drawnLen = acc;
+
+        float maxAmp    = cell * 0.25f;
+        float wobAmp    = Mathf.Min(noiseAmp * cell, maxAmp);
+        float weaveAmp  = Mathf.Min(weaveAmplitude * cell * 1.5f, maxAmp);
+        float time      = Time.time * noiseSpeed + tentacle.flowOffset * 10f;
+        float weavePhase = tentacle.lineIndexInRole * Mathf.PI * 0.8f;
+        float weaveTime = Time.time * weaveSpeed;
+        float waveK     = Mathf.PI * 2f / Mathf.Max(0.01f, weaveWavelength);
+
+        for (int i = 0; i < drawCount; i++)
+        {
+            Vector2 p = Pt(i);
+            Vector2 tan = i < drawCount - 1 ? Pt(i + 1) - p : p - Pt(i - 1);
+            Vector2 nrm = tan.sqrMagnitude > 1e-8f ? new Vector2(-tan.y, tan.x).normalized : Vector2.zero;
+
+            float fromTip  = _vineDenseFromTip[i];
+            float fromRoot = drawnLen - fromTip;
+            float taper = Mathf.SmoothStep(0f, 1f, fromRoot / cell) * Mathf.SmoothStep(0f, 1f, fromTip / cell);
+
+            float wob   = (Mathf.PerlinNoise(fromTip * 0.6f, time) - 0.5f) * 2f;
+            float weave = Mathf.Sin(fromTip * waveK + weaveTime + weavePhase);
+            p += nrm * ((wob * wobAmp + weave * weaveAmp) * taper);
+
+            tentacle.linePts[i] = i == 0 ? new Vector3(starPos.x, starPos.y, z) : new Vector3(p.x, p.y, z);
+        }
+        tentacle.lineCount = drawCount;
+    }
+
+    private static float ComputeCurveLength(Vector3[] pts, int count)
     {
         float len = 0f;
-        for (int i = 1; i < pts.Length; i++)
+        for (int i = 1; i < count; i++)
             len += Vector3.Distance(pts[i - 1], pts[i]);
         return len;
     }
 
     private void UpdateTentacleLine(Tentacle tentacle, Vector2 starPos, float dt)
     {
-        RebuildNoteTetherCurve(tentacle, starPos);
+        RebuildVineCurve(tentacle, starPos, dt);
 
         Color roleColor = GetRoleColor(tentacle.role);
 
+        // linePts already end at the grow front (or the target), so every state draws them all.
+        tentacle.line.positionCount = tentacle.lineCount;
+        for (int i = 0; i < tentacle.lineCount; i++)
+            tentacle.line.SetPosition(i, tentacle.linePts[i]);
+
         if (tentacle.state == TentacleState.Growing)
         {
-            float fullT    = tentacle.growProgress * (SplinePoints - 1);
-            int   baseIdx  = Mathf.Min(Mathf.FloorToInt(fullT), SplinePoints - 2);
-            float frac     = fullT - baseIdx;
-            int renderCount = Mathf.Max(2, baseIdx + 2);
-
-            tentacle.line.positionCount = renderCount;
-            for (int i = 0; i < renderCount - 1; i++)
-                tentacle.line.SetPosition(i, tentacle.linePts[i]);
-            tentacle.line.SetPosition(renderCount - 1,
-                Vector3.Lerp(tentacle.linePts[baseIdx], tentacle.linePts[baseIdx + 1], frac));
-
             BuildGrowingGradient(tentacle, roleColor);
             tentacle.line.colorGradient = tentacle.gradient;
         }
         else
         {
-            // Draining or Dissolving — full curve
-            tentacle.line.positionCount = SplinePoints;
-            tentacle.line.SetPositions(tentacle.linePts);
-
             float dustCharge01 = 1f;
             if (tentacle.state == TentacleState.Draining || tentacle.state == TentacleState.Dissolving)
             {
@@ -166,14 +200,16 @@ public partial class PhaseStarDustAffect
     {
         if (tentacle.shimmerPS == null || tentacle.linePts == null) return;
 
-        float curveLen     = ComputeCurveLength(tentacle.linePts);
+        int   n            = tentacle.lineCount;
+        if (n < 2) return;
+        float curveLen     = ComputeCurveLength(tentacle.linePts, n);
         float toEmit       = curveLen * shimmerRatePerUnit * Mathf.Max(0.0001f, dt);
         int   emitCount    = Mathf.FloorToInt(toEmit);
         Color roleColor    = GetRoleColor(tentacle.role);
 
         for (int i = 0; i < emitCount; i++)
         {
-            int   idx = Mathf.Clamp(Mathf.RoundToInt(UnityEngine.Random.value * (SplinePoints - 1)), 0, SplinePoints - 1);
+            int   idx = Mathf.Clamp(Mathf.RoundToInt(UnityEngine.Random.value * (n - 1)), 0, n - 1);
             Vector3 pos = tentacle.linePts[idx] + (Vector3)(UnityEngine.Random.insideUnitCircle * 0.025f);
 
             var ep = new ParticleSystem.EmitParams

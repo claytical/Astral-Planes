@@ -295,6 +295,12 @@ public partial class InstrumentTrack
         persistentLoopNotes?.Clear();
         _loopCacheDirtyPending = true;
 
+        // Provenance belongs to the old maze; the interstitial maze rebuilds the grid.
+        _noteOriginCells.Clear();
+        _originCellQueue.Clear();
+        _lastOriginBatch.Clear();
+        _lastOriginBatchCursor = 0;
+
         _loopNotes?.Clear();
         _spawnedNotes?.Clear();
 

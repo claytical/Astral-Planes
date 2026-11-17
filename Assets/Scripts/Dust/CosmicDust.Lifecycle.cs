@@ -119,6 +119,7 @@ public partial class CosmicDust
         regrowAlphaCapped = false;
         _isDespawned = false;
         HideFlower();
+        ResetBlockFormImmediate();
         _nonBoostClearSeconds = 0f;
         _growInOverride = -1f;
         _hiddenHintColor = Color.clear;

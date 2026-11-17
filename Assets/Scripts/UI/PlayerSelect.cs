@@ -28,7 +28,7 @@ public class PlayerSelect : MonoBehaviour
     private Hangar _hangar;
     private GameObject _chosenPlane;
     private string _currentShipName;
-    private NotePlacementMethod _placementMethod = NotePlacementMethod.Auto;
+    private NotePlacementMethod _placementMethod = NotePlacementDefaults.Default; // overwritten by LocalPlayer.CreatePlayerSelect
 
     public NotePlacementMethod CurrentPlacementMethod => _placementMethod;
 

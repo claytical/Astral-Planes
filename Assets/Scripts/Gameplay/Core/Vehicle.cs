@@ -100,7 +100,7 @@ public partial class Vehicle : MonoBehaviour
     }
 
     [Header("Release Cue")]
-    [Tooltip("Optional VehicleReleaseCue component on this vehicle (or a child). Drives the ring fill and beat-dot countdown.")]
+    [Tooltip("Manual-release approach ring. Optional — added at runtime if missing (Vehicle.TickReleaseApproachCue).")]
     [SerializeField] private VehicleReleaseCue releaseCue;
 
     [Header("Note Carry")]
@@ -111,7 +111,7 @@ public partial class Vehicle : MonoBehaviour
     public Transform NoteCoreAnchor => noteCoreAnchor != null ? noteCoreAnchor : transform;
 
     /// <summary>Per-player placement method; set by LocalPlayer at spawn from the ship-select choice.</summary>
-    public NotePlacementMethod PlacementMethod { get; set; } = NotePlacementMethod.Manual;
+    public NotePlacementMethod PlacementMethod { get; set; } = NotePlacementDefaults.Default;
     public bool ManualNoteReleaseEnabled => PlacementMethod == NotePlacementMethod.Manual;
     public float OccupiedStepVelocityMultiplier => vehicleConfig != null ? vehicleConfig.occupiedStepVelocityMultiplier : 1f;
     public bool OccupiedStepOctaveAccent => vehicleConfig != null && vehicleConfig.occupiedStepOctaveAccent;
@@ -129,6 +129,8 @@ public partial class Vehicle : MonoBehaviour
         public float velocity127;
         public int authoredRootMidi;     // root in the same register as collectedMidi (used for mismatch substitution)
         public int burstId;              // used for decrement/completion logic at commit
+        public Vector2Int originCell;    // provenance (copied from the collectable; it may be destroyed before commit)
+        public bool hasOriginCell;
     }
 
     private readonly Queue<PendingCollectedNote> _pendingNotes = new Queue<PendingCollectedNote>();
@@ -211,10 +213,6 @@ public partial class Vehicle : MonoBehaviour
             energyLevel = capacity; // Start at full energy
             lastPosition = transform.position;
             SyncEnergyUI();
-
-            // Hook step events for the release-cue beat countdown.
-            var drum = gfm?.activeDrumTrack;
-            if (drum != null) drum.OnStepChanged += OnStepTickForReleaseCue;
 
             // --- Spawn rest pocket ---
             // The vehicle often spawns inside a solid dust tile by design (teaches boosting),
@@ -364,6 +362,8 @@ public partial class Vehicle : MonoBehaviour
     {
         TickManualReleaseCue();
         TickNoteTrail();
+        TickStatusGlow(Time.deltaTime);
+        TickReleaseApproachCue();
     }
 
     public void SetDrumTrack(DrumTrack drums)
@@ -509,10 +509,7 @@ public partial class Vehicle : MonoBehaviour
     {
         ReleaseTrackLock();
 
-        // Unhook step-tick before the object is gone.
         if (gfm == null) gfm = GameFlowManager.Instance;
-        var drum = gfm?.activeDrumTrack;
-        if (drum != null) drum.OnStepChanged -= OnStepTickForReleaseCue;
 
         var gen = (gfm != null) ? gfm.dustGenerator : null;
         if (gen == null) return;

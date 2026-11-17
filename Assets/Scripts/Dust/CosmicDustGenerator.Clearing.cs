@@ -5,12 +5,16 @@ using UnityEngine;
 public partial class CosmicDustGenerator
 {
     public void ClearCell(Vector2Int gp, DustClearMode mode, float fadeSeconds, bool scheduleRegrow, DustClearSource source = DustClearSource.System, float regrowDelaySeconds = -1f, bool runPreExplode = false, Color? explosionTintOverride = null, Vector2 burstDirection = default, float preExplodeScaleOutSeconds = -1f, DustInteractionMode interactionMode = DustInteractionMode.Zap) {
+        // Cosmic Blocks are indestructible: every clear path (vehicle, collectable plow/arrival/jail,
+        // star zap/burrow, bombs, SuperNode) funnels through here. Teardown reverts them first
+        // (ReleaseRoleBlock) — see CosmicDustGenerator.Blocks.cs.
+        if (HasCellFlag(gp, CellFlags.RoleBlocked)) return;
         if (!TryGetCellState(gp, out var st)) return;
         if (st == DustCellState.Empty || st == DustCellState.Clearing || st == DustCellState.PendingRegrow) {
             // Optionally refresh regrow timer even if already empty.
             if (scheduleRegrow) {
                 _pendingRegrowSource[gp] = source;
-                RequestRegrowCellAt(gp, ResolveRegrowDelay(gp, source, regrowDelaySeconds), refreshIfPending: true);
+                RequestRegrowCellAt(gp, ResolveRegrowDelay(gp, regrowDelaySeconds), refreshIfPending: true);
             }
             return;
         }
@@ -18,7 +22,7 @@ public partial class CosmicDustGenerator
             SetCellState(gp, DustCellState.Empty);
             if (scheduleRegrow) {
                 _pendingRegrowSource[gp] = source;
-                RequestRegrowCellAt(gp, ResolveRegrowDelay(gp, source, regrowDelaySeconds), refreshIfPending: true);
+                RequestRegrowCellAt(gp, ResolveRegrowDelay(gp, regrowDelaySeconds), refreshIfPending: true);
             }
             return;
         }
@@ -79,7 +83,7 @@ public partial class CosmicDustGenerator
          if (scheduleRegrow)
          {
              _pendingRegrowSource[gp] = source;
-             RequestRegrowCellAt(gp, ResolveRegrowDelay(gp, source, regrowDelaySeconds), refreshIfPending: true);
+             RequestRegrowCellAt(gp, ResolveRegrowDelay(gp, regrowDelaySeconds), refreshIfPending: true);
              // TODO: density conservation — fill a frontier cell when one is eroded so total
              // coverage stays constant. Deferred: TryQueueFrontierCompensation() interfered with
              // role-assignment logic when multiple stars were active. Re-enable only after
@@ -110,6 +114,7 @@ public partial class CosmicDustGenerator
     public void CarveCellPreserveGray(Vector2Int cell, float fadeSeconds, DustClearSource source, float regrowDelaySeconds = -1f, bool runPreExplode = false)
     {
         if (!IsInBounds(cell)) return;
+        if (IsBlockAt(cell)) return; // don't leave a stray ForceGray flag on a Cosmic Block
         SetCellFlag(cell, CellFlags.ForceGrayRegrow);
         CarveCell(cell, fadeSeconds, scheduleRegrow: true, source: source, regrowDelaySeconds: regrowDelaySeconds, runPreExplode: runPreExplode);
     }
@@ -146,6 +151,7 @@ public partial class CosmicDustGenerator
     public void ZapClearCellHeld(Vector2Int cell, Color? explosionTint = null, Vector2 burstDirection = default)
     {
         if (!IsInBounds(cell)) return;
+        if (IsBlockAt(cell)) return; // Cosmic Block: never drained, never held
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
 
         SetCellFlag(cell, CellFlags.ZapForceGray);
@@ -166,7 +172,7 @@ public partial class CosmicDustGenerator
         {
             var c = cells[i];
             if (!_heldRegrowCells.Remove(c)) continue;
-            RequestRegrowCellAt(c, ResolveRegrowDelay(c, source, delayOverride), refreshIfPending: true);
+            RequestRegrowCellAt(c, ResolveRegrowDelay(c, delayOverride), refreshIfPending: true);
         }
     }
 
@@ -188,6 +194,7 @@ public partial class CosmicDustGenerator
         for (int i = 0; i < _roleSweepScratch.Count; i++)
         {
             var cell = _roleSweepScratch[i];
+            if (IsBlockAt(cell)) continue; // Cosmic Block: not swept, not held
             SetCellFlag(cell, CellFlags.ZapForceGray);
             var req = new DustClearRequest(DustInteractionMode.Zap, DustClearMode.FadeAndHide, config.zapFadeSeconds, false, DustClearSource.TrackFilled, -1f, true);
             ClearCellByInteraction(cell, req);
@@ -218,8 +225,9 @@ public partial class CosmicDustGenerator
     public bool PermanentlyClearOneCellForRole(MusicalRole role)
     {
         _registry.GetCellsForRole(role, _commitClearScratch);
+        _commitClearScratch.RemoveAll(IsBlockAt); // Cosmic Blocks are never permanently cleared
         if (_commitClearScratch.Count == 0)
-            _registry.GetColoredDustCells(_commitClearScratch); // fallback: role territory exhausted
+            _registry.GetColoredDustCells(_commitClearScratch); // fallback: role territory exhausted (excludes blocks)
         if (_commitClearScratch.Count == 0) return false;
 
         var cell = _commitClearScratch[Random.Range(0, _commitClearScratch.Count)];
@@ -300,6 +308,7 @@ public partial class CosmicDustGenerator
     private void DespawnDustAt(Vector2Int gridPos)
     {
         if (_permanentClearCells.Contains(gridPos)) return;
+        if (IsBlockAt(gridPos)) return; // Cosmic Block: indestructible
 
         // Immediate logical clear (no fade). This is used for hard removals
         // (eg. collectable pockets) where we want topology open immediately.

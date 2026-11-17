@@ -24,23 +24,6 @@ public partial class InstrumentTrackController
         return allocated > 0 ? Mathf.Clamp01(filled / (float)allocated) : 0f;
     }
 
-    // Filled ÷ allocated bins for one role's track (0 if the role has no track this motif).
-    // Drum intensity: Bass fill lifts the non-Bass ceiling (see DrumTrack.BeatIntensity.cs).
-    public float GetRoleBinFill01(MusicalRole role)
-    {
-        var t = FindTrackForRole(role);
-        if (t == null) return 0f;
-
-        int allocated = 0, filled = 0;
-        int hiAlloc = t.GetHighestAllocatedBin();
-        for (int b = 0; b <= hiAlloc; b++)
-        {
-            allocated++;
-            if (t.IsBinFilled(b)) filled++;
-        }
-        return allocated > 0 ? Mathf.Clamp01(filled / (float)allocated) : 0f;
-    }
-
     public InstrumentTrack FindTrackForRole(MusicalRole role)
     {
         if (tracks == null) return null;

@@ -4,6 +4,22 @@ using UnityEngine;
 
 public partial class Collectable
 {
+    private Vector2Int? _arrivalTargetCell;
+
+    /// <summary>
+    /// Grid cell a ship must reach to collect this note: its landing cell while in arrival
+    /// flight, else where it is now. False once it has been collected/carried or is a bomb.
+    /// </summary>
+    public bool TryGetReachCell(out Vector2Int cell)
+    {
+        cell = default;
+        if (_handled || _isBomb || ReportedCollected) return false;
+        if (_inSpawnArrival && _arrivalTargetCell.HasValue) { cell = _arrivalTargetCell.Value; return true; }
+        var dt = assignedInstrumentTrack != null ? assignedInstrumentTrack.drumTrack : null;
+        if (dt == null) return false;
+        cell = dt.WorldToGridPosition(transform.position);
+        return true;
+    }
     public void BeginSpawnArrival(
         Vector3 originWorld,
         Vector3 targetWorld,
@@ -19,6 +35,11 @@ public partial class Collectable
         // Protect before the first frame of flight: vehicles pass through and
         // cannot collect until the note lands.
         SetSpawnArrivalProtection(true);
+
+        // Where this note will be once it lands — Cosmic Block doorways keep it reachable
+        // even while it's still in flight (CosmicDustGenerator.Blocks.cs).
+        var dt = track != null ? track.drumTrack : null;
+        _arrivalTargetCell = dt != null ? dt.WorldToGridPosition(targetWorld) : (Vector2Int?)null;
 
         _spawnArrivalRoutine = StartCoroutine(SpawnArrivalRoutine(
             originWorld,

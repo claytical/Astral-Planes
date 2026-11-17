@@ -309,14 +309,15 @@ public partial class PhaseStar : MonoBehaviour
         // (turbulence + scatter) instead of hitting an easy-to-miss wall. See PhaseStarMotion2D.
         motion?.SetGhostDrift(_state == PhaseStarState.Dormant && !_burstOffScreen && !_isDisposing);
 
-        _accumulatorRotAngle += accumulatorRotSpeed * dt;
+        _accumulatorRotAngle += accumulatorRotSpeed * dt * (_sleepVisual ? kSleepRotationMul : 1f);
 
         ComputeDiamondRotation(dt, out float rotA, out bool aLocked, out float rotB, out bool bLocked);
 
         EnsureDormantSeedVisuals();
         UpdateDominantRole(dt);
         UpdateChargeVisuals(rotA, aLocked, rotB, bLocked);
-        UpdatePickupLockVisual();
+        UpdateSleepVisual();
+        TickSuperNodeTell(dt);
     }
 
     private void SafeUnsubscribeAll()
@@ -339,8 +340,19 @@ public partial class PhaseStar : MonoBehaviour
         }
     }
 
+    // Live-star registry: Cosmic Block doorways/watchdog keep every on-screen star reachable
+    // (CosmicDustGenerator.Blocks.cs) — a walled-off star could otherwise dead-end the motif.
+    private static readonly HashSet<PhaseStar> s_live = new HashSet<PhaseStar>();
+    public static IReadOnlyCollection<PhaseStar> Live => s_live;
+
+    /// <summary>True while the star is parked off-screen for a note burst (not a reach target).</summary>
+    public bool IsParkedOffScreen => _burstOffScreen;
+
+    private void OnEnable() => s_live.Add(this);
+
     private void OnDisable()
     {
+        s_live.Remove(this);
         ResolveGameFlowManager();
         var drum = _gfm?.activeDrumTrack;
         SafeUnsubscribeAll();
@@ -349,6 +361,7 @@ public partial class PhaseStar : MonoBehaviour
 
     private void OnDestroy()
     {
+        s_live.Remove(this);
         _isDisposing = true;
         ReleaseUnassignedDrainCells();
         SafeUnsubscribeAll();

@@ -55,6 +55,21 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     private int _lastLocalStep = -1;
     private int _lastBarIndex  = -1;
     private readonly Dictionary<int, float> _noteCommitTimes = new(); // stepIndex -> Time.time at commit
+
+    // ---- Provenance (drained dust cell → note) -------------------------------------------
+    // A resolved DiscoveryTrackNode hands over the star-drained cells that built it
+    // (EnqueueOriginCells); each collectable spawned afterwards takes the next one in drain
+    // order (AssignNextOriginCell). Once the queue runs dry (backfill bursts, more notes than
+    // drained cells) assignment cycles through the last batch. The committed step keeps its
+    // origin in _noteOriginCells; any re-commit at that step clears it (AddNoteToLoop).
+    private readonly Queue<Vector2Int> _originCellQueue = new();
+    private readonly List<Vector2Int> _lastOriginBatch = new();
+    private int _lastOriginBatchCursor;
+    private readonly Dictionary<int, Vector2Int> _noteOriginCells = new(); // stepIndex -> origin cell
+    private Vector2Int? _nextCommitOriginCell; // staged by CommitPendingNoteAtStep, consumed by AddNoteToLoop
+
+    /// <summary>Fires when a looped note actually sounds: (track, absolute step, duration seconds).</summary>
+    public event Action<InstrumentTrack, int, float> OnLoopNotePlayed;
     private bool _ascendQueued;
     private int? _pendingLoopMultiplier;
     public int currentBurstId;
@@ -77,6 +92,27 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         public readonly HashSet<int> steps = new();
     }
     private readonly Dictionary<int, BurstState> _bursts = new();
+
+    /// <summary>
+    /// True while this track has a live collectable burst; progress01 = the most-resolved
+    /// burst's resolved/spawned fraction. A bin fill (and this role's Cosmic Block shatter,
+    /// BinRingController.OnBinFilled) lands when a burst completes — CosmicBlockField uses this
+    /// to loosen the role's blocks ahead of time (LEGIBILITY_AUDIT.md E1).
+    /// </summary>
+    public bool TryGetLiveBurstProgress01(out float progress01)
+    {
+        progress01 = 0f;
+        bool any = false;
+        foreach (var kv in _bursts)
+        {
+            var s = kv.Value;
+            if (s == null || s.totalSpawned <= 0) continue;
+            any = true;
+            float p = 1f - Mathf.Clamp01(s.remaining / (float)s.totalSpawned);
+            if (p > progress01) progress01 = p;
+        }
+        return any;
+    }
     private readonly Dictionary<Collectable, Action> _destroyHandlers = new();
 
     // ---- Composition Mode: step-sequenced burst spawning (see InstrumentTrackCompositionSpawner) ----
@@ -138,6 +174,8 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     private void ResetBinCursor()            => _binCursor = 0;
     public event Action<InstrumentTrack, int, bool> OnCollectableBurstCleared; // (track, burstId, hadNotes)
     public event Action<InstrumentTrack, int> OnBinFilled; // (track, binIndex)
+    // Fired once per carried note committed to the loop (manual release or auto-deposit arrival).
+    public event Action<InstrumentTrack, int> OnNoteCommitted; // (track, burstId)
 
     /// <summary>
     /// Store the pre-generated NoteSet for a specific bin.
@@ -219,14 +257,20 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             if (n.stepIndex / binSize != binIndex) continue;
             int localStep = n.stepIndex % binSize;
             float commitTime01 = (binSize > 1) ? localStep / (float)(binSize - 1) : 0.5f;
-            result.Add(new MotifSnapshot.NoteEntry(
+            var entry = new MotifSnapshot.NoteEntry(
                 step: n.stepIndex,
                 note: n.note,
                 velocity: n.velocity,
                 trackColor: DisplayColor,
                 binIndex: binIndex,
                 isMatched: true,
-                commitTime01: commitTime01));
+                commitTime01: commitTime01);
+            if (_noteOriginCells.TryGetValue(n.stepIndex, out var origin))
+            {
+                entry.OriginCell = origin;
+                entry.HasOriginCell = true;
+            }
+            result.Add(entry);
         }
         return result;
     }
@@ -237,6 +281,43 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     /// </summary>
     public float GetNoteCommitTime(int stepIndex) =>
         _noteCommitTimes.TryGetValue(stepIndex, out var t) ? t : -1f;
+
+    /// <summary>The star-drained dust cell whose energy fed the note committed at <paramref name="stepIndex"/>.</summary>
+    public bool TryGetNoteOriginCell(int stepIndex, out Vector2Int cell) =>
+        _noteOriginCells.TryGetValue(stepIndex, out cell);
+
+    /// <summary>Queues the drained cells of a resolved node; collectables spawned next take them in order.</summary>
+    public void EnqueueOriginCells(IReadOnlyList<Vector2Int> cells)
+    {
+        if (cells == null || cells.Count == 0) return;
+        _lastOriginBatch.Clear();
+        _lastOriginBatchCursor = 0;
+        for (int i = 0; i < cells.Count; i++)
+        {
+            _originCellQueue.Enqueue(cells[i]);
+            _lastOriginBatch.Add(cells[i]);
+        }
+    }
+
+    private void AssignNextOriginCell(Collectable c)
+    {
+        if (c == null) return;
+        if (_originCellQueue.Count > 0)
+        {
+            c.originCell = _originCellQueue.Dequeue();
+            c.hasOriginCell = true;
+        }
+        else if (_lastOriginBatch.Count > 0)
+        {
+            c.originCell = _lastOriginBatch[_lastOriginBatchCursor % _lastOriginBatch.Count];
+            _lastOriginBatchCursor++;
+            c.hasOriginCell = true;
+        }
+        else
+        {
+            c.hasOriginCell = false;
+        }
+    }
     private static int WrapIndex(int i, int n)
     {
         if (n <= 0) return 0;
@@ -343,6 +424,13 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
 
             if (controller != null && controller.noteVisualizer != null)
                 controller.noteVisualizer.RegisterNotePlayTint(this, DisplayColor, TicksToSeconds(duration));
+        }
+
+        // One event per sounding step (not per voice) — Cosmic Blocks / markers / ring dents pulse on it.
+        if (_tmpStepNotes.Count > 0 && OnLoopNotePlayed != null)
+        {
+            int absStep = trackBin * Mathf.Max(1, BinSize()) + localStep;
+            OnLoopNotePlayed.Invoke(this, absStep, TicksToSeconds(_tmpStepNotes[0].duration));
         }
     }
 
@@ -594,6 +682,17 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         persistentLoopNotes.RemoveAll(t => t.stepIndex == stepIndex);
         persistentLoopNotes.Add((stepIndex, qNote, durationTicks, force, authoredRootMidi));
         _noteCommitTimes[stepIndex] = Time.time;
+        // A fresh commit at this step has no origin unless its caller staged one
+        // (CommitPendingNoteAtStep); the chord-retune rebuild restores them explicitly.
+        if (_nextCommitOriginCell.HasValue)
+        {
+            _noteOriginCells[stepIndex] = _nextCommitOriginCell.Value;
+            _nextCommitOriginCell = null;
+        }
+        else
+        {
+            _noteOriginCells.Remove(stepIndex);
+        }
 
         _loopCacheDirtyPending = true;
         GameObject noteMarker = null;
@@ -708,6 +807,9 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             RegisterBurstMultiplierOwner(multiplierOwner.playerStats);
     }
 
+    /// <summary>Destination cells of this track's queued (not yet launched) notes.</summary>
+    public void GetPendingSpawnCells(List<Vector2Int> outCells) => _compositionSpawner.GetPendingTargetCells(outCells);
+
     private InstrumentTrackCompositionSpawner _compositionSpawnerBacking;
     private InstrumentTrackCompositionSpawner _compositionSpawner => _compositionSpawnerBacking ??= new InstrumentTrackCompositionSpawner(
         getName: () => name,
@@ -747,7 +849,7 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
                 controller.BeginGravityVoidForPendingExpand(this, voidPos, drumTrack.WorldToGridPosition(voidPos));
         },
         endGravityVoidForPendingExpandIfOwner: () => controller?.EndGravityVoidForPendingExpand(this),
-        assignInstrumentTrack: c => c.assignedInstrumentTrack = this,
+        assignInstrumentTrack: c => { c.assignedInstrumentTrack = this; AssignNextOriginCell(c); },
         applyTrackVisuals: c => c.ApplyTrackVisuals(this),
         beginSpawnArrival: (c, origin, target, note, dur, noteSet, steps) =>
             c.BeginSpawnArrival(origin, target, note, dur, this, noteSet, steps),

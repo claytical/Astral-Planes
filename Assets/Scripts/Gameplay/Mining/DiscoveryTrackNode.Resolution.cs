@@ -23,6 +23,11 @@ public partial class DiscoveryTrackNode
         var explode = GetComponent<Explode>();
         if (explode != null) explode.SetBurstDirection(blastDir);
 
+        // Provenance: the cells whose drained energy built this node become the origins of the
+        // notes it bursts into (must precede the burst; ReleaseHeldDustOnce clears the list).
+        if (_heldDustCells != null && _heldDustCells.Count > 0)
+            _track.EnqueueOriginCells(_heldDustCells);
+
         _track.SpawnCollectableBurst(_noteSet, -1, -1, origin, repelFrom, 1.0f, 140f, 0.18f, InstrumentTrack.BurstPlacementMode.Free, 10,
             multiplierOwner: vehicle);
         TutorialEvents.RaiseDiscoveryBurst();

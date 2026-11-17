@@ -90,8 +90,11 @@ MonoBehaviour:
   diamondAngleSmoothTime: 0.06
   dimRgbMul: 0.08
   dimUsesFixedTint: 0
-  rejectFlashColor: {r: 1, g: 1, b: 1, a: 0.55}
-  rejectFlashSeconds: 0.12
+  notReadyShakeSeconds: 0.35
+  notReadyShakeDeg: 18
+  notReadyShakeHz: 7
+  sleepDesaturate01: 0.65
+  sleepAlphaMul: 0.6
   particles: {fileID: 382306593780773728}
   traceParticleState: 0
   particleAlphaDriftTolerance: 0.02
@@ -114,10 +117,10 @@ MonoBehaviour:
   drainBuildupSeconds: 0.35
   siphonTravelSeconds: 0.5
   siphonBrightness: 0.85
-  tentacleGrowSpeed: 1
+  tentacleGrowSpeed: 1.2
   tentacleRetractSpeed: 4
-  tentacleFlowSpeed: 0.2
-  tentacleWidth: 0.08
+  tentacleFlowSpeed: 0.15
+  tentacleWidth: 0.2
   dissolveDuration: 1
   fallbackTentaclesPerRole: 8
   tentacleMaterial: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee, type: 2}
@@ -126,7 +129,14 @@ MonoBehaviour:
   growingRootAlpha: 0.669
   growingTipAlpha: 0.554
   drainingBaseAlpha: 0.751
-  sag: 0.8
+  boreSeconds: 0.25
+  boreFadeSeconds: 0.15
+  boreTimeout: 1
+  vineFollowSharpness: 10
+  vineMeander: 0.35
+  vineMeanderMaxCells: 1.25
+  vineMeanderSpacingCells: 2.5
+  vineRootSlackCells: 0.5
   noiseAmp: 0.15
   noiseSpeed: 1.5
   weaveAmplitude: 0.15
@@ -151,6 +161,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarMotion2D
   pushDecayPerSecond: 5
+  frozenSettleDeceleration: 20
+  ghost:
+    driftSpeed: 0.35
+    driftAccel: 1.5
+    scatterSpeed: 4
+    scatterFollowsShip: 0.5
+    turbulence01: 0.8
+    turbulenceSeconds: 0.6
   enableUnstickImpulse: 0
   stuckThresholdSeconds: 0.22
   unstickImpulseSpeed: 1
@@ -184,6 +202,7 @@ MonoBehaviour:
   replanIntervalSeconds: 0.5
   retargetOnTargetLost: 1
   snifferIntervalSeconds: 2
+  wanderMinHops: 6
 --- !u!58 &1335835332103871931
 CircleCollider2D:
   m_ObjectHideFlags: 0

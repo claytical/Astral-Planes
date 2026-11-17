@@ -1,30 +1,36 @@
 using UnityEngine;
 
-// Bass drop: when the last note of a Bass collectable burst commits (burst cleared with notes),
-// the drums jump to the motif's heaviest intensity clip on the next loop boundary — bypassing
-// the entry window, phrase gate and min-dwell — hold for config.bassDropHoldLoops audible loops,
-// then hand back to carve-driven selection (which drains from the top since _lastPressure01
-// is seeded to 1).
+// Bass drop: when a Bass note is placed (committed to the loop — manual release or auto-deposit
+// arrival), the drums jump to the motif's heaviest intensity clip on the next loop boundary —
+// bypassing the entry window, phrase gate and min-dwell — hold for config.bassDropHoldLoops
+// audible loops, then hand back to carve-driven selection (which drains from the top since
+// _lastPressure01 is seeded to 1). Each further Bass placement during a drop refreshes the hold.
+// (Was keyed off burst-cleared, which only fired once every collectable resolved — an uncaught
+// note held it open until motif teardown.)
 public partial class DrumTrack
 {
     private AudioClip _bassDropClip;
     private int _bassDropLoopsRemaining;
     private bool _bassDropPending;
+    // Visual tell (LEGIBILITY_AUDIT.md D1): fired once per drop, the moment the drop clip is
+    // actually audible — not when it's triggered — so the shockwave lands on the beat.
+    private bool _bassDropAnnounced;
+    private Color _bassDropColor = Color.white;
 
-    private bool _burstClearedSubscribed;
-    private InstrumentTrack[] _burstClearedSubscribedTracks;
+    private bool _noteCommittedSubscribed;
+    private InstrumentTrack[] _noteCommittedSubscribedTracks;
 
     private bool BassDropActive => _bassDropClip != null;
 
-    private void EnsureBurstClearedSubscription()
+    private void EnsureNoteCommittedSubscription()
     {
         var tracks = _trackController != null ? _trackController.tracks : null;
-        if (_burstClearedSubscribed && tracks == _burstClearedSubscribedTracks) return;
+        if (_noteCommittedSubscribed && tracks == _noteCommittedSubscribedTracks) return;
 
-        if (_burstClearedSubscribedTracks != null)
+        if (_noteCommittedSubscribedTracks != null)
         {
-            foreach (var t in _burstClearedSubscribedTracks)
-                if (t != null) t.OnCollectableBurstCleared -= OnAnyTrackBurstCleared;
+            foreach (var t in _noteCommittedSubscribedTracks)
+                if (t != null) t.OnNoteCommitted -= OnAnyTrackNoteCommitted;
         }
 
         if (tracks != null)
@@ -32,20 +38,27 @@ public partial class DrumTrack
             foreach (var t in tracks)
             {
                 if (t == null) continue;
-                t.OnCollectableBurstCleared -= OnAnyTrackBurstCleared;
-                t.OnCollectableBurstCleared += OnAnyTrackBurstCleared;
+                t.OnNoteCommitted -= OnAnyTrackNoteCommitted;
+                t.OnNoteCommitted += OnAnyTrackNoteCommitted;
             }
         }
 
-        _burstClearedSubscribedTracks = tracks;
-        _burstClearedSubscribed = true;
+        _noteCommittedSubscribedTracks = tracks;
+        _noteCommittedSubscribed = true;
     }
 
-    private void OnAnyTrackBurstCleared(InstrumentTrack track, int burstId, bool hadNotes)
+    private void OnAnyTrackNoteCommitted(InstrumentTrack track, int burstId)
     {
         if (config == null || !config.bassDropEnabled) return;
-        if (!hadNotes || track == null || track.assignedRole != MusicalRole.Bass) return;
+        if (track == null || track.assignedRole != MusicalRole.Bass) return;
         if (!_driveFromDensity || _motif == null || _intensityTags == null || _intensityTags.Count == 0) return;
+
+        if (BassDropActive)
+        {
+            _bassDropLoopsRemaining = Mathf.Max(1, config.bassDropHoldLoops);
+            if (logBeatSeqGates) Debug.Log($"[DRUM][BassDrop] refresh track={track.name} burst={burstId} hold={_bassDropLoopsRemaining}");
+            return;
+        }
 
         var clip = ResolveBassDropClip();
         if (clip == null) return;
@@ -53,6 +66,9 @@ public partial class DrumTrack
         _bassDropClip = clip;
         _bassDropLoopsRemaining = Mathf.Max(1, config.bassDropHoldLoops);
         _bassDropPending = false;
+        _bassDropAnnounced = false;
+        var bassProfile = track.ActiveProfile != null ? track.ActiveProfile : MusicalRoleProfileLibrary.GetProfile(MusicalRole.Bass);
+        _bassDropColor = bassProfile != null ? bassProfile.GetBaseColor() : Color.white;
         _entryLoopsRemaining = 0;   // a drop ends the intro window
         _lastPressure01 = 1f;       // ease down from the top once the drop releases
 
@@ -93,10 +109,13 @@ public partial class DrumTrack
         {
             _bassDropPending = false;
             if (logBeatSeqGates) Debug.Log($"[DRUM][BassDrop] already audible/scheduled clip={_bassDropClip.name}");
+            // Already playing the heaviest clip: the drop is "audible" right now.
+            if (!alreadyHeading) AnnounceBassDropIfAudible();
             return;
         }
 
-        // A swap that's already PlayScheduled can't be cancelled safely — retry next boundary.
+        // A swap that's already PlayScheduled can't be cancelled safely — retry the moment it
+        // finalizes (TickDeckSwap), falling back to the next leader boundary.
         if (_pendingDrumLoopDspStart > 0.0)
         {
             _bassDropPending = true;
@@ -110,23 +129,18 @@ public partial class DrumTrack
         ScheduleDrumLoopChange(_bassDropClip);
         _bassDropPending = false;
 
-        // Fast-arm for the upcoming boundary rather than waiting a full phrase. If the boundary
-        // is too close for the crossfade window, leave it armed — TickLoopBoundaries arms it for
-        // the following boundary (avoids the near-instant, off-grid fallback).
+        // Fast-arm for the next BAR (one bin), not the next leader boundary — with an expanded
+        // leader loop (2+ bins) waiting for the leader boundary put the drop up to N bars late.
+        // Drum clips loop per bar, so a swap on any bar boundary inside the leader loop is on-grid.
+        // Skip ahead a bar if the next one is too close for the crossfade window.
         double effLen = Mathf.Max(0.0001f, EffectiveLoopLengthSec);
-        double nextBoundary = leaderStartDspTime + effLen;
+        double barLen = Mathf.Max(0.0001f, GetAuthoredBaseLoopSeconds());
         double minLead = (config != null ? config.deckCrossfadeSeconds : 0.15) + 0.05;
-        if (nextBoundary - AudioSettings.dspTime > minLead)
-        {
-            ArmPendingDrumLoopForNextLeaderBoundary(nextBoundary, effLen);
-            if (logBeatSeqGates) Debug.Log($"[DRUM][BassDrop] scheduled clip={_bassDropClip.name} at next boundary dsp={nextBoundary:F3}");
-        }
-        else
-        {
-            _pendingSwapPhraseTarget = 1;
-            _pendingSwapLoopsElapsed = 0;
-            if (logBeatSeqGates) Debug.Log($"[DRUM][BassDrop] scheduled clip={_bassDropClip.name} (boundary too close, arming at following boundary)");
-        }
+        double earliest = AudioSettings.dspTime + minLead;
+        double barsAhead = System.Math.Max(1.0, System.Math.Ceiling((earliest - leaderStartDspTime) / barLen));
+        double nextBar = leaderStartDspTime + barsAhead * barLen;
+        ArmPendingDrumLoopForNextLeaderBoundary(nextBar, effLen);
+        if (logBeatSeqGates) Debug.Log($"[DRUM][BassDrop] scheduled clip={_bassDropClip.name} at next bar dsp={nextBar:F3} (in {(nextBar - AudioSettings.dspTime):F2}s)");
     }
 
     // Called once per loop boundary while a drop is active. Returns true while the drop
@@ -161,5 +175,22 @@ public partial class DrumTrack
         _bassDropClip = null;
         _bassDropLoopsRemaining = 0;
         _bassDropPending = false;
+        _bassDropAnnounced = false;
+    }
+
+    // Called when the drop clip is confirmed audible (here, or from TickDeckSwap's finalize in
+    // DrumTrack.Transport.cs). One shockwave per drop; refreshes during the hold don't re-fire.
+    private void AnnounceBassDropIfAudible()
+    {
+        if (!BassDropActive || _bassDropAnnounced) return;
+        var audible = drumAudioSource != null ? drumAudioSource.clip : null;
+        if (audible != _bassDropClip) return;
+
+        _bassDropAnnounced = true;
+        if (config == null || !config.bassDropShockwaveEnabled || _dust == null) return;
+
+        Color flash = Color.Lerp(_bassDropColor, Color.white, config.bassDropShockwaveWhiten01);
+        _dust.BeginShockwaveFromCenter(flash, config.bassDropShockwaveCellsPerSecond, config.bassDropShockwaveFlashSeconds);
+        if (logBeatSeqGates) Debug.Log($"[DRUM][BassDrop] shockwave clip={_bassDropClip.name}");
     }
 }

@@ -146,7 +146,9 @@ public partial class InstrumentTrack
             durationTicks = durationTicks,
             velocity127 = Mathf.Clamp(velocity127, 1f, 127f),
             authoredRootMidi = rootInRegister,
-            burstId = collectable.burstId
+            burstId = collectable.burstId,
+            originCell = collectable.originCell,
+            hasOriginCell = collectable.hasOriginCell
         };
 
         return pending;
@@ -203,6 +205,9 @@ public partial class InstrumentTrack
                 commitAuthoredRoot = targetNs.chordRegion[ResolveChordRegionIndex(targetBin, targetNs.chordRegion.Count)].rootNote;
         }
 
+        // Provenance must land before the commit: committing the bin's last note fills the bin,
+        // and OnBinFilled → GetBinNoteEntries snapshots origins synchronously inside the call.
+        _nextCommitOriginCell = p.hasOriginCell ? p.originCell : (Vector2Int?)null;
         CommitManualReleasedNote(
             stepAbs: targetAbsStep,
             midiNote: chosenMidi,
@@ -213,6 +218,8 @@ public partial class InstrumentTrack
             lightMarkerNow: true,
             skipChordQuantize: true,
             placer: placer);
+
+        _nextCommitOriginCell = null; // consumed by AddNoteToLoop; clear in case the commit bailed early
 
         PlayOneShotMidi(chosenMidi, commitVel, resolvedDurationTicks);
 
@@ -277,6 +284,9 @@ public partial class InstrumentTrack
         NotifyNoteCommittedForDust();
         TutorialEvents.RaiseNotePlaced();
         AwardCompetitiveNote(placer, burstId);
+
+        // Before the burst decrement below, so listeners see the last note too.
+        OnNoteCommitted?.Invoke(this, burstId);
 
         int targetBin = BinIndexForStep(stepAbs);
         RegisterBurstStep(burstId, stepAbs);

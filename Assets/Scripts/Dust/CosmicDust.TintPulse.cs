@@ -81,6 +81,10 @@ private void ClearRainbowParticleDirtyIfNeeded()
         // DrainCharge, ApplyRoleAndCharge, and EnsureMinSolidAlpha. Callers of SetBaseTint
         // (diffusion, retinting) must not reset drain progress.
         tint.a = _currentTint.a;
+        // Legibility rule (CosmicDust.Legibility.cs): keep the raw input, display the
+        // brightness-gated version.
+        _restRgbRaw = tint;
+        tint = ResolveLegibleRgb(tint);
         _currentTint = tint;
         _undrainedRgb = tint;
 
@@ -223,10 +227,9 @@ private void ClearRainbowParticleDirtyIfNeeded()
     {
         if (visual.particleSystem == null) yield break;
 
-        var main = visual.particleSystem.main;
-        Color from = (main.startColor.mode == ParticleSystemGradientMode.Color)
-            ? main.startColor.color
-            : Color.white;
+        // Lerp in raw (pre-legibility) space — SetBaseTint re-applies the darkening each
+        // frame, so starting from the displayed color would compound it.
+        Color from = _restRgbRaw;
 
         float t = 0f;
         while (t < seconds)
@@ -311,6 +314,52 @@ private void ClearRainbowParticleDirtyIfNeeded()
         _tintPulseRoutine = null;
     }
 }
+
+    // Single-color flash on the shared tint-pulse lane: quick rise to `color`, slower fall back
+    // to the live rest tint. Used by the bass-drop shockwave (CosmicDustGenerator.Shockwave.cs).
+    public void BeginColorFlash(Color color, float seconds)
+    {
+        if (seconds <= 0f) return;
+        CancelTintPulse(restoreToBase: false);
+        _tintPulseToken++;
+        int token = _tintPulseToken;
+        _tintPulseRoutine = StartCoroutine(ColorFlashRoutine(token, color, seconds));
+    }
+
+    private IEnumerator ColorFlashRoutine(int token, Color color, float seconds)
+    {
+        _tintPulseActive = true;
+        float rise = seconds * 0.25f;
+        float fall = seconds - rise;
+        Color startTint = _displayTint;
+
+        float t = 0f;
+        while (t < rise)
+        {
+            if (token != _tintPulseToken) yield break;
+            t += Time.deltaTime;
+            Color target = color;
+            target.a = _currentTint.a;
+            ApplyDisplayedTint(Color.Lerp(startTint, target, Mathf.Clamp01(t / rise)));
+            yield return null;
+        }
+
+        startTint = _displayTint;
+        t = 0f;
+        while (t < fall)
+        {
+            if (token != _tintPulseToken) yield break;
+            t += Time.deltaTime;
+            ApplyDisplayedTint(Color.Lerp(startTint, _currentTint, Mathf.Clamp01(t / fall)));
+            yield return null;
+        }
+
+        if (token == _tintPulseToken)
+        {
+            RestoreDisplayToBaseTint();
+            _tintPulseRoutine = null;
+        }
+    }
 
     // Triggered maze-wide by CosmicDustGenerator.BeginRainbowPulseAllDust on wisp consume.
     // Same fade-in/hold/fade-out shape as TintPulseRoutine, except "hold" continuously
@@ -478,7 +527,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
         var main = visual.particleSystem.main;
 
         _baseColor = main.startColor.color;
-        _baseSize  = main.startSize.constant;
+        _baseSize  = main.startSize.constant / Mathf.Max(0.0001f, _blockSizeMul); // block form is layered on top
         _baseAlpha = _baseColor.a;
         _baseCaptured = true;
 
@@ -528,7 +577,11 @@ private void ClearRainbowParticleDirtyIfNeeded()
         _denyColor = denyColor;
         _hasFeedbackColors = true;
     }
-    public void SetHiddenHintColor(Color c) { _hiddenHintColor = c; }
+    public void SetHiddenHintColor(Color c)
+    {
+        _hiddenHintColor = c;
+        RefreshLegibleRestTint();
+    }
     private void OnDisable()
     {
         CancelTintPulse(restoreToBase: true);
@@ -544,7 +597,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
         if (!_baseCaptured) return;
 
         var main = visual.particleSystem.main;
-        main.startSize = _baseSize;
+        main.startSize = _baseSize * _blockSizeMul;
 
         // Restore emission if we captured it.
         var emission = visual.particleSystem.emission;

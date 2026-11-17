@@ -20,10 +20,22 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     [Header("Dim (Disarmed) Look")]
     [SerializeField, Range(0f, 1f)] private float dimRgbMul = 0.55f;
     [SerializeField] private bool dimUsesFixedTint = true;
-    [SerializeField] private Color rejectFlashColor = new Color(0.9f, 0.25f, 0.05f, 0.55f);
-    [SerializeField, Min(0.02f)] private float rejectFlashSeconds = 0.12f;
 
-    private Coroutine _rejectFlashRoutine;
+    // Poke feedback (LEGIBILITY_AUDIT.md B1): every rejected poke gets a quick head-shake of
+    // the diamonds ("not now").
+    [Header("Poke Feedback: Not Ready (head shake)")]
+    [SerializeField, Min(0.05f)] private float notReadyShakeSeconds = 0.35f;
+    [SerializeField, Min(0f)] private float notReadyShakeDeg = 18f;
+    [SerializeField, Min(0.5f)] private float notReadyShakeHz = 7f;
+
+    // Sleep (LEGIBILITY_AUDIT.md B2): an armed star blocked by another sequence in flight is
+    // drawn desaturated + slowed so "one star at a time" reads before anyone pokes it.
+    [Header("Sleep (blocked by another sequence)")]
+    [SerializeField, Range(0f, 1f)] private float sleepDesaturate01 = 0.65f;
+    [SerializeField, Range(0f, 1f)] private float sleepAlphaMul = 0.6f;
+
+    private float _notReadyShakeStart = -999f;
+    public bool Sleeping { get; set; }
 
     public ParticleSystem particles;
 
@@ -128,6 +140,12 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         Color startGray = new Color(dimShardTint.r, dimShardTint.g, dimShardTint.b, 1f);
         Color tint = Color.Lerp(startGray, roleColor, charge01 * charge01);
         tint.a = Mathf.Lerp(dimShardTint.a, 1f, charge01);
+        if (Sleeping)
+        {
+            float a = tint.a * sleepAlphaMul;
+            tint = Color.Lerp(tint, startGray, sleepDesaturate01);
+            tint.a = a;
+        }
 
         float sep = isReady ? 0f : Mathf.Lerp(dualMaxSeparationDeg, 0f, charge01);
 
@@ -155,6 +173,15 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
                 diamondAngleSmoothTime);
         }
 
+        // Not-ready head shake: applied after smoothing so the damper doesn't eat it.
+        float shakeDeg = 0f;
+        float shakeT = Time.time - _notReadyShakeStart;
+        if (shakeT >= 0f && shakeT < notReadyShakeSeconds)
+        {
+            float decay = 1f - shakeT / notReadyShakeSeconds;
+            shakeDeg = Mathf.Sin(shakeT * notReadyShakeHz * Mathf.PI * 2f) * notReadyShakeDeg * decay;
+        }
+
         Sprite shardSprite = charge01 <= 0.001f
             ? diamond
             : (role == MusicalRole.Rhythm && activeDiamondRhythm != null)
@@ -165,7 +192,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         {
             _diamondASprite.color = tint;
             _diamondASprite.sprite = shardSprite;
-            _diamondASprite.transform.localRotation = Quaternion.Euler(0f, 0f, _diamondAAngleCurrent);
+            _diamondASprite.transform.localRotation = Quaternion.Euler(0f, 0f, _diamondAAngleCurrent + shakeDeg);
             _diamondASprite.transform.localScale = Vector3.one;
         }
 
@@ -173,7 +200,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         {
             _diamondBSprite.color = tint;
             _diamondBSprite.sprite = shardSprite;
-            _diamondBSprite.transform.localRotation = Quaternion.Euler(0f, 0f, _diamondBAngleCurrent);
+            _diamondBSprite.transform.localRotation = Quaternion.Euler(0f, 0f, _diamondBAngleCurrent + shakeDeg);
             _diamondBSprite.transform.localScale = Vector3.one;
         }
     }
@@ -220,20 +247,13 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         EnsureParticlesVisible(playIfStopped: true);
     }
 
-    public void FlashReject()
+    // "Not ready": the star's diamonds shake their head. Purely rotational, so it never fights
+    // the charge-scale or body-tint updates (and never leaves the star stuck dim).
+    public void PlayNotReadyShake()
     {
-        if (_rejectFlashRoutine != null) StopCoroutine(_rejectFlashRoutine);
-        _rejectFlashRoutine = StartCoroutine(RejectFlashRoutine());
+        _notReadyShakeStart = Time.time;
     }
 
-    private IEnumerator RejectFlashRoutine()
-    {
-        SetShardTint(rejectFlashColor);
-        ApplyParticleAlpha(0.3f);
-        yield return new WaitForSeconds(rejectFlashSeconds);
-        ShowDim(Color.gray);
-        _rejectFlashRoutine = null;
-    }
 
     public void HideAll()
     {

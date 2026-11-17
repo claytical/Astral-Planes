@@ -16,8 +16,7 @@ public partial class CosmicDustGenerator
         List<Vector2Int> vehicleCells,
         int vehicleNoSpawnRadiusCells,
         int maxCellsThisCall = -1,
-        int innerRadiusCellsExclusive = -1,
-        bool hideRole = false)
+        int innerRadiusCellsExclusive = -1)
     {
         EnsureCellGrid();
         _imprints.EnsureAllocated(2048);
@@ -82,18 +81,9 @@ public partial class CosmicDustGenerator
                 // Vehicle pocket is a hard exclusion — no imprint, no spawn, no visual update.
                 if (IsNearAnyVehicle(gp, vehicleCells, vehicleNoSpawnRadiusCells)) continue;
 
-                // When hideRole is true, spawn gray so PhaseStar cannot detect the cell
-                // until the vehicle reveals it by carving. hiddenRole is baked into the imprint.
                 MusicalRole spawnRole = imprintRole;
                 Color spawnColor = c;
                 MusicalRole storedHidden = MusicalRole.None;
-                if (hideRole && imprintRole != MusicalRole.None)
-                {
-                    storedHidden = imprintRole;
-                    spawnRole = MusicalRole.None;
-                    spawnColor = config.mazeTint;
-                    spawnColor.a = c.a;
-                }
 
                 // Always write persistent imprint (so regrow picks it up later)
                 _imprints[gp] = new DustImprint
@@ -249,7 +239,7 @@ public partial class CosmicDustGenerator
     public void SpawnDustAtCells(
         IReadOnlyList<Vector2Int> cells,
         MusicalRole role, Color hue, float energy01, float growInSeconds,
-        bool hideRole = false, bool solid = false)
+        bool solid = false)
     {
         if (cells == null || cells.Count == 0) return;
         EnsureCellGrid();
@@ -266,13 +256,6 @@ public partial class CosmicDustGenerator
             MusicalRole spawnRole = role;
             Color spawnColor = c;
             MusicalRole hiddenRole2 = MusicalRole.None;
-            if (hideRole && role != MusicalRole.None)
-            {
-                hiddenRole2 = role;
-                spawnRole = MusicalRole.None;
-                spawnColor = config.mazeTint;
-                spawnColor.a = c.a;
-            }
 
             var imprint = new DustImprint { color = spawnColor, role = spawnRole, hiddenRole = hiddenRole2 };
             if (solid)
@@ -289,6 +272,7 @@ public partial class CosmicDustGenerator
             {
                 existingDust.ApplyRoleAndCharge(MusicalRole.None, config.mazeTint, c.a);
                 _imprints.ApplyHiddenHintToDust(gp, existingDust);
+                if (solid) existingDust.HideFlower(); // bypass-proof wall: no bud
                 var res = ResolveResistanceProfile(gp, role, context: "SpawnDustAtCells:existing");
                 existingDust.clearing.drainResistance01 = solid ? 1f : res.drainResistance01;
                 continue;
@@ -404,7 +388,12 @@ public partial class CosmicDustGenerator
             Color dormantStart = config.mazeTint;
             dormantStart.a = tintWithAlpha.a;
             dust.ApplyTintVisual(dormantStart);
-            dust.TintFadeInManaged(config.voidDustGrowInSeconds, dormantStart, tintWithAlpha);
+            // Fade to the legibility-resolved rest tint (darkened unless bloomed / hint preview
+            // for None) rather than the raw role color, or the grow-in would end brighter than
+            // the cell's actual rest state.
+            Color fadeTo = dust.CurrentTint;
+            fadeTo.a = tintWithAlpha.a;
+            dust.TintFadeInManaged(config.voidDustGrowInSeconds, dormantStart, fadeTo);
 
             // Always non-colliding during grow
             SetDustCollision(dust, false);

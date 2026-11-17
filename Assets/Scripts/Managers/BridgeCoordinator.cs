@@ -107,6 +107,11 @@ public sealed class BridgeCoordinator
         {
             yield return _gameFlow.StartCoroutine(rings.SpinAndRollOffActiveRings(spinDur, rollDur));
         }
+        else
+        {
+            // No record to follow: still take the loop's markers off the timeline.
+            _gameFlow.noteViz?.SendLoopMarkersWithRecord(null, 0f, 0f);
+        }
 
         // Final safety sweep for any stray tether that didn't already retract gracefully
         // (e.g. DetachPendingRingTethers only covers ring preview tethers). Runs after the

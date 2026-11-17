@@ -208,11 +208,14 @@ public sealed class SceneFlowCoordinator
         {
             _gameFlow.phaseTransitionManager.AdvancePhase("GFM/StartNextMotifInPhase(Exhausted)");
             yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
+            _gameFlow.activeDrumTrack?.BeginMotifTransport("GFM/StartNextMotifInPhase(Exhausted)");
             _gameFlow.StartCoroutine(RevealAndFadeRecordAfterMaze());
             yield break;
         }
 
         yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
+        // Play begins now: restart the drums so the playhead's step 0 lines up with it.
+        _gameFlow.activeDrumTrack?.BeginMotifTransport("GFM/StartNextMotifInPhase");
         // Not yielded — mirrors StartChosenMotifOrPhase: the name → record sequence plays
         // over gameplay instead of holding up the bridge.
         _gameFlow.StartCoroutine(RevealAndFadeRecordAfterMaze());
@@ -295,8 +298,8 @@ public sealed class SceneFlowCoordinator
         }
 
         // Runs after the chapter/motif is resolved so the intro shows the actual starting
-        // motif's name. Transport hasn't started yet (ManualStart below), so nothing plays
-        // underneath it.
+        // motif's name. Transport hasn't started yet (BeginMotifTransport after the maze
+        // below), so nothing plays underneath it.
         yield return _gameFlow.StartCoroutine(PlayIntroScreenSequenceAsync());
 
         _gameFlow.noteViz.Initialize();
@@ -323,6 +326,9 @@ public sealed class SceneFlowCoordinator
 
         _gameFlow.GetBinRingController()?.FadeInitialRecordOut(MazeSpawnDuration);
         yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
+        // Drums start only now (record hold + maze growth are silent) so bar 1 step 0 is
+        // where play begins, not partway through the first loop.
+        _gameFlow.activeDrumTrack.BeginMotifTransport("GFM/Setup");
         yield return null;
 
         _session.SetCurrentState(GameState.Playing);
@@ -568,6 +574,10 @@ public sealed class SceneFlowCoordinator
 
         if (entryPortal != null)
             entryPortal.CloseAndDestroy(_gameFlow.PathEntryPortalCloseSeconds);
+
+        // Play begins now: restart the drums on the new motif's entry clip so the playhead's
+        // step 0 lines up with it. Before the wisp carry so it lives one full new loop.
+        _gameFlow.activeDrumTrack?.BeginMotifTransport("GFM/PathChoice");
 
         // An uncaught wisp whose exit the player followed reappears now (despawns at first loop boundary).
         Vector2Int wispEntryCell = default;

@@ -25,6 +25,10 @@ public abstract class TrackNode : MonoBehaviour
     protected int _expireAfterLoops;
     private DrumTrack _loopBoundarySource;
 
+    // Read-only view for the lifetime pip ring (TrackNodeLifetimePips). 0 = never expires.
+    public int ExpireAfterLoops => _expireAfterLoops;
+    public int LoopsRemaining => _expireAfterLoops > 0 ? Mathf.Max(0, _expireAfterLoops - _loopsSinceSpawn) : 0;
+
     protected void SubscribeLoopBoundary(DrumTrack drumTrack)
     {
         _loopBoundarySource = drumTrack;

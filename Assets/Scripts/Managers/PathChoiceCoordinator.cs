@@ -14,6 +14,8 @@ public sealed class PathChoiceCoordinator
     private readonly SceneFlowCoordinator _sceneFlow;
 
     private readonly List<MazePathExit> _allExits = new();
+    // Sealed markers for phase exits that aren't unlocked yet (LEGIBILITY_AUDIT.md E2).
+    private readonly List<PathExitLockedStub> _lockedStubs = new();
     private MazePathExit _winnerExit;
     private Vehicle _winnerVehicle;
     private HashSet<(string phaseId, string motifId)> _playedKeys = new();
@@ -38,6 +40,7 @@ public sealed class PathChoiceCoordinator
         var ascension = Object.FindFirstObjectByType<NoteAscensionDirector>();
         ascension?.SetAscentLineVisible(false);
         yield return _gameFlow.StartCoroutine(RunPathChoiceAndAdvanceInner());
+        DestroyLockedStubs(); // idempotent; covers every exit path out of the inner routine
         ascension?.SetAscentLineVisible(true);
     }
 
@@ -64,8 +67,20 @@ public sealed class PathChoiceCoordinator
 
         // Phase-change exits (Up/Down) only appear once EVERY motif of the current phase has a
         // recorded ring. (The tutorial phase has one motif, so its Up road opens right away.)
+        // Those held back by this rule (not the permanent phase-1 Down rule below) still get a
+        // sealed stub on their edge once the interstitial is up — see SpawnLockedStubs.
+        var lockedPhaseDirs = new List<MazeArm>();
         if (!AllMotifsRecordedInPhase(ptm))
+        {
+            foreach (var e in mazeExits)
+            {
+                bool phaseDir = e.Dir == MazeArm.Up || e.Dir == MazeArm.Down;
+                bool permanentlyClosed = e.Dir == MazeArm.Down && ptm.CurrentPhaseIndex <= 1;
+                if (phaseDir && !permanentlyClosed && !lockedPhaseDirs.Contains(e.Dir))
+                    lockedPhaseDirs.Add(e.Dir);
+            }
             mazeExits.RemoveAll(e => e.Dir == MazeArm.Up || e.Dir == MazeArm.Down);
+        }
 
         // No travelling back out of phase 1: MotifMazeGraph's inward move from phase 1 wraps to
         // the outermost orbit (and the tutorial below it is gone once played). Scoped here, not
@@ -144,6 +159,7 @@ public sealed class PathChoiceCoordinator
         }
 
         SpawnWisp(drums, vehicleCells, ptm);
+        SpawnLockedStubs(drums, lockedPhaseDirs, ptm);
 
         var exitAnchors = new List<Vector2Int>(_allExits.Count);
         foreach (var e in _allExits) exitAnchors.Add(e.AnchorCell);
@@ -181,6 +197,62 @@ public sealed class PathChoiceCoordinator
         exit.BeginSwallow();
         foreach (var e in _allExits)
             if (e != exit) e.SetSealed(true);
+        DestroyLockedStubs();
+    }
+
+    // ── Locked phase-exit dust gates (LEGIBILITY_AUDIT.md E2) ───────────────────────────
+    // The dust wall across the centre band of a locked Up/Down edge — exactly where that road
+    // would open (same topBottomExitCenterBand the real exits use) — shimmers, harder with each
+    // motif recorded in the phase.
+    private const int kGateDepthCells = 3;
+    private static readonly Color kLockedGateColor = new Color(0.82f, 0.82f, 0.9f, 1f);
+
+    private void SpawnLockedStubs(DrumTrack drums, List<MazeArm> lockedDirs, PhaseTransitionManager ptm)
+    {
+        DestroyLockedStubs();
+        var dust = _gameFlow.dustGenerator;
+        if (lockedDirs == null || lockedDirs.Count == 0 || drums == null || dust == null) return;
+
+        int w = drums.GetSpawnGridWidth(), h = drums.GetSpawnGridHeight();
+        if (w <= 0 || h <= 0) return;
+
+        float band = _gameFlow.PathExitConfig != null ? Mathf.Clamp01(_gameFlow.PathExitConfig.topBottomExitCenterBand) : 1f / 3f;
+        int half = Mathf.Max(1, Mathf.RoundToInt(w * band * 0.5f));
+        int cx = w / 2;
+
+        CountRecordedInPhase(ptm, out int recorded, out int total);
+        foreach (var dir in lockedDirs)
+        {
+            bool top = MotifMaze.SideOf(dir) == BoundaryWrap.BoundarySide.Top;
+            var cells = new List<Vector2Int>();
+            for (int d = 0; d < kGateDepthCells; d++)
+            {
+                int y = top ? h - 1 - d : d;
+                for (int x = Mathf.Max(0, cx - half); x <= Mathf.Min(w - 1, cx + half); x++)
+                    cells.Add(new Vector2Int(x, y));
+            }
+            _lockedStubs.Add(PathExitLockedStub.Create(dust, cells, recorded, total, kLockedGateColor));
+        }
+    }
+
+    private void DestroyLockedStubs()
+    {
+        foreach (var s in _lockedStubs)
+            if (s != null) Object.Destroy(s.gameObject);
+        _lockedStubs.Clear();
+    }
+
+    private void CountRecordedInPhase(PhaseTransitionManager ptm, out int recorded, out int total)
+    {
+        recorded = 0; total = 0;
+        int phase = ptm.CurrentPhaseIndex;
+        int count = ptm.PeekMotifCount(phase);
+        for (int i = 0; i < count; i++)
+        {
+            if (ptm.PeekMotif(phase, i) == null) continue; // empty library slot
+            total++;
+            if (IsPlayed(phase, i)) recorded++;
+        }
     }
 
     // Wisp the current interstitial spawned (null once consumed/destroyed/carried).

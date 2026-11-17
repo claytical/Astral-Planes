@@ -28,15 +28,7 @@ public partial class MotifRingGlyphApplicator
     {
         if (_pendingRingNotes.Count == 0) return false;
 
-        int bestIdx = 0;
-        float bestDistSqr = float.MaxValue;
-        for (int i = 0; i < _pendingRingNotes.Count; i++)
-        {
-            var anchor = _pendingRingNotes[i].Anchor;
-            if (anchor == null) continue;
-            float d = (anchor.transform.position - contactPoint).sqrMagnitude;
-            if (d < bestDistSqr) { bestDistSqr = d; bestIdx = i; }
-        }
+        int bestIdx = NearestPendingIndex(contactPoint);
 
         var entry = _pendingRingNotes[bestIdx];
         _pendingRingNotes.RemoveAt(bestIdx);
@@ -66,6 +58,35 @@ public partial class MotifRingGlyphApplicator
         return true;
     }
 
+    // Pending note whose ring-side anchor is closest to the contact point (0 if none have anchors).
+    private int NearestPendingIndex(Vector3 contactPoint)
+    {
+        int bestIdx = 0;
+        float bestDistSqr = float.MaxValue;
+        for (int i = 0; i < _pendingRingNotes.Count; i++)
+        {
+            var anchor = _pendingRingNotes[i].Anchor;
+            if (anchor == null) continue;
+            float d = (anchor.transform.position - contactPoint).sqrMagnitude;
+            if (d < bestDistSqr) { bestDistSqr = d; bestIdx = i; }
+        }
+        return bestIdx;
+    }
+
+    /// <summary>
+    /// Too-soft ring bump (LEGIBILITY_AUDIT.md C5): if a note is pending, pluck the tether that a
+    /// harder hit would break and return true — the caller skips the denial shake, which is now
+    /// reserved for "nothing to break". Changes no state.
+    /// </summary>
+    public bool TryPluckNearestPendingTether(Vector3 contactPoint)
+    {
+        if (_pendingRingNotes.Count == 0) return false;
+        var entry = _pendingRingNotes[NearestPendingIndex(contactPoint)];
+        if (entry.Tether == null) return false;
+        entry.Tether.Pluck();
+        return true;
+    }
+
     /// <summary>
     /// Gracefully retracts every still-pending note tether (preview tethers whose notes haven't
     /// departed yet) instead of leaving them to the deformation coroutines' normal onDepart timing.
@@ -86,6 +107,74 @@ public partial class MotifRingGlyphApplicator
             if (entry.Anchor != null) Destroy(entry.Anchor, retractDuration);
         }
         _pendingRingNotes.Clear();
+    }
+
+    /// <summary>
+    /// Heartbeat flash at a recorded note's dent on its gameplay ring, fired when that note plays
+    /// in the loop (CosmicBlockField, alongside its Cosmic Block and timeline marker). No-op while
+    /// the ring stack is hidden (scaled to zero between deformations) or leaving.
+    /// </summary>
+    public void FlashDent(MusicalRole role, int binIndex, int stepAbs, int binSteps)
+    {
+        if (config == null || _gameplayFadingOut) return;
+        if (transform.lossyScale.sqrMagnitude < 0.0001f) return;
+
+        int ringIdx = _gameplayRings.FindIndex(r => r.BinIndex == binIndex && r.Role == role);
+        if (ringIdx < 0) return;
+        var ring = _gameplayRings[ringIdx];
+        if (ring.Root == null || !ring.Root.activeInHierarchy) return;
+
+        // Same placement math as DeformBinRingCoroutine's tugLocal.
+        binSteps = Mathf.Max(1, binSteps);
+        int   localStep = ((stepAbs % binSteps) + binSteps) % binSteps;
+        float outerR    = RingInnerRadius(ringIdx) + config.ringThickness;
+        float tugR      = outerR * (1f - config.tugDepthFraction);
+        float angle     = localStep / (float)binSteps * Mathf.PI * 2f
+            + config.ringStartAngleOffset + MotifRingGlyphGenerator.RingOrdinalAngleJitter(ring.RingOrdinal);
+        var worldPos = ring.Root.transform.TransformPoint(
+            new Vector3(Mathf.Cos(angle) * tugR, Mathf.Sin(angle) * tugR, 0f));
+
+        if (notePlaybackFireworkPrefab != null)
+        {
+            // Parented so it stays glued to the spinning dent (see SpawnNoteFirework).
+            var go = Instantiate(notePlaybackFireworkPrefab, worldPos, Quaternion.identity, ring.Root.transform);
+            var ps = go.GetComponentInChildren<ParticleSystem>();
+            if (ps != null)
+            {
+                var main = ps.main;
+                main.startColor = ring.BaseColor;
+                main.simulationSpace = ParticleSystemSimulationSpace.Local;
+                var psRenderer = ps.GetComponent<ParticleSystemRenderer>();
+                if (psRenderer != null) psRenderer.sortingOrder = TravelDotSortingOrder;
+            }
+        }
+        else if (noteTravelDotPrefab != null)
+        {
+            StartCoroutine(FlashDotRoutine(worldPos, ring.Root.transform, ring.BaseColor));
+        }
+    }
+
+    // Fallback heartbeat when no firework prefab is wired: a travel dot that swells and fades.
+    private IEnumerator FlashDotRoutine(Vector3 worldPos, Transform parent, Color color)
+    {
+        var go = Instantiate(noteTravelDotPrefab, worldPos, Quaternion.identity, parent);
+        float baseScale = config.noteDotRadius * 2f;
+        var sr = go.GetComponentInChildren<SpriteRenderer>();
+        var lr = go.GetComponentInChildren<LineRenderer>();
+        const float dur = 0.35f;
+        float t = 0f;
+        while (t < dur && go != null)
+        {
+            t += Time.deltaTime;
+            float u = Mathf.Clamp01(t / dur);
+            var c = color; c.a = 1f - u;
+            if (sr != null) sr.color = c;
+            if (lr != null) lr.startColor = lr.endColor = c;
+            // Ring-local like TravelNoteDot's applicator-local scale, so it matches the travel dot's size.
+            go.transform.localScale = Vector3.one * (baseScale * Mathf.Lerp(1.6f, 0.8f, u));
+            yield return null;
+        }
+        if (go != null) Destroy(go);
     }
 
     private void SpawnBreakEffect(Vector3 worldPos, InstrumentTrack track)
@@ -320,6 +409,13 @@ public partial class MotifRingGlyphApplicator
                 onLaunch: () =>
                 {
                     revealedNotes.Add(capturedNote);
+                    if (OnNoteRecordedToRing != null)
+                    {
+                        Vector3 dentWorld = ring.Root != null
+                            ? ring.Root.transform.TransformPoint(tugLocal)
+                            : transform.position;
+                        OnNoteRecordedToRing.Invoke(role, color, ring.BinIndex, capturedNote, dentWorld);
+                    }
                     var targetPoly = MotifRingGlyphGenerator.GenerateSingleRingAtRadius(
                         role, ring.BinIndex, color, revealedNotes, binSteps, outerR, config, ring.RingOrdinal);
                     var targetPts = targetPoly?.Points;

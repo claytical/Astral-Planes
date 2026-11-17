@@ -21,26 +21,28 @@ public partial class PhaseStarDustAffect
                 if (drum != null)
                     tentacle.targetWorldPos = drum.GridToWorldPosition(tentacle.targetCell);
 
+                // A locked vine never swaps its route mid-growth: if the target is lost it
+                // withdraws along its path, and the idle tentacle re-acquires a new target.
                 if (!TryValidateOrHoldTarget(tentacle, dt, out var invalidReason))
                 {
-                    if (_navigator != null && drum != null && _navigator.TryGetTargetForRole(tentacle.role, out var newCell) &&
-                        newCell != tentacle.targetCell && IsTargetValid(newCell, tentacle.role, tentacle, out _) && TryReserveCell(tentacle, newCell))
-                    {
-                        tentacle.targetCell      = newCell;
-                        tentacle.targetWorldPos  = drum.GridToWorldPosition(newCell);
-                        ResetInvalidTargetRetry(tentacle);
-                    }
-                    else
-                    {
-                        BeginRetractingTentacle(tentacle, starPos, invalidReason);
-                        break;
-                    }
+                    BeginRetractingTentacle(tentacle, starPos, invalidReason);
+                    break;
                 }
 
-                tentacle.growProgress = Mathf.Clamp01(tentacle.growProgress + tentacleGrowSpeed * dt);
+                UpdateVineRoot(tentacle, starPos, drum);
+                if (!TickVineGrowth(tentacle, dt, drum, gen, starPos))
+                {
+                    BeginRetractingTentacle(tentacle, starPos, "vine blocked");
+                    break;
+                }
+
+                tentacle.growProgress = tentacle.route.TotalLength > 1e-4f
+                    ? Mathf.Clamp01(tentacle.route.GrownLength / tentacle.route.TotalLength)
+                    : 1f;
+                tentacle.tipPos = tentacle.route.Sample(tentacle.route.GrownLength);
                 UpdateTentacleLine(tentacle, starPos, dt);
 
-                if (tentacle.growProgress >= 1f)
+                if (tentacle.route.FrontDistFromTarget <= 1e-4f)
                 {
                     tentacle.tipPos      = tentacle.targetWorldPos;
                     TransitionTentacleState(tentacle, TentacleState.Draining, "reached target");
@@ -64,6 +66,7 @@ public partial class PhaseStarDustAffect
                     break;
                 }
 
+                UpdateVineRoot(tentacle, starPos, drum);
                 tentacle.tipPos          = tentacle.targetWorldPos;
                 tentacle.drainFlashTimer = Mathf.Max(0f, tentacle.drainFlashTimer - dt);
                 TickSiphon(tentacle, dt);
@@ -98,11 +101,15 @@ public partial class PhaseStarDustAffect
 
             case TentacleState.Retracting:
             {
-                tentacle.tipPos = Vector2.MoveTowards(tentacle.tipPos, starPos, tentacleRetractSpeed * dt);
-                tentacle.targetWorldPos = tentacle.tipPos;
+                // Withdraw back along the vine's own route, root still riding the star.
+                var route = tentacle.route;
+                UpdateVineRoot(tentacle, starPos, drum);
+                route.FrontDistFromTarget = Mathf.Min(route.TotalLength,
+                    route.FrontDistFromTarget + tentacleRetractSpeed * dt);
+                tentacle.tipPos = route.Sample(route.GrownLength);
                 UpdateTentacleLine(tentacle, starPos, dt);
 
-                if (Vector2.Distance(tentacle.tipPos, starPos) < 0.05f)
+                if (route.GrownLength < 0.05f)
                 {
                     TransitionTentacleState(tentacle, TentacleState.Idle, "fully retracted");
                     tentacle.line.enabled = false;
@@ -121,7 +128,8 @@ public partial class PhaseStarDustAffect
                 tentacle.drainFlashTimer = Mathf.Max(0f, tentacle.drainFlashTimer - dt);
                 TickSiphon(tentacle, dt);
                 tentacle.alphaScale      = Mathf.Clamp01(1f - tentacle.dissolveTimer / dissolveDuration);
-                tentacle.tipPos          = tentacle.targetWorldPos;
+                UpdateVineRoot(tentacle, starPos, drum);
+                tentacle.tipPos          = tentacle.route.Sample(tentacle.route.GrownLength);
                 UpdateTentacleLine(tentacle, starPos, dt);
 
                 if (tentacle.dissolveTimer >= dissolveDuration)
@@ -164,6 +172,8 @@ public partial class PhaseStarDustAffect
         Vector3 root3 = new Vector3(starPos.x, starPos.y, transform.position.z);
         for (int i = 0; i < SplinePoints; i++)
             tentacle.linePts[i] = root3;
+
+        BeginVineRoute(tentacle, starPos, drum);
 
         TransitionTentacleState(tentacle, TentacleState.Growing, "acquired target");
         tentacle.line.enabled = true;
@@ -260,9 +270,10 @@ public partial class PhaseStarDustAffect
         ReleaseDrainLock(tentacle);
         ReleaseReservation(tentacle, tentacle.targetCell);
 
-        tentacle.tipPos = tentacle.targetWorldPos;
+        // Retract from wherever the grow front actually is (mid-growth vines no longer snap to the target).
+        tentacle.boring = false;
+        tentacle.tipPos = tentacle.route.Count >= 2 ? tentacle.route.Sample(tentacle.route.GrownLength) : starPos;
         tentacle.contactTimer = 0f;
-        tentacle.targetWorldPos = tentacle.tipPos;
 
         TransitionTentacleState(tentacle, TentacleState.Retracting, reason);
         tentacle.line.enabled = true;
@@ -294,6 +305,11 @@ public partial class PhaseStarDustAffect
         tentacle.effectiveBuildupSeconds = 0f;
         tentacle.siphonActive = false;
         tentacle.siphonT = 0f;
+        tentacle.route.Clear();
+        tentacle.boring = false;
+        tentacle.rootRenderInit = false;
+        tentacle.rootCrumbs = 0;
+        tentacle.lineCount = 0;
 
         if (tentacle.line != null)
         {

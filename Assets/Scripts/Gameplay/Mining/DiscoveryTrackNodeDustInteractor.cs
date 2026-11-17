@@ -124,6 +124,9 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
         if (_gfm == null) _gfm = GameFlowManager.Instance;
         var gen = _gfm?.dustGenerator;
         if (gen == null) return;
+        // A Cosmic Block reads as "dust" to the grid (wall) but the pooled dust GO under it is
+        // hidden/non-solid — recoloring it would corrupt that cell's later regrow.
+        if (!gen.HasDustAt(cell)) return;
         if (!gen.TryGetCellGo(cell, out var go) || go == null) return;
         if (!go.TryGetComponent<CosmicDust>(out var dust)) return;
 

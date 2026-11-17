@@ -146,6 +146,8 @@ public partial class DiscoveryTrackNode : TrackNode
         SetBehaviorIntent(DiscoveryTrackNodeBehaviorIntent.Committing);
         _lastProcessedStep = -1;
         SubscribeLoopBoundary(_drumTrack);
+        // Expiry countdown ring: one pip per loop left, refilled on every hit (LEGIBILITY_AUDIT B3).
+        TrackNodeLifetimePips.Attach(this, _lockedColor);
 
         var dust = GetComponent<DiscoveryTrackNodeDustInteractor>();
         if (dust != null) dust.SetLevelAuthority(_drumTrack);

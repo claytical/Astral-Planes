@@ -63,6 +63,17 @@ public partial class MotifRingGlyphApplicator
         _gameplayFadingOut = true;
         _spinOffPending    = false;
 
+        // The final ring has recorded all its notes — the record is leaving. Fired here (not at
+        // OnMotifCompleted) so listeners like CosmicBlockField clear only after the last ring's
+        // notes have landed, together with the record's exit.
+        OnRecordSpinOffStarted?.Invoke();
+
+        // The timeline's notes follow the record into the distance. The loop keeps playing
+        // (unseen) through the interstitial maze until a path is chosen and BeginNewMotif clears it.
+        GameFlowManager.Instance?.noteViz?.SendLoopMarkersWithRecord(
+            transform, spinDuration,
+            spinDuration + rollDuration + (config != null ? config.scaleDownDuration : 0.5f));
+
         // Restore to full scale — handles both "hidden after deformation" and "mid-fade interrupted".
         transform.localScale = _fitScale.sqrMagnitude > 0.0001f ? _fitScale : Vector3.one;
 

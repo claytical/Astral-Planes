@@ -358,6 +358,49 @@ public partial class Collectable
         Destroy(gameObject);
     }
 
+    // ── Unreachable ghost (LEGIBILITY_AUDIT.md C2) ──────────────────────────────────────
+    // A ship carrying notes only accepts its own track's notes (Vehicle.CanAcceptCollectable),
+    // and a full manual queue refuses pickups (C1). When NO ship could take this note right
+    // now, it fades and shrinks so it reads as "not yours yet" instead of silently passing
+    // through. 1 = solid, 0 = fully ghosted.
+    private const float kGhostAlphaMul   = 0.3f;
+    private const float kGhostScaleMul   = 0.8f;
+    private const float kGhostCheckPeriod = 0.2f;
+    private const float kGhostFadeSpeed  = 6f;
+    private float _ghost01 = 1f;
+    private bool _ghostTargetSolid = true;
+    private float _nextGhostCheck;
+
+    private float TickUnreachableGhost()
+    {
+        // Only free-floating notes are pickup candidates: carried notes (a full queue would
+        // otherwise ghost the ship's own cargo), armed bombs and arriving notes stay solid.
+        if (_handled || _isBomb || _inSpawnArrival)
+        {
+            _ghostTargetSolid = true;
+            _ghost01 = 1f;
+            return 1f;
+        }
+
+        if (Time.time >= _nextGhostCheck)
+        {
+            _nextGhostCheck = Time.time + kGhostCheckPeriod;
+            _ghostTargetSolid = AnyVehicleCanTakeThis();
+        }
+        _ghost01 = Mathf.Lerp(_ghost01, _ghostTargetSolid ? 1f : 0f, 1f - Mathf.Exp(-kGhostFadeSpeed * Time.deltaTime));
+        return _ghost01;
+    }
+
+    private bool AnyVehicleCanTakeThis()
+    {
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var vehicles = _gfm != null ? _gfm.GetVehicles() : null;
+        if (vehicles == null || vehicles.Count == 0 || assignedInstrumentTrack == null) return true; // nothing to compare — stay solid
+        for (int i = 0; i < vehicles.Count; i++)
+            if (vehicles[i] != null && vehicles[i].CanTakeNoteNow(assignedInstrumentTrack)) return true;
+        return false;
+    }
+
     private IEnumerator PulseEnergySprite()
     {
         var particles = new ParticleScaleLockstep();
@@ -366,12 +409,14 @@ public partial class Collectable
         while (true)
         {
             float t = (Mathf.Sin(Time.time * pulseSpeed) * 0.5f) + 0.5f;
-            float a = Mathf.Lerp(minAlpha, maxAlpha, t);
+            // Ghost tell (LEGIBILITY_AUDIT.md C2): fades + shrinks while no ship can take it.
+            float ghost = TickUnreachableGhost();
+            float a = Mathf.Lerp(minAlpha, maxAlpha, t) * Mathf.Lerp(kGhostAlphaMul, 1f, ghost);
             if (energySprite != null)
             {
                 var col = energySprite.color; col.a = a; energySprite.color = col;
             }
-            float ratio = Mathf.Lerp(1f, pulseScale, t);
+            float ratio = Mathf.Lerp(1f, pulseScale, t) * Mathf.Lerp(kGhostScaleMul, 1f, ghost);
             transform.localScale = _baseRootScale * ratio;
             particles.Apply(ratio);
             yield return null;

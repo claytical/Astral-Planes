@@ -78,10 +78,13 @@ public partial class PhaseStar
         SetVisual(VisualMode.Bright, ResolvePreviewColorByReadiness());
     }
 
+    // Paused stars sleep like any other blocked star (PhaseStar.PokeFeedback.cs): dim, slow
+    // rotation, still drifting. Motion is no longer frozen — a frozen, full-color star read as
+    // a stuck/ready star rather than one waiting its turn. Disarm keeps tentacles off and
+    // pokes harmless (pushed + Wait pointer).
     public void Pause()
     {
         Disarm(PhaseStarDisarmReason.SiblingActive);
-        motion?.SetFrozen(true);
     }
 
     public void Resume()

@@ -39,6 +39,54 @@ public class Fuel : MonoBehaviour
     [Tooltip("Fraction of maxTintLerp reached at drainWeight01 = 0; heavier drains darken closer to the full drainTint.")]
     [SerializeField, Range(0f, 1f)] private float minHeavyTintMul = 0.5f;
 
+    // Status tells (LEGIBILITY_AUDIT.md D2): persistent states layered under the change FX above.
+    [Header("Low Fuel Warning")]
+    [Tooltip("Fuel ratio below which the bar pulses (keep in sync with VehicleConfig.lowFuelThreshold01).")]
+    [SerializeField, Range(0.01f, 0.9f)] private float lowFuelThreshold01 = 0.2f;
+    [SerializeField] private Color lowFuelTint = new Color(1f, 0.35f, 0.2f, 1f);
+    [SerializeField, Range(0f, 1f)] private float lowFuelTintMax = 0.75f;
+    [SerializeField] private float lowFuelPulseHz = 1.2f;
+    [SerializeField] private float lowFuelPulseHzEmpty = 3.5f;
+    [SerializeField] private float lowFuelScalePulse = 0.06f;
+
+    [Header("Refueling (gravity void) Shimmer")]
+    [SerializeField] private Color refuelTint = new Color(0.85f, 1f, 1f, 1f);
+    [SerializeField] private float refuelShimmerHz = 2f;
+    [SerializeField, Range(0f, 1f)] private float refuelTintMax = 0.55f;
+    [SerializeField] private float refuelScalePulse = 0.04f;
+
+    private bool _refueling;
+
+    /// <summary>Set by the vehicle while it is passively refueling (inside a gravity void).</summary>
+    public void SetRefueling(bool refueling) => _refueling = refueling;
+
+    private bool IsLowFuel => _hasLastRatio && _lastRatio > 0f && _lastRatio < lowFuelThreshold01;
+    private bool HasStatus => IsLowFuel || _refueling;
+
+    // Rest color with status tints applied; the change FX lerp away from this instead of the
+    // authored base color, so a drain shake still reads on top of the low-fuel pulse.
+    private Color StatusRestColor(out float scaleMul)
+    {
+        Color c = _baseFillColor;
+        scaleMul = 1f;
+        if (IsLowFuel)
+        {
+            float urgency = 1f - _lastRatio / lowFuelThreshold01;
+            float hz = Mathf.Lerp(lowFuelPulseHz, lowFuelPulseHzEmpty, urgency);
+            float p = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * hz * Mathf.PI * 2f);
+            c = Color.Lerp(c, lowFuelTint, lowFuelTintMax * p);
+            scaleMul *= 1f + lowFuelScalePulse * p;
+        }
+        if (_refueling)
+        {
+            float p = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * refuelShimmerHz * Mathf.PI * 2f);
+            c = Color.Lerp(c, refuelTint, refuelTintMax * (0.4f + 0.6f * p));
+            scaleMul *= 1f + refuelScalePulse * p;
+        }
+        c.a = _baseFillColor.a;
+        return c;
+    }
+
     private RectTransform _rect;
     private Color _baseFillColor;
     private Vector3 _baseScale;
@@ -103,7 +151,16 @@ public class Fuel : MonoBehaviour
     {
         if (_intensity <= 0f)
         {
-            if (!_atRestVisual) SnapToRest();
+            if (HasStatus)
+            {
+                // No change FX running, but a status (low fuel / refueling) owns the rest look.
+                _atRestVisual = false;
+                ShakeDegreesZ = 0f;
+                Color rest = StatusRestColor(out float restScale);
+                if (_rect != null) _rect.localScale = _baseScale * restScale;
+                if (fuelFill != null) fuelFill.color = rest;
+            }
+            else if (!_atRestVisual) SnapToRest();
             return;
         }
 
@@ -140,10 +197,11 @@ public class Fuel : MonoBehaviour
 
         // Scale multiplies directly by _intensity (not Mathf.Lerp'd), so a heavy drain that
         // pushed intensity above 1 genuinely swells/shakes further than a normal-weight event.
+        Color restColor = StatusRestColor(out float statusScale);
         if (_rect != null)
         {
             float scaleOffset = (_gaining ? swellScale : -squeezeScale) * _intensity;
-            _rect.localScale = _baseScale * (1f + scaleOffset);
+            _rect.localScale = _baseScale * (1f + scaleOffset) * statusScale;
         }
 
         if (fuelFill != null)
@@ -151,8 +209,8 @@ public class Fuel : MonoBehaviour
             float tintLerpAmount = _gaining
                 ? maxTintLerp
                 : maxTintLerp * Mathf.Lerp(minHeavyTintMul, 1f, _activeDrainWeight);
-            Color target = Color.Lerp(_baseFillColor, _gaining ? gainTint : drainTint, tintLerpAmount);
-            fuelFill.color = Color.Lerp(_baseFillColor, target, Mathf.Clamp01(_intensity));
+            Color target = Color.Lerp(restColor, _gaining ? gainTint : drainTint, tintLerpAmount);
+            fuelFill.color = Color.Lerp(restColor, target, Mathf.Clamp01(_intensity));
         }
     }
 

@@ -130,44 +130,60 @@ public partial class Vehicle
         GrantPostCommitRingCollisionImmunity();
     }
 
-    private void OnStepTickForReleaseCue(int stepIndex, int leaderSteps)
+    // ── Approach ring (LEGIBILITY_AUDIT.md C3) ────────────────────────────────────────
+    // While carrying a manual note whose release window hasn't opened yet, a ring in the
+    // track color contracts toward the hull (VehicleReleaseCue). It vanishes when the window
+    // opens — the release tether only shows while the window is open and takes over from there.
+    private const float kApproachPollSeconds = 0.05f;
+    private float _nextApproachPoll;
+    private bool _approachHas;
+    private float _approachSecondsUntilOpen;
+    private float _approachPolledAt;
+    private Color _approachColor = Color.white;
+
+    // Enclosing radius of the ship's own sprite (unrotated local bounds × world scale) — not the
+    // collider or any particle/child effect, which can be much larger than the hull.
+    private float GetShipSpriteRadiusWorld()
     {
-        if (releaseCue == null) return;
-
-        int targetStep = -1;
-        double gapDsp = 0;
-        DrumTrack drum = null;
-
-        if (_armedReleases.Count > 0)
+        if (baseSprite != null && baseSprite.sprite != null)
         {
-            var a = _armedReleases.Peek();
-            targetStep = a.targetAbsStep;
-            gapDsp = a.gapDurationDsp;
-            drum = a.note.track?.drumTrack;
+            Vector3 ext = baseSprite.sprite.bounds.extents;
+            Vector3 ls = baseSprite.transform.lossyScale;
+            float r = Mathf.Max(ext.x * Mathf.Abs(ls.x), ext.y * Mathf.Abs(ls.y));
+            if (r > 0f) return r;
         }
-        else if (_pendingNotes.Count > 0)
+        return GetHullRadiusWorld();
+    }
+
+    private void TickReleaseApproachCue()
+    {
+        if (releaseCue == null)
         {
-            var p = _pendingNotes.Peek();
-            drum = p.track?.drumTrack;
-            if (p.track?.controller != null &&
-                p.track.controller.TryGetRawPlayheadAbsStep(out double rawAbsP, out _, out int totalP) &&
-                TryResolveManualReleaseTargetStep(p, rawAbsP, totalP, out int resolvedTargetStep, out _))
+            releaseCue = GetComponent<VehicleReleaseCue>();
+            if (releaseCue == null) releaseCue = gameObject.AddComponent<VehicleReleaseCue>();
+        }
+        releaseCue.centerAnchor = NoteCoreAnchor;
+
+        bool eligible = !_isDead && ManualNoteReleaseEnabled && _pendingNotes.Count > 0 && _armedReleases.Count == 0;
+        if (!eligible) { _approachHas = false; releaseCue.Hide(); return; }
+
+        if (Time.time >= _nextApproachPoll)
+        {
+            _nextApproachPoll = Time.time + kApproachPollSeconds;
+            _approachHas = TryGetReleaseWindowState(out var w) && w.track != null && !w.isOpen;
+            if (_approachHas)
             {
-                targetStep = resolvedTargetStep;
-                double fwdSteps = (targetStep - rawAbsP + totalP) % totalP;
-                gapDsp = Math.Max(0.001, fwdSteps * ComputeStepDuration(drum, leaderSteps));
+                _approachSecondsUntilOpen = w.secondsUntilOpen;
+                _approachPolledAt = Time.time;
+                _approachColor = w.track.DisplayColor;
             }
         }
 
-        if (targetStep < 0 || drum == null) return;
+        if (!_approachHas) { releaseCue.Hide(); return; }
 
-        double stepDur = ComputeStepDuration(drum, leaderSteps);
-
-        int gapStepsNow = Mathf.Max(1, Mathf.RoundToInt((float)(gapDsp / stepDur)));
-
-        double fwd = (targetStep - stepIndex + (double)leaderSteps) % leaderSteps;
-        int stepsLeft = Mathf.Max(0, Mathf.RoundToInt((float)fwd));
-
-        releaseCue.SetBeatsRemaining(stepsLeft, gapStepsNow);
+        float lookahead = Mathf.Max(0.05f, vehicleConfig.releaseApproachLookaheadSeconds);
+        float secs = _approachSecondsUntilOpen - (Time.time - _approachPolledAt); // extrapolate between polls
+        if (secs > lookahead || secs <= 0f) { releaseCue.Hide(); return; }
+        releaseCue.SetApproach(_approachColor, 1f - secs / lookahead, GetShipSpriteRadiusWorld());
     }
 }

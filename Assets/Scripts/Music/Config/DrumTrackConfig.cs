@@ -24,18 +24,24 @@ public class DrumTrackConfig : ScriptableObject
     public float bassCarveWeight = 1f;
     [Min(0f), Tooltip("Default energy each carved non-Bass cell (incl. filler) adds (role profiles can override).")]
     public float otherCarveWeight = 0.5f;
-    [Range(0f, 1f), Tooltip("Default intensity ceiling while a non-Bass role drives. Lifted toward 1 as the Bass track's bins fill. Bass's ceiling is always 1 unless overridden on its profile.")]
-    public float otherRoleCeiling01 = 0.6f;
     [Min(0f), Tooltip("Continuous poll mode: seconds between intensity re-evaluations. The swap itself still lands on the next leader-loop boundary.")]
     public float intensityPollIntervalSeconds = 0.5f;
     [Range(0.01f, 1f), Tooltip("Exponential smoothing factor applied to the carve-driven intensity per evaluation. Higher = drums follow carving faster. The carve pool's half-life already smooths, so this can stay high.")]
     public float intensitySmoothFactor = 0.6f;
 
     [Header("Bass Drop")]
-    [Tooltip("When the last note of a Bass collectable burst commits, jump straight to the motif's highest-pressure intensity clip on the next loop boundary.")]
+    [Tooltip("When a Bass note is placed, jump straight to the motif's highest-pressure intensity clip on the next bar.")]
     public bool bassDropEnabled = true;
     [Min(1), Tooltip("Loop boundaries the drop clip holds once audible before carve-driven selection resumes.")]
     public int bassDropHoldLoops = 2;
+    [Tooltip("Visual tell: when the drop clip becomes audible, a Bass-colored ring flash sweeps out through the dust from the play-area center.")]
+    public bool bassDropShockwaveEnabled = true;
+    [Min(1f), Tooltip("Shockwave expansion speed in grid cells per second.")]
+    public float bassDropShockwaveCellsPerSecond = 45f;
+    [Min(0.05f), Tooltip("How long each dust cell flashes as the wave passes.")]
+    public float bassDropShockwaveFlashSeconds = 0.35f;
+    [Range(0f, 1f), Tooltip("How far the flash color is pushed from the Bass color toward white.")]
+    public float bassDropShockwaveWhiten01 = 0.3f;
 
     [Header("Axis Smoothing")]
     [Tooltip("Exponential smoothing factor applied to depth01/breadth01 per evaluation (0-1, higher = faster response). Intensity uses intensitySmoothFactor.")]

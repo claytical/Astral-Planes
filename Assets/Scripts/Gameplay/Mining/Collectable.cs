@@ -20,6 +20,11 @@ public partial class Collectable : MonoBehaviour
     [Tooltip("Authoritative burst bin assigned at spawn; used to resolve absolute sequencer step on deposit.")]
     public int intendedBin = -1;
 
+    // Provenance: the star-drained dust cell whose energy this note carries (assigned at spawn by
+    // InstrumentTrack.AssignNextOriginCell). Carried to the committed note → ring → Cosmic Block.
+    [NonSerialized] public Vector2Int originCell;
+    [NonSerialized] public bool hasOriginCell;
+
     [Header("Tuning")]
     [Tooltip("Non-role-varying tuning knobs shared by every spawned Collectable. Per-role movement tuning stays on MusicalRoleProfile.")]
     [SerializeField] private CollectableTuning tuning;

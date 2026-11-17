@@ -60,6 +60,8 @@ public partial class NoteVisualizer
 
     public GameObject PlacePersistentNoteMarker(InstrumentTrack track, int stepIndex, bool lit = true, int burstId = -1)
     {
+        // Between the record's departure and the next motif, nothing is drawn on the timeline.
+        if (_loopMarkersDetached) return null;
         if (GameFlowManager.VerboseLogging) Debug.Log($"[PLACE] Starting for {stepIndex} on {track.name}");
         var key = (track, stepIndex);
 

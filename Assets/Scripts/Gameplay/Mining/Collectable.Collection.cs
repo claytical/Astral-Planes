@@ -27,6 +27,14 @@ public partial class Collectable
 
         if (!vehicle.CanAcceptCollectable(assignedInstrumentTrack)) return;
 
+        // Ship can't carry any more (LEGIBILITY_AUDIT.md C1): refuse the pickup and bounce off.
+        // Previously the oldest carried note was silently dropped and became a time bomb.
+        if (vehicle.ManualNoteReleaseEnabled && vehicle.IsManualReleaseQueueFull)
+        {
+            BounceOffFullVehicle(vehicle);
+            return;
+        }
+
         _collector = vehicle.transform;
 
         if (assignedInstrumentTrack == null)
@@ -127,6 +135,22 @@ public partial class Collectable
         }
 
         HandleAutoDeposit(vehicle, stepToReportBase, velocity127, force, baseSteps, drumTrack);
+    }
+
+    // Push the note away from a full ship; the weak-steer recovery window (same one dust hits
+    // use) lets the bounce visibly play out before its movement intent reasserts.
+    private void BounceOffFullVehicle(Vehicle vehicle)
+    {
+        if (_rb == null) TryGetComponent(out _rb);
+        if (_rb == null || !_rb.simulated || _rb.bodyType != RigidbodyType2D.Dynamic) return;
+
+        Vector2 away = _rb.position - (Vector2)vehicle.transform.position;
+        if (away.sqrMagnitude < 0.0001f) away = UnityEngine.Random.insideUnitCircle;
+        away.Normalize();
+
+        float impulse = tuning != null ? tuning.noteTrail.queueFullBounceImpulse : 2.5f;
+        _rb.AddForce(away * impulse, ForceMode2D.Impulse);
+        _bounceRecoverTimer = _roleProfile != null ? _roleProfile.collectableBounceRecoverSeconds : 0.45f;
     }
 
     private void HandleManualPickup(Vehicle vehicle, int stepToReportBase, float velocity127)

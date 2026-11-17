@@ -50,7 +50,7 @@ Coral and the 2D glyph path have both been fully removed — noted briefly rathe
 
 Top-level facade. Holds the authoritative references to every major system and exposes coordinator-backed properties (`CurrentState`, `BridgePending`, `GhostCycleInProgress` all forward to `SessionState`).
 
-**Owns:** Vehicle list, active `DrumTrack`, `InstrumentTrackController`, `CosmicDustGenerator`, `NoteVisualizer`, ring-glyph applicator reference, phase-in FX, vehicle-trap spawning, note-tether cleanup, `AnyCollectablesInFlightGlobal()` (shared collectable-in-flight query used by `StarPool`/`PhaseStar`).
+**Owns:** Vehicle list, active `DrumTrack`, `InstrumentTrackController`, `CosmicDustGenerator`, `NoteVisualizer`, ring-glyph applicator reference, phase-in FX, note-tether cleanup, `AnyCollectablesInFlightGlobal()` (shared collectable-in-flight query used by `StarPool`/`PhaseStar`).
 
 **Delegates to:** `SessionState`, `BridgeFlow`, `SceneFlow` (below) for everything state/sequencing-related.
 
@@ -155,8 +155,8 @@ Per-role MIDI loop state. The **bin** is the expansion unit — each bin adds on
 | `RoleMotifNoteSetConfig` | Per-role generation rules: weighted scales, melodic patterns, rhythms, chord function palette, optional riff override |
 | `ChordProgressionProfile` | Ordered chord sequence; `NoteSetFactory` shifts note pitches to each chord's root |
 | `MusicalRoleProfile` | Role constants: dust colors (base + shadow), energy units (dust-cell plow HP, not a star currency), carve/drain resistance, mine node speed + agility, ripeness duration, per-role regrowth delay override (`regrowthDelay`, vehicle carves only) |
-| `MazePatternConfig` | Maze wall pattern + `dustTiming`: base regrow delay plus per-source overrides (vehicle plow, collectable arrival/plow, jail, SuperNode, zap, star-drain release) keyed by `DustClearSource` |
-| `ShipMusicalProfile` | Ship physics, fuel, plow footprint, and `regrowDelayMultipliers` — per-role scaling of regrow delay for cells this ship carves (growth agent) |
+| `MazePatternConfig` | Maze wall pattern + `dustTiming.regrowDelay`: regrow delay for role-less (filler/None) cells only. The per-source overrides were removed 2026-11-17 (`LEGIBILITY_AUDIT.md` A5) |
+| `ShipMusicalProfile` | Ship physics, fuel, plow footprint. `regrowDelayMultipliers` was removed 2026-11-17; it was 1.0 on every ship |
 
 `MotifProfile` → references `RoleMotifNoteSetConfig[]`, `ChordProgressionProfile`, and `MazePatternConfig` (`mazePattern`).
 `MusicalRoleProfile` → consumed by `CosmicDustGenerator` (imprint color), `DiscoveryTrackNode`/`SuperNodeTrackNode` (speed/agility), `PhaseStar` (dust affinity), `InstrumentTrackController` (SFX routing).
@@ -196,6 +196,12 @@ The per-role drain/eject actor spawned and gated by `StarPool`. Siphons dust fro
 Readiness is **zap-count-only** — there is no charge/threshold gate. `_displayedCharge01` (`PhaseStar.cs:149`) is a pure visual lerp of `ZapProgress01` (drives the diamond-fill animation); it does not gate ejection. `IsEjectionReady()` = descriptor valid + `ReadyLatched` (zap quota met), period. On entering Dormant (`EnterInMaze`), the navigator activates immediately but tentacles wait `tentacleActivationDelay` seconds (`PhaseStar.DormantState.cs`) before `dust.SetTentaclesActive(true)` fires, so the star visibly appears before it starts reaching for dust.
 
 **Tentacle drain (`PhaseStarDustAffect`):** one tentacle grows per available role-carved cell, capped by the node payload — the zap budget is `RemainingZapCount` minus in-flight tentacles, so a 5-note payload with 3 carved cells grows 3 tentacles at once and adds more as cells are carved. Each drained cell goes through `CosmicDustGenerator.ZapClearCellHeld()` (no regrow while held) and is registered on the star; the zap is credited immediately on drain (`CreditZap()`), not deferred to full tentacle retraction. When the payload's zap count is met, acquisition disables and the star latches `ReadyLatched`. Targeting itself is gated on `CosmicDust.IsVisuallyPresentForTargeting()`, which since the flower-bloom redesign also requires `HasBloomedFlower` — a freshly-generated or non-vehicle-regrown cell is invisible to tentacles even if solid and role-carved, until a vehicle has plow-carved it at least once.
+
+**Poke feedback and sleep** (`PhaseStar.PokeFeedback.cs`, 2026-11-17, `LEGIBILITY_AUDIT.md` B1/B2).
+- **Rejected poke:** every rejected poke plays `PhaseStarVisuals2D.PlayNotReadyShake()`, a diamond head-shake. This includes incidental bumps, rate-limited to once per 0.25s.
+- **Internal guards stay silent:** same frame, ejection already in flight, bad state, sibling.
+- **Removed:** a "Wait" pointer line to the blocking node or note was removed after playtest. It read as the star zapping a differently colored note: the pickup lock is global, so the nearest blocker was often another role's note.
+- **Sleep:** while an armed star `IsBlockedByWorkElsewhere()` (pickup lock, a pending expansion, or `CanCommitEjection(role, true)` false), or is paused (`SiblingActive`), `UpdateSleepVisual` sets `visuals.Sleeping`: desaturated diamonds, rotation ×0.25, no ready-spin.
 
 **Emits / calls out:**
 - Spawns `DiscoveryTrackNode` via `SpawnNodeCommon()` or `SuperNode` via `SpawnSuperNodeCommon()` — gated by `ShouldSpawnSuperNodeForTrack()` (target track fully expanded + `MotifProfile.alternateChordProgressionProfile` set)
@@ -250,7 +256,7 @@ corridor lookahead (wall avoidance, gates into TrackNode.RunDirectionScan on res
 
 **Emits / calls out:**
 - `OnResolved` event → `PhaseStar` clears `_activeNode`; `StarPool` reads `WasCaptured`/expiry off the resolved star
-- `ReleaseHeldDustOnce()` on resolve **and** destroy → `CosmicDustGenerator.ReleaseHeldCells()` — the star-drained cells finally regrow (gray, `starDrainReleaseDelay`)
+- `ReleaseHeldDustOnce()` on resolve **and** destroy → `CosmicDustGenerator.ReleaseHeldCells()` — the star-drained cells finally regrow (at the role's `regrowthDelay`)
 - `InstrumentTrack.SpawnCollectableBurst(noteSet)` on depletion
 - Self-destructs after N loop boundaries without capture (NoteSet motif override, else role/archetype baseline off `DiscoveryTrackNodeLocomotionProfile`, else `DiscoveryTrackNodeConfig.defaultExpireAfterLoops`), refunding the ejection slot via `StarPool`
 - `Explode` component → visual burst
@@ -258,7 +264,13 @@ corridor lookahead (wall avoidance, gates into TrackNode.RunDirectionScan on res
 **Listens to:**
 - `DrumTrack.OnLoopBoundary` — increments the loop counter that drives expiry
 
-**Collision:** `Vehicle` collision reduces strength; on zero → `HandleDepleted()`.
+**Collision:** `Vehicle` collision reduces strength; on zero → `HandleDepleted()`. Each hit also resets the expiry counter (`_loopsSinceSpawn = 0`).
+
+**Expiry pips** (`TrackNodeLifetimePips.cs`, 2026-11-17, `LEGIBILITY_AUDIT.md` B3): concentric translucent discs behind the node show `TrackNode.LoopsRemaining`. There is one disc per loop left, with opacity graded from the inner disc to the outer one.
+- The outer disc fades out per loop boundary.
+- Discs re-emanate on a hit.
+- The halo is scale-compensated so it stays a constant world size.
+- It's purely a reader: it polls each frame and owns no gameplay state.
 
 ---
 
@@ -266,6 +278,8 @@ corridor lookahead (wall avoidance, gates into TrackNode.RunDirectionScan on res
 `Assets/Scripts/Gameplay/Mining/SuperNode.cs`, `SuperNodeTrackNode.cs` (inherits `TrackNode`), `SuperNodeSteeringMath.cs`
 
 DiscoveryTrackNode's alternate ejection outcome — a multi-track "bonus round" instead of a single mineable shard. `PhaseStar` picks one of the two mutually exclusive paths per poke (`ShouldSpawnSuperNodeForTrack`, `PhaseStar.EjectionLogic.cs:353-386`): a SuperNode requires `MotifProfile.alternateChordProgressionProfile` to be set **and** the target track already at `maxLoopMultiplier`. Prefab naming is not obvious from the class names: the SuperNode prefab is `Assets/Prefabs/Interactable Objects/Major Discovery.prefab` (wired via `Star.prefab.superNodePrefab`), and the `SuperNodeTrackNode` prefab is `Assets/Prefabs/Interactable Objects/Ideas.prefab`.
+
+**Tell** (`PhaseStar.SuperNodeTell.cs`, 2026-11-17, `LEGIBILITY_AUDIT.md` B4): while the condition above holds for a star's track, a role-striped ring turns around that star, using the colors of all the motif's active roles.
 
 **Spawn** (`SpawnSuperNodeCommon`, `PhaseStar.EjectionLogic.cs:256-351`): instantiates the SuperNode prefab, computes `difficulty01` from harvests-so-far, builds a `shardTracks` list of every other active-role track still below `maxLoopMultiplier` (the target track is filled directly, not chased).
 
@@ -305,7 +319,8 @@ Vehicle trigger pickup → OnCollectablePickedUpForManualRelease()
 **Path 3 — Discard → Time Bomb** (`Collectable.Bomb.cs`):
 ```
 Vehicle discards a carried note (missed release window, sacrificed outside window,
-manual-release queue overflow, or Vehicle death) → OnManualReleaseDiscarded(step)
+or Vehicle death — queue overflow no longer discards: since 2026-11-17 a full ship refuses
+the pickup and the note bounces off, Collectable.BounceOffFullVehicle) → OnManualReleaseDiscarded(step)
   → ArmAsTimeBomb(step)
       Rigidbody2D → Kinematic (pinned exactly in place — immune to the physics
         engine's own collision depenetration as its collider grows, which a
@@ -377,6 +392,16 @@ Collectable trigger → EnqueuePendingCollectedNote()
   → NoteVisualizer ghost cue cleared
 ```
 
+**Release approach ring** (2026-11-17, `LEGIBILITY_AUDIT.md` C3): in Manual mode, `Vehicle.TickReleaseApproachCue` → `VehicleReleaseCue.SetApproach` draws a track-colored ring that contracts toward the hull over the last `releaseApproachLookaheadSeconds` before the release window opens.
+- The release `NoteTether` only shows while the window is open, so the ring means "get ready" and the tether means "now".
+- The component is added at runtime if a ship prefab lacks it.
+
+**Fuel status tells** (2026-11-17, `LEGIBILITY_AUDIT.md` D2): `Vehicle.StatusGlow.cs` draws a runtime glow sprite behind the hull.
+- Warm pulse below `VehicleConfig.lowFuelThreshold01`.
+- Cool shimmer while gravity-void refueling. `UpdateVoidEnergyRecovery` → `SetVoidRefueling` → `PlayerStats.SetFuelRefueling`.
+
+`Fuel.cs` mirrors both on the bar. `StatusRestColor` replaces the plain base color as the rest look that the change FX lerp from.
+
 **External energy drain:** `DrainEnergy(amount, source)` (`Vehicle.Energy.cs`) is the shared
 entry point any system uses to damage a vehicle from outside its own boost loop — dust
 boost-collision resistance (`CosmicDust.Collision.cs`) and a detonating bomb Collectable
@@ -390,7 +415,7 @@ the fuel UI ticking down.
 
 **Calls out:**
 - `NoteVisualizer.TryGetNextUnlitStepExcluding()` — finds target for ghost cue
-- `dustGenerator.SetVehicleKeepClear()` / `ChipDustByVehicle(…, profile)` — dust pocket + plow; the ship's `regrowDelayMultipliers` scale the carved cell's regrow delay per role (growth agent — a Bass-accelerator ship regrows Bass dust sooner). A vehicle carve is also the only path that blooms the cell's flower on regrow, making it PhaseStar-targetable (see CosmicDustGenerator / PhaseStar).
+- `dustGenerator.SetVehicleKeepClear()` / `ChipDustByVehicle(…, profile)` — dust pocket + plow. A vehicle carve is also the only path that blooms the cell's flower on regrow, making it PhaseStar-targetable (see CosmicDustGenerator / PhaseStar).
 
 ---
 
@@ -404,13 +429,13 @@ Authoritative 2D grid. All spatial state lives here — cell solid/empty status,
 **Key operations:**
 | Method | Who calls it |
 |--------|-------------|
-| `ClearCell()` / `CarveCell()` | internal funnel — every removal carries a `DustClearSource` for per-source regrow delay |
+| `ClearCell()` / `CarveCell()` | internal funnel — every removal carries a `DustClearSource`. It gates the flower bloom and ForceGray color, not timing |
 | `CarveCellPreserveGray()` | `Collectable` arrival flight + intent plow, `SuperNodeTrackNode` — always regrows gray/uncharged |
 | `ZapClearCellHeld()` / `ReleaseHeldCells()` | `PhaseStarDustAffect` tentacle drain / `DiscoveryTrackNode` death (and star teardown) |
 | `SetVehicleKeepClear()` / `ReleaseVehicleKeepClear()` | `Vehicle` |
 | `ChipDustByVehicle()` / `CarveDustByVehicle()` | `Vehicle` boost plow (passes `ShipMusicalProfile`) |
 | `PaintDustExhaust()` | `DiscoveryTrackNodeDustInteractor` — role tint only, never clears |
-| `GrowVoidDustDiskFromGrid()` | `InstrumentTrackController` (expansion pending), `GameFlowManager.SpawnVehicleTraps` |
+| `GrowVoidDustDiskFromGrid()` | `GravityVoidController` (expansion pending). Vehicle traps don't use this: they're injected into the maze-build stagger via `InjectTrapCellsIntoStagger`/`InjectTrapCellsFromList` from `SceneFlowCoordinator`'s trap callback |
 | `CreateJailCenterForCollectable()` | `Collectable` spawn pocket |
 | `TriggerDiscardBlast()` | `Collectable.Bomb.cs Detonate()` — discard-detonation dust clear, source `CollectableDiscard` |
 | `HardStopRegrowthForBridge()` | `BridgeCoordinator` bridge start (also flushes held cells) |
@@ -418,13 +443,29 @@ Authoritative 2D grid. All spatial state lives here — cell solid/empty status,
 | `ResumeRegrowthAfterBridge()` | `SceneFlowCoordinator` next motif start |
 | `ApplyActiveRoles()` | `SceneFlowCoordinator` motif swap |
 
-**Regrow delay resolution** (`ResolveRegrowDelay`, precedence high → low): explicit per-call override → carved cell's `MusicalRoleProfile.regrowthDelay` (vehicle carves only) → maze `dustTiming` per-source delay → maze base `regrowDelay` → 8s fallback. Vehicle carves then scale the result by the carving ship's per-role `regrowDelayMultipliers`. Cells flagged `ForceGrayRegrow`/`ZapForceGray` always regrow gray and uncharged — role tint (and drainable charge) is only earned by vehicle plow-carves or DiscoveryTrackNode exhaust painting.
+**Regrow delay resolution** (`ResolveRegrowDelay`, simplified 2026-11-17, `LEGIBILITY_AUDIT.md` A5). Each role regrows at its own speed, in this precedence:
+1. Explicit per-call override.
+2. The cell's prospective role's `MusicalRoleProfile.regrowthDelay`, whatever cleared it.
+3. For role-less cells: the maze's `dustTiming.regrowDelay`, else an 8s fallback.
+
+The result is then multiplied by density easing. Cells flagged `ForceGrayRegrow`/`ZapForceGray` always regrow gray and uncharged — role tint (and drainable charge) is only earned by vehicle plow-carves or DiscoveryTrackNode exhaust painting.
 
 Role imprinting: a vehicle plow-carve promotes the cell's hidden Voronoi role into the active imprint, so it regrows in its true role color with charge. Same-role cells attract nearby `DiscoveryTrackNode`/`SuperNodeTrackNode` and `Collectable` movement.
 
 **Spawn-time color reveal is not hidden by default.** Every occupied cell's `hiddenRole` is a Voronoi ground-truth assigned at maze build time, but `imp.role`/`dust.Role` stay `MusicalRole.None` until a vehicle actually carves it — that's what gates targeting, carve resistance, and star-arming (untouched by any of this). The cell's *displayed color*, though, is a separate, purely cosmetic pass: `ApplyHiddenColorPreview` (`CosmicDustGenerator.MazeGeneration.cs`, run at the end of every `BuildMazeRoleImprints` path — single-voice, multi-voice Voronoi, and Exact-Count below) colors each cell with `Color.Lerp(hiddenRole's true MusicalRoleProfile color, Color.black, hiddenRoleColorDarken01)` instead of flat `mazeTint` gray, so the maze reads as "roughly what it is" from the moment it spawns, well before any carving. `CosmicDustGeneratorConfig.hideDustColorAtSpawn` (default `false`) is the one switch that turns this off entirely, falling back to flat `mazeTint` for every cell. Carving still promotes the real `Role` and reveals the full, un-darkened color exactly as before — this preview only narrows the gap between "secret" and "revealed," it doesn't erase it.
 
-**"No musical role" dust is not the same thing as this gray/darkened preview.** A `hiddenRole`-bearing cell is *always* owned by some role underneath, whether it's currently showing a darkened preview, mid-regrow gray (`ForceGrayRegrow`/`ZapForceGray`, see Regrow delay resolution above), or fully revealed. True `MusicalRole.None` dust — no hidden role at all, permanently — only exists via Exact-Count Maze Mode's leftover generic fill, in two visually- and behaviorally-distinct sub-types (never-regrow vs. quick-regrow); see below.
+**Dust brightness = star readiness** (`CosmicDust.Legibility.cs`, 2026-11-17, see `LEGIBILITY_AUDIT.md` A1/A2). `CosmicDust.SetBaseTint` gates every rest tint:
+- **Bright:** a role cell with a bloomed flower. These are the only cells stars can drain.
+- **Darkened** by `hiddenRoleColorDarken01`, the same amount as the spawn preview. This covers:
+  - role cells that are not bloomed (zap/collectable/void regrows, node exhaust paint);
+  - `None` cells that still hide a role. This is via the revived `_hiddenHintColor`, which `ApplyHiddenHintToDust` sets. So ForceGray and ZapForceGray regrows now show a dark role tint, not flat gray.
+- **Raw:** `None` cells with no hidden role (filler, interstitial walls) keep their raw tint.
+
+`BloomFlower`/`HideFlower`/`SetHiddenHintColor` re-apply the rest tint. Use `RestTintRaw`, not `CurrentTint`, whenever you blend a color and write it back.
+
+Note: blooming also happens after `CollectableBombBlast`, not just `VehiclePlow` (`CosmicDustGenerator.cs` `CommitRegrowCell`).
+
+**"No musical role" dust is not the same thing as this gray/darkened preview.** A `hiddenRole`-bearing cell is *always* owned by some role underneath, whether it's currently showing a darkened preview, mid-regrow gray (`ForceGrayRegrow`/`ZapForceGray`, see Regrow delay resolution above), or fully revealed. True `MusicalRole.None` dust — no hidden role at all, permanently — only exists as generic filler (exact-count leftovers or `genericFillRatio01` reservation). Filler is a single permanent type: dark `genericFillTint`, never regrows once cleared. See below.
 
 Flower bloom (`CosmicDust.Flower.cs`): each cell carries a hidden `Flower` child sprite pair, normally inactive. `CommitRegrowCell` persists the `DustClearSource` that triggered a pending regrow (`_pendingRegrowSource`, written in `ClearCell`) and, only when that source was `VehiclePlow`, calls `dust.BloomFlower(regrowTint)` — the flower fades in role-tinted alongside the regrowing dust. Every `ClearCell` call unconditionally calls `dust.HideFlower()` first, so any clear (vehicle re-carve, tentacle drain, any other source) resets the tell; only a vehicle carve can re-bloom it. `HasBloomedFlower` gates `CosmicDust.IsVisuallyPresentForTargeting()` (see PhaseStar below) — dust regrown by any non-vehicle source still regrows and is still solid/collidable, it's just untargetable by tentacles until a vehicle carves it at least once.
 
@@ -435,9 +476,15 @@ Flower bloom (`CosmicDust.Flower.cs`): each cell carries a hidden `Flower` child
 
 An alternate to the default Voronoi-partition maze build. A per-role `MazeRoleGeoConfig.useExactNoteCount` flag switches that role's territory from the relative density-weight formula to an absolute cell count: `cellCount = round(avgNoteCount * notesToCellsMultiplier)`, claimed by nearest-cell assignment out from greedily-spread seed points (`PickFarthestSeeds`) rather than a full-maze Voronoi split. If *any* active role in the motif uses exact-count sizing, **every** role does — a non-flagged role gets no territory at all in that motif; its would-be cells fall into the leftover pool instead.
 
-Leftover (unclaimed) cells become generic `MusicalRole.None` filler dust, split by `MotifProfile.genericFillNeverRegrowRatio` into two visually-distinct sub-types (`DustImprintStore.SetHiddenRoleGenericFill`, tagged `hiddenRoleIsGenericFill`/`genericFillNeverRegrows`):
-- **Permanent filler** (darker `CosmicDustGeneratorConfig.genericFillTint`) — once cleared, never re-enters the regrow cadence for the rest of the motif (`CosmicDustGenerator.CellLifecycle.cs` checks the flag in `RequestRegrowCellAt` and adds the cell to `_permanentClearCells` instead of scheduling regrow).
-- **Quick-regrow filler** (ordinary `mazeTint`) — regrows normally, but bypasses the shared step-gate queue entirely (`CosmicDustRegrowthController`'s `shouldBypassStepGate` hook) so hundreds of inert filler cells can't starve real role-dust out of the queue.
+Leftover (unclaimed) cells become generic `MusicalRole.None` filler dust (`DustImprintStore.SetHiddenRoleGenericFill`, tagged `hiddenRoleIsGenericFill`).
+
+There is **one filler type** as of 2026-11-17 (`LEGIBILITY_AUDIT.md` A3). It uses the darker `CosmicDustGeneratorConfig.genericFillTint`. Once cleared it never re-enters the regrow cadence for the rest of the motif: `RequestRegrowCellAt` adds the cell to `_permanentClearCells` instead of scheduling regrow.
+
+Removed along with the quick-regrow sub-type:
+- `MotifProfile.genericFillNeverRegrowRatio`
+- `MotifProfile.genericFillRegrowSoftenMultiplier01`
+- the `DustImprint.genericFillNeverRegrows` flag
+- the regrowth controller's `shouldBypassStepGate` hook
 
 `DustRoleDensityTracker` tracks generic-fill solid count separately (`GenericFillSolidCount`) so `GetRoleRelevantSolidFraction()` — which paces regrow-delay density easing — can exclude inert filler from the density figure a role's authored `regrowthDelay` is judged against; the literal filler-inclusive `GetSolidFraction()` is left untouched for the systems that intentionally key off it (`GravityVoidController`, `DrumTrack`'s density-driven beat intensity, Flow D). `ResolveRegrowVoice` also special-cases `hiddenRoleIsGenericFill` so a generic cell always regrows `None` rather than drifting into a neighboring role's color via the normal plurality/least-dense fallback.
 
@@ -477,7 +524,7 @@ Each ring is a filled annulus tinted by musical role, plus a contour line that d
 
 **Motif-start record reveal:** `SceneFlowCoordinator` calls `BinRingController.ShowInitialRecord()` / `FadeInitialRecordOut()` / `GetRecordHoldDuration()` (thin forwarders onto the applicator) at the start of every motif — immediately, in darkness, before the maze exists for the very first motif of a session; after the new maze has already fully generated for every other transition. `ShowInitialRecord()` populates the full placeholder-ring stack via `SetRemainingProgressRings(nodesPerStar)`. The record holds at full opacity for `RingGlyphConfig.recordHoldDuration`, then `FadeRecordOut()` fades everything (placed + remaining rings, both background discs) out over `recordFadeOutDuration` — or, for the very first motif, over an explicit duration passed in so the fade finishes exactly as the maze fully grows in. Two solid backdrop discs (`_placedBgDisc` sized to completed rings, `_fullBgDisc` sized to the whole record, both built by `CreateBackgroundDisc`/`BuildDiscMesh`) give the record a genuine opaque backing instead of a wireframe. The innermost not-yet-filled placeholder ring previews the motif's active role palette — static if the motif has one role, cycling through them (`AnimateNextUpRingColorCycle`, `nextUpColorCycleDuration`) if it has several — so the "next up" ring always hints at what's coming.
 
-**Note preview tethers + ring-collision breaking:** while a bin's rings are deforming in (`DeformBinRingCoroutine`), each note about to land gets a `NoteTether` cable that grows in (`GrowIn`) from its timeline marker to its future ring landing spot, tracked in `_pendingRingNotes`. The tether retracts and self-destroys (`RetractAndDestroy`) the instant its travel dot actually departs (`onDepart`). While a tether is still live, a `Vehicle` colliding with the ring's `CircleCollider2D` can break it — but only deliberately (boosting, or `coll.relativeVelocity` ≥ `VehicleConfig.ringBreakMinImpactSpeed`; softer bumps just play the denial shake). Because the stack snaps to near-full play-area height when a bin completes, any ship it lands on (or straddles) is put into a ring *phase* (`PhaseVehiclesInsideRing` → `Vehicle.BeginRingPhase`, `Vehicle.RingPhase.cs`): ship↔ring collision is ignored and the ship drawn at `ringPhaseGhostAlpha` until it drives fully outside — no teleport. On a qualifying hit, `Vehicle.OnCollisionEnter2D` (`Vehicle.Damage.cs`) calls `MotifRingGlyphApplicator.TryBreakNextPendingTether(contactPoint)`, which finds the pending note whose ring-side anchor is closest to the contact point, cancels its travel-dot launch, retracts its tether, and calls `InstrumentTrack.RemovePersistentNoteAtStep()` + `NoteVisualizer.RemoveCommittedMarkerAtStep()` (which cancels the note out of `NoteAscensionDirector` first, via `CancelAscension()`, so ascension doesn't hold a dangling reference) — the note is undone as if it had never landed. A successful break plays a low-frequency "released spring" shake (`PlayBreakShake`) and spawns a tint-matched particle burst at both the marker and the ring anchor (`PlayBreakShake` is private to the applicator); colliding with the ring when nothing is pending instead plays a short, stiff denial shake (`PlayDenialShake`) — both driven by Perlin-noise-decayed `transform.localPosition` jitter (`ShakeRoutine`), config'd via `RingGlyphConfig`'s Ring Collision Feedback knobs. A bin emptied this way re-fires `OnBinFilled`/`SpawnBinRing` when it refills; `SpawnBinRing(role, binIndex, color, totalSteps)` replaces the stale ring entry in place (matched by `binIndex`+`role`) instead of appending a duplicate. `DetachPendingRingTethers()` retracts all still-pending tethers without undoing their notes (called as the end-of-motif spin begins), and `SetSuperNodeMode(true)` (called by `PhaseStar.EjectionLogic.cs` and `SuperNodeTrackNode.cs`) suppresses the per-bin auto-hide of the ring stack while a SuperNode fills bins. `WaitAndLaunchDot` and `HideGameplayRingStackAfterLoopBoundary` subscribe to `DrumTrack` events inside `try/finally` so a stopped coroutine can't leak its handler.
+**Note preview tethers + ring-collision breaking:** while a bin's rings are deforming in (`DeformBinRingCoroutine`), each note about to land gets a `NoteTether` cable that grows in (`GrowIn`) from its timeline marker to its future ring landing spot, tracked in `_pendingRingNotes`. The tether retracts and self-destroys (`RetractAndDestroy`) the instant its travel dot actually departs (`onDepart`). While a tether is still live, a `Vehicle` colliding with the ring's `CircleCollider2D` can break it — but only deliberately (boosting, or `coll.relativeVelocity` ≥ `VehicleConfig.ringBreakMinImpactSpeed`; softer bumps just play the denial shake). Because the stack snaps to near-full play-area height when a bin completes, any ship it lands on (or straddles) is put into a ring *phase* (`PhaseVehiclesInsideRing` → `Vehicle.BeginRingPhase`, `Vehicle.RingPhase.cs`): ship↔ring collision is ignored and the ship drawn at `ringPhaseGhostAlpha` until it drives fully outside — no teleport. On a qualifying hit, `Vehicle.OnCollisionEnter2D` (`Vehicle.Damage.cs`) calls `MotifRingGlyphApplicator.TryBreakNextPendingTether(contactPoint)`, which finds the pending note whose ring-side anchor is closest to the contact point, cancels its travel-dot launch, retracts its tether, and calls `InstrumentTrack.RemovePersistentNoteAtStep()` + `NoteVisualizer.RemoveCommittedMarkerAtStep()` (which cancels the note out of `NoteAscensionDirector` first, via `CancelAscension()`, so ascension doesn't hold a dangling reference) — the note is undone as if it had never landed. A successful break plays a low-frequency "released spring" shake (`PlayBreakShake`) and spawns a tint-matched particle burst at both the marker and the ring anchor (`PlayBreakShake` is private to the applicator); colliding with the ring when nothing is pending instead plays a short, stiff denial shake (`PlayDenialShake`). A too-soft hit while a note *is* pending instead plucks that note's tether (`TryPluckNearestPendingTether` → `NoteTether.Pluck`, 2026-11-17, `LEGIBILITY_AUDIT.md` C5), so the two cases read differently — both driven by Perlin-noise-decayed `transform.localPosition` jitter (`ShakeRoutine`), config'd via `RingGlyphConfig`'s Ring Collision Feedback knobs. A bin emptied this way re-fires `OnBinFilled`/`SpawnBinRing` when it refills; `SpawnBinRing(role, binIndex, color, totalSteps)` replaces the stale ring entry in place (matched by `binIndex`+`role`) instead of appending a duplicate. `DetachPendingRingTethers()` retracts all still-pending tethers without undoing their notes (called as the end-of-motif spin begins), and `SetSuperNodeMode(true)` (called by `PhaseStar.EjectionLogic.cs` and `SuperNodeTrackNode.cs`) suppresses the per-bin auto-hide of the ring stack while a SuperNode fills bins. `WaitAndLaunchDot` and `HideGameplayRingStackAfterLoopBoundary` subscribe to `DrumTrack` events inside `try/finally` so a stopped coroutine can't leak its handler.
 
 There are **two distinct consumers**, and they use different methods — this is the biggest place the old documentation was wrong:
 - **Live bridge:** `BridgeCoordinator.PlayMotifBridgeAndRestart()` calls `MotifRingGlyphApplicator.SpinAndRollOffActiveRings(spinDur, rollOffDuration)` on the accumulated gameplay rings (spin 360°, tilt, scale to zero). The ring stack is torn down by that method itself.
@@ -519,6 +566,44 @@ The selected glyph's size follows from its ring count times these units, multipl
 - `effectsMixerGroup` is unset in every scene/prefab, so launch/impact one-shots (`PlayOneShotRouted`) bypass the Effects mixer group.
 - `ShakeRoutine` resets `localPosition` to zero while `RefreshPlayAreaFit` writes the world position — only correct if the applicator's parent sits at the origin.
 - Legacy serialized keys remain in `Final Rings.asset` and `In Game Ring Glyph.asset`; Unity drops them on next save (the `FormerlySerializedAs("noteTetherGrowDuration")` is still needed until then).
+
+---
+
+## Path-Choice Locked Exits
+
+`PathChoiceCoordinator` (2026-11-17, `LEGIBILITY_AUDIT.md` E2): phase-change exits withheld by `AllMotifsRecordedInPhase` get a `PathExitLockedStub` dust gate. The dust across that edge's centre band shimmers via `CosmicDustGenerator.TryFlashSolidCell`, with intensity = recorded/total motifs in the phase. Stubs are destroyed in `OnVehicleReachedExit` and at the end of `RunPathChoiceAndAdvance`.
+
+---
+
+## Cosmic Blocks (role-wide, 2026-11-17)
+
+`Dust/CosmicBlockField.cs` (controller) + `Dust/CosmicDustGenerator.Blocks.cs` (dust side) + `Dust/CosmicDust.BlockForm.cs` (look) + `Dust/DustReachability.cs` (search).
+
+**When a ring completes** (`InstrumentTrack.OnBinFilled` → `BinRingController` → `CosmicBlockField.OnRingCompleted`):
+- The previous role's blocks revert.
+- Every Solid dust cell of the completed role becomes a block **in place**, revealed or still hidden (`GetProspectiveRegrowRole`).
+- Generic filler and interstitial walls are excluded, and so are cells a ship is overlapping.
+- Swaps coalesce to once per frame (SuperNode multi-bin fills).
+- No new wall is placed when no other active role still has unfilled bins. The old blocks still revert.
+- Record spin-off, `HardStopRegrowthForBridge` and `ClearMaze` all call `ReleaseRoleBlock`.
+
+**A block is:**
+- `CellFlags.RoleBlocked`, gated at every clear choke point: `ClearCell`, `ZapClearCellHeld`, `CarveCellPreserveGray`, `DespawnDustAt`, the discard blast, `PermanentlyClearOneCellForRole`, `ClearAndHoldRoleCells`, and vehicle carve/chip via `IsUnbreakable` / `CanVehicleChip`;
+- plus `CosmicDust.SetBlockForm`, which swells the particle start size ×`roleBlockParticleSizeMul` (4) and makes `IsVisuallyPresentForTargeting` return false, so a block is never star food.
+
+The cell stays Solid, so `HasDustAt` and every grid pathfinder already treat it as a wall. `IsBlockAt` is now flag-based.
+
+**No-trap guarantee** (`DustReachability`, a clearance-aware 0-1 BFS):
+- **Clearance:** `rc = max(1, ceil(widestShipRadius / cellWorld))`. A ship node needs no hard wall within `rc`.
+- **Doorways:** before walling, routes run from the first ship to the other ships, every on-screen PhaseStar (`PhaseStar.Live`, skipping `IsParkedOffScreen`), live notes (`Collectable.TryGetReachCell`, which uses the landing cell while in flight) and queued destinations (`InstrumentTrack.GetPendingSpawnCells`). Candidate cells within `rc` of the cheapest route stay ordinary dust.
+- **Regrow:** while a role is blocked, its cells that regrow to Solid join the wall only if `CanBlockWithoutTrapping` passes. This hooks the registry solid-transition callback.
+- **Note spawns** (`TryResolveSpawnDestinationCell`) reject block cells and cells not `IsCellReachableForShips` (cached per frame). As a last resort, `OpenDoorwayTo` reverts blocks along the cheapest route.
+
+**Watchdog:** `CosmicBlockField` calls `EnsureTargetsReachable` every 0.5s while blocks stand. Anything that has drifted out of reach gets a doorway: stars and notes are narrower than ships, so they can slip into pockets ships can't follow. It also gives a doorway to any active, non-blocked role with unfilled bins whose dust is entirely unreachable, since its star could never charge (`CollectSealedRoleTerritories`). Together with the deadlock skip, this means walls can't dead-end a motif.
+
+**"About to move" tell:** while any track has a live burst, random blocked cells flash toward white (`TryFlashSolidCell`), denser and faster with the burst's progress.
+
+The 11-16 note-driven system (one `CosmicBlock` prefab per recorded note, provenance, echo sparks, heartbeat) is gone. `CosmicBlock.cs` and `Cosmic Block.prefab` were deleted. The scene's stale `blockPrefab` value is dropped on next save.
 
 ---
 
@@ -608,32 +693,32 @@ StarPool.CheckBridgeGate() passes (budget spent, no live stars) + no collectable
   → new StarPool spins up, PhaseStars re-arm for the new phase
 ```
 
-### Flow D — Track Fullness / Dust Density → Drum Intensity
-Energy-burn-driven intensity is gone — `MotifProfile.driveBeatsFromDensity` (`[FormerlySerializedAs("driveBeatsFromEnergy")]`) marks that the old burn-rate tracking plumbing was removed outright, not just renamed.
+### Flow D — Carving → Drum Intensity (+ Bass Drop)
+Rewritten 2026-11-17 (`LEGIBILITY_AUDIT.md` D1). The fullness/density formula and the role-driven ceiling (v2) are both gone.
 ```
-DrumTrack.Update() → TickLoopBoundaries() (once per leader-loop boundary)
-  → HandleBeatSequencingAtLoopBoundary()
-      gates: driveBeatsFromDensity=true, entry-loop window elapsed, _carryLatched
-             (a vehicle has carried at least one collectable), intensityDrumLoops non-empty
-      → ComputeTrackFullness01() — avg loopMultiplier/maxLoopMultiplier across all InstrumentTracks (tier driver)
-      → ComputeDensityIntensity(CosmicDustGenerator.GetSolidFraction()) — smoothed/hysteresis dust density (nudge)
-      → intensity01 = fullness01 + (density01 − 0.5) × densityNudgeRange
-      → ResolveIntensityClip(intensity01) — linear index into MotifProfile.intensityDrumLoops
-      → ScheduleDrumLoopChange() → ArmPendingDrumLoopForNextLeaderBoundary() → TickDeckSwap()
-          (dual A/B AudioSource decks, bar-aligned swap)
+DrumTrack loop boundary / Continuous poll → EvaluateAndScheduleClip()  (DrumTrack.BeatIntensity.cs)
+  gates: no bass drop holding, driveBeatsFromDensity=true, entry-loop window elapsed,
+         _carryLatched (first carry/catch), intensity tags non-empty
+  → intensity01 = CosmicDustGenerator.GetCarveEnergy01()   — leaky pool of recent vehicle carves,
+        weighted per carved role (DrumIntensityTuning.CarveWeight: Bass 1.0, others 0.5)
+  → query (depth·I, breadth·I, I) → ResolveNearestIntensityClip → ScheduleDrumLoopChange → TickDeckSwap
+Bass note committed (InstrumentTrack.OnNoteCommitted) → DrumTrack.BassDrop.cs
+  → heaviest-pressure clip armed at the next bar, held bassDropHoldLoops (refreshed per Bass note)
+  → when the drop clip becomes audible (TickDeckSwap finalize): AnnounceBassDropIfAudible()
+      → CosmicDustGenerator.BeginShockwaveFromCenter(bass color) — ring flash through solid dust
 ```
 `DrumTrack.ApplyMotif()` is a separate path — phase/motif changes only. It commits the new `MotifProfile` refs, resets entry-loop/carry-latch state, and picks an entry clip via `ChooseEntryClip()` (random from `entryDrumLoops`). It takes no intensity parameter and never touches `ResolveIntensityClip`/`_intensityLoops`; within-motif intensity swaps run entirely separately, once per loop boundary, as above.
 
 ### Flow E — Dust Energy Economy
 ```
 Vehicle plow-carves dust → cell regrows in its true role color + charge, flower blooms (vehicle-carve tell)
-    (delay = maze dustTiming table × ship's per-role regrowDelayMultiplier)
+    (delay = the role's regrowthDelay × density easing)
   → PhaseStar grows one tentacle per bloomed, role-carved cell, capped at the node payload
       → each drained cell: ZapClearCellHeld() — held, no regrow; zap credited immediately; flower hides
   → payload zap count met → tentacles retract → star ReadyLatched
   → DiscoveryTrackNode (or SuperNode) ejected, holding the drained-cell batch
   → node captured / escaped / expired → ReleaseHeldCells()
-      → cells regrow gray + uncharged (starDrainReleaseDelay), flower stays hidden
+      → cells regrow at the role's regrowthDelay, dark/unbloomed (not star-drainable), flower stays hidden
   → gray dust must be plow-carved again to re-earn role charge and re-bloom
 ```
 Collectable dust removal (arrival flight + intent-window plowing) and SuperNodeTrackNode dust-seeking always regrow gray and never bloom the flower —
@@ -641,7 +726,7 @@ they open temporary corridors but never feed the star.
 
 ### Flow F — Discard → Time Bomb → Blast
 ```
-Vehicle discards a carried note (miss window / sacrifice / queue overflow / vehicle death)
+Vehicle discards a carried note (miss window / sacrifice / vehicle death; full queue refuses pickup instead)
   → Collectable.ArmAsTimeBomb(authoredAbsStep)
       Rigidbody2D → Kinematic (pinned, immune to physics-engine depenetration)
       fuse = InstrumentTrack.ComputeDepositDsp(step) − now, floored at minFuseSeconds
@@ -660,8 +745,7 @@ Vehicle discards a carried note (miss window / sacrifice / queue overflow / vehi
         → each cell regrows via the normal resolver: revealed role stays the same role,
           still-gray cells fall back to their permanent hidden Voronoi role — never biased
           toward a different role; regrow delay is MusicalRoleProfile.discardBlastRegrowDelay
-          when set, else falls back to the normal resolver (MazePatternConfig.dustTiming
-          .collectableDiscardRegrowDelay)
+          when set, else falls back to the normal resolver (role regrowthDelay)
   → FlashThenImplode() — flash to the same resolved radius, then collapse → Destroy()
 ```
 The note's own energy was already processed at pickup (a partial refund is granted on most

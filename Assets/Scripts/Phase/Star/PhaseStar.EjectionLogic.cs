@@ -11,6 +11,10 @@ public partial class PhaseStar
         // tick a star enters Dormant); never a push, flash, or state change.
         if (_state == PhaseStarState.Dormant) return;
 
+        // Every rejected poke gets the same "not now" head shake (PhaseStar.PokeFeedback.cs);
+        // the sleeping look explains when another sequence is the reason. Internal guards stay silent.
+
+        // Disarmed while its own node/notes resolve.
         if (!_isArmed
             && _state == PhaseStarState.WaitingForPoke
             && !_ejectionInFlight)
@@ -30,6 +34,7 @@ public partial class PhaseStar
 
         if (AnyExpansionPendingGlobal())
         {
+            RespondToRejectedPoke();
             Trace("OnCollisionEnter2D: expansion pending — ignoring poke, star stays armed");
             if (GameFlowManager.VerboseLogging)
                 Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=expansion-pending " +
@@ -75,6 +80,7 @@ public partial class PhaseStar
             }
             else
             {
+                RespondToRejectedPoke();
                 Trace("OnCollisionEnter2D: ignored poke — zap requirement not met yet");
                 if (GameFlowManager.VerboseLogging)
                     Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=zaps-not-met " +
@@ -84,6 +90,7 @@ public partial class PhaseStar
         }
         if (_activeNode != null)
         {
+            RespondToRejectedPoke();
             Trace("OnCollision: ignored, activeNode != null");
             if (GameFlowManager.VerboseLogging)
                 Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=active-node activeNode={_activeNode.name}");
@@ -116,6 +123,7 @@ public partial class PhaseStar
                 || Collectable.AnyLiveForTrack(_cachedTrack)
                 || Collectable.AnyLiveFromOtherTracks(_cachedTrack)))
         {
+            RespondToRejectedPoke();
             Trace("OnCollisionEnter2D: new-bin expansion blocked — notes still in play");
             if (GameFlowManager.VerboseLogging)
                 Debug.Log($"[PS:SILENT] {name} role={_attunedRole} reason=bin-full-notes-in-play " +
@@ -148,7 +156,7 @@ public partial class PhaseStar
                                              0f, MaxImpactStrength);
             motion.ApplyPushImpulse(pushDir * pushSpeed);
         }
-        visuals?.FlashReject();
+        RespondToRejectedPoke();
     }
 
     bool SpawnNodeCommon(Vector2 contactPoint, InstrumentTrack usedTrack)
@@ -228,7 +236,7 @@ public partial class PhaseStar
         {
             // Another sequence is still unresolved (or the harvest budget is spent). Keep
             // the zap latch and stay armed — the poke retries once that sequence resolves.
-            visuals?.FlashReject();
+            RespondToRejectedPoke();
             if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar] Eject deferred — sequence in flight or no harvest budget (role={ejectedRole}).");
             return;
         }

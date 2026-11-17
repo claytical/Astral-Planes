@@ -77,7 +77,7 @@ public partial class CosmicDust
         float perUnit   = _cellWorldSize / (Mathf.Max(0.01f, _spriteScaleTarget) * rootScale); // prefab units that span one cell
 
         var main = visual.particleSystem.main;
-        main.startSize = Mathf.Max(0.001f, visual.particleCellFraction * perUnit); // constant: CaptureBaseVisual reads .constant
+        main.startSize = Mathf.Max(0.001f, visual.particleCellFraction * perUnit) * _blockSizeMul; // constant: CaptureBaseVisual reads .constant (÷ block mul)
 
         // Emit exactly at the cell center: the plasma field is one kernel per cell and its surface must line up with the
         // cell's collider. Any emitter radius/jitter here shifts the blob off the collider grid.

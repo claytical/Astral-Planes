@@ -52,6 +52,21 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
     [Tooltip("Mixer group for launch/impact one-shot SFX (see PlayOneShotRouted in Animation.cs).")]
     [SerializeField] private AudioMixerGroup effectsMixerGroup;
 
+    /// <summary>
+    /// Fires once per note at the moment it is recorded onto a gameplay bin ring (the
+    /// travel dot launches and the contour grows to include it). Notes whose tether the
+    /// vehicle breaks never fire. Args: (role, ring color, binIndex, note, dent world position
+    /// at impact). CosmicBlockField listens to send an echo spark from the dent into the maze
+    /// and raise one Cosmic Block per recorded note.
+    /// </summary>
+    public event System.Action<MusicalRole, Color, int, MotifSnapshot.NoteEntry, Vector3> OnNoteRecordedToRing;
+
+    /// <summary>Fires when the motif's finished record begins its spin/roll-off exit, after the final ring's notes have all landed.</summary>
+    public event System.Action OnRecordSpinOffStarted;
+
+    /// <summary>True from the start of the record's spin-off exit until its rings are destroyed.</summary>
+    public bool IsRecordLeaving => _gameplayFadingOut;
+
     private static readonly int BasePropId  = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorPropId = Shader.PropertyToID("_Color");
 

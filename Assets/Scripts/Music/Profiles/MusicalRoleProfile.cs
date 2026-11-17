@@ -21,18 +21,11 @@ public static class DrumIntensityTuning
 {
     public static float BassCarveWeight   = 1f;
     public static float OtherCarveWeight  = 0.5f;
-    public static float OtherRoleCeiling01 = 0.6f;
 
     public static float CarveWeight(MusicalRoleProfile profile, MusicalRole role)
     {
         if (profile != null && profile.overrideDrumIntensity) return Mathf.Max(0f, profile.drumCarveWeight);
         return role == MusicalRole.Bass ? BassCarveWeight : OtherCarveWeight;
-    }
-
-    public static float Ceiling01(MusicalRoleProfile profile, MusicalRole role)
-    {
-        if (profile != null && profile.overrideDrumIntensity) return Mathf.Clamp01(profile.drumIntensityCeiling01);
-        return role == MusicalRole.Bass ? 1f : OtherRoleCeiling01;
     }
 }
 [System.Serializable]
@@ -144,12 +137,10 @@ public class MusicalRoleProfile : ScriptableObject
     public bool sameRootAcrossBins = false;
 
     [Header("Drum Intensity")]
-    [Tooltip("Off: use DrumTrackConfig's role defaults (Bass = bassCarveWeight / full ceiling; others = otherCarveWeight / otherRoleCeiling01). On: use the two fields below.")]
+    [Tooltip("Off: use DrumTrackConfig's role defaults (bassCarveWeight / otherCarveWeight). On: use drumCarveWeight below.")]
     public bool overrideDrumIntensity = false;
     [Min(0f), Tooltip("How much carving one cell of this role's dust pumps the drum energy pool.")]
     public float drumCarveWeight = 1f;
-    [Range(0f, 1f), Tooltip("Max drum intensity while this role is the driving role (ready PhaseStar's role). Non-Bass ceilings are lifted toward 1 as the Bass track fills.")]
-    public float drumIntensityCeiling01 = 1f;
 
     // ---------- Color helpers (authority) ----------
 

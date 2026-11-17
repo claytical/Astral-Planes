@@ -132,7 +132,6 @@ public partial class DrumTrack
         // OR when restartTransport forces hard-reset semantics.
         if (motifChanged || restartTransport)
         {
-            _lastDrivingRole      = MusicalRole.None;
             ClearBassDropState();
             _entryLoopsRemaining  =_motif != null ? Mathf.Max(0, _motif.entryLoopCount) : 0;
             // Preserve intensity when timing is identical — same BPM/steps means no perceptual

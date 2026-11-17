@@ -328,6 +328,14 @@ public sealed class InstrumentTrackCompositionSpawner
         }
     }
 
+    /// <summary>Destination cells of queued (not yet launched) notes — kept reachable by Cosmic Block doorways.</summary>
+    public void GetPendingTargetCells(List<Vector2Int> outCells)
+    {
+        outCells.Clear();
+        for (int i = 0; i < _pendingCompositionLaunches.Count; i++)
+            outCells.Add(_pendingCompositionLaunches[i].targetCell);
+    }
+
     /// <summary>
     /// Deterministic destination: absStep maps to the X column (0 = left edge, finalStep = right edge),
     /// pitch maps to the Y row across the NoteSet's note range (lowest = bottom, highest = top).
@@ -361,13 +369,24 @@ public sealed class InstrumentTrackCompositionSpawner
 
         var spawnBlockedMask = _getSpawnBlockedMask();
 
+        var dustGen = GameFlowManager.Instance != null ? GameFlowManager.Instance.dustGenerator : null;
+
         bool IsHardBlocked(Vector2Int gp)
         {
             if (usedCellsThisBurst != null && usedCellsThisBurst.Contains(gp)) return true;
             if (!Collectable.IsCellFreeStatic(gp)) return true;
+            // Never inside a Cosmic Block (an indestructible wall).
+            if (dustGen != null && dustGen.IsBlockAt(gp)) return true;
             Vector2 wp = (Vector2)drumTrack.GridToWorldPosition(gp);
             return Physics2D.OverlapBox(wp, halfExtents * 2f, 0f, spawnBlockedMask) != null;
         }
+
+        // Also reachable: a ship as wide as the widest active one can get there without
+        // passing a Cosmic Block. Cached per frame by the generator, so a whole burst shares
+        // one search.
+        bool IsReachable(Vector2Int gp) => dustGen == null || dustGen.IsCellReachableForShips(gp);
+
+        Vector2Int? fallback = null;
 
         // Scan outward from the exact cell; every same-column candidate beats any
         // one-column-away candidate so repeated notes stack vertically before drifting sideways.
@@ -385,6 +404,7 @@ public sealed class InstrumentTrackCompositionSpawner
                         if (y < 0 || y >= h) continue;
                         var gp = new Vector2Int(x, y);
                         if (IsHardBlocked(gp)) continue;
+                        if (!IsReachable(gp)) { fallback ??= gp; continue; }
                         chosenCell = gp;
                         return true;
                     }
@@ -392,6 +412,14 @@ public sealed class InstrumentTrackCompositionSpawner
             }
         }
 
+        // Nothing reachable anywhere: take the nearest open cell and open a ship-wide doorway
+        // through the Cosmic Blocks to it.
+        if (fallback.HasValue)
+        {
+            chosenCell = fallback.Value;
+            dustGen?.OpenDoorwayTo(chosenCell);
+            return true;
+        }
         return false;
     }
 

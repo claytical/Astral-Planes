@@ -91,7 +91,9 @@ public sealed class CosmicDustTintDiffusionSystem
             Color avg = ComputeNeighborAverageColor(cell, dust.Role, radius, out int nCount);
             if (nCount <= 0) continue;
 
-            Color cur = dust.CurrentTint;
+            // Raw (pre-legibility) tint: SetTint re-applies the unbloomed-role darkening, so
+            // blending from the displayed CurrentTint would compound it toward black.
+            Color cur = dust.RestTintRaw;
             Color next = Color.Lerp(cur, avg, t);
 
 // Don't let diffusion drag a solid cell's alpha below the visibility

@@ -8,6 +8,8 @@ public partial class NoteVisualizer
    public void ForceSyncMarkersToPersistentLoop(InstrumentTrack track)
 {
     if (track == null) return;
+    // Loop markers left with the record; the loop still plays but stays off the timeline.
+    if (_loopMarkersDetached) return;
     if (_ctrl == null || _ctrl.tracks == null) return;
 
     int trackIndex = Array.IndexOf(_ctrl.tracks, track);

@@ -40,8 +40,25 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float growingTipAlpha   = 0.40f;
     [SerializeField, Range(0f, 1f)] private float drainingBaseAlpha = 0.45f;
 
+    [Header("Vine Routing")]
+    [Tooltip("Pause at each dust cell the vine has to break through (no open route to the target).")]
+    [SerializeField, Min(0f)] private float boreSeconds = 0.25f;
+    [Tooltip("Fade time of a dust cell broken by a vine (regrows normally, as StarBurrow).")]
+    [SerializeField, Min(0.01f)] private float boreFadeSeconds = 0.15f;
+    [Tooltip("A blocking cell still solid after this long (Cosmic Block / uncarveable) makes the vine give up and retract.")]
+    [SerializeField, Min(0.1f)] private float boreTimeout = 1.0f;
+    [Tooltip("How quickly the drawn vine catches up to its route when the star is bumped. Lower = looser, more whip.")]
+    [SerializeField, Min(0.5f)] private float vineFollowSharpness = 10f;
+    [Tooltip("Curviness: sideways bend offset as a fraction of the run between bends. 0 = straight runs between corners.")]
+    [SerializeField, Range(0f, 1f)] private float vineMeander = 0.35f;
+    [Tooltip("Max sideways offset of a bend, in cells (bends are also shrunk to stay off dust).")]
+    [SerializeField, Min(0f)] private float vineMeanderMaxCells = 1.25f;
+    [Tooltip("Roughly one bend per this many cells of vine length. Lower = wigglier.")]
+    [SerializeField, Min(1f)] private float vineMeanderSpacingCells = 2.5f;
+    [Tooltip("Star within this many cells of a root breadcrumb → the vine shortens to it (pushed back along itself).")]
+    [SerializeField, Min(0.1f)] private float vineRootSlackCells = 0.5f;
+
     [Header("Tether Style")]
-    [SerializeField] private float sag        = 0.5f;
     [SerializeField] private float noiseAmp   = 0.15f;
     [SerializeField] private float noiseSpeed = 1.5f;
     [SerializeField] private float weaveAmplitude = 0.1f;
@@ -104,6 +121,18 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
         public float effectiveBuildupSeconds; // drainBuildupSeconds × cell HP, set at buildup start
         public bool siphonActive;
         public float siphonT; // 1 = at tip, 0 = arrived at star root
+
+        // Vine routing (PhaseStarDustAffect.Vine.cs)
+        public readonly TentacleVineRoute route = new TentacleVineRoute();
+        public float growUnitsPerSec;
+        public bool boring;
+        public Vector2Int boreCell;
+        public float boreTimer;
+        public Vector2 lastRootPos;
+        public int rootCrumbs;          // breadcrumb corners at nodes[1..rootCrumbs], added by star movement
+        public int lineCount;           // valid entries in linePts (variable: pinned to the route's corners)
+        public Vector3[] rootRenderPts; // spring-smoothed star-end segment
+        public bool rootRenderInit;
     }
 
     public Action<MusicalRole, float> onDelivery;
@@ -115,7 +144,7 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
     private PhaseStar _star;
     private PhaseStarCravingNavigator _navigator;
     private MusicalRole _attunedRole = MusicalRole.None;
-    private Camera _cam;
+    private readonly TentacleVinePlanner _vinePlanner = new TentacleVinePlanner();
 
     [Header("Zap Stagger")]
     [Tooltip("Optional pacing between successive tentacle activations. 0 (default) = every available carved cell grows a tentacle immediately, up to the node payload; > 0 = one activation per interval.")]
@@ -269,8 +298,11 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
         var drum = _gfm?.activeDrumTrack;
         if (drum == null) return;
 
+        // Aim where the vine actually leaves the star (it may route around dust), not straight at the target.
         Vector2 starPos  = transform.position;
-        Vector2 targetPt = best.targetWorldPos;
+        Vector2 targetPt = best.route.Count >= 2
+            ? best.route.Sample(Mathf.Min(best.route.TotalLength, Mathf.Max(0.01f, drum.GetCellWorldSize())))
+            : best.targetWorldPos;
         Vector2 dir      = targetPt - starPos;
         dir = dir.sqrMagnitude > 0.0001f
             ? dir.normalized * (dir.magnitude + DiamondTipOffset)
@@ -414,6 +446,7 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
     private void AllocateTentacleBuffers(Tentacle tentacle)
     {
         tentacle.linePts   = new Vector3[SplinePoints];
+        tentacle.rootRenderPts = new Vector3[kVineSubdivisions + 1];
         tentacle.gradient  = new Gradient();
         tentacle.alphaScale = 1f;
         tentacle.notifiedDrainLock = false;

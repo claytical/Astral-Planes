@@ -9,6 +9,8 @@ public class VehicleConfig : ScriptableObject
 
     [Header("Manual Note Release")]
     public int manualReleaseQueueCapacity = 9;
+    [Min(0.05f), Tooltip("Seconds before a manual release window opens that the approach ring appears around the ship and starts closing in (LEGIBILITY_AUDIT.md C3).")]
+    public float releaseApproachLookaheadSeconds = 1.25f;
     [Tooltip("When releasing onto an already-occupied step, multiply committed velocity by this factor.")]
     public float occupiedStepVelocityMultiplier = 1.25f;
     [Tooltip("On occupied-step releases, play a one-shot octave accent (+12) in addition to the committed note.")]
@@ -123,6 +125,18 @@ public class VehicleConfig : ScriptableObject
     public float drainFeedbackShrinkScale = 0.7f;
     [Tooltip("Duration of the shrink-and-recover flicker/pulse triggered by a drain hit.")]
     public float drainFeedbackDuration = 0.25f;
+
+    [Header("Fuel Status Tells (ship glow)")]
+    [Range(0.01f, 0.9f), Tooltip("Fuel fraction below which the ship shows the low-fuel warning glow (the fuel bar has its own matching threshold on Fuel.cs).")]
+    public float lowFuelThreshold01 = 0.2f;
+    public Color lowFuelGlowColor = new Color(1f, 0.35f, 0.2f, 1f);
+    [Tooltip("Low-fuel glow pulse rate at the threshold (Hz); speeds toward lowFuelPulseHzEmpty as fuel nears zero.")]
+    public float lowFuelPulseHz = 1.2f;
+    public float lowFuelPulseHzEmpty = 3.5f;
+    public Color voidRefuelGlowColor = new Color(0.75f, 0.95f, 1f, 1f);
+    [Tooltip("Radius of the soft status glow behind the ship, as a multiple of the ship sprite's radius. Centered on the note core anchor.")]
+    public float statusGlowRadiusMul = 1.6f;
+    [Range(0f, 1f)] public float statusGlowMaxAlpha = 0.45f;
 
     [Header("Turbulence (passing through a dormant star)")]
     [Tooltip("Peak sideways buffeting acceleration at full turbulence (world units/s^2).")]

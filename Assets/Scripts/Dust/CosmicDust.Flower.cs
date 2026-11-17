@@ -55,7 +55,7 @@ public partial class CosmicDust
                 _flowerRootBaseRot = flowerRoot.transform.localRotation;
                 _flowerRootTransformCaptured = true;
             }
-            flowerRoot.SetActive(true);
+            flowerRoot.SetActive(!IsBlockForm); // a Cosmic Block keeps its bloom hidden until it reverts
             if (_flowerGrowInRoutine != null) StopCoroutine(_flowerGrowInRoutine);
             _flowerGrowInRoutine = StartCoroutine(FlowerGrowInRoutine());
         }
@@ -63,11 +63,17 @@ public partial class CosmicDust
         ApplyFlowerShimmerColor();
         ApplyFlowerSway();
         ApplyFlowerSpin();
+
+        // Bloomed = star-drainable, so the cell now shows its full role brightness
+        // (CosmicDust.Legibility.cs).
+        RefreshLegibleRestTint();
     }
 
     public void HideFlower()
     {
+        bool wasBloomed = HasBloomedFlower;
         HasBloomedFlower = false;
+        if (wasBloomed) RefreshLegibleRestTint();
         if (_flowerGrowInRoutine != null) { StopCoroutine(_flowerGrowInRoutine); _flowerGrowInRoutine = null; }
         if (flowerRoot != null) flowerRoot.SetActive(false);
     }

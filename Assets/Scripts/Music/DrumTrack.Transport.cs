@@ -17,7 +17,7 @@ public partial class DrumTrack
         TickMotifLateBind();
         TickGridValidation();
         EnsureBinFillSubscription();
-        EnsureBurstClearedSubscription();
+        EnsureNoteCommittedSubscription();
 
         if (drumAudioSource == null || totalSteps <= 0)
             return;
@@ -202,6 +202,13 @@ public partial class DrumTrack
         if (logBeatSeqGates) Debug.Log($"[DRUM] Finalized drum loop swap at dsp={_pendingDrumLoopDspStart:F3} clip={(_currentDrumClip ? _currentDrumClip.name : "null")}");
         _lastClipSwapFinalizedDsp = _pendingDrumLoopDspStart;
         _pendingDrumLoopDspStart = -1.0;
+
+        // The drop clip just became audible — fire its visual tell on the beat.
+        AnnounceBassDropIfAudible();
+
+        // A bass drop that arrived while this swap was in flight goes out on the next bar now,
+        // rather than waiting for the next leader-loop boundary.
+        if (_bassDropPending) TryScheduleBassDrop();
     }
 
     // Returns false if the effective loop length is not yet valid (caller should return early).

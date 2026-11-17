@@ -262,6 +262,11 @@ public class MotifSnapshot
         /// </summary>
         public float CommitTime01;
 
+        /// <summary>Runtime-only provenance: the star-drained dust cell whose energy fed this note
+        /// (see InstrumentTrack.TryGetNoteOriginCell). Never saved — a recorded ring outlives its maze.</summary>
+        [System.NonSerialized] public Vector2Int OriginCell;
+        [System.NonSerialized] public bool       HasOriginCell;
+
         /// <summary>Serializable backing. Use TrackColor property at runtime.</summary>
         public SerializableColor SerializedTrackColor;
 

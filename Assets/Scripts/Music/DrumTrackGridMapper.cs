@@ -183,7 +183,9 @@ public sealed class DrumTrackGridMapper
     {
         var dust = _dust();
         if (dust == null) return false;
-        return dust.HasDustAt(cell);
+        // Cosmic Blocks are unbreakable obstacles but not dust — every grid pathfinder/probe
+        // routed through DrumTrack.HasDustAt must treat them as walls.
+        return dust.HasDustAt(cell) || dust.IsBlockAt(cell);
     }
 
     public bool TryGetDustAt(Vector2Int cell, out CosmicDust dust)
@@ -201,6 +203,9 @@ public sealed class DrumTrackGridMapper
             return false;
         // 2) Dust blocks spawning (your decision 8A: no spawning inside dust)
         if (_dust() != null && _dust().HasDustAt(new Vector2Int(x, y)))
+            return false;
+        // 3) Cosmic Blocks are walls — nothing spawns inside one.
+        if (_dust() != null && _dust().IsBlockAt(new Vector2Int(x, y)))
             return false;
         return true;
     }

@@ -163,6 +163,9 @@ public sealed class NoteTrailParams
 
     [Tooltip("Drift radius shrinks to this fraction as release pulse approaches 1 (energy focuses).")]
     public float trailDriftFocusMul = 0.15f;
+
+    [Tooltip("Impulse a collectable gets when it bounces off a ship whose manual-release queue is full (the pickup is refused instead of dropping the oldest carried note into a time bomb).")]
+    public float queueFullBounceImpulse = 2.5f;
 }
 
 [Serializable]

@@ -67,7 +67,7 @@ public partial class CosmicDustGenerator
     public void CarveDustByVehicle(Vector2Int cell, float fadeSeconds, ShipMusicalProfile shipProfile = null)
     {
         if (!IsInBounds(cell)) return;
-        if (HasCellFlag(cell, CellFlags.Solid)) return; // bypass-proof: no ship carveResistanceBypass01 can defeat this
+        if (IsUnbreakable(cell)) return; // bypass-proof (interstitial wall / Cosmic Block): no ship carveResistanceBypass01 can defeat this
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
 
         var cellDust = _gridState.CellDust?[cell.x, cell.y];
@@ -78,12 +78,12 @@ public partial class CosmicDustGenerator
 
     // False for bypass-proof dust ChipDustByVehicle will always refuse — the plow must not
     // suppress those colliders, or the vehicle slides into a cell it can never carve out of.
-    public bool CanVehicleChip(Vector2Int cell) => IsInBounds(cell) && !HasCellFlag(cell, CellFlags.Solid);
+    public bool CanVehicleChip(Vector2Int cell) => IsInBounds(cell) && !IsUnbreakable(cell);
 
     public void ChipDustByVehicle(Vector2Int cell, int energyAmount, float fadeSeconds, float resistanceBypass01 = 0f, ShipMusicalProfile shipProfile = null)
     {
         if (!IsInBounds(cell)) return;
-        if (HasCellFlag(cell, CellFlags.Solid)) return; // bypass-proof: no ship carveResistanceBypass01 can defeat this
+        if (IsUnbreakable(cell)) return; // bypass-proof (interstitial wall / Cosmic Block): no ship carveResistanceBypass01 can defeat this
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
 
         var cellGo = _gridState.CellGo?[cell.x, cell.y];
@@ -142,36 +142,28 @@ public partial class CosmicDustGenerator
         bool wasVoidCell = ClearCellFlag(cell, CellFlags.VoidGrow);
         if (wasVoidCell) _imprints.Remove(cell);
 
-        // The carving ship is a growth agent: its per-role multiplier scales the resolved
-        // delay, so a Bass-accelerator ship makes Bass dust regrow sooner. Resolved after
-        // the role promotion above so the multiplier keys off the role the cell regrows as.
-        float delay = ResolveRegrowDelay(cell, DustClearSource.VehiclePlow, -1f);
-        if (shipProfile != null && shipProfile.regrowDelayMultipliers != null)
-            delay *= shipProfile.regrowDelayMultipliers.GetFor(GetProspectiveRegrowRole(cell));
+        // Resolved after the role promotion above so it keys off the role the cell regrows as.
+        float delay = ResolveRegrowDelay(cell, -1f);
 
         CarveCell(cell, fadeSeconds, scheduleRegrow: true, source: DustClearSource.VehiclePlow, regrowDelaySeconds: delay, runPreExplode: true, explosionTintOverride: explosionTint);
     }
 
     /// <summary>
-    /// Regrow-delay precedence:
-    /// 1. Explicit per-call override (>= 0).
-    /// 2. The cell's prospective role's MusicalRoleProfile.regrowthDelay (>= 0) — consulted
-    ///    regardless of DustClearSource or ForceGrayRegrow. Pacing is a separate concern from
-    ///    identity: a role's authored regrow speed holds whether the cell was vehicle-plowed,
-    ///    star-drained, jailed, or track-filled. ForceGrayRegrow (single-role-motif temporary
-    ///    collectable-plow corridors) still forces the cell's *color* back to MusicalRole.None on
-    ///    regrow (see ResolveRegrowVoice). ZapForceGray (star-drain harvest) no longer hides
-    ///    color — a zapped cell regrows showing its true role tint immediately, since the anti-farm
-    ///    invariant ("can't feed a star off dust you didn't carve") is fully enforced independently
-    ///    by the flower/bloom gate (CosmicDust.HasBloomedFlower / IsVisuallyPresentForTargeting),
-    ///    which only a vehicle plow or bomb blast can grant — a zap-regrown cell is visible but not
-    ///    zap-eligible again until the player physically re-carves it.
-    /// 3. Active maze pattern's per-source delay (>= 0) — reached for None-role cells, or a role
-    ///    whose regrowthDelay is -1 ("use maze pattern").
-    /// 4. Active maze pattern's base regrowDelay.
-    /// 5. Hard fallback 8s (no active pattern).
+    /// Regrow delay = "each role regrows at its own speed" (LEGIBILITY_AUDIT.md A5):
+    /// 1. Explicit per-call override (>= 0) — jail holds, SuperNode/bomb call-site tuning.
+    /// 2. The cell's prospective role's MusicalRoleProfile.regrowthDelay (>= 0), whatever cleared
+    ///    it (vehicle plow, star drain, collectable, blast…). Pacing is role identity, not source.
+    /// 3. Role-less cells (generic filler / None) or a role authored -1: the maze pattern's base
+    ///    regrowDelay; 8s if no pattern is active.
+    /// Then × density easing (ApplyDensityRegrowEasing).
+    ///
+    /// Removed 2026-11-17: the 11-entry per-DustClearSource maze table (it only ever applied to
+    /// role-less cells, since every role profile authors regrowthDelay), the ship per-role
+    /// regrowDelayMultipliers (1.0 on every ship) and CosmicDustGeneratorConfig.zapRegrowDelaySeconds
+    /// (never read). DustClearSource itself stays — it still gates the flower bloom and
+    /// ForceGray color behavior, just not timing.
     /// </summary>
-    private float ResolveRegrowDelay(Vector2Int cell, DustClearSource source, float explicitOverride)
+    private float ResolveRegrowDelay(Vector2Int cell, float explicitOverride)
     {
         if (explicitOverride >= 0f)
             return explicitOverride;
@@ -185,11 +177,7 @@ public partial class CosmicDustGenerator
         }
 
         var timing = _activeMazePattern != null ? _activeMazePattern.dustTiming : null;
-        if (timing == null)
-            return ApplyDensityRegrowEasing(8f);
-
-        float perSource = timing.GetDelayFor(source);
-        float baseDelay = perSource >= 0f ? perSource : Mathf.Max(0f, timing.regrowDelay);
+        float baseDelay = timing != null ? Mathf.Max(0f, timing.regrowDelay) : 8f;
         return ApplyDensityRegrowEasing(baseDelay);
     }
 
@@ -326,12 +314,11 @@ public partial class CosmicDustGenerator
         if (_heldRegrowCells.Contains(gridPos))
             return;
 
-        // Exact-count mode's permanent-filler (None) dust is permanent scenery for the rest of
-        // the motif once cleared — it never re-enters the regrow cadence like quick-regrow
-        // generic dust does. ClearMaze()'s _permanentClearCells.Clear() lifts this at the next
-        // motif's maze generation.
+        // Generic filler (None) dust is permanent once cleared — carving it is progress that
+        // holds for the rest of the motif. ClearMaze()'s _permanentClearCells.Clear() lifts this
+        // at the next motif's maze generation.
         if (_imprints != null && _imprints.TryGetValue(gridPos, out var fillImp)
-            && fillImp.hiddenRoleIsGenericFill && fillImp.genericFillNeverRegrows)
+            && fillImp.hiddenRoleIsGenericFill)
         {
             _permanentClearCells.Add(gridPos);
             _regrow?.CancelRegrow(gridPos);
@@ -349,7 +336,23 @@ public partial class CosmicDustGenerator
         if (!shouldSchedule)
             return;
 
-        float delay = delaySeconds >= 0f ? delaySeconds : (_activeMazePattern != null ? _activeMazePattern.dustTiming.regrowDelay : 8f);
+        float delay;
+        if (delaySeconds >= 0f)
+        {
+            delay = delaySeconds;
+            _pendingRegrowDelay[gridPos] = delaySeconds;
+        }
+        else if (_pendingRegrowDelay.TryGetValue(gridPos, out var remembered))
+        {
+            // Refresh after a keep-clear release: keep this cycle's authored delay.
+            delay = remembered;
+        }
+        else
+        {
+            // No authored delay on record: resolve it the same way a clear would.
+            delay = ResolveRegrowDelay(gridPos, -1f);
+            _pendingRegrowDelay[gridPos] = delay;
+        }
 
         EnsureRegrowController();
         _regrow?.RequestRegrowCellAt(gridPos, delay, refreshIfPending);

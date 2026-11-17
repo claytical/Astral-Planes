@@ -14,6 +14,9 @@ public class BinRingController : MonoBehaviour
     private InstrumentTrack[]        _tracks;
     private MotifRingGlyphApplicator _ringApplicator;
 
+    [Tooltip("Role-wide Cosmic Blocks: when a ring completes, that role's dust becomes blocks and the previous role's revert. Auto-found on the dust generator if empty.")]
+    [SerializeField] private CosmicBlockField _blockField;
+
     void Start()
     {
         GameFlowManager.Instance.RegisterBinRingController(this);
@@ -28,6 +31,10 @@ public class BinRingController : MonoBehaviour
         _ringApplicator = GameFlowManager.Instance?.GetMotifRingGlyphApplicator();
 
         _ringApplicator?.ClearGameplayRings();
+
+        if (_blockField == null)
+            _blockField = GameFlowManager.Instance?.dustGenerator?.BlockField;
+        _blockField?.BindRingApplicator(_ringApplicator);
 
         if (_tracks != null)
             foreach (var t in _tracks)
@@ -96,6 +103,12 @@ public class BinRingController : MonoBehaviour
 
     private void OnBinFilled(InstrumentTrack track, int binIndex)
     {
+        // A ring completed: the previous role's Cosmic Blocks revert and this role's dust
+        // becomes the new wall (CosmicBlockField / CosmicDustGenerator.Blocks.cs).
+        if (_blockField == null)
+            _blockField = GameFlowManager.Instance?.dustGenerator?.BlockField;
+        _blockField?.OnRingCompleted(track);
+
         if (_ringApplicator == null)
             _ringApplicator = GameFlowManager.Instance?.GetMotifRingGlyphApplicator();
         if (_ringApplicator == null) return;

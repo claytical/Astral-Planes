@@ -8,6 +8,19 @@ public partial class Vehicle
     public static bool AnyVehicleCarryingTrack(InstrumentTrack track)
         => _s_vehiclesCarryingByTrack.TryGetValue(track, out var count) && count > 0;
 
+    /// <summary>Manual-release queue is at capacity — further pickups are refused (Collectable bounces off).</summary>
+    public bool IsManualReleaseQueueFull =>
+        _pendingNotes.Count >= Mathf.Max(1, vehicleConfig != null ? vehicleConfig.manualReleaseQueueCapacity : 9);
+
+    /// <summary>
+    /// Would this ship pick up a note of <paramref name="track"/> right now? False while dead,
+    /// carry-locked to a different track, or (manual mode) holding a full queue. Used by
+    /// Collectable's ghost tell (LEGIBILITY_AUDIT.md C2).
+    /// </summary>
+    public bool CanTakeNoteNow(InstrumentTrack track) =>
+        !_isDead && isActiveAndEnabled && CanAcceptCollectable(track)
+        && !(ManualNoteReleaseEnabled && IsManualReleaseQueueFull);
+
     public bool CanAcceptCollectable(InstrumentTrack track) =>
         _lockedTrack == null || _lockedTrack == track;
 
@@ -97,7 +110,9 @@ public partial class Vehicle
     {
         int cap = Mathf.Max(1, vehicleConfig.manualReleaseQueueCapacity);
 
-        // If full, drop oldest (and clean up its visual carrier if still around)
+        // Defensive only: Collectable.OnTriggerEnter2D refuses pickups once the queue is full
+        // (IsManualReleaseQueueFull → the note bounces off), so this should never run. If some
+        // other path enqueues past capacity, fall back to dropping the oldest.
         while (_pendingNotes.Count >= cap)
         {
             var dropped = _pendingNotes.Dequeue();

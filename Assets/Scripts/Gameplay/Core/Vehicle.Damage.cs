@@ -82,7 +82,15 @@ public partial class Vehicle
             // relativeVelocity is the pre-solve impact speed (rb.linearVelocity is already post-bounce here).
             float minImpact = vehicleConfig != null ? vehicleConfig.ringBreakMinImpactSpeed : 0f;
             bool intentional = boosting || coll.relativeVelocity.magnitude >= minImpact;
-            if (!intentional || !ringApplicator.TryBreakNextPendingTether(coll.contacts[0].point))
+            Vector3 contact = coll.contacts[0].point;
+            // Three distinct answers (LEGIBILITY_AUDIT.md C5):
+            //   hard hit + pending note → break (break shake + burst)
+            //   soft hit + pending note → that note's tether twangs ("hit harder")
+            //   nothing pending         → stiff denial shake ("nothing to break")
+            bool handled = intentional
+                ? ringApplicator.TryBreakNextPendingTether(contact)
+                : ringApplicator.TryPluckNearestPendingTether(contact);
+            if (!handled)
                 ringApplicator.PlayDenialShake();
         }
 }

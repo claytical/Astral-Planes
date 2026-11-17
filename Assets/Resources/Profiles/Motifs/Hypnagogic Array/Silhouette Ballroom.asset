@@ -55,7 +55,7 @@ MonoBehaviour:
   phraseLengthLoopsOverride: 0
   nodesPerStar: 6
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
-  mazePattern: {fileID: 11400000, guid: f25d976f74184ee0829d295ecd60d4d2, type: 2}
+  mazePattern: {fileID: 11400000, guid: b23b5785003148639c0f2687270353ba, type: 2}
   roleGeoConfigs: []
   genericFillNeverRegrowRatio: 0.5
   genericFillRatio01: 0

@@ -96,9 +96,13 @@ public partial class PhaseStar
     // below must run after it to win for the Dormant phase.
     private void UpdateChargeVisuals(float rotA, bool aLocked, float rotB, bool bLocked)
     {
-        bool dominantReady = IsEjectionReady();
+        // A sleeping star (blocked by work elsewhere, PhaseStar.PokeFeedback.cs) never shows
+        // the fast ready-spin, even when its own zaps are met.
+        bool dominantReady = IsEjectionReady() && !_sleepVisual;
 
-        if (_previewVisual != null && _disarmReason != PhaseStarDisarmReason.SiblingActive)
+        // Paused (SiblingActive) stars keep updating too — Sleeping desaturates them and the
+        // rotation runs slowed (PhaseStar.PokeFeedback.cs), instead of freezing mid-frame.
+        if (_previewVisual != null)
         {
             visuals?.UpdateDualDiamonds(
                 _previewColor,
@@ -127,53 +131,18 @@ public partial class PhaseStar
             if (_previewVisual != null)  _previewVisual.localScale  = chargeScale;
             if (_previewVisualB != null) _previewVisualB.localScale = chargeScale;
 
-            if (visualScale01 > 0.001f && _disarmReason != PhaseStarDisarmReason.SiblingActive)
+            if (visualScale01 > 0.001f && !_sleepVisual && _disarmReason != PhaseStarDisarmReason.SiblingActive)
             {
                 visuals?.ToggleShardRenderers(true);
                 Color roleColor = _previewRole != MusicalRole.None ? _previewColor : Color.gray;
                 visuals?.LerpBodyColor(roleColor, _displayedCharge01);
             }
         }
-        else if (visuals != null && !_burstOffScreen && !_pickupLockVisual && _disarmReason != PhaseStarDisarmReason.SiblingActive)
+        else if (visuals != null && !_burstOffScreen && !_sleepVisual && _disarmReason != PhaseStarDisarmReason.SiblingActive)
         {
             Color bodyColor = _previewRole != MusicalRole.None ? _previewColor : Color.gray;
             visuals.LerpBodyColor(bodyColor, _displayedCharge01);
         }
-    }
-
-    private bool _pickupLockVisual;
-    private float _nextPickupLockCheck;
-
-    // Proactive "locked" look while an armed star is inert during note pickup. Scale is
-    // never touched; only tint/particles dim, then restore when the notes clear.
-    private void UpdatePickupLockVisual()
-    {
-        bool eligible = _isArmed
-                        && _state == PhaseStarState.WaitingForPoke
-                        && !_burstOffScreen
-                        && _disarmReason != PhaseStarDisarmReason.SiblingActive;
-
-        bool want = false;
-        if (eligible)
-        {
-            if (Time.unscaledTime >= _nextPickupLockCheck)
-            {
-                _nextPickupLockCheck = Time.unscaledTime + 0.1f;
-                want = IsPickupLocked();
-            }
-            else
-            {
-                want = _pickupLockVisual;
-            }
-        }
-
-        if (want == _pickupLockVisual) return;
-        _pickupLockVisual = want;
-
-        if (want)
-            SetVisual(VisualMode.Dim, ResolvePreviewColorByReadiness());
-        else if (eligible)
-            SetVisual(VisualMode.Bright, ResolvePreviewColorByReadiness());
     }
 
     private void EnsureDormantSeedVisuals()

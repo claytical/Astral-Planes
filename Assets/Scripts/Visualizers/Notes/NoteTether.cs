@@ -382,6 +382,32 @@ private int     _cachedHash  = 0;
     public bool IsApproaching => _isApproaching;
     public void SetApproaching(bool approaching) => _isApproaching = approaching;
 
+    // ── Pluck (LEGIBILITY_AUDIT.md C5) ──────────────────────────────────────────────
+    // A short, decaying string vibration perpendicular to the cable, strongest mid-span.
+    // Used when a ship bumps the ring too softly to break a pending note: the cable it
+    // *could* break twangs, so "there's a note here — hit harder" reads distinctly from
+    // the ring's stiff denial shake (nothing to break at all).
+    private float _pluckStart = -999f;
+    private float _pluckDuration = 0.4f;
+    private float _pluckAmpPx = 18f;
+    private float _pluckHz = 14f;
+
+    public void Pluck(float duration = 0.4f, float amplitudePx = 18f, float hz = 14f)
+    {
+        _pluckStart = Time.time;
+        _pluckDuration = Mathf.Max(0.05f, duration);
+        _pluckAmpPx = amplitudePx;
+        _pluckHz = hz;
+    }
+
+    private float CurrentPluckOffsetPx()
+    {
+        float t = Time.time - _pluckStart;
+        if (t < 0f || t >= _pluckDuration) return 0f;
+        float decay = 1f - t / _pluckDuration;
+        return Mathf.Sin(t * _pluckHz * Mathf.PI * 2f) * _pluckAmpPx * decay * decay;
+    }
+
     // Whether the tether line is currently drawn (see SetTimingState). RebuildCurve() runs every
     // Update() regardless, so _points/EvaluatePosition01 stay valid even while hidden — callers
     // that only want to show something while the cable itself is visible should check this.
@@ -697,6 +723,7 @@ private int     _cachedHash  = 0;
     Vector2 cS = (Vector2)dS - dir * c2Dist + bend * 0.35f;
 
     float time = Time.time * noiseSpeed;
+    float pluckPx = CurrentPluckOffsetPx();
 
     for (int i = 0; i < segments; i++)
     {
@@ -722,6 +749,7 @@ private int     _cachedHash  = 0;
             wobTaper = 1f - Mathf.InverseLerp(wobOffAt, 1f, u);
 
         pS += n * wob * (noiseAmp * 35f) * wobTaper;
+        if (pluckPx != 0f) pS += n * (pluckPx * Mathf.Sin(Mathf.PI * u)); // string mode: 0 at both ends
         // Clamp to screen bounds so we never go offscreen
         pS.x = Mathf.Clamp(pS.x, margin, Screen.width - margin);
         pS.y = Mathf.Clamp(pS.y, margin, Screen.height - margin);

@@ -359,7 +359,8 @@ public partial class Collectable
         for (int i = 0; i < kDirs8.Length; i++)
         {
             // Any open neighbor (or off-grid edge) is an escape route.
-            if (!dustGen.HasDustAt(c + kDirs8[i]))
+            var nb = c + kDirs8[i];
+            if (!dustGen.HasDustAt(nb) && !dustGen.IsBlockAt(nb))
                 return false;
         }
         return true;

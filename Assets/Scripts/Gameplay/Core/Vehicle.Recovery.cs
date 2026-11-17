@@ -176,9 +176,13 @@ public partial class Vehicle
 
     private void UpdateVoidEnergyRecovery(float dt)
 {
-    if (vehicleConfig.voidEnergyRecoveryPerSecond <= 0f) return;
-    if (energyLevel >= capacity) return;
-    if (!IsInsideGravityVoid(out _, out _)) return;
+    bool refueling = vehicleConfig.voidEnergyRecoveryPerSecond > 0f
+                     && energyLevel < capacity
+                     && !_isDead
+                     && IsInsideGravityVoid(out _, out _);
+    // Visible tell (ship glow + fuel bar shimmer, Vehicle.StatusGlow.cs) — LEGIBILITY_AUDIT D2.
+    SetVoidRefueling(refueling);
+    if (!refueling) return;
 
     RecoverEnergy(vehicleConfig.voidEnergyRecoveryPerSecond * dt);
 }
@@ -361,6 +365,7 @@ public partial class Vehicle
     // Cells are pooled forever and never destroyed, so TryGetDustAt() alone can't tell us
     // whether a cell is currently passable — it only tells us whether dust ever spawned
     // there. "Empty enough to respawn into" means the cell isn't currently Solid.
+    if (gen.IsBlockAt(gp)) return false; // Cosmic Block: unbreakable wall, never respawn into it
     return !gen.TryGetCellState(gp, out var st) || st != DustCellState.Solid;
 }
 }

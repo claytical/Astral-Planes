@@ -160,6 +160,9 @@ public partial class NoteVisualizer : MonoBehaviour
         }
         noteMarkers?.Clear();
 
+        // The previous record's markers left with it; the new motif draws markers again.
+        _loopMarkersDetached = false;
+
         // Force any temporarily overridden leader sizes back to default.
         _forcedLeaderSteps = -1;
 

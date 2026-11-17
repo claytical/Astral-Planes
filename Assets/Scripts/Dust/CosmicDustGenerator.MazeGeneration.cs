@@ -22,9 +22,7 @@ public partial class CosmicDustGenerator
         return _hasMazeAnchorCell;
     }
     private DustMotifDensitySnapshot _densitySnapshot;
-    private float _genericFillNeverRegrowRatio = 1f;
     private float _genericFillRatio01 = 0f;
-    private float _genericFillRegrowSoftenMultiplier01 = 1f;
 
     public void ApplyMotifGeoConfig(MotifProfile motif, IReadOnlyList<InstrumentTrack> tracks = null)
     {
@@ -32,14 +30,12 @@ public partial class CosmicDustGenerator
             ? new List<MazeRoleGeoConfig>(motif.roleGeoConfigs)
             : null;
         _activePatternType = motif?.mazePattern?.patternType ?? MazePatternType.FullFill;
-        _genericFillNeverRegrowRatio = motif != null ? Mathf.Clamp01(motif.genericFillNeverRegrowRatio) : 1f;
         // Composed with the maze pattern's own floor (never below it, motif authoring can only add
         // more gray) rather than read from _activeMazePattern — that field is set later in
         // GenerateMazeForPhaseWithPaths, so reading motif.mazePattern directly here avoids any
         // ordering dependency between the two independent call sites.
         float patternFloor = motif?.mazePattern != null ? Mathf.Clamp01(motif.mazePattern.minGenericFillRatio01) : 0f;
         _genericFillRatio01 = Mathf.Max(motif != null ? Mathf.Clamp01(motif.genericFillRatio01) : 0f, patternFloor);
-        _genericFillRegrowSoftenMultiplier01 = motif != null ? Mathf.Clamp01(motif.genericFillRegrowSoftenMultiplier01) : 1f;
         _densitySnapshot = MotifNoteDensityAnalyzer.Analyze(
             motif,
             tracks,
@@ -130,6 +126,10 @@ public partial class CosmicDustGenerator
         // already ran (idempotent: dictionaries already empty, StopCoroutine(null) no-ops).
         CancelAllInFlightDustCoroutines();
 
+        // Safety net: no Cosmic Block may survive into a new maze. Normally they already reverted
+        // with the departing record (CosmicBlockField) / HardStopRegrowthForBridge.
+        ReleaseRoleBlock();
+
         try
         {
             for (int x = 0; x < _gridState.Width; x++)
@@ -154,6 +154,8 @@ public partial class CosmicDustGenerator
         _gridState.RegrowingCount   = 0;
         _mazePatternCells = null;
         _carveAccumulator.Clear();
+        _pendingRegrowSource.Clear();
+        _pendingRegrowDelay.Clear();
 
         if (GameFlowManager.VerboseLogging)
             Debug.Assert(_regrowthScheduler.VoidGrowCoroutines.Count == 0 && _regrowthScheduler.CommitRegrowCoroutines.Count == 0,
@@ -371,20 +373,15 @@ public partial class CosmicDustGenerator
             counts[voice] += ClaimNearestCells(voice, cfg, remaining, unclaimed, gridCenter, starCell, occupied.Count);
         }
 
-        // Shuffle before splitting so the never-regrow/quick-regrow sub-types interleave
-        // across the leftover territory instead of one sub-type clumping wherever it
-        // happened to land in claim order.
+        // Shuffle leftover order (kept from the old two-sub-type split; harmless now).
         for (int s = unclaimed.Count - 1; s > 0; s--)
         {
             int r = Random.Range(0, s + 1);
             (unclaimed[s], unclaimed[r]) = (unclaimed[r], unclaimed[s]);
         }
-        int neverRegrowCount = Mathf.Clamp(Mathf.RoundToInt(unclaimed.Count * _genericFillNeverRegrowRatio), 0, unclaimed.Count);
+        // One filler type (LEGIBILITY_AUDIT.md A3): every leftover cell is permanent filler.
         for (int i = 0; i < unclaimed.Count; i++)
-        {
-            bool neverRegrow = i < neverRegrowCount;
-            _imprints.SetHiddenRoleGenericFill(unclaimed[i], neverRegrow ? config.genericFillTint : config.mazeTint, neverRegrow);
-        }
+            _imprints.SetHiddenRoleGenericFill(unclaimed[i], config.genericFillTint);
 
         if (GameFlowManager.VerboseLogging)
         {
@@ -393,7 +390,7 @@ public partial class CosmicDustGenerator
             int totalGray = unclaimed.Count + reservedFloorCount;
             float totalGrayFrac01 = totalCells > 0 ? (float)totalGray / totalCells : 0f;
             Debug.Log($"[MAZE] BuildMazeRoleImprints: exact-count mode, cells={occupied.Count}, claimed=({summary}), " +
-                $"generic(None)={unclaimed.Count} (neverRegrow={neverRegrowCount}, quickRegrow={unclaimed.Count - neverRegrowCount}), " +
+                $"generic(None, permanent)={unclaimed.Count}, " +
                 $"totalGray={totalGray}/{totalCells} ({totalGrayFrac01:P0}) [reservedFloor={reservedFloorCount}, leftover={unclaimed.Count}]");
         }
     }
@@ -454,13 +451,9 @@ public partial class CosmicDustGenerator
         }
 
         int fillCount = Mathf.Clamp(Mathf.RoundToInt(occupied.Count * _genericFillRatio01), 0, occupied.Count);
-        int neverRegrowCount = Mathf.Clamp(Mathf.RoundToInt(fillCount * _genericFillNeverRegrowRatio), 0, fillCount);
-
+        // One filler type (LEGIBILITY_AUDIT.md A3): every reserved cell is permanent filler.
         for (int i = 0; i < fillCount; i++)
-        {
-            bool neverRegrow = i < neverRegrowCount;
-            _imprints.SetHiddenRoleGenericFill(pool[i], neverRegrow ? config.genericFillTint : config.mazeTint, neverRegrow);
-        }
+            _imprints.SetHiddenRoleGenericFill(pool[i], config.genericFillTint);
 
         var remaining = new List<Vector2Int>(occupied.Count - fillCount);
         for (int i = fillCount; i < pool.Count; i++) remaining.Add(pool[i]);
@@ -469,7 +462,7 @@ public partial class CosmicDustGenerator
         {
             float fillFrac01 = occupied.Count > 0 ? (float)fillCount / occupied.Count : 0f;
             Debug.Log($"[MAZE] ReserveUniversalGenericFill: reserved={fillCount}/{occupied.Count} ({fillFrac01:P0}) " +
-                $"(neverRegrow={neverRegrowCount}, quickRegrow={fillCount - neverRegrowCount}) before role claims, " +
+                $"(permanent filler) before role claims, " +
                 $"ratio01={_genericFillRatio01:F2}");
         }
 

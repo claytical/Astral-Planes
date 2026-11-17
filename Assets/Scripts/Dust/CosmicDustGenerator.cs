@@ -67,7 +67,19 @@ public partial class CosmicDustGenerator : MonoBehaviour
         () => drums != null ? drums.GetSpawnGridWidth() : 0,
         () => drums != null ? drums.GetSpawnGridHeight() : 0,
         cell => _imprints.TryGetValue(cell, out var imp) ? imp.hiddenRole : MusicalRole.None,
-        (cell, becomesSolid) => _roleDensity.TrackRoleDensityChange(cell, becomesSolid));
+        (cell, becomesSolid) =>
+        {
+            _roleDensity.TrackRoleDensityChange(cell, becomesSolid);
+            OnCellSolidTransitionForBlocks(cell, becomesSolid); // role-wide Cosmic Blocks (Blocks.cs)
+            // Any route to Solid (regrow commit, void growth, maze spawn) ends the pending
+            // regrow cycle — a stale VehiclePlow source must never grant a later, non-carved
+            // regrow its flower bud.
+            if (becomesSolid)
+            {
+                _pendingRegrowSource.Remove(cell);
+                _pendingRegrowDelay.Remove(cell);
+            }
+        });
 
     private DustResistanceResolver _resistanceBacking;
     private DustResistanceResolver _resistance => _resistanceBacking ??= new DustResistanceResolver(
@@ -173,6 +185,12 @@ public partial class CosmicDustGenerator : MonoBehaviour
     // to specific sources (VehiclePlow, CollectableBombBlast). Written whenever a regrow is
     // scheduled; read-and-removed once.
     private readonly Dictionary<Vector2Int, DustClearSource> _pendingRegrowSource = new();
+    // The resolved regrow delay (role regrowthDelay x ship multiplier, or per-source pattern
+    // delay) for a cell's pending regrow cycle. Keep-clear releases (vehicle footprint/trail,
+    // star pocket, corridors) re-request regrow with no delay and refreshIfPending — without
+    // this they restarted the timer on the maze pattern's base regrowDelay (2-4s), silently
+    // replacing every role's authored delay (Bass 8s -> 2s). Cleared when the cell goes Solid.
+    private readonly Dictionary<Vector2Int, float> _pendingRegrowDelay = new();
     private Coroutine _spawnRoutine;
     private DrumTrack drums;
     private PhaseTransitionManager phaseTransitionManager;
@@ -243,6 +261,9 @@ public partial class CosmicDustGenerator : MonoBehaviour
     public void HardStopRegrowthForBridge(bool hideTransientDust = true)
     {
         _regrowthSuppressed = true;
+        // Blocks revert before the bridge fades the maze (their ClearCell gate would otherwise
+        // keep them standing through the fade).
+        ReleaseRoleBlock();
         // The regenerated maze supersedes any node-held drain batches.
         _heldRegrowCells.Clear();
 
@@ -319,6 +340,9 @@ public partial class CosmicDustGenerator : MonoBehaviour
         // In some scenes the generator may be instantiated before the GameFlowManager
         // is fully ready. We do a best-effort bind here, and also lazily re-bind elsewhere.
         _imprints.EnsureAllocated();
+        // Dust brightness legibility (CosmicDust.Legibility.cs) must darken exactly like the
+        // spawn-time hidden-role preview (ApplyHiddenColorPreview).
+        CosmicDust.SetLegibilityParams(config.hiddenRoleColorDarken01, !config.hideDustColorAtSpawn);
         TryEnsureRefs();
         EnsureCellGrid();
         _regrowthScheduler.Initialize(config.regrowCellsPerStep, config.regrowColliderEnableDelaySeconds);
@@ -366,9 +390,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             startCommitRegrowCell: gp => _regrowthScheduler.CommitRegrowCoroutines[gp] = StartCoroutine(CommitRegrowCell(gp)),
 
             getRegrowVetoRetryDelaySeconds: () => Mathf.Max(0.05f, config.regrowVetoRetryDelaySeconds),
-            getRegrowCellsPerStep: () => Mathf.Max(0, config.regrowCellsPerStep),
-            shouldBypassStepGate: gp => _imprints != null && _imprints.TryGetValue(gp, out var bypassImp)
-                && bypassImp.hiddenRoleIsGenericFill && !bypassImp.genericFillNeverRegrows
+            getRegrowCellsPerStep: () => Mathf.Max(0, config.regrowCellsPerStep)
         );
     }
     private void TryEnsureRefs()
@@ -494,27 +516,22 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
             // Which DustClearSource triggered this regrow cycle — determines whether the
             // flower bloom tell is allowed to show (VehiclePlow only).
+            // Read only — NOT removed here. If the post-delay gate below bounces this cell back
+            // to PendingRegrow (vehicle overlap / keep-clear), the step-gate retry must still see
+            // VehiclePlow, or the retried regrow loses its flower bud and the role never becomes
+            // star-eligible. Removed once the cell actually commits Solid (registry callback).
             _pendingRegrowSource.TryGetValue(gp, out var regrowSource);
-            _pendingRegrowSource.Remove(gp);
 
             // Write / update the imprint so future regrows of this cell remember the role.
             // Preserve hiddenRole (permanent Voronoi ground-truth) across the rewrite.
             _imprints.EnsureAllocated();
             _imprints.TryGetValue(gp, out var existingImp);
 
-            // Generic-fill cells (hiddenRoleIsGenericFill) regrowing back to None get an extra
-            // softness multiplier on top of the None baseline — role-tinted and force-gray
-            // regrows (regrowRole == None but hiddenRoleIsGenericFill == false) are unaffected.
-            bool isGenericFillRegrow = existingImp.hiddenRoleIsGenericFill;
-            float genericFillSoftenMul = (regrowRole == MusicalRole.None && isGenericFillRegrow)
-                ? _genericFillRegrowSoftenMultiplier01
-                : 1f;
-
             _imprints[gp] = new DustImprint
             {
                 color               = regrowTint,
-                carveResistance01   = (roleProfile != null ? roleProfile.carveResistance01 : config.noneCarveResistance01) * genericFillSoftenMul,
-                drainResistance01   = (roleProfile != null ? roleProfile.drainResistance01 : config.noneDrainResistance01) * genericFillSoftenMul,
+                carveResistance01   = (roleProfile != null ? roleProfile.carveResistance01 : config.noneCarveResistance01),
+                drainResistance01   = (roleProfile != null ? roleProfile.drainResistance01 : config.noneDrainResistance01),
                 maxEnergyUnits      = roleProfile != null ? roleProfile.maxEnergyUnits : config.noneMaxEnergyUnits,
                 role                = regrowRole,
                 healDelay           = 0f,
@@ -579,7 +596,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             yield break;
         }
 
-        SetCellState(gp, DustCellState.Solid);
+        SetCellState(gp, DustCellState.Solid); // solid-transition callback clears pending source/delay
         if (dust != null)
         {
             dust.regrowAlphaCapped = false;
@@ -717,7 +734,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         if (TryGetCellState(cell, out var st) && st == DustCellState.Solid)
         {
             if (TryGetDustAt(cell, out var dust) && dust != null)
-                return dust.CurrentTint;
+                return dust.RestTintRaw;
         }
 
         // Default: current maze tint (CosmicDustGeneratorConfig.mazeTint).

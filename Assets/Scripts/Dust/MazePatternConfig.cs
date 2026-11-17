@@ -17,58 +17,12 @@ public enum MazePatternType
 public sealed class DustTimingParams
 {
     [FormerlySerializedAs("regrowDelay")]
-    [Tooltip("Base seconds before a cleared cell regrows dust. Fallback for all sources.")]
+    [Tooltip("Seconds before a cleared role-less (filler/None) cell regrows. Role cells use their MusicalRoleProfile.regrowthDelay instead. (Per-source overrides were removed 2026-11-17 — LEGIBILITY_AUDIT.md A5.)")]
     public float regrowDelay = 8f;
-
-    [Header("Per-Source Overrides (-1 = use base)")]
-    public float vehiclePlowRegrowDelay = -1f;
-    public float collectableArrivalRegrowDelay = -1f;
-    public float collectablePlowRegrowDelay = -1f;
-    public float jailRegrowDelay = -1f;
-    public float superNodeRegrowDelay = -1f;
-    public float zapRegrowDelay = -1f;
-    [Tooltip("Delay applied when a DiscoveryTrackNode dies and releases the star-drained cells it was holding.")]
-    public float starDrainReleaseDelay = -1f;
-    [Tooltip("Delay applied to cells cleared by a discarded carried note's detonation blast.")]
-    public float collectableDiscardRegrowDelay = -1f;
-    [Tooltip("Delay applied to cells cleared by a time bomb collectable's detonation blast.")]
-    public float collectableBombBlastRegrowDelay = -1f;
-    [Tooltip("Delay applied when a track-filled role sweep (SuperNode fill) releases its held cells.")]
-    public float trackFilledRegrowDelay = -1f;
-    [Tooltip("Delay applied to cells a PhaseStar carves while burrowing (StarNavigationParams Burrow mode).")]
-    public float starBurrowRegrowDelay = -1f;
-
-    /// <summary>Per-source delay, or -1 to fall back to the base regrowDelay.</summary>
-    public float GetDelayFor(DustClearSource source) => source switch
-    {
-        DustClearSource.VehiclePlow          => vehiclePlowRegrowDelay,
-        DustClearSource.StarDrain            => starDrainReleaseDelay,
-        DustClearSource.Zap                  => zapRegrowDelay,
-        DustClearSource.CollectableArrival   => collectableArrivalRegrowDelay,
-        DustClearSource.CollectablePlow      => collectablePlowRegrowDelay,
-        DustClearSource.Jail                 => jailRegrowDelay,
-        DustClearSource.SuperNode            => superNodeRegrowDelay,
-        DustClearSource.CollectableDiscard   => collectableDiscardRegrowDelay,
-        DustClearSource.CollectableBombBlast => collectableBombBlastRegrowDelay,
-        DustClearSource.TrackFilled          => trackFilledRegrowDelay,
-        DustClearSource.StarBurrow           => starBurrowRegrowDelay,
-        _                                    => -1f,
-    };
 
     public void Validate()
     {
         regrowDelay = Mathf.Max(0f, regrowDelay);
-        vehiclePlowRegrowDelay        = Mathf.Max(-1f, vehiclePlowRegrowDelay);
-        collectableArrivalRegrowDelay = Mathf.Max(-1f, collectableArrivalRegrowDelay);
-        collectablePlowRegrowDelay    = Mathf.Max(-1f, collectablePlowRegrowDelay);
-        jailRegrowDelay               = Mathf.Max(-1f, jailRegrowDelay);
-        superNodeRegrowDelay          = Mathf.Max(-1f, superNodeRegrowDelay);
-        zapRegrowDelay                = Mathf.Max(-1f, zapRegrowDelay);
-        starDrainReleaseDelay         = Mathf.Max(-1f, starDrainReleaseDelay);
-        collectableDiscardRegrowDelay = Mathf.Max(-1f, collectableDiscardRegrowDelay);
-        collectableBombBlastRegrowDelay = Mathf.Max(-1f, collectableBombBlastRegrowDelay);
-        trackFilledRegrowDelay        = Mathf.Max(-1f, trackFilledRegrowDelay);
-        starBurrowRegrowDelay         = Mathf.Max(-1f, starBurrowRegrowDelay);
     }
 }
 

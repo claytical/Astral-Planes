@@ -1,182 +1,116 @@
 using UnityEngine;
 
 /// <summary>
-/// Vehicle-local release cue: a filled circle that grows behind the vehicle,
-/// colored with the pending note's track color, plus a step bar that
-/// counts down remaining steps to the armed target.
+/// Manual-release approach ring (LEGIBILITY_AUDIT.md C3). While a ship carries a note in Manual
+/// mode and the next release window hasn't opened yet, a thin ring in the note's track color
+/// contracts from wide toward the hull, getting brighter as the window approaches. The moment the
+/// window opens the ring vanishes and the release tether (NoteTether, shown only while the window
+/// is open) takes over — so: ring closing in = "get ready", tether = "now".
 ///
-/// Setup — add this component to the vehicle GameObject (or a child).
-/// Assign the <see cref="releaseCue"/> field on Vehicle to this component.
-///
-/// The growing circle is a SpriteRenderer drawn BEHIND the vehicle (lower
-/// sorting order), so white-outline vehicles remain visible on top of it.
+/// Driven every frame by Vehicle.TickReleaseApproachCue. Self-contained: Vehicle adds this
+/// component at runtime if the prefab lacks it, and the ring sprite is generated procedurally.
+/// (Replaces the original growing-circle + step-bar cue, inert since its setters were removed.)
 /// </summary>
 [DisallowMultipleComponent]
 public class VehicleReleaseCue : MonoBehaviour
 {
-    // ------------------------------------------------------------------
-    // Inspector
-    // ------------------------------------------------------------------
-    [Header("Growing Circle")]
-    [Tooltip("Maximum world-space radius of the filled circle at pulse = 1.")]
-    [SerializeField] private float circleMaxRadius = 0.65f;
+    [Header("Approach Ring")]
+    [Tooltip("Ring radius when it first appears, as a multiple of the ship sprite's radius.")]
+    [SerializeField] private float ringStartRadiusMul = 2.5f;
+    [Tooltip("Ring radius as the window opens, as a multiple of the ship sprite's radius (just outside the hull).")]
+    [SerializeField] private float ringEndRadiusMul = 1.15f;
+    [SerializeField, Range(0f, 1f)] private float ringAlphaStart = 0.15f;
+    [SerializeField, Range(0f, 1f)] private float ringAlphaEnd = 0.85f;
+    [Tooltip("Sorting order relative to the vehicle sprite (negative = behind the hull).")]
+    [SerializeField] private int sortingOrderOffset = 1;
 
-    [Tooltip("Minimum world-space radius when the circle first becomes visible.")]
-    [SerializeField] private float circleMinRadius = 0.35f;
+    private const float kRingThickness01 = 0.07f; // ring band as a fraction of the sprite radius
 
-    [Tooltip("Alpha of the circle at pulse = 0 (just appeared).")]
-    [SerializeField] private float circleAlphaMin = 0.50f;
+    private static Sprite s_ringSprite;
 
-    [Tooltip("Alpha of the circle at pulse = 1 (fully grown).")]
-    [SerializeField] private float circleAlphaMax = 0.90f;
+    private SpriteRenderer _ring;
+    private float _approach01;
+    private Color _color = Color.white;
+    private float _hullRadiusWorld = 0.35f;
 
-    [Tooltip("Sorting layer shared with the vehicle sprite.")]
-    [SerializeField] private string circleSortingLayer = "Default";
-
-    [Tooltip("Sorting order for the circle — must be LOWER than the vehicle sprite's order so it renders behind.")]
-    [SerializeField] private int circleSortingOrder = -1;
-
-    [Tooltip("How quickly the circle size lerps toward its target value.")]
-    [SerializeField] private float circleLerpSpeed = 10f;
-
-    [Tooltip("Sprite to use for the filled circle. Assign Unity's built-in 'Knob' or any filled circle sprite. Leave null for a white quad fallback (less round).")]
-    [SerializeField] private Sprite circleSprite;
-
-    [Header("Step Bar")]
-    [Tooltip("Sprite for the horizontal step-countdown bar. A 1×1 white quad works well.")]
-    [SerializeField] private Sprite stepBarSprite;
-
-    [Tooltip("Full width of the bar in world units (at max beats remaining).")]
-    [SerializeField] private float stepBarWidth = 0.80f;
-
-    [Tooltip("Height of the step bar in world units.")]
-    [SerializeField] private float stepBarHeight = 0.07f;
-
-    [Tooltip("World-space Y offset from the vehicle center (negative = below).")]
-    [SerializeField] private float stepBarYOffset = -0.55f;
-
-    [Tooltip("Sorting order for the step bar.")]
-    [SerializeField] private int stepBarSortingOrder = 3;
-
-    private SpriteRenderer _stepBar;
-    private float _stepBarFullWidth = 1f;
-
-    // ------------------------------------------------------------------
-    // Runtime state
-    // ------------------------------------------------------------------
-    private SpriteRenderer  _circle;
-    private float           _currentPulse;   // 0→1, smoothed
-    private float           _targetPulse;
-    private Color           _trackColor = Color.white;
-
-    // ------------------------------------------------------------------
-    // Unity
-    // ------------------------------------------------------------------
-    private void Awake()
-    {
-        BuildCircle();
-        BuildStepBar();
-        SetVisible(false);
-    }
-
-    private void Update()
-    {
-        // Snap off immediately when the cue is cleared — no fizzle/linger.
-        if (_targetPulse <= 0f)
-            _currentPulse = 0f;
-        else
-            _currentPulse = Mathf.Lerp(_currentPulse, _targetPulse, circleLerpSpeed * Time.deltaTime);
-
-        // Use _targetPulse for visibility so the circle appears/disappears on musical time,
-        // not on the lagged smoothed value.
-        bool active = _targetPulse > 0.01f;
-        SetVisible(active);
-
-        if (active)
-            UpdateCircle(_currentPulse);
-    }
-
-    // ------------------------------------------------------------------
-    // Public API — called by Vehicle
-    // ------------------------------------------------------------------
+    /// <summary>World point the ring is centered on (Vehicle.NoteCoreAnchor); falls back to this transform.</summary>
+    public Transform centerAnchor;
 
     /// <summary>
-    /// Update the step countdown display.
-    /// Called on every musical step tick while a note is armed.
+    /// approach01: 0 = hidden, (0..1] = window approaching (1 = opening now).
+    /// hullRadiusWorld: radius of the ship's own sprite — the ring is sized relative to it.
     /// </summary>
-    public void SetBeatsRemaining(int remaining, int total)
+    public void SetApproach(Color trackColor, float approach01, float hullRadiusWorld)
     {
-        // Shrink step bar proportionally to beats remaining.
-        if (_stepBar != null && total > 0)
+        _color = trackColor;
+        _approach01 = Mathf.Clamp01(approach01);
+        if (hullRadiusWorld > 0.001f) _hullRadiusWorld = hullRadiusWorld;
+    }
+
+    public void Hide() => _approach01 = 0f;
+
+    private void LateUpdate()
+    {
+        if (_approach01 <= 0.001f)
         {
-            float fraction = Mathf.Clamp01((float)remaining / total);
-            float barW = Mathf.Max(0f, _stepBarFullWidth * fraction);
-            _stepBar.transform.localScale = new Vector3(barW, stepBarHeight, 1f);
-            // Anchor left edge so bar drains left-to-right.
-            _stepBar.transform.localPosition = new Vector3(
-                -(_stepBarFullWidth - barW) * 0.5f,
-                stepBarYOffset,
-                0f);
+            if (_ring != null && _ring.enabled) _ring.enabled = false;
+            return;
+        }
+
+        EnsureRing();
+        _ring.enabled = true;
+
+        // Ease-in so the ring visibly accelerates into the hull right before the window.
+        float u = _approach01 * _approach01;
+        float radius = _hullRadiusWorld * Mathf.Lerp(ringStartRadiusMul, ringEndRadiusMul, u);
+        Color c = _color;
+        c.a = Mathf.Lerp(ringAlphaStart, ringAlphaEnd, _approach01);
+        _ring.color = c;
+
+        Vector3 ls = transform.lossyScale;
+        float d = radius * 2f;
+        _ring.transform.localScale = new Vector3(
+            Mathf.Abs(ls.x) > 0.0001f ? d / ls.x : d,
+            Mathf.Abs(ls.y) > 0.0001f ? d / ls.y : d, 1f);
+        _ring.transform.rotation = Quaternion.identity; // stays round/upright as the ship turns
+        _ring.transform.position = centerAnchor != null ? centerAnchor.position : transform.position;
+    }
+
+    private void EnsureRing()
+    {
+        if (_ring != null) return;
+        var go = new GameObject("Release Approach Ring");
+        go.transform.SetParent(transform, false);
+        _ring = go.AddComponent<SpriteRenderer>();
+        _ring.sprite = GetRingSprite();
+
+        var hull = GetComponent<SpriteRenderer>();
+        if (hull != null)
+        {
+            _ring.sortingLayerID = hull.sortingLayerID;
+            _ring.sortingOrder = hull.sortingOrder + sortingOrderOffset;
         }
     }
 
-    // ------------------------------------------------------------------
-    // Growing circle (SpriteRenderer)
-    // ------------------------------------------------------------------
-    private void BuildCircle()
+    // Procedural thin annulus, 1 world unit across at scale 1.
+    private static Sprite GetRingSprite()
     {
-        var go = new GameObject("ReleaseCueCircle");
-        go.transform.SetParent(transform, false);
-        go.transform.localPosition = Vector3.zero;
-
-        _circle = go.AddComponent<SpriteRenderer>();
-        _circle.sprite           = circleSprite;   // assign a filled circle sprite in the Inspector
-        _circle.sortingLayerName = circleSortingLayer;
-        _circle.sortingOrder     = circleSortingOrder;
-        _circle.color            = new Color(1f, 1f, 1f, 0f);
-        _circle.enabled          = false;
-    }
-
-    private void UpdateCircle(float pulse)
-    {
-        if (_circle == null) return;
-
-        float radius = Mathf.Lerp(circleMinRadius, circleMaxRadius, pulse);
-        // Scale the GameObject so the sprite fills 'radius' world units.
-        // A default Unity sprite is 1 unit wide at scale 1, so diameter = radius * 2.
-        _circle.transform.localScale = Vector3.one * (radius * 2f);
-
-        float alpha = Mathf.Lerp(circleAlphaMin, circleAlphaMax, pulse);
-        _circle.color = new Color(_trackColor.r, _trackColor.g, _trackColor.b, alpha);
-    }
-
-    private void BuildStepBar()
-    {
-        var go = new GameObject("StepBar");
-        go.transform.SetParent(transform, false);
-        go.transform.localPosition = new Vector3(0f, stepBarYOffset, 0f);
-        go.transform.localScale = new Vector3(stepBarWidth, stepBarHeight, 1f);
-
-        _stepBar = go.AddComponent<SpriteRenderer>();
-        _stepBar.sprite           = stepBarSprite;
-        _stepBar.sortingLayerName = circleSortingLayer;
-        _stepBar.sortingOrder     = stepBarSortingOrder;
-        _stepBar.color            = new Color(1f, 1f, 1f, 0.75f);
-        _stepBar.enabled          = false;
-
-        _stepBarFullWidth = stepBarWidth;
-    }
-
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
-    private void SetVisible(bool visible)
-    {
-        if (_circle != null)
-            _circle.enabled = visible;
-
-        if (_stepBar != null)
-            _stepBar.enabled = visible;
-
+        if (s_ringSprite != null) return s_ringSprite;
+        const int n = 128;
+        var tex = new Texture2D(n, n, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+        float r = n * 0.5f;
+        float inner = 1f - kRingThickness01;
+        const float soft = 0.025f;
+        for (int y = 0; y < n; y++)
+        for (int x = 0; x < n; x++)
+        {
+            float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(r, r)) / r;
+            float outerA = Mathf.Clamp01((1f - d) / soft);
+            float innerA = Mathf.Clamp01((d - inner) / soft);
+            tex.SetPixel(x, y, new Color(1f, 1f, 1f, Mathf.Min(outerA, innerA)));
+        }
+        tex.Apply();
+        s_ringSprite = Sprite.Create(tex, new Rect(0, 0, n, n), new Vector2(0.5f, 0.5f), n);
+        return s_ringSprite;
     }
 }

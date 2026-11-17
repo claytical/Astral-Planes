@@ -78,7 +78,6 @@ public partial class DrumTrack : MonoBehaviour
 
     private int _entryLoopsRemaining;
     private bool _carryLatched; // one-way: set once any vehicle carries a collectable (or auto-deposits one)
-    private MusicalRole _lastDrivingRole = MusicalRole.None; // sticky driving role for the pressure axis (DrumTrack.BeatIntensity.cs)
 
     /// <summary>Auto placement never "carries" via the vehicle lock; latch the intro hold on first catch instead.</summary>
     public void NotifyFirstCollect() { _carryLatched = true; }
@@ -240,8 +239,6 @@ public partial class DrumTrack : MonoBehaviour
             );
         }
 
-        AudioClip initialClip = null;
-
     // Ensure our internal motif state is applied consistently with later transitions
     // IMPORTANT: PTM.StartPhase already applied the motif to DrumTrack during TrackSetup.
     // ManualStart should NOT re-apply unless DrumTrack somehow missed it.
@@ -260,55 +257,86 @@ public partial class DrumTrack : MonoBehaviour
         {
             ApplyMotif(bootMotif, armAtNextBoundary: false, who: "DrumTrack/ManualStart", restartTransport: false);
         }
-        initialClip = ChooseEntryClip();
 
-        // Fallback: use whatever is on the inspector source
-        if (initialClip == null)
-            initialClip = drumAudioSource.clip;
-
-        if (initialClip == null)
-        {
-            Debug.LogError("[BOOT] DrumTrack.ManualStart: no initial drum clip available (ChooseEntryClip + drumAudioSource.clip are null).");
-            return;
-        }
-
-        // Prevent hearing the inspector/default loop: stop both decks before scheduling.
+        // Prevent hearing the inspector/default loop. Playback itself waits for
+        // BeginMotifTransport (called by SceneFlowCoordinator once the maze + star are up), so
+        // bar 1 step 0 lines up with the start of play instead of the intro/record hold.
+        // Until then _clipLengthSec stays 0, which keeps Update out of the transport ticks.
         try { _activeDrum.Stop(); } catch { }
         try { if (_inactiveDrum != null) _inactiveDrum.Stop(); } catch { }
         StopAllOtherDrumSources(keepPlaying: null);
         _pendingDrumLoop = null;
         _pendingDrumLoopArmed = false;
+    }
 
-        // Configure active deck
-        _activeDrum.clip = initialClip;
+    /// <summary>
+    /// Hard-(re)starts the drum transport on the current motif's entry clip so the leader loop's
+    /// step 0 lands now. Used for the first start of the session and at every motif start
+    /// (after the new maze + star are ready), replacing whatever was playing or armed.
+    /// </summary>
+    public void BeginMotifTransport(string who)
+    {
+        if (drumAudioSource == null)
+        {
+            Debug.LogError($"[DRUM] BeginMotifTransport by {who}: drumAudioSource is null.");
+            return;
+        }
+
+        EnsureDualDrumSources();
+        if (_activeDrum == null)
+        {
+            Debug.LogError($"[DRUM] BeginMotifTransport by {who}: dual-drum source init failed (_activeDrum is null).");
+            return;
+        }
+
+        AudioClip entryClip = ChooseEntryClip();
+        if (entryClip == null) entryClip = _currentDrumClip != null ? _currentDrumClip : drumAudioSource.clip;
+        if (entryClip == null)
+        {
+            Debug.LogError($"[DRUM] BeginMotifTransport by {who}: no drum clip available (ChooseEntryClip + fallbacks are null).");
+            return;
+        }
+
+        // Drop everything in flight: decks, armed/scheduled swap, crossfade.
+        try { _activeDrum.Stop(); } catch { }
+        try { if (_inactiveDrum != null) _inactiveDrum.Stop(); } catch { }
+        StopAllOtherDrumSources(keepPlaying: null);
+        _pendingDrumLoop = null;
+        _pendingDrumLoopArmed = false;
+        _pendingDrumLoopDspStart = -1.0;
+        _pendingSwapLoopsElapsed = 0;
+        _crossfadeStartDsp = -1.0;
+        _crossfadeEndDsp = -1.0;
+
+        // Commit the motif's authored timing now (no deck swap will do it for us).
+        if (_motif != null)
+        {
+            drumLoopBPM = _motif.bpm;
+            totalSteps  = Mathf.Max(1, _motif.stepsPerLoop);
+        }
+        _pendingTimingValid = false;
+
+        _activeDrum.clip = entryClip;
         _activeDrum.loop = true;
         _activeDrum.playOnAwake = false;
         _activeDrum.volume = MotifDrumVolume();
+        _clipLengthSec = Mathf.Max(entryClip.length, 0f);
 
-        _clipLengthSec = Mathf.Max(initialClip.length, 0f);
-
-        // Start scheduled
         double dspStart = AudioSettings.dspTime + 0.05;
         _activeDrum.PlayScheduled(dspStart);
-
-        // Make the active deck the canonical "drumAudioSource" used elsewhere
         drumAudioSource = _activeDrum;
 
         startDspTime = dspStart;
         leaderStartDspTime = dspStart;
-
-        _currentDrumClip = initialClip;
+        _currentDrumClip = entryClip;
         _started = true;
 
-        if (_motif != null)
-        {
-            if (GameFlowManager.VerboseLogging) Debug.Log($"[BOOT] Drum transport started (motif): clip={initialClip.name} dspStart={dspStart:F3} bpm={drumLoopBPM} steps={totalSteps}");
-        }
-        else
-        {
-            // We don't know bpm/steps in fallback mode; keep whatever inspector/default values were set.
-            if (GameFlowManager.VerboseLogging) Debug.Log($"[BOOT] Drum transport started (fallback): clip={initialClip.name} dspStart={dspStart:F3} (PTM motif missing)");
-        }
+        // Fresh motif start: intro window counts from here, and no drop carries across.
+        _entryLoopsRemaining = _motif != null ? Mathf.Max(0, _motif.entryLoopCount) : 0;
+        ClearBassDropState();
+
+        if (logBeatSeqGates || GameFlowManager.VerboseLogging)
+            Debug.Log($"[DRUM] BeginMotifTransport by {who}: motif={(_motif ? _motif.motifId : "null")} clip={entryClip.name} dspStart={dspStart:F3} bpm={drumLoopBPM} steps={totalSteps}");
     }
 
     public void RequestPhaseStar(Vector2Int? cellHint = null)

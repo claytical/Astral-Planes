@@ -13,6 +13,9 @@ public enum CellFlags
     // Bypass-proof "this cell can never be carved" marker — distinct from the transient,
     // ship-bypassable DustImprint.carveResistance01. See CosmicDustGenerator.CellLifecycle.cs.
     Solid           = 1 << 4,
+    // Cosmic Block: this cell's role is walled off for the current ring (CosmicDustGenerator.Blocks.cs).
+    // Indestructible to every clear path while set; reverted when the next ring completes.
+    RoleBlocked     = 1 << 5,
 }
 
 /// <summary>

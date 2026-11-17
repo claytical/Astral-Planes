@@ -36,7 +36,6 @@ public sealed class CosmicDustRegrowthController
     private readonly Action<Vector2Int> _setCellEmpty;            // used for permanent veto on step gate
     private readonly Action<Vector2Int> _setCellPendingRegrow;    // used by delay coroutine
     private readonly Action<Vector2Int> _startCommitRegrowCell;   // host starts + tracks the commit coroutine itself
-    private readonly Func<Vector2Int, bool> _shouldBypassStepGate; // inert filler dust commits immediately instead of queuing
 
     // --- Tunables provided per tick / call ---
     private readonly Func<float> _getRegrowVetoRetryDelaySeconds;
@@ -57,8 +56,7 @@ public sealed class CosmicDustRegrowthController
         Action<Vector2Int> setCellPendingRegrow,
         Action<Vector2Int> startCommitRegrowCell,
         Func<float> getRegrowVetoRetryDelaySeconds,
-        Func<int> getRegrowCellsPerStep,
-        Func<Vector2Int, bool> shouldBypassStepGate)
+        Func<int> getRegrowCellsPerStep)
     {
         _host = host;
 
@@ -78,7 +76,6 @@ public sealed class CosmicDustRegrowthController
 
         _getRegrowVetoRetryDelaySeconds = getRegrowVetoRetryDelaySeconds;
         _getRegrowCellsPerStep = getRegrowCellsPerStep;
-        _shouldBypassStepGate = shouldBypassStepGate;
     }
 
     public void CancelRegrow(Vector2Int cell)
@@ -252,14 +249,11 @@ public sealed class CosmicDustRegrowthController
                 continue;
             }
 
-            // Success: mark PendingRegrow, then either commit immediately (inert filler dust,
-            // which shouldn't wait behind — or be able to starve — real role-dust regrowth in
-            // the shared step-gate queue) or enqueue for step-gate promotion as usual.
+            // Success: mark PendingRegrow and enqueue for step-gate promotion. (Filler never
+            // reaches here any more — it's permanent once cleared — so the old filler
+            // step-gate bypass was removed with the quick-regrow sub-type.)
             _setCellPendingRegrow(gridPos);
-            if (_shouldBypassStepGate(gridPos))
-                _startCommitRegrowCell(gridPos);
-            else
-                EnqueueStepRegrow(gridPos);
+            EnqueueStepRegrow(gridPos);
 
             _regrowthCoroutines.Remove(gridPos);
             yield break;

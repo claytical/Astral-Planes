@@ -76,6 +76,12 @@ public class PlayerStats : MonoBehaviour
         float ratio = currentEnergy / maxEnergy;
         fuel.UpdateFuelUI(ratio, drainWeight01);
     }
+
+    /// <summary>Gravity-void passive refuel on/off — drives the fuel bar's refuel shimmer.</summary>
+    public void SetFuelRefueling(bool refueling)
+    {
+        if (fuel != null) fuel.SetRefueling(refueling);
+    }
     public void SetColor(Color color)
     {
         vehicleIcon.color = color;

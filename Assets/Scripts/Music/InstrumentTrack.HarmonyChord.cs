@@ -417,6 +417,8 @@ public partial class InstrumentTrack
         // player collected the note. Restoring these keeps CommitTime01 non-zero in the
         // ring glyph so squiggles are visible after a chord change.
         var savedCommitTimes = new Dictionary<int, float>(_noteCommitTimes);
+        // Same for provenance: AddNoteToLoop below clears each step's origin cell.
+        var savedOriginCells = new Dictionary<int, Vector2Int>(_noteOriginCells);
 
         persistentLoopNotes.Clear();
         _noteCommitTimes.Clear();
@@ -436,6 +438,8 @@ public partial class InstrumentTrack
                 AddNoteToLoop(step, note, dur, vel, true, authoredRoot, skipChordQuantize: true);
                 if (savedCommitTimes.TryGetValue(step, out float originalTime))
                     _noteCommitTimes[step] = originalTime;
+                if (savedOriginCells.TryGetValue(step, out var originCell))
+                    _noteOriginCells[step] = originCell;
             }
         }
 

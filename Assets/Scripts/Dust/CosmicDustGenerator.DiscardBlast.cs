@@ -34,6 +34,7 @@ public partial class CosmicDustGenerator
             var gp = new Vector2Int(centerGP.x + dx, centerGP.y + dy);
             if (!IsInBounds(gp)) continue;
             if (!TryGetCellState(gp, out var st) || st != DustCellState.Solid) continue;
+            if (IsBlockAt(gp)) continue; // Cosmic Blocks shrug off blasts (and must not be marked permanent-clear)
             _discardBlastScratch.Add(gp);
         }
 
