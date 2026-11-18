@@ -97,8 +97,7 @@ public class Boundaries : MonoBehaviour
     {
         if (boundary == null || opposite == null) return;
 
-        var wrap = boundary.gameObject.GetComponent<BoundaryWrap>()
-                   ?? boundary.gameObject.AddComponent<BoundaryWrap>();
+        var wrap = boundary.gameObject.GetOrAddComponent<BoundaryWrap>();
 
         wrap.warpPrefab = warpPrefab;
         wrap.axis = axis;

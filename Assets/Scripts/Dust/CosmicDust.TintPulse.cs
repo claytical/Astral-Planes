@@ -74,7 +74,30 @@ private void ClearRainbowParticleDirtyIfNeeded()
         _displayTint = tint;
         SetDustColorAllParticles(tint);
     }
-    private void SetBaseTint(Color tint, bool applyImmediatelyIfNoPulse = true)
+
+    // Intermediate frame of an animation (pulse / flash / fade): same as ApplyDisplayedTint, but
+    // the live-particle rewrite goes through the shared DustParticleRewriteBudget. The animation's
+    // final write must use ApplyDisplayedTint / RestoreDisplayToBaseTint so it always lands.
+    private void ApplyDisplayedTintAnimated(Color tint)
+    {
+        _displayTint = tint;
+        SetDustColorAllParticles(tint, budgeted: true);
+    }
+
+    private int _rewriteBudgetPhase = -1;
+    private int RewriteBudgetPhase
+    {
+        get
+        {
+            if (_rewriteBudgetPhase < 0)
+                _rewriteBudgetPhase = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this) & 0x7fffffff;
+            return _rewriteBudgetPhase;
+        }
+    }
+
+    private bool AllowLiveRewrite(bool budgeted) =>
+        !budgeted || DustParticleRewriteBudget.TryRewrite(RewriteBudgetPhase);
+    private void SetBaseTint(Color tint, bool applyImmediatelyIfNoPulse = true, bool display = true)
     {
         // Preserve _currentTint.a — it is authoritative charge state managed only by
         // DrainCharge, ApplyRoleAndCharge, and EnsureMinSolidAlpha. Callers of SetBaseTint
@@ -87,7 +110,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
         _currentTint = tint;
         _undrainedRgb = tint;
 
-        if (!_tintPulseActive || applyImmediatelyIfNoPulse)
+        if (display && (!_tintPulseActive || applyImmediatelyIfNoPulse))
             ApplyDisplayedTint(_currentTint);
     }
     private void RestoreDisplayToBaseTint()
@@ -119,7 +142,9 @@ private void ClearRainbowParticleDirtyIfNeeded()
     }
     public void SetTint(Color tint)
     {
-        SetBaseTint(tint, applyImmediatelyIfNoPulse: true);
+        // ApplyTintVisual rewrites the particles itself; displaying in SetBaseTint first was a
+        // second full live-particle rewrite that the next one immediately overwrote.
+        SetBaseTint(tint, applyImmediatelyIfNoPulse: true, display: false);
         ApplyTintVisual(_currentTint);
     }
     // Now the real particle tint path (dust is going particle-only — see CosmicDust migration
@@ -128,7 +153,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
     // pushed near-black role tints onto particles that read as invisible under an additive blend
     // mode, breaking every interstitial maze — verify in-editor that the particle material
     // actually alpha-blends (not additive) before relying on this for solid/dim tints.
-    private void SetDustColorAllParticles(Color target)
+    private void SetDustColorAllParticles(Color target, bool budgeted = false)
     {
         if (visual.particleSystem == null) return;
 
@@ -140,6 +165,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
 
         int count = ps.particleCount;
         if (count <= 0) return;
+        if (!AllowLiveRewrite(budgeted)) return;
 
         if (_colorParticleBuffer == null || _colorParticleBuffer.Length < count)
             _colorParticleBuffer = new ParticleSystem.Particle[Mathf.Max(count, 32)];
@@ -165,7 +191,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
     // cell spawn/reuse or other pulses. Sets startColor for future emissions and rewrites
     // up to kRainbowParticleRewriteCap currently-live particles so the change reads
     // immediately.
-    private void SetRainbowParticleColor(Color target)
+    private void SetRainbowParticleColor(Color target, bool budgeted = false)
     {
         if (visual.particleSystem == null) return;
 
@@ -175,6 +201,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
 
         int count = ps.particleCount;
         if (count <= 0) return;
+        if (!AllowLiveRewrite(budgeted)) return;
 
         if (_colorParticleBuffer == null || _colorParticleBuffer.Length < count)
             _colorParticleBuffer = new ParticleSystem.Particle[Mathf.Max(count, 32)];
@@ -187,12 +214,22 @@ private void ClearRainbowParticleDirtyIfNeeded()
         // leaves any remaining particles fully untouched in the live system.
         ps.SetParticles(_colorParticleBuffer, rewriteCount);
     }
+    // Explode lives on a child of the prefab; look it up once instead of every tint change.
+    private Explode _explodeCached;
+    private bool _explodeLookedUp;
+
     internal void ApplyTintVisual(Color tint)
     {
-        ApplyDisplayedTint(tint);
+        // The work-shader write below rewrites every particle (startColor + live) with this tint,
+        // so displaying via ApplyDisplayedTint first was a wasted extra rewrite.
+        _displayTint = tint;
         ApplyWorkShaderParamsParticlesOnly(roleColor: tint, workSigned01: 0f);
-        var explode = GetComponentInChildren<Explode>(true);
-        if (explode != null) explode.SetTint(tint);
+        if (!_explodeLookedUp || _explodeCached == null)
+        {
+            _explodeCached = GetComponentInChildren<Explode>(true);
+            _explodeLookedUp = true;
+        }
+        if (_explodeCached != null) _explodeCached.SetTint(tint);
     }
     private Coroutine _retintOverRoutine;
     private Coroutine _tintFadeInRoutine;
@@ -290,7 +327,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
         Color liveChargeTint = chargeTint;
         liveChargeTint.a = _currentTint.a;
 
-        ApplyDisplayedTint(Color.Lerp(startTint, liveChargeTint, a));
+        ApplyDisplayedTintAnimated(Color.Lerp(startTint, liveChargeTint, a));
         yield return null;
     }
 
@@ -305,7 +342,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
         float a = (fadeOut <= 0f) ? 1f : Mathf.Clamp01(t / fadeOut);
 
         // Fade back toward live base tint so ongoing charge drain is respected.
-        ApplyDisplayedTint(Color.Lerp(startTint, _currentTint, a));
+        ApplyDisplayedTintAnimated(Color.Lerp(startTint, _currentTint, a));
         yield return null;
     }
 
@@ -341,7 +378,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
             t += Time.deltaTime;
             Color target = color;
             target.a = _currentTint.a;
-            ApplyDisplayedTint(Color.Lerp(startTint, target, Mathf.Clamp01(t / rise)));
+            ApplyDisplayedTintAnimated(Color.Lerp(startTint, target, Mathf.Clamp01(t / rise)));
             yield return null;
         }
 
@@ -351,7 +388,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
         {
             if (token != _tintPulseToken) yield break;
             t += Time.deltaTime;
-            ApplyDisplayedTint(Color.Lerp(startTint, _currentTint, Mathf.Clamp01(t / fall)));
+            ApplyDisplayedTintAnimated(Color.Lerp(startTint, _currentTint, Mathf.Clamp01(t / fall)));
             yield return null;
         }
 
@@ -411,8 +448,8 @@ private void ClearRainbowParticleDirtyIfNeeded()
         float a = (fadeIn <= 0f) ? 1f : Mathf.Clamp01(t / fadeIn);
         Color rc = RainbowColorAt(t, hueCyclesPerSecond, saturation, value);
 
-        ApplyDisplayedTint(Color.Lerp(startTint, rc, a));
-        SetRainbowParticleColor(Color.Lerp(particleRestColor, rc, a));
+        ApplyDisplayedTintAnimated(Color.Lerp(startTint, rc, a));
+        SetRainbowParticleColor(Color.Lerp(particleRestColor, rc, a), budgeted: true);
         yield return null;
     }
 
@@ -423,8 +460,8 @@ private void ClearRainbowParticleDirtyIfNeeded()
 
         holdElapsed += Time.deltaTime;
         Color rc = RainbowColorAt(fadeIn + holdElapsed, hueCyclesPerSecond, saturation, value);
-        ApplyDisplayedTint(rc);
-        SetRainbowParticleColor(rc);
+        ApplyDisplayedTintAnimated(rc);
+        SetRainbowParticleColor(rc, budgeted: true);
         yield return null;
     }
 
@@ -441,8 +478,8 @@ private void ClearRainbowParticleDirtyIfNeeded()
         t += Time.deltaTime;
         float a = (fadeOut <= 0f) ? 1f : Mathf.Clamp01(t / fadeOut);
 
-        ApplyDisplayedTint(Color.Lerp(startTint, _currentTint, a));
-        SetRainbowParticleColor(Color.Lerp(startTint, particleRestColor, a));
+        ApplyDisplayedTintAnimated(Color.Lerp(startTint, _currentTint, a));
+        SetRainbowParticleColor(Color.Lerp(startTint, particleRestColor, a), budgeted: true);
         yield return null;
     }
 
@@ -482,7 +519,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
         Color liveDenyTint = denyTint;
         liveDenyTint.a = _currentTint.a;
 
-        ApplyDisplayedTint(Color.Lerp(startTint, liveDenyTint, a));
+        ApplyDisplayedTintAnimated(Color.Lerp(startTint, liveDenyTint, a));
         yield return null;
     }
 
@@ -496,7 +533,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
             Color liveDenyTint = denyTint;
             liveDenyTint.a = _currentTint.a;
 
-            ApplyDisplayedTint(liveDenyTint);
+            ApplyDisplayedTintAnimated(liveDenyTint);
             yield return null;
         }
     }
@@ -511,7 +548,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
         t += Time.deltaTime;
         float a = (fadeOut <= 0f) ? 1f : Mathf.Clamp01(t / fadeOut);
 
-        ApplyDisplayedTint(Color.Lerp(startTint, _currentTint, a));
+        ApplyDisplayedTintAnimated(Color.Lerp(startTint, _currentTint, a));
         yield return null;
     }
 

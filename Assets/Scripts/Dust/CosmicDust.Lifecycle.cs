@@ -71,7 +71,9 @@ public partial class CosmicDust
         AnimateSpriteScale(0f, _spriteScaleTarget, growSeconds);
         _particles.EnsureParticlesPlaying();
         SetEmissionMultiplier(Role != MusicalRole.None ? revealedEmissionMultiplier : 1f, seconds: growSeconds);
-        ApplyTintVisual(_currentTint);
+        // No trailing ApplyTintVisual: SetColorVariance → SetTint already applied _currentTint to
+        // every particle (and startColor for the ones EnsureParticlesPlaying emits), and nothing in
+        // between changes the tint — the repeat was a second full rewrite per regrowing cell.
     }
     private IEnumerator GrowInAlphaRoutine(float seconds)
     {
@@ -82,8 +84,9 @@ public partial class CosmicDust
             t += Time.deltaTime;
             _growInAlpha01 = Mathf.SmoothStep(0f, 1f, t / seconds);
             // Re-push whatever is currently displayed so the fade advances even when no other
-            // writer touches the particles this frame.
-            ApplyDisplayedTint(_displayTint);
+            // writer touches the particles this frame. Budgeted: a regrow wave would otherwise
+            // rewrite every regrowing cell's particles every frame (final write below always lands).
+            ApplyDisplayedTintAnimated(_displayTint);
             yield return null;
         }
         _growInAlpha01 = 1f;

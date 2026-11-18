@@ -381,6 +381,8 @@ public partial class CosmicDustGenerator
     /// Last resort for a note destination no ship can reach: reverts the Cosmic Blocks along the
     /// cheapest ship-wide route to it back to ordinary dust. Returns true if anything opened.
     /// </summary>
+    private readonly List<Vector2Int> _openDoorwayScratch = new List<Vector2Int>(32);
+
     public bool OpenDoorwayTo(Vector2Int gp)
     {
         if (_roleBlockedCells.Count == 0 || !GatherReachSeedsAndTargets()) return false;
@@ -389,7 +391,8 @@ public partial class CosmicDustGenerator
             c => _roleBlockedCells.Contains(c));
         if (!_reach.TryGetBestNear(gp, out var node, out int cost) || cost <= 0) return false;
 
-        var toOpen = new List<Vector2Int>();
+        var toOpen = _openDoorwayScratch;
+        toOpen.Clear();
         _reach.TracePath(node, _reachPath);
         foreach (var step in _reachPath)
             _reach.ForEachInClearance(step, p => { if (_roleBlockedCells.Contains(p)) toOpen.Add(p); });

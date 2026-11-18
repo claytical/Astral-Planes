@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-public enum TrackRetunePolicy { BassHarmonyLead, DensestFirst, Manual }
 public class HarmonyDirector : MonoBehaviour
 {
     
@@ -17,7 +16,7 @@ public class HarmonyDirector : MonoBehaviour
     public int ProgressionOffset => _progressionOffset;
 
     private bool _hasPendingProfileSwap;
-    private int  _pendingCharges = 0, _lastPreviewLoopIdx    = -1, _ringsArmedThisLoop    = 0, _globalBuiltCount = 1, _previewChordIdx = -1;   // the palette index we're previewing this loop
+    private int  _globalBuiltCount = 1;
 
     // Re-key offset so TryGetChordAt agrees with NoteSetFactory's authored register:
     // NoteSetFactory rekeys chordSequence[0].rootNote to the current motif's keyRootMidi
@@ -54,7 +53,6 @@ public class HarmonyDirector : MonoBehaviour
     [SerializeField, Range(0f, 4f)] private float commitWindowBeats = 1f; // last N beats before downbeat
     [SerializeField] private bool burnIfOutsideWindow;            // consume rings even if mistimed (no chord change)
     [SerializeField] private bool spreadOverLoops = true;                 // retune 1 track per loop if true
-    [SerializeField] private TrackRetunePolicy retunePolicy = TrackRetunePolicy.BassHarmonyLead;
     [SerializeField] private bool seedFromProfileOnPhaseStart;    // leave false for Option C
 
     [Header("Motif Integration")]
@@ -63,9 +61,6 @@ public class HarmonyDirector : MonoBehaviour
     [Tooltip("If true, on Start() we snap immediately to the current motif's profile, if any.")]
     [SerializeField] private bool applyInitialMotifProfileImmediately = true;
 
-    private enum ConflictPolicy { DeferPlayerToNextLoop, LetPlayerOvertake }
-    [SerializeField] private ConflictPolicy conflictPolicy = ConflictPolicy.DeferPlayerToNextLoop;
-    private bool _forceCommitNextBoundary;
     private DrumTrack _subscribedDrumTrack;
 
     void OnEnable()
@@ -181,37 +176,9 @@ public class HarmonyDirector : MonoBehaviour
         }
     }
 
-    // 2) Preserve existing bridge timing behavior.
-    var sig = BridgeLibrary.Default();
-    switch (sig.commitTiming)
-    {
-        case HarmonyCommit.AtBridgeStart:
-            // Retune everyone to chord 0 on next downbeat
-            CommitNextChordNow();
-            break;
-
-        case HarmonyCommit.MidBridge:
-            // Stage a one-loop delay: commit on the *following* boundary
-            StartCoroutine(CommitOnNextBoundary());
-            break;
-
-        case HarmonyCommit.AtBridgeEnd:
-        default:
-            // Do nothing here; your bridge coroutine should call CommitNextChordNow() at the end.
-            break;
-    }
-}
-    private System.Collections.IEnumerator CommitOnNextBoundary()
-{
-    // Debounced: wait one full loop, then commit
-    var d = GameFlowManager.Instance?.activeDrumTrack;
-    if (d == null) yield break;
-
-    double target = AudioSettings.dspTime + d.GetLoopLengthInSeconds();
-    while (AudioSettings.dspTime < target)
-        yield return null;
-
-    CommitNextChordNow();
+    // 2) The staged profile swaps in at the next loop boundary (_hasPendingProfileSwap). The old
+    //    PhaseBridgeSignature start/mid-bridge timings and the CommitNextChordNow force flag were
+    //    never reachable (BridgeLibrary.Default() always returned AtBridgeEnd) and were removed.
 }
     public void SetActiveProfile(ChordProgressionProfile profile, bool applyImmediately)
     {
@@ -224,7 +191,6 @@ public class HarmonyDirector : MonoBehaviour
             this.profile = profile;
             RecomputeKeyRekeyDelta();
             _globalBuiltCount = (this.profile.chordSequence != null && this.profile.chordSequence.Count > 0) ? 1 : 0;
-            _previewChordIdx  = -1;
 
             if (GameFlowManager.Instance.controller?.tracks != null && this.profile.chordSequence.Count > 0)
             {
@@ -324,10 +290,6 @@ public class HarmonyDirector : MonoBehaviour
             return profile.chordSequence.Count;
         }
     }
-    private void CommitNextChordNow() {
-        if (GameFlowManager.VerboseLogging) Debug.Log("[HD] CommitNextChordNow -> force commit at next downbeat");
-        _forceCommitNextBoundary = true;
-    }
     private void ApplyChordToAllTracks(int chordIndex)
     {
         if (profile == null || GameFlowManager.Instance.controller == null || GameFlowManager.Instance.controller.tracks == null) return;
@@ -347,7 +309,6 @@ public class HarmonyDirector : MonoBehaviour
     }
     private void ResetLoopFlags()
     {
-        _ringsArmedThisLoop = 0;
     }
     private void OnLoopBoundary()
     {
@@ -358,8 +319,8 @@ public class HarmonyDirector : MonoBehaviour
         }
 
         // === Phase/Chord COMMIT path (system-driven) ===
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[CHORD][HD][Boundary] forceCommit={_forceCommitNextBoundary} pendingSwap={_hasPendingProfileSwap} profile={(profile != null ? profile.name : "<null>")}");
-        if (_forceCommitNextBoundary || _hasPendingProfileSwap)
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[CHORD][HD][Boundary] pendingSwap={_hasPendingProfileSwap} profile={(profile != null ? profile.name : "<null>")}");
+        if (_hasPendingProfileSwap)
         {
             bool appliedProfileSwap = false;
 
@@ -391,7 +352,6 @@ public class HarmonyDirector : MonoBehaviour
                 }
 
                 _globalBuiltCount = 1;
-                _previewChordIdx = -1;
 
                 // Reset ascension phrasings so notes don't arrive at the line mid-phrase
                 // after a chord swap — they restart their countdown from current position.
@@ -399,7 +359,6 @@ public class HarmonyDirector : MonoBehaviour
                 nv?.ResetAscensionPhrasing();
             }
 
-            _forceCommitNextBoundary = false;
             ResetLoopFlags();
             return; // Important: skip the player-build step this boundary
         }

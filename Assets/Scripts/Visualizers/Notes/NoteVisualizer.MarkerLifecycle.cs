@@ -24,7 +24,7 @@ public partial class NoteVisualizer
         tag.ascendBurstId = burstId; // ← persist for ascension even if canonicalize neutralizes burstId later
         tag.isPlaceholder = false;   // ← lit now
         tag.isAscending = false;
-        var ml = markerGo.GetComponent<MarkerLight>() ?? markerGo.AddComponent<MarkerLight>();
+        var ml = markerGo.GetOrAddComponent<MarkerLight>();
         ml.LightUp(track.DisplayColor);
     }
 

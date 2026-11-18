@@ -196,7 +196,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
     private PhaseTransitionManager phaseTransitionManager;
 
     // Density conservation: target solid count set at maze init; -1 = inactive.
-    private int _targetSolidCount = -1;
     // Pattern oracle: wall cells intended by the current archetype. Null when no maze is active.
     private HashSet<Vector2Int> _mazePatternCells;
     // Cells currently transitioning in (Regrowing state). Added to Solid count
@@ -212,7 +211,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
     [SerializeField] private LayerMask vehicleMask;
 
     [SerializeField] private DustClaimManager dustClaims;
-    private bool _runtimeVoidOnlyDustCreation;
 
     // Back-compat hooks (no-op now that composite rebuilds are removed).
 
@@ -575,7 +573,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
         // Let the visual settle before collisions are reintroduced.
         if (config.regrowColliderEnableDelaySeconds > 0f)
-            yield return new WaitForSeconds(config.regrowColliderEnableDelaySeconds);
+            yield return GetRegrowColliderDelayWait(config.regrowColliderEnableDelaySeconds);
 
         // Abort if conditions changed.
         if (_permanentClearCells.Contains(gp))
@@ -604,6 +602,20 @@ public partial class CosmicDustGenerator : MonoBehaviour
         _regrowthScheduler.CommitRegrowCoroutines.Remove(gp);
     }
 
+    // One shared WaitForSeconds instead of one per regrowing cell (it's immutable, so sharing is
+    // safe); rebuilt only if the config value changes.
+    private WaitForSeconds _regrowColliderDelayWait;
+    private float _regrowColliderDelayWaitSeconds = -1f;
+    private WaitForSeconds GetRegrowColliderDelayWait(float seconds)
+    {
+        if (_regrowColliderDelayWait == null || !Mathf.Approximately(seconds, _regrowColliderDelayWaitSeconds))
+        {
+            _regrowColliderDelayWait = new WaitForSeconds(seconds);
+            _regrowColliderDelayWaitSeconds = seconds;
+        }
+        return _regrowColliderDelayWait;
+    }
+
     private void EnqueueStepRegrow(Vector2Int gp)
     {
         EnsureRegrowController();
@@ -614,8 +626,18 @@ public partial class CosmicDustGenerator : MonoBehaviour
     // ------------------------------------------------------------------
     // Authoritative cell grid helpers
     // ------------------------------------------------------------------
+    // EnsureCellGrid runs from every TryGetCellState/TryGetCellGo/SetCellState call, and those
+    // are hit thousands of times per frame by grid searches. Once a frame has confirmed the grid
+    // matches the current DrumTrack's dimensions, skip the re-check for the rest of that frame.
+    private int _cellGridOkFrame = -1;
+    private DrumTrack _cellGridOkDrums;
+
     private void EnsureCellGrid()
 {
+    if (_cellGridOkFrame == Time.frameCount && drums != null && ReferenceEquals(drums, _cellGridOkDrums)
+        && _gridState.CellGo != null)
+        return;
+
     _permanentClearCells ??= new HashSet<Vector2Int>();
     _imprints.EnsureAllocated(256);
 
@@ -642,6 +664,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
     }
 
     if (w <= 0 || h <= 0) return;
+    _cellGridOkFrame = Time.frameCount;
+    _cellGridOkDrums = drums;
     if (_gridState.CellGo != null && _gridState.Width == w && _gridState.Height == h) return;
 
     _gridState.Allocate(w, h);

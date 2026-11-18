@@ -65,7 +65,8 @@ public partial class CosmicDust
             Mathf.Approximately(legible.b, _currentTint.b))
             return;
 
-        SetBaseTint(raw, applyImmediatelyIfNoPulse: false);
+        // display:false — ApplyTintVisual below does the (single) particle rewrite.
+        SetBaseTint(raw, applyImmediatelyIfNoPulse: false, display: false);
         if (!_tintPulseActive)
             ApplyTintVisual(_currentTint);
     }

@@ -3,31 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-[Serializable]
-public class PhaseRecord
-{
-    public string PhaseId;            // stable authored ID from PhaseLibrary
-    public int    PlaythroughIndex;   // 1 = first time, 2 = second, etc.
-    public long   CompletedAtTicks;   // DateTime.UtcNow.Ticks — survives timezone changes
-    public List<MotifSnapshot> Motifs = new();
-
-    // Convenience
-    public System.DateTime CompletedAt =>
-        new System.DateTime(CompletedAtTicks, System.DateTimeKind.Utc);
-}
-
-// The full persistent garden — one instance, loaded at startup, saved on phase completion.
-[Serializable]
-public class GardenRecord
-{
-    public int              SaveVersion = 1;      // for future migration
-    public List<string>     UnlockedPhaseIds = new();
-    public List<PhaseRecord> CompletedPhases    = new();
-
-    // How many times a given phase has been completed (derived, but cached for perf)
-    public int PlaythroughCountFor(string phaseId) =>
-        CompletedPhases.Count(r => r.PhaseId == phaseId);
-}
 public enum PhaseStarState
 {
     Dormant        = -1,    // on-screen but inert, waiting for colored dust

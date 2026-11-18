@@ -9,6 +9,8 @@ using UnityEngine;
 public partial class CosmicDustGenerator
 {
     private Coroutine _shockwaveRoutine;
+    // Ring buckets reused across bass drops (one wave runs at a time — a new one stops the old).
+    private List<Vector2Int>[] _shockwaveRings;
 
     /// <summary>Flashes one cell's displayed tint if it's currently solid dust (no state change).
     /// Used by the locked phase-exit gate shimmer (PathExitLockedStub).</summary>
@@ -17,8 +19,12 @@ public partial class CosmicDustGenerator
         if (_gridState.CellState == null || _gridState.CellGo == null) return false;
         if (gp.x < 0 || gp.y < 0 || gp.x >= _gridState.Width || gp.y >= _gridState.Height) return false;
         if (_gridState.CellState[gp.x, gp.y] != DustCellState.Solid) return false;
-        var go = _gridState.CellGo[gp.x, gp.y];
-        if (go == null || !go.TryGetComponent<CosmicDust>(out var dust)) return false;
+        var dust = _gridState.CellDust != null ? _gridState.CellDust[gp.x, gp.y] : null;
+        if (dust == null)
+        {
+            var go = _gridState.CellGo[gp.x, gp.y];
+            if (go == null || !go.TryGetComponent(out dust)) return false;
+        }
         dust.BeginColorFlash(color, seconds);
         return true;
     }
@@ -35,7 +41,10 @@ public partial class CosmicDustGenerator
     {
         int w = _gridState.Width, h = _gridState.Height;
         int maxRing = Mathf.CeilToInt(Mathf.Sqrt(w * w + h * h) * 0.5f) + 1;
-        var rings = new List<Vector2Int>[maxRing + 1];
+        if (_shockwaveRings == null || _shockwaveRings.Length < maxRing + 1)
+            _shockwaveRings = new List<Vector2Int>[maxRing + 1];
+        var rings = _shockwaveRings;
+        for (int i = 0; i < rings.Length; i++) rings[i]?.Clear();
 
         for (int x = 0; x < w; x++)
         for (int y = 0; y < h; y++)
@@ -54,15 +63,20 @@ public partial class CosmicDustGenerator
             if (_gridState.CellState == null || _gridState.Width != w || _gridState.Height != h) break;
 
             var ring = rings[r];
-            if (ring == null) continue;
+            if (ring == null || ring.Count == 0) continue;
             for (int i = 0; i < ring.Count; i++)
             {
                 var c = ring[i];
                 if (_gridState.CellState[c.x, c.y] != DustCellState.Solid) continue;
-                var go = _gridState.CellGo[c.x, c.y];
-                if (go == null) continue;
-                if (go.TryGetComponent<CosmicDust>(out var dust))
-                    dust.BeginColorFlash(color, flashSeconds);
+                // Flashes are budgeted per frame (DustParticleRewriteBudget), so a maze-wide wave
+                // no longer rewrites every cell's particles every frame.
+                var dust = _gridState.CellDust != null ? _gridState.CellDust[c.x, c.y] : null;
+                if (dust == null)
+                {
+                    var go = _gridState.CellGo[c.x, c.y];
+                    if (go == null || !go.TryGetComponent(out dust)) continue;
+                }
+                dust.BeginColorFlash(color, flashSeconds);
             }
         }
         _shockwaveRoutine = null;

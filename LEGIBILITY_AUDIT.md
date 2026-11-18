@@ -10,7 +10,7 @@ This audit asks one question per system: **which rules change what happens in pl
 Cost: S ≈ under a day · M ≈ 1–3 days · L ≈ larger.
 
 **Status:**
-- **A1 and A2 implemented** (2026-11-17), with the flower kept as decoration. The rule lives in `Dust/CosmicDust.Legibility.cs`. It compiles via msbuild but has not been playtested in Unity yet.
+- **A1 and A2 implemented** (2026-11-17). The flower is no longer the brightness tell, but it is not purely decoration: `HasBloomedFlower` still gates star targeting (`CosmicDust.ColliderVisibility.cs`). The rule lives in `Dust/CosmicDust.Legibility.cs`. It compiles via msbuild but has not been playtested in Unity yet.
 - **D1 implemented** (2026-11-17), compiles; not playtested.
   - Intensity is now carve energy only (`DrumTrack.BeatIntensity.cs` `ComputeIntensity01`).
   - Deleted with it: the driving-role ceiling, the Bass-fill lift, `StarPool.GetDrivingRole`, `InstrumentTrackController.GetRoleBinFill01`, `DrumTrackConfig.otherRoleCeiling01` and `MusicalRoleProfile.drumIntensityCeiling01`.
@@ -18,9 +18,7 @@ Cost: S ≈ under a day · M ≈ 1–3 days · L ≈ larger.
   - New bass-drop tell: when the drop clip becomes audible, a Bass-colored ring flash sweeps out through the dust from the center. It lives in `CosmicDustGenerator.Shockwave.cs` and `CosmicDust.BeginColorFlash`, and its knobs are in `DrumTrackConfig` under "Bass Drop".
 - **B1 revised after playtest:** the Wait pointer was removed. It looked like the star zapping another color's note, because the global pickup lock makes the nearest blocker any role's note. Every rejected poke now gets the head shake, and sleep explains the "wait" case.
 - **B1 and B2 implemented** (2026-11-17), compiles; not playtested. The code is in `Phase/Star/PhaseStar.PokeFeedback.cs`.
-  - **B1:** every rejected poke now gives one of two answers:
-    - **NotReady:** the diamonds shake their head (zaps not met).
-    - **Wait:** a pointer line runs from the star to the blocker: its own or another live node, else the nearest floating note, else a ship carrying notes. If no blocker is found it falls back to the shake.
+  - **B1:** every rejected poke plays the NotReady head-shake (the diamonds shake). The original "Wait" pointer line was removed after playtest (see the revision note above).
   - The orange `FlashReject` was deleted, along with its stuck-dim bug.
   - The "budget spent" answer was dropped as unreachable.
   - **B2:** while an armed star is blocked by work elsewhere, it **sleeps**: desaturated diamonds, 25% rotation speed, no ready-spin, dimmed particles. "Blocked" means pickup lock, a pending expansion, or another sequence in flight. This replaces the pickup-lock-only dim.
@@ -73,7 +71,7 @@ Cost: S ≈ under a day · M ≈ 1–3 days · L ≈ larger.
   - **The finding was wrong:** the open window *was* already shown, because the release tether only draws while the window is open.
   - **What it actually described:** the ship-side `VehicleReleaseCue` (circle + step bar). It has been inert since March, when its setters were removed. Every prefab's `releaseCue` was unset, and Sandwave and X-agong lack the component.
   - **The real gap:** nothing signalled that a window was *coming*.
-  - **The fix:** `VehicleReleaseCue` was rewritten as an **approach ring**. A track-colored ring contracts toward the hull over the last `VehicleConfig.releaseApproachLookaheadSeconds` (1.25s) before the window opens, then vanishes as the tether takes over.
+  - **The fix:** `VehicleReleaseCue` was rewritten as an **approach ring**. A track-colored ring contracts toward the hull over the last `VehicleConfig.releaseApproachLookaheadSeconds` (1.25s) before the window opens, then, once the window opens, becomes a filled low-alpha pulsing disc that stays up through a held-button release cascade (revised 11-17: outline = wait, filled disc = window open).
   - **Wiring:** driven by `Vehicle.TickReleaseApproachCue` from `TryGetReleaseWindowState` at 20 Hz. The component is added at runtime when missing, with a procedural sprite.
   - **Removed:** the dead `OnStepTickForReleaseCue` / `SetBeatsRemaining` step-tick path.
   - **Follow-up:** the ring is now sized from the ship's own sprite radius (×2.5 shrinking to ×1.15) instead of fixed world radii, which read far too large.
@@ -93,11 +91,11 @@ Cost: S ≈ under a day · M ≈ 1–3 days · L ≈ larger.
   - **Look:** since A1, trap cells render as the trap role's darkened latent color, the same rule as every uncarved cell. No color conflict remains.
   - **Removed:** the dead `SpawnVehicleTraps`, the `hideRole` parameter/branches in `GrowVoidDustDiskFromGrid` and `SpawnDustAtCells`, and the now-unused `MotifProfile.trapGrowSeconds`. Trap tooltips were updated.
   - **No separate pre-warning added:** the maze grow-in already is the arrival. Say so if traps still feel like a surprise in play.
-- **E1: superseded** by the role-wide Cosmic Block redesign (same day; see ECOSYSTEM.md "Cosmic Blocks"). The loosen tell became a shimmer on all blocked cells while any burst is live. Original entry:
+- **E1: superseded** by the role-wide Cosmic Block redesign (same day; see ECOSYSTEM.md "Cosmic Blocks"). Leftover cells of the walled role that must stay open (doorways, ship-overlapped cells, trap-avoiding regrows) now show as inert gray **passage form** (`CosmicDust.PassageForm.cs`) — carvable, never star food. The loosen tell became a shimmer on all blocked cells while any burst is live. Original entry:
   - **E1 implemented** (2026-11-17), compiles; not playtested.
   - **When it shows:** while a role has a live collectable burst. That role's next bin fill, and so its Cosmic Block shatter, lands when the burst completes.
   - **What it looks like:** the role's standing blocks **loosen**. Each flower trembles (visual-only Perlin jitter; the collider never moves) and flickers toward white. Intensity runs from 0.2 when the burst spawns to 1.0 as its last notes resolve.
-  - **Where:** `InstrumentTrack.TryGetLiveBurstProgress01`; `CosmicBlockField.Update` polls at 5 Hz; `CosmicBlock.SetLoosen` / `TickLoosen`.
+  - **Where:** `InstrumentTrack.TryGetLiveBurstProgress01` (still used by the shimmer); `CosmicBlockField.Update` polls at 5 Hz; `CosmicBlock.SetLoosen` / `TickLoosen` (deleted with `CosmicBlock.cs`).
   - **Performance:** the flicker is sprite-only, so it never triggers the heavy particle-color rewrite.
   - **Not covered:** where the next block will rise is still untold.
 - **E2 implemented** (2026-11-17), compiles; not playtested. The look was redesigned the same day at the user's request: the first bar + pips overlay didn't fit the aesthetic.

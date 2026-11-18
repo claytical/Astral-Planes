@@ -150,7 +150,6 @@ public partial class CosmicDustGenerator
         _imprints?.Clear();
         _registry.ClearAllFlags();
         _gridState.AllSolidCount    = 0;
-        _targetSolidCount = -1;
         _gridState.RegrowingCount   = 0;
         _mazePatternCells = null;
         _carveAccumulator.Clear();
@@ -973,7 +972,6 @@ public partial class CosmicDustGenerator
         _activeMazePattern = phaseTransitionManager?.currentMotif?.mazePattern;
         _lastMazeAnchorCell = starCell;
         _hasMazeAnchorCell = true;
-        _runtimeVoidOnlyDustCreation = false;
         var reserved = new HashSet<Vector2Int> { starCell };
 
         var cellsToFill = new List<(Vector2Int grid, Vector3 world)>();
@@ -1038,7 +1036,6 @@ public partial class CosmicDustGenerator
             foreach (var vehCell in vehicleCells)
                 CarvePermanentDisk(vehCell, vehicleHoleRadiusCells);
         }
-        _targetSolidCount = _roleDensity.TotalSolidCount();
         _isBootstrappingMaze = false;
     }
 

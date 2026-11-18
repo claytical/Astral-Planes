@@ -500,9 +500,9 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
         lr.widthMultiplier    = tentacleWidth;
         lr.shadowCastingMode  = ShadowCastingMode.Off;
         lr.receiveShadows     = false;
-        lr.material = tentacleMaterial != null
+        lr.sharedMaterial = tentacleMaterial != null
             ? tentacleMaterial
-            : new Material(Shader.Find("Sprites/Default"));
+            : SharedMaterials.SpriteDefault;
 
         lr.numCornerVertices = 5;
         lr.numCapVertices    = 5;
@@ -544,7 +544,7 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
             shape.enabled = false;
 
             var rend = ps.GetComponent<ParticleSystemRenderer>();
-            rend.material         = new Material(Shader.Find("Sprites/Default"));
+            rend.sharedMaterial   = SharedMaterials.SpriteDefault;
             rend.sortingLayerName = "Foreground";
             rend.sortingOrder     = 40;
 

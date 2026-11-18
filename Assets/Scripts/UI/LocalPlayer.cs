@@ -17,7 +17,7 @@ public partial class LocalPlayer : MonoBehaviour
     // Shared one-shot SFX source for confirm/nav-click sounds (routed to Effects bus).
     private AudioSource _sfxSource;
 
-    private bool _confirmEnabled, _launchStarted, _launched, _suppressChoose = true;
+    private bool _confirmEnabled, _launchStarted, _launched;
 
     private PlayerSelect _selection;
     private PlayerStats _ui;
@@ -68,7 +68,6 @@ public partial class LocalPlayer : MonoBehaviour
     IEnumerator Start()
     {
         yield return null; // wait one frame so input system "settles"
-        _suppressChoose = false;
         DontDestroyOnLoad(this);
         GameFlowManager.Instance.RegisterPlayer(this);
 

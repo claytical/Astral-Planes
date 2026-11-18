@@ -3,8 +3,6 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
-// One completed playthrough of one authored chapter.
-// Sealed at phase completion and added to GardenRecord.
 
 public partial class DrumTrack : MonoBehaviour
 {

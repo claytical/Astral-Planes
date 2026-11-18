@@ -95,8 +95,17 @@ public partial class MotifRingGlyphApplicator
     /// this doesn't remove notes from the persistent loop or play break effects — the notes already
     /// completed; only their in-flight preview visuals are being wound down.
     /// </summary>
+    // Bumped on every detach so a DeformBinRingCoroutine still building its tethers (it spreads
+    // them over a few frames) stops creating new ones once the record starts leaving.
+    private int _tetherDetachGeneration;
+
+    // Tethers created per frame by DeformBinRingCoroutine. Each one is an anchor GameObject, an
+    // instantiated tether and a shimmer ParticleSystem; a full bin built them all in one frame.
+    private const int kTethersPerFrame = 4;
+
     public void DetachPendingRingTethers(float retractDuration)
     {
+        _tetherDetachGeneration++;
         if (_pendingRingNotes.Count == 0) return;
 
         foreach (var entry in _pendingRingNotes)
@@ -336,10 +345,18 @@ public partial class MotifRingGlyphApplicator
 
         // shouldStop: only hard-clear kills deformation; spin-off lets it finish naturally.
         System.Func<bool> shouldStop = () => ring.Root == null;
+        int detachGeneration = _tetherDetachGeneration;
+        int tethersThisFrame = 0;
 
         foreach (var note in sortedNotes)
         {
             if (shouldStop()) break;
+            if (tethersThisFrame >= kTethersPerFrame)
+            {
+                tethersThisFrame = 0;
+                yield return null;
+                if (shouldStop()) break;
+            }
 
             int   localStep      = note.Step % binSteps;
             float angle          = localStep / (float)binSteps * Mathf.PI * 2f
@@ -350,21 +367,22 @@ public partial class MotifRingGlyphApplicator
             if (noteVisualizer?.noteMarkers != null && track != null)
                 noteVisualizer.noteMarkers.TryGetValue((track, note.Step), out markerTr);
 
-            // Preview tether: grows in immediately (all notes in the bin grow together, since
-            // nothing in this loop yields) from the note's timeline marker to its future
-            // landing spot on the ring. Retracts and self-destroys once the note's step is
+            // Preview tether: grows in from the note's timeline marker to its future landing spot
+            // on the ring. Built kTethersPerFrame per frame, so a full bin's tethers appear over
+            // a few frames instead of all in one; none are built once the record has detached. Retracts and self-destroys once the note's step is
             // reached (see onDepart below), in sync with its travel dot's departure/arrival.
             NoteTether tether = null;
             GameObject tetherAnchor = null;
-            if (noteVisualizer?.noteTetherPrefab != null && track != null)
+            if (noteVisualizer?.noteTetherPrefab != null && track != null && detachGeneration == _tetherDetachGeneration)
             {
+                tethersThisFrame++;
                 var ringLocalPos = new Vector3(Mathf.Cos(angle) * outerR, Mathf.Sin(angle) * outerR, 0f);
                 tetherAnchor = new GameObject($"TetherAnchor_Bin{ring.BinIndex}_Step{note.Step}");
                 tetherAnchor.transform.SetParent(ring.Root.transform, worldPositionStays: false);
                 tetherAnchor.transform.localPosition = ringLocalPos;
 
                 var tetherGo = Instantiate(noteVisualizer.noteTetherPrefab);
-                tether = tetherGo.GetComponent<NoteTether>() ?? tetherGo.AddComponent<NoteTether>();
+                tether = tetherGo.GetOrAddComponent<NoteTether>();
                 tether.SetEndpoints(markerTr, tetherAnchor.transform, note.TrackColor);
                 // The marker may not be registered in noteVisualizer.noteMarkers yet — this
                 // resolves it immediately if it already exists, otherwise NoteTether polls for

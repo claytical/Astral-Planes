@@ -47,7 +47,6 @@ public partial class DiscoveryTrackNode : TrackNode
     private InstrumentTrack _track;
     private MusicalRole _role;
     private DiscoveryTrackNodeLocomotionProfile _activeLocomotionProfile;
-    private int _lastProcessedStep = -1;
     private float _rescanTimer = 0f;
     private DiscoveryTrackNodeDustInteractor _dustInteractor;
     private Camera _cam;
@@ -144,7 +143,6 @@ public partial class DiscoveryTrackNode : TrackNode
         _nextDirectionDecisionAt = Time.time + initialReactionDelay;
         _pathCommitUntil = Time.time + Mathf.Max(0.05f, initialPathCommitmentDuration);
         SetBehaviorIntent(DiscoveryTrackNodeBehaviorIntent.Committing);
-        _lastProcessedStep = -1;
         SubscribeLoopBoundary(_drumTrack);
         // Expiry countdown ring: one pip per loop left, refilled on every hit (LEGIBILITY_AUDIT B3).
         TrackNodeLifetimePips.Attach(this, _lockedColor);

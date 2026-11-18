@@ -49,6 +49,7 @@ public partial class GameFlowManager
     public void AbortTutorialSession()
     {
         ControlTutorialDirector.Instance?.AbortPrimaryTutorial();
+        AbortSessionCoroutines(); // see QuitToSelection
         StartCoroutine(SceneFlow.ReturnToJoinScreen());
     }
 

@@ -125,7 +125,7 @@ public partial class ControlTutorialHighlight : MonoBehaviour
         _pivotBaseScale = pivot.localScale;
 
         _rootRectTransform     = GetComponent<RectTransform>();
-        _rootCanvasGroup       = GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
+        _rootCanvasGroup       = gameObject.GetOrAddComponent<CanvasGroup>();
         _rootCanvasGroup.alpha = 0f;
         _rootAlpha             = 0f;
         _rootAlphaTarget       = 0f;

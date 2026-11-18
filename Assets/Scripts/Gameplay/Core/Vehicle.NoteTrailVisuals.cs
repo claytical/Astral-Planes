@@ -184,7 +184,7 @@ public partial class Vehicle
             if (_vehicleTether == null && viz != null && viz.noteTetherPrefab != null)
             {
                 var go = Instantiate(viz.noteTetherPrefab);
-                _vehicleTether = go.GetComponent<NoteTether>() ?? go.AddComponent<NoteTether>();
+                _vehicleTether = go.GetOrAddComponent<NoteTether>();
                 Color col = Color.white;
                 if (_pendingNotes.Count > 0 && _pendingNotes.Peek().track != null)
                     col = _pendingNotes.Peek().track.DisplayColor;

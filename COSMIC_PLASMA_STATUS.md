@@ -1,4 +1,4 @@
-# Cosmic Plasma (metaball dust look) — status: PAUSED, not working
+# Cosmic Plasma (metaball dust look) — status: PAUSED, not working, renderer feature disabled
 
 Experiment (2026-11-10/11): replace the CosmicDust look with a "grid of bubbly, merged plasma". The live dust prefab
 (`Cosmic Potential.prefab`) is untouched and still works; all collision is correct on it. The plasma variant is **not
@@ -7,12 +7,14 @@ rendering correctly** and work on it was stopped. Nothing here is wired into the
 
 None of this code was ever verified end-to-end by the author of these notes; Unity was driven by the user.
 
-## What exists (all uncommitted)
+## What exists (all committed)
+
+**Renderer feature disabled 2026-11-17** (`m_Active: 0` on the referenced `CosmicPlasmaFeature` in `2D URP Renderer_Renderer.asset`). It was still active, running a half-res field pass plus a fullscreen composite every frame with nothing drawing into it — flagged as a GPU cost in `CODE_HEALTH_AUDIT.md`. The asset also holds a second, unreferenced `CosmicPlasmaFeature` sub-asset. Re-tick the feature to resume.
 | File | Purpose |
 |---|---|
 | `Assets/Shaders/CosmicPlasmaParticle.shader` | Particle shader, single pass `LightMode "PlasmaField"` (never drawn by the 2D renderer). Writes `rgb = tint*dim*d`, `a = d` (density) with additive blend. Kernel `(1-r²)²`, vertex alpha < ~0.1–0.2 gated to zero (ghost/collider-off cells). |
 | `Assets/Shaders/CosmicPlasmaComposite.shader` | Fullscreen composite: blur, threshold -> surface, tint/rim/swirl shading, tone-map, debug views. |
-| `Assets/Scripts/Dust/CosmicPlasmaFeature.cs` | URP 2D `ScriptableRendererFeature` (Render Graph). Field pass draws the dust layer's `PlasmaField` renderers into a half-res RGBA16F buffer; composite pass blends over camera color. Has `debugView` (SolidTest / FieldDensity / FieldColor) and one-time log lines. Currently added to `Assets/Settings/2D URP Renderer_Renderer.asset` (modified, uncommitted). |
+| `Assets/Scripts/Dust/CosmicPlasmaFeature.cs` | URP 2D `ScriptableRendererFeature` (Render Graph). Field pass draws the dust layer's `PlasmaField` renderers into a half-res RGBA16F buffer; composite pass blends over camera color. Has `debugView` (SolidTest / FieldDensity / FieldColor) and one-time log lines. Added to `Assets/Settings/2D URP Renderer_Renderer.asset` (now inactive, see above). |
 | `Assets/Editor/CosmicPlasmaSetup.cs` | Menu `Tools/Astral Planes/Dust/Build Cosmic Plasma Variant`: builds `Assets/Materials/CosmicPlasma.mat` and the variant prefab `Assets/Prefabs/Interactable Objects/Cosmic Plasma.prefab`. |
 | `Assets/Scripts/Dust/CosmicDust.Helpers.cs` / `CosmicDust.SpriteScale.cs` | New opt-in `visual.particleCellFraction` (0 = legacy behavior) + `ApplyCellRelativeParticleSizing()` sizing the particle in cell units, emitter forced to the cell center. Harmless to other prefabs. |
 
@@ -43,12 +45,14 @@ None of this code was ever verified end-to-end by the author of these notes; Uni
 - Root cause for the last failures is **not identified**.
 
 ## If resuming
-1. Confirm the feature is still enabled in the renderer asset and `dustPrefab` points at `Cosmic Plasma`.
+1. Re-enable the feature in the renderer asset (it is now off) and `dustPrefab` points at `Cosmic Plasma`.
 2. Re-run the setup menu (prefab changes only apply on rebuild), then use `debugView` SolidTest -> FieldDensity.
 3. Verify with Game view + Physics2D "Always Show Colliders" so plasma and colliders are compared in the same camera.
 4. Cheaper alternative worth weighing: keep the original particle dust and only change its material/size for a bubbly
    look; true metaball fusion is the part that turned out fragile.
 
 ## To remove entirely
-Delete the files in the table above, revert `CosmicDust.Helpers.cs` / `CosmicDust.SpriteScale.cs`
-(`git checkout`), and remove the Cosmic Plasma Feature from `2D URP Renderer_Renderer.asset`.
+Delete the shader, feature, editor-setup, material and prefab files in the table above, and remove both Cosmic Plasma
+Feature sub-assets from `2D URP Renderer_Renderer.asset`. **Do not** `git checkout` `CosmicDust.Helpers.cs` /
+`CosmicDust.SpriteScale.cs`: Cosmic Blocks (`CosmicDust.BlockForm.cs`) now build on that sizing path (`_blockSizeMul` in
+`ApplyCellRelativeParticleSizing`). Leave `particleCellFraction` in place (0 = legacy behaviour).

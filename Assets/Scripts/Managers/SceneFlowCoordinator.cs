@@ -58,6 +58,21 @@ public sealed class SceneFlowCoordinator
         _gameFlow.StartCoroutine(HandleTrackSceneSetupAsync());
     }
 
+    /// <summary>
+    /// Called after GameFlowManager stops its coroutines to abort a session mid-flow: clears the
+    /// setup guard and any half-finished screen fade / motif banner those coroutines owned.
+    /// </summary>
+    public void ResetAfterAbortedFlows()
+    {
+        _setupInFlight = false;
+        _motifBannerRoutine = null;
+        if (_screenFadeOverlay != null)
+        {
+            _screenFadeOverlay.alpha = 0f;
+            _screenFadeOverlay.gameObject.SetActive(false);
+        }
+    }
+
     public IEnumerator QuitToSelection()
     {
         if (GameFlowManager.VerboseLogging) Debug.Log($"[GFM] QuitToSelection: destroying players and resetting state (demoMode={_gameFlow.demoMode})");
@@ -371,7 +386,7 @@ public sealed class SceneFlowCoordinator
 
     private IEnumerator FadeIntroScreen(GameObject introGo, bool motifNameOnly)
     {
-        var cg = introGo.GetComponent<CanvasGroup>() ?? introGo.AddComponent<CanvasGroup>();
+        var cg = introGo.GetOrAddComponent<CanvasGroup>();
 
         // When showing just the name, temporarily hide every Intro Screen child that isn't on
         // the Motif Name branch, restoring their prior active state afterwards.
@@ -477,7 +492,7 @@ public sealed class SceneFlowCoordinator
             if (v == null) continue;
             if (v.GetComponentInParent<InstrumentTrack>() != null) continue;
             v.SetDrumTrack(_gameFlow.activeDrumTrack);
-            var player = v.GetComponent<MidiStreamPlayer>() ?? v.GetComponentInParent<MidiStreamPlayer>();
+            var player = v.TryGetComponent(out MidiStreamPlayer own) ? own : v.GetComponentInParent<MidiStreamPlayer>(); // not ??: Unity fake-null
             if (player != null) v.SetMidiStreamPlayer(player);
         }
     }

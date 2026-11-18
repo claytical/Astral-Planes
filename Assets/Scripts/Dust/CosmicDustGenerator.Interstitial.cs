@@ -57,7 +57,6 @@ public partial class CosmicDustGenerator
         int w = drums.GetSpawnGridWidth();
         int h = drums.GetSpawnGridHeight();
 
-        _runtimeVoidOnlyDustCreation = false;
 
         // MazeTopologyService.Context always wants a StarCell, but Tunnels (the only pattern
         // the interstitial uses) never reads it — only RingChokepoints does. Any in-bounds cell
@@ -181,7 +180,6 @@ public partial class CosmicDustGenerator
             });
         }
 
-        _targetSolidCount = _roleDensity.TotalSolidCount();
         _isBootstrappingMaze = false;
 
         onExitsComputed?.Invoke(exits);

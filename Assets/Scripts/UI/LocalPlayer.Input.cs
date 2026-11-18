@@ -17,7 +17,6 @@ public partial class LocalPlayer
     [Tooltip("Exponential decay rate to 0 for the virtual stick when no input is held.")]
     [SerializeField] private float stickDecayPerSec = 2.5f;
 
-    private bool _gamepadDriving; // true while a gamepad stick is (or was last) driving _virtualStick
 
     public Vector2 GetMoveInput()
     {
@@ -79,11 +78,9 @@ public partial class LocalPlayer
         if (isGamepad)
         {
             _virtualStick = raw;
-            _gamepadDriving = true;
         }
         else
         {
-            _gamepadDriving = false;
 
             if (Keyboard.current != null)
             {

@@ -80,11 +80,6 @@ public class NoteTether : MonoBehaviour
         return _cam;
     }
 
-    // --- Arc-length cache (add these fields somewhere in the same class) ---
-private float[] _cumDist;   // cumulative distance at each point
-private float   _totalLen;  // total curve length
-private int     _cachedCount = -1;
-private int     _cachedHash  = 0;
 
     public Vector3 EvaluatePosition01(float t)
 {
@@ -260,13 +255,15 @@ private int     _cachedHash  = 0;
 }
     void Awake()
     {
-        _lr = GetComponent<LineRenderer>() ?? gameObject.AddComponent<LineRenderer>();
+        _lr = gameObject.GetOrAddComponent<LineRenderer>();
         _lr.useWorldSpace = true;
         _lr.positionCount = segments;
         _lr.widthMultiplier = baseWidth;
         _lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         _lr.receiveShadows = false;
-        _lr.material = _lr.material ? _lr.material : new Material(Shader.Find("Sprites/Default"));
+        // sharedMaterial: reading .material cloned the prefab's material per tether (never freed).
+        // Tether colour comes from the LineRenderer gradient, so sharing is safe.
+        if (_lr.sharedMaterial == null) _lr.sharedMaterial = SharedMaterials.SpriteDefault;
         // Same layer as the shimmer particles below, so the cable always renders above
         // ring backing/Fill/Contour and dust/maze (all in "Default"), never occluded by them.
         _lr.sortingLayerName = "Foreground";
@@ -616,7 +613,7 @@ private int     _cachedHash  = 0;
         shape.enabled = false;
 
         var _renderer = _shimmerPS.GetComponent<ParticleSystemRenderer>();
-        _renderer.material = new Material(Shader.Find("Sprites/Default"));
+        _renderer.sharedMaterial = SharedMaterials.SpriteDefault;
         _renderer.sortingLayerName = "Foreground";
         _renderer.sortingOrder = 40; // 🔧 ensure on top of dust/maze
     }

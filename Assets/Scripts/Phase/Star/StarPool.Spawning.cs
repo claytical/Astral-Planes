@@ -6,6 +6,9 @@ public sealed partial class StarPool
     // Guard against spawning the same role twice in a single Tick().
     private readonly HashSet<MusicalRole> _spawningThisFrame = new();
 
+    private MotifProfile _cachedRolesMotif;
+    private List<MusicalRole> _cachedActiveRoles;
+
     // Throttles the per-role diagnostic dump below to ~1/sec so it doesn't spam every frame.
     private float _lastDiagLogTime;
 
@@ -17,7 +20,14 @@ public sealed partial class StarPool
         if (_dustGen == null || _drum == null) return;
         if (_remainingEjectionsTotal <= 0) return;
 
-        var roles = _activeMotif?.GetActiveRoles();
+        // GetActiveRoles() allocates a HashSet + List; motif role configs don't change at runtime,
+        // so cache per motif instead of rebuilding every frame.
+        if (!ReferenceEquals(_activeMotif, _cachedRolesMotif))
+        {
+            _cachedRolesMotif = _activeMotif;
+            _cachedActiveRoles = _activeMotif != null ? _activeMotif.GetActiveRoles() : null;
+        }
+        var roles = _cachedActiveRoles;
         if (roles == null || roles.Count == 0) return;
 
         // Diagnostic-only: dumps every active role's gating state on a throttled cadence,
@@ -39,7 +49,10 @@ public sealed partial class StarPool
             bool notNull = hasKey && _activeStars[role] != null;
             bool slotEmpty = !hasKey || !notNull;
             bool alreadySpawning = _spawningThisFrame.Contains(role);
-            bool hasDust = !mineBlocked && _dustGen.HasAnyDustWithRole(role);
+            // HasAnyDustWithRole scans the grid — only pay for it when a spawn is actually possible
+            // (or the diagnostic dump wants the value).
+            bool hasDust = !mineBlocked && (logDiagThisTick || (slotEmpty && !alreadySpawning))
+                           && _dustGen.HasAnyDustWithRole(role);
             bool canSpawn = !mineBlocked && slotEmpty && !alreadySpawning && hasDust;
 
             if (logDiagThisTick)

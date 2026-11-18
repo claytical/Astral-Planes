@@ -28,7 +28,7 @@ public partial class InstrumentTrack
     {
         if (!collectableParent) collectableParent = transform;
         if (!midiVoice) midiVoice = GetComponent<MidiVoice>();
-        if (!loopPattern) loopPattern = GetComponent<LoopPattern>() ?? gameObject.AddComponent<LoopPattern>();
+        if (!loopPattern) loopPattern = gameObject.GetOrAddComponent<LoopPattern>();
         _expansionCtrl = new TrackExpansionController(this);
         _expansionCtrl?.Bind(drumTrack);
         var awakeProf = MusicalRoleProfileLibrary.GetProfile(assignedRole);

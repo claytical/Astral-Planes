@@ -45,7 +45,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5aee3c51e8324a5a9bd2498adfec2cf, type: 3}
   m_Name: CosmicPlasmaFeature
   m_EditorClassIdentifier: Assembly-CSharp::CosmicPlasmaFeature
-  m_Active: 1
+  m_Active: 0
   settings:
     debugView: 0
     logOnce: 1

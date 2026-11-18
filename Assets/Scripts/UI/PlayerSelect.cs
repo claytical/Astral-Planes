@@ -24,7 +24,6 @@ public class PlayerSelect : MonoBehaviour
     public GameObject grooveStyleStage;
     [Range(0f, 1f)] public float confirmedAlpha = 0.4f;
 
-    private int _selectedColor = 0;
     private Hangar _hangar;
     private GameObject _chosenPlane;
     private string _currentShipName;

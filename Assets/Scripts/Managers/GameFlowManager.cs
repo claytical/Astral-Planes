@@ -96,8 +96,6 @@ public partial class GameFlowManager : MonoBehaviour
 
     [SerializeField] private Transform playerStatsGrid; // assign via inspector if possible
     public Transform PlayerStatsGrid => playerStatsGrid;
-    private GameState currentState = GameState.Begin;
-    private Dictionary<string, Action> sceneHandlers;
     private List<Vehicle> vehicles;
 
     // Scratch list for dust regrow veto (prevents collider "trap" when a cell regrows under a vehicle).
@@ -217,18 +215,30 @@ public partial class GameFlowManager : MonoBehaviour
 
         return false;
     }
-    void Start()
-    {
-        sceneHandlers = new()
-        {
-            { "TrackFinished", HandleTrackFinishedSceneSetup },
-            { "TrackSelection", HandleTrackSelectionSceneSetup },
-        };
-    }
     
+    private Coroutine _quitRoutine;
+
     public void QuitToSelection()
     {
-        StartCoroutine(SceneFlow.QuitToSelection());
+        if (_quitRoutine != null) return; // already quitting
+        // Every session flow (bridge, path choice, track setup, game over) runs as a coroutine
+        // on this persistent object. QuitToSelection nulls the scene refs they use, so stop them
+        // first instead of letting them resume against torn-down state.
+        AbortSessionCoroutines();
+        _quitRoutine = StartCoroutine(QuitToSelectionRoutine());
+    }
+
+    private IEnumerator QuitToSelectionRoutine()
+    {
+        yield return SceneFlow.QuitToSelection();
+        _quitRoutine = null;
+    }
+
+    private void AbortSessionCoroutines()
+    {
+        StopAllCoroutines();
+        _quitRoutine = null;
+        SceneFlow.ResetAfterAbortedFlows();
     }
 
     public void RegisterPlayerStatsGrid(Transform grid)
@@ -254,23 +264,8 @@ public partial class GameFlowManager : MonoBehaviour
     }
 
 
-    private void HandleTrackFinishedSceneSetup()
-    {
-        currentState = GameState.GameOver;
-        harmony?.Initialize(null, null); // drops subscriptions safely
-    }
-    private void HandleTrackSelectionSceneSetup()
-    {
-        currentState = GameState.Selection;
-        localPlayers = localPlayers.Where(p => p != null).ToList();
-        foreach (var player in localPlayers)
-        {
-            player.IsReady = false;
-            player.ResetReady();
-            player.CreatePlayerSelect();
-            player.SetStats();
-        }
-    }
+    // Scene-load handlers live on SceneFlowCoordinator (HandleTrackFinishedSceneSetup /
+    // HandleTrackSelectionSceneSetup). An unused duplicate of them here was removed 2026-11-17.
     private IEnumerator HandleGameOverSequence()
     {
         InstrumentTrackController itc = FindAnyObjectByType<InstrumentTrackController>(); 

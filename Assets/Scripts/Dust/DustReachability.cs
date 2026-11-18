@@ -18,14 +18,21 @@ using UnityEngine;
 //  stay open so X is reachable?" (trace the cheapest path, CosmicDustGenerator
 //  .Blocks.cs doorways). Modeled on StarSpawnReachabilityWeighter's multi-source
 //  BFS and CosmicDustGenerator.Interstitial's CarveConnectorToReachable.
-//  The grid is ~40x18, so a full run is cheap enough to do on demand.
+//  The grid is ~40x18, so a full run is cheap enough to do on demand; the wall
+//  predicates are sampled once per cell up front and the deque never allocates.
 // =========================================================================
 public sealed class DustReachability
 {
     private int _w, _h, _rc;
     private int[] _dist;
     private int[] _parent;
-    private readonly LinkedList<int> _deque = new LinkedList<int>();
+    // Wall predicates are sampled once per cell per run (instead of once per disk cell per
+    // neighbour visit) and the deque is an array ring buffer, so a run allocates nothing once
+    // the buffers have grown to the grid size.
+    private bool[] _hard;
+    private bool[] _soft;
+    private int[] _dq;
+    private int _dqHead, _dqCount;
     private readonly List<Vector2Int> _disk = new List<Vector2Int>();
 
     public int ClearanceCells => _rc;
@@ -38,12 +45,26 @@ public sealed class DustReachability
         _w = Mathf.Max(0, w); _h = Mathf.Max(0, h);
         _rc = Mathf.Max(0, clearanceCells);
         int n = _w * _h;
-        if (_dist == null || _dist.Length != n) { _dist = new int[n]; _parent = new int[n]; }
+        if (_dist == null || _dist.Length != n)
+        {
+            _dist = new int[n]; _parent = new int[n];
+            _hard = new bool[n]; _soft = new bool[n];
+        }
         for (int i = 0; i < n; i++) { _dist[i] = -1; _parent[i] = -1; }
         BuildDisk(_rc);
         if (n == 0 || seeds == null) return;
 
-        _deque.Clear();
+        bool anySoft = softWall != null;
+        for (int y = 0; y < _h; y++)
+        for (int x = 0; x < _w; x++)
+        {
+            var p = new Vector2Int(x, y);
+            int i = y * _w + x;
+            _hard[i] = hardWall != null && hardWall(p);
+            _soft[i] = anySoft && softWall(p);
+        }
+
+        DequeClear(n);
         for (int i = 0; i < seeds.Count; i++)
         {
             var s = seeds[i];
@@ -51,12 +72,12 @@ public sealed class DustReachability
             int si = s.y * _w + s.x;
             if (_dist[si] == 0) continue;
             _dist[si] = 0;               // seeds always count, even if the ship is wedged in
-            _deque.AddFirst(si);
+            PushFront(si);
         }
 
-        while (_deque.Count > 0)
+        while (_dqCount > 0)
         {
-            int cur = _deque.First.Value; _deque.RemoveFirst();
+            int cur = PopFront();
             int cx = cur % _w, cy = cur / _w;
             int cd = _dist[cur];
             for (int k = 0; k < 4; k++)
@@ -65,14 +86,14 @@ public sealed class DustReachability
                 int ny = cy + (k == 2 ? 1 : k == 3 ? -1 : 0);
                 if (nx < 0 || ny < 0 || nx >= _w || ny >= _h) continue;
                 var np = new Vector2Int(nx, ny);
-                if (!Clear(np, hardWall)) continue;
-                int cost = (softWall != null && TouchesSoft(np, softWall)) ? 1 : 0;
+                if (!Clear(np)) continue;
+                int cost = (anySoft && TouchesSoft(np)) ? 1 : 0;
                 int ni = ny * _w + nx;
                 int nd = cd + cost;
                 if (_dist[ni] >= 0 && _dist[ni] <= nd) continue;
                 _dist[ni] = nd;
                 _parent[ni] = cur;
-                if (cost == 0) _deque.AddFirst(ni); else _deque.AddLast(ni);
+                if (cost == 0) PushFront(ni); else PushBack(ni);
             }
         }
     }
@@ -131,24 +152,59 @@ public sealed class DustReachability
 
     // Out-of-bounds cells are ignored (the play-area edge isn't a grid wall), so ships can still
     // hug the border.
-    private bool Clear(Vector2Int c, Func<Vector2Int, bool> hardWall)
+    private bool Clear(Vector2Int c)
     {
         for (int i = 0; i < _disk.Count; i++)
         {
             var p = c + _disk[i];
-            if (InBounds(p) && hardWall(p)) return false;
+            if (InBounds(p) && _hard[p.y * _w + p.x]) return false;
         }
         return true;
     }
 
-    private bool TouchesSoft(Vector2Int c, Func<Vector2Int, bool> softWall)
+    private bool TouchesSoft(Vector2Int c)
     {
         for (int i = 0; i < _disk.Count; i++)
         {
             var p = c + _disk[i];
-            if (InBounds(p) && softWall(p)) return true;
+            if (InBounds(p) && _soft[p.y * _w + p.x]) return true;
         }
         return false;
+    }
+
+    // ---- array ring-buffer deque (0-1 BFS can re-push a node, so it grows on demand) ----
+    private void DequeClear(int minCapacity)
+    {
+        int cap = Mathf.Max(16, minCapacity);
+        if (_dq == null || _dq.Length < cap) _dq = new int[cap];
+        _dqHead = 0; _dqCount = 0;
+    }
+
+    private void GrowDeque()
+    {
+        var bigger = new int[_dq.Length * 2];
+        for (int i = 0; i < _dqCount; i++) bigger[i] = _dq[(_dqHead + i) % _dq.Length];
+        _dq = bigger; _dqHead = 0;
+    }
+
+    private void PushFront(int v)
+    {
+        if (_dqCount == _dq.Length) GrowDeque();
+        _dqHead = (_dqHead - 1 + _dq.Length) % _dq.Length;
+        _dq[_dqHead] = v; _dqCount++;
+    }
+
+    private void PushBack(int v)
+    {
+        if (_dqCount == _dq.Length) GrowDeque();
+        _dq[(_dqHead + _dqCount) % _dq.Length] = v; _dqCount++;
+    }
+
+    private int PopFront()
+    {
+        int v = _dq[_dqHead];
+        _dqHead = (_dqHead + 1) % _dq.Length; _dqCount--;
+        return v;
     }
 
     private void BuildDisk(int r)

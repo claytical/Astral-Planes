@@ -36,6 +36,9 @@ public class CosmicBlockField : MonoBehaviour
     [Tooltip("At full burst progress, flash this share of the blocked cells per wave.")]
     [SerializeField, Range(0f, 1f)] private float shimmerMaxShare = 0.15f;
     [SerializeField] private float shimmerFlashSeconds = 0.7f;
+    [Tooltip("Most blocked cells flashing at once. Each flash animates that cell's particles for " +
+             "shimmerFlashSeconds, so this bounds the shimmer's per-frame cost on big walls.")]
+    [SerializeField] private int shimmerMaxConcurrent = 24;
     [SerializeField, Range(0f, 1f)] private float shimmerFloor01 = 0.15f;
 
     private MotifRingGlyphApplicator _boundApplicator;
@@ -45,6 +48,7 @@ public class CosmicBlockField : MonoBehaviour
     private float _nextWatchdog;
     private const float kWatchdogSeconds = 0.5f;
     private readonly List<Vector2Int> _shimmerScratch = new List<Vector2Int>(256);
+    private readonly Queue<float> _shimmerFlashEnds = new Queue<float>(32);
 
     private CosmicDustGenerator Gen => GameFlowManager.Instance != null ? GameFlowManager.Instance.dustGenerator : null;
 
@@ -157,9 +161,12 @@ public class CosmicBlockField : MonoBehaviour
         _shimmerScratch.Clear();
         _shimmerScratch.AddRange(gen.RoleBlockedCells);
         int k = Mathf.Max(1, Mathf.RoundToInt(_shimmerScratch.Count * shimmerMaxShare * intensity));
+        while (_shimmerFlashEnds.Count > 0 && _shimmerFlashEnds.Peek() <= Time.time) _shimmerFlashEnds.Dequeue();
+        k = Mathf.Min(k, Mathf.Max(0, shimmerMaxConcurrent - _shimmerFlashEnds.Count));
         Color flash = Color.Lerp(new Color(0.85f, 0.85f, 0.9f, 1f), Color.white, intensity);
         for (int i = 0; i < k; i++)
-            gen.TryFlashSolidCell(_shimmerScratch[Random.Range(0, _shimmerScratch.Count)], flash, shimmerFlashSeconds);
+            if (gen.TryFlashSolidCell(_shimmerScratch[Random.Range(0, _shimmerScratch.Count)], flash, shimmerFlashSeconds))
+                _shimmerFlashEnds.Enqueue(Time.time + shimmerFlashSeconds);
     }
 
     private static float MaxLiveBurstProgress(out bool anyLive)

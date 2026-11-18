@@ -58,7 +58,7 @@ private GameFlowManager _gfm;
             _cachedInitialScale = true;
         }
         if (visual.particleSystem == null)
-            visual.particleSystem = GetComponent<ParticleSystem>() ?? GetComponentInChildren<ParticleSystem>(true);
+            visual.particleSystem = TryGetComponent(out ParticleSystem own) ? own : GetComponentInChildren<ParticleSystem>(true); // not ??: Unity fake-null
         _particles = new CosmicDustParticleEmissionSystem(() => visual.particleSystem, _baseEmission);
 
         // If the prefab has PlayOnAwake accidentally enabled, force idle so pool/prewarm won't explode.

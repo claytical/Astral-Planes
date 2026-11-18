@@ -97,7 +97,7 @@ public partial class NoteVisualizer
 
     public void CanonicalizeTrackMarkers(InstrumentTrack track, int currentBurstId)
     {
-        if (track == null) return;
+        if (track == null || _loopMarkersDetached) return;
 
         int trackIndex = Array.IndexOf(_ctrl.tracks, track);
         if (GameFlowManager.VerboseLogging) Debug.Log($"[CANONICALIZE TRACK MARKERS] {track.name} for {currentBurstId}");
@@ -151,7 +151,7 @@ public partial class NoteVisualizer
                 {
                     var key = (track, tag.step);
                     noteMarkers[key] = tag.transform;
-                    var ml = tag.GetComponent<MarkerLight>() ?? tag.gameObject.AddComponent<MarkerLight>();
+                    var ml = tag.gameObject.GetOrAddComponent<MarkerLight>();
                     ml.SetGrey(track.DisplayColor);
                     continue;
                 }

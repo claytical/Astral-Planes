@@ -7,7 +7,6 @@ public class MarkerLight : MonoBehaviour
     public float pulseScale = 1.25f;
     public float pulseTime  = 0.2f;
 
-    private Color _base;
     private Vector3 _startScale;
     private int _baseSortOrder;
 
@@ -16,7 +15,6 @@ public class MarkerLight : MonoBehaviour
         if (sr == null) sr = GetComponentInChildren<SpriteRenderer>();
         if (sr != null)
         {
-            _base = sr.color;
             _baseSortOrder = sr.sortingOrder;
         }
         _startScale = transform.localScale;

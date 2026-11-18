@@ -49,7 +49,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     private int _currentBurstRemaining = 0;
     private bool _currentBurstArmed = false;
     private NoteSet _currentNoteSet;
-    private Boundaries _boundaries;
     private readonly List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)> persistentLoopNotes = new List<(int stepIndex, int note, int duration, float velocity, int authoredRootMidi)>();    List<GameObject> _spawnedNotes = new();
     private int _totalSteps = -1;
     private int _lastLocalStep = -1;
@@ -68,10 +67,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     private readonly Dictionary<int, Vector2Int> _noteOriginCells = new(); // stepIndex -> origin cell
     private Vector2Int? _nextCommitOriginCell; // staged by CommitPendingNoteAtStep, consumed by AddNoteToLoop
 
-    /// <summary>Fires when a looped note actually sounds: (track, absolute step, duration seconds).</summary>
-    public event Action<InstrumentTrack, int, float> OnLoopNotePlayed;
-    private bool _ascendQueued;
-    private int? _pendingLoopMultiplier;
     public int currentBurstId;
     [SerializeField] private List<bool> _binFilled = new();
     private float[] _binCompletionTime;
@@ -425,13 +420,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             if (controller != null && controller.noteVisualizer != null)
                 controller.noteVisualizer.RegisterNotePlayTint(this, DisplayColor, TicksToSeconds(duration));
         }
-
-        // One event per sounding step (not per voice) — Cosmic Blocks / markers / ring dents pulse on it.
-        if (_tmpStepNotes.Count > 0 && OnLoopNotePlayed != null)
-        {
-            int absStep = trackBin * Mathf.Max(1, BinSize()) + localStep;
-            OnLoopNotePlayed.Invoke(this, absStep, TicksToSeconds(_tmpStepNotes[0].duration));
-        }
     }
 
     public bool HasOutstandingNotesInRange(int stepStart, int stepEnd)
@@ -703,15 +691,14 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
             t != null)
         {
             noteMarker = t.gameObject;
-            var dbgTag = noteMarker.GetComponent<MarkerTag>();
             if (lightMarkerNow) { 
-                var tag = noteMarker.GetComponent<MarkerTag>() ?? noteMarker.AddComponent<MarkerTag>(); 
+                var tag = noteMarker.GetOrAddComponent<MarkerTag>(); 
                 tag.track = this;
                 tag.step = stepIndex;
                 tag.isPlaceholder = false;
                 var vnm = noteMarker.GetComponent<VisualNoteMarker>(); 
                 if (vnm != null) vnm.Initialize(DisplayColor);
-                var ml = noteMarker.GetComponent<MarkerLight>() ?? noteMarker.AddComponent<MarkerLight>();
+                var ml = noteMarker.GetOrAddComponent<MarkerLight>();
                 ml.LightUp(DisplayColor);
             }
         }

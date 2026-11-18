@@ -20,7 +20,6 @@ public class MidiVoice : MonoBehaviour
     private int preset;
     [SerializeField] private int bank = 0;
     
-    private static bool _forcedProgramPropsCached;
 
     // Cached per-role volume trim; re-applied on every note-on so it self-heals
     // once MPTK_Channels exists, the same way preset/bank already do.

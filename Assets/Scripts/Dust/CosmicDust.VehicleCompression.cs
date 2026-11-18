@@ -19,6 +19,7 @@ public partial class CosmicDust
     private bool _noseCompressWasActive;
     private bool _noseCompressIsBoosting;
     private bool _bumpHighlightActive;
+    private bool _noseAtRest; // rest pose already written to the particle transform
 
     [SerializeField] private NoseCompressionSettings noseCompression = new()
     {
@@ -104,11 +105,16 @@ public partial class CosmicDust
 
         if (_noseCompressCurrent01 <= 0.0001f)
         {
+            // Idle cells (nearly all of them) used to rewrite the rest pose every frame, dirtying
+            // hundreds of transforms + particle bounds. Write it once when settling, then skip.
+            if (_noseAtRest) return;
             _noseVisualOffsetLocal = Vector3.zero;
             srt.localScale = _dustSpriteBaseVisualScale;
             srt.localPosition = _dustSpriteBaseLocalPos;
+            _noseAtRest = true;
             return;
         }
+        _noseAtRest = false;
 
         if (_dustSpriteBaseVisualScale.sqrMagnitude <= 0.000001f)
         {

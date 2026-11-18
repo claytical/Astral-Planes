@@ -17,6 +17,7 @@ public partial class NoteVisualizer
         try
         {
             if (track == null) return;
+            if (_loopMarkersDetached) return; // record departed: rows are empty until the next motif
 
             int trackIndex = Array.IndexOf(_ctrl.tracks, track);
             if (trackIndex < 0 || trackIndex >= trackRows.Count) return;

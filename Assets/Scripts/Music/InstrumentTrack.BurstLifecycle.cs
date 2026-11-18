@@ -20,12 +20,12 @@ public partial class InstrumentTrack
         if (nv == null) return;
         var markerGO = nv.PlacePersistentNoteMarker(this, absStep, lit: false, burstId);
         if (!markerGO) return;
-        var tag = markerGO.GetComponent<MarkerTag>() ?? markerGO.AddComponent<MarkerTag>();
+        var tag = markerGO.GetOrAddComponent<MarkerTag>();
         tag.track         = this;
         tag.step          = absStep;
         tag.burstId       = burstId;
         tag.isPlaceholder = true;
-        var ml = markerGO.GetComponent<MarkerLight>() ?? markerGO.AddComponent<MarkerLight>();
+        var ml = markerGO.GetOrAddComponent<MarkerLight>();
         ml.SetGrey(new Color(1f, 1f, 1f, 0.25f));
         c.BindMarkerAtSpawn(markerGO.transform, absStep);
     }

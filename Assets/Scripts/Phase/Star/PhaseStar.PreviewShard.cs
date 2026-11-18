@@ -3,7 +3,6 @@ using UnityEngine;
 public partial class PhaseStar
 {
     private bool _previewInitialized;
-    private bool _buildingPreview;
     private int _baseSortingOrder;
 
     private void EnsurePreviewRing()
@@ -23,7 +22,6 @@ public partial class PhaseStar
 
     void BuildPreviewRing()
     {
-        _buildingPreview = true;
 
         if (_previewVisual != null)
         {
@@ -47,7 +45,6 @@ public partial class PhaseStar
 
         if (visuals == null)
         {
-            _buildingPreview = false;
             return;
         }
 
@@ -89,7 +86,6 @@ public partial class PhaseStar
 
         _previewVisualB = goB.transform;
 
-        _buildingPreview = false;
 
         visuals?.InvalidateShardCache();
         visuals?.BindDualDiamondRenderers(_previewVisual, _previewVisualB);

@@ -300,7 +300,6 @@ public partial class CosmicDustGenerator
     }
 
     private void EnterRuntimeVoidOnlyDustCreationMode() {
-        _runtimeVoidOnlyDustCreation = true;
         StopActiveStaggeredGrowth();
     }
 

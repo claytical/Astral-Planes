@@ -29,8 +29,6 @@ public sealed class SessionStateCoordinator
     public event Action<GameMode> ModeChanged;
     public event Action PlayersChanged;
     public event Action<GameState> GameStateChanged;
-    public event Action<bool> BridgePendingChanged;
-    public event Action<bool> GhostCycleChanged;
 
     public IReadOnlyList<LocalPlayer> Players => _players;
     public List<LocalPlayer> MutablePlayers => _players;
@@ -110,13 +108,11 @@ public sealed class SessionStateCoordinator
     public void SetBridgePending(bool value)
     {
         _bridgePending = value;
-        BridgePendingChanged?.Invoke(value);
     }
 
     public void SetGhostCycleInProgress(bool value)
     {
         _ghostCycleInProgress = value;
-        GhostCycleChanged?.Invoke(value);
     }
 
     public void CheckAllPlayersReady(Action beginTutorial, Action beginGameplay)

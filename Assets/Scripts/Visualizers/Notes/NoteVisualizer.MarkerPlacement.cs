@@ -105,18 +105,18 @@ public partial class NoteVisualizer
             bool inLoop = track.GetPersistentLoopNotes().Any(n => n.Item1 == stepIndex);
             if (inLoop)
             {
-                var existingTag = existing.GetComponent<MarkerTag>() ?? existing.gameObject.AddComponent<MarkerTag>();
+                var existingTag = existing.gameObject.GetOrAddComponent<MarkerTag>();
                 existingTag.isPlaceholder = false;
                 if (burstId >= 0) existingTag.burstId = burstId;
             }
         }
         else
         {
-            var tag = existing.GetComponent<MarkerTag>() ?? existing.gameObject.AddComponent<MarkerTag>();
+            var tag = existing.gameObject.GetOrAddComponent<MarkerTag>();
             tag.isPlaceholder = true;
             if (burstId >= 0) tag.burstId = burstId;
 
-            var ml = existing.GetComponent<MarkerLight>() ?? existing.gameObject.AddComponent<MarkerLight>();
+            var ml = existing.gameObject.GetOrAddComponent<MarkerLight>();
             ml.SetGrey(track.DisplayColor);
         }
 
@@ -137,7 +137,7 @@ public partial class NoteVisualizer
         noteMarkers[key] = adopt;
         UpdateMarkerXPreserveYIfAscending(rowRect, row, track, stepIndex, adopt);
 
-        var tag = adopt.GetComponent<MarkerTag>() ?? adopt.gameObject.AddComponent<MarkerTag>();
+        var tag = adopt.gameObject.GetOrAddComponent<MarkerTag>();
         tag.track = track;
         tag.step = stepIndex;
 
@@ -151,7 +151,7 @@ public partial class NoteVisualizer
             tag.isPlaceholder = true;
             if (burstId >= 0) tag.burstId = burstId;
 
-            var ml = adopt.GetComponent<MarkerLight>() ?? adopt.gameObject.AddComponent<MarkerLight>();
+            var ml = adopt.gameObject.GetOrAddComponent<MarkerLight>();
             ml.SetGrey(track.DisplayColor);
         }
 
@@ -182,7 +182,7 @@ public partial class NoteVisualizer
         GameObject marker = Instantiate(notePrefab, row, worldPositionStays: false);
         marker.transform.localPosition = new Vector3(xLocal, bottomLocalY, 0f);
 
-        var newTag = marker.GetComponent<MarkerTag>() ?? marker.AddComponent<MarkerTag>();
+        var newTag = marker.GetOrAddComponent<MarkerTag>();
         newTag.track = track;
         newTag.step = stepIndex;
         newTag.isPlaceholder = !shouldLight;
@@ -197,7 +197,7 @@ public partial class NoteVisualizer
     private void ApplyMarkerVisuals(GameObject marker, InstrumentTrack track, bool isLit)
     {
         var vnm = marker.GetComponent<VisualNoteMarker>();
-        var ml = marker.GetComponent<MarkerLight>() ?? marker.AddComponent<MarkerLight>();
+        var ml = marker.GetOrAddComponent<MarkerLight>();
         if (isLit)
         {
             if (vnm != null) vnm.Initialize(track.DisplayColor);

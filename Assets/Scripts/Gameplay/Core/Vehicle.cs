@@ -559,9 +559,12 @@ public partial class Vehicle : MonoBehaviour
         return GetColliderBoundingRadiusWorld() * scale;
     }
 
+    private Collider2D _boundsCollider;
+
     public float GetColliderBoundingRadiusWorld()
     {
-        var col = GetComponent<Collider2D>();
+        if (_boundsCollider == null) _boundsCollider = GetComponent<Collider2D>();
+        var col = _boundsCollider;
         return col != null ? Mathf.Max(col.bounds.extents.x, col.bounds.extents.y) : 0.35f;
     }
 }
