@@ -16,8 +16,10 @@ public class MotifProfile : ScriptableObject
 {
     [Header("Identity")]
     public string motifId;                  // Stable identifier (e.g. "RockSteady_A")
+    [Tooltip("Designer-friendly name shown in the phase/motif carousel.")]
     public string displayName;             // Designer-friendly label
 
+    [Tooltip("Key root as a MIDI note (60 = C4). Riffs and chord progressions are transposed to this root.")]
     public int keyRootMidi = 60;   // default C4
     [Header("Drums")]
     [Tooltip("Entry loops: minimal / nearly silent. One will be chosen at motif start.")]
@@ -45,7 +47,9 @@ public class MotifProfile : ScriptableObject
     public bool quantizeBridgeSampleToBeat = true;
 
     [Header("Timing")]
+    [Tooltip("Tempo of this motif (beats per minute).")]
     public float bpm = 120f;
+    [Tooltip("Grid steps per drum loop (16 = sixteenth notes over one bar).")]
     public int stepsPerLoop = 16;
     [Min(0), Tooltip("Overrides DrumTrackConfig.defaultTransitionPhraseLengthLoops for transitions INTO this motif: how many completed leader-loop boundaries to wait before the swap is allowed to arm. 0 = use the config default.")]
     public int phraseLengthLoopsOverride = 0;
@@ -94,6 +98,7 @@ public class MotifProfile : ScriptableObject
     [Header("Vehicle Trap")]
     [Tooltip("If true, a ring or box of dust grows in around each vehicle as part of this motif's maze build (SceneFlowCoordinator trap callback → InjectTrapCells*), so it arrives with the maze rather than popping in afterward.")]
     public bool spawnVehicleTrap = false;
+    [Tooltip("Shape of the dust trap grown around each vehicle when Spawn Vehicle Trap is on.")]
     public TrapShape trapShape = TrapShape.Circle;
     [Min(1), Tooltip("Ring radius in grid cells (circle) or half-side length (box).")]
     public int trapRadius = 3;
@@ -109,11 +114,28 @@ public class MotifProfile : ScriptableObject
         ValidateTimingAgainstClips();
     }
 
-    // Warns when an authored clip's real length isn't a whole-number subdivision of what
-    // bpm/stepsPerLoop implies for the full phrase. A clip shorter than the phrase is expected
-    // to loop natively N times underneath it (see DrumTrack.GetAuthoredBaseLoopSeconds) — only
-    // a non-integer ratio means audio-bound and note-duration timing will actually disagree,
-    // which surfaces as an audible/visual glitch at motif transitions.
+    /// <summary>
+    /// True when a clip's length is a whole-number ratio of the phrase in either direction:
+    /// a short clip loops N times underneath one phrase (phrase / N), or a long clip spans N
+    /// phrases (phrase × N; DrumTrack swaps land on clip boundaries, so it stays on the grid).
+    /// Only a non-integer ratio makes audio-bound and note-duration timing disagree.
+    /// <paramref name="expectedDesc"/> names the nearest valid length, for warnings.
+    /// </summary>
+    public static bool ClipFitsPhrase(float clipSec, float phraseSec, out string expectedDesc)
+    {
+        expectedDesc = null;
+        if (clipSec <= 0f || phraseSec <= 0f) return true;
+        bool longer = clipSec >= phraseSec;
+        int n = Mathf.Max(1, Mathf.RoundToInt(longer ? clipSec / phraseSec : phraseSec / clipSec));
+        float expectedSec = longer ? phraseSec * n : phraseSec / n;
+        float tol = Mathf.Max(0.02f, expectedSec * 0.02f);
+        if (Mathf.Abs(clipSec - expectedSec) <= tol) return true;
+        expectedDesc = longer ? $"{n} phrases = {expectedSec:F3}s" : $"1/{n} phrase = {expectedSec:F3}s";
+        return false;
+    }
+
+    // Warns when an authored clip's real length isn't a whole-number ratio of what
+    // bpm/stepsPerLoop implies for the full phrase (see ClipFitsPhrase).
     private void ValidateTimingAgainstClips()
     {
         if (bpm <= 0f || stepsPerLoop <= 0) return;
@@ -122,11 +144,8 @@ public class MotifProfile : ScriptableObject
         void Check(AudioClip clip, string label)
         {
             if (clip == null || clip.length <= 0f) return;
-            int n = Mathf.Max(1, Mathf.RoundToInt(impliedLoopSec / clip.length));
-            float expectedClipSec = impliedLoopSec / n;
-            float tol = Mathf.Max(0.02f, expectedClipSec * 0.02f);
-            if (Mathf.Abs(clip.length - expectedClipSec) > tol)
-                Debug.LogWarning($"[MotifProfile:{name}] bpm={bpm} stepsPerLoop={stepsPerLoop} implies phrase={impliedLoopSec:F3}s (nearest valid subdivision: {n}x{expectedClipSec:F3}s) but '{label}' clip '{clip.name}' is {clip.length:F3}s.");
+            if (!ClipFitsPhrase(clip.length, impliedLoopSec, out var expected))
+                Debug.LogWarning($"[MotifProfile:{name}] bpm={bpm} stepsPerLoop={stepsPerLoop} implies phrase={impliedLoopSec:F3}s (nearest valid length: {expected}) but '{label}' clip '{clip.name}' is {clip.length:F3}s.");
         }
 
         foreach (var c in entryDrumLoops) Check(c, "entryDrumLoops");

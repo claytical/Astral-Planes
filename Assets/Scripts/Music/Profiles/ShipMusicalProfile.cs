@@ -2,28 +2,39 @@ using System.Collections.Generic;
 using UnityEngine;
 
 
-[CreateAssetMenu(fileName = "ShipMusicalProfile", menuName = "Astral Planes/Music/Role/Ship Musical Profile")]
+[CreateAssetMenu(fileName = "ShipMusicalProfile", menuName = "Astral Planes/Ship/Ship Musical Profile (per ship)")]
 public class ShipMusicalProfile : ScriptableObject
 {
     [Header("Identity & Music")]
+    [Tooltip("Display name on ship select.")]
     public string shipName;
     [Tooltip("A brief description of the ship's musical personality")]
     [TextArea(2, 4)] public string description;
 
     [Header("Movement (Arcade RB2D)")]
+    [Tooltip("Top cruising speed (world units/s). Also the reference for impact damage and hit velocity.")]
     public float arcadeMaxSpeed = 14f;
+    [Tooltip("Thrust acceleration while steering without boost.")]
     public float arcadeAccel = 10f;
+    [Tooltip("Thrust acceleration while boosting (burns fuel and carves dust).")]
     public float arcadeBoostAccel = 70f;
+    [Tooltip("Rigidbody linear drag. Higher = ship slows down sooner when you let go.")]
     public float arcadeLinearDamping = 0.10f;
+    [Tooltip("Rigidbody angular drag. Higher = ship stops spinning sooner after bumps. (VehicleConfig.maxAngularVelocityDegPerSec is the hard safety cap.)")]
     public float arcadeAngularDamping = 0.50f;
 
     [Header("Coast / Stop")]
+    [Tooltip("Extra braking force applied while there is no input, on top of linear damping. 0 = pure drift.")]
     public float coastBrakeForce = 1.0f;
+    [Tooltip("Below this speed (and Stop Angular Speed) with no input, the ship is snapped to a full stop.")]
     public float stopSpeed = 0.03f;
+    [Tooltip("Below this spin (deg/s) and Stop Speed with no input, the ship is snapped to a full stop.")]
     public float stopAngularSpeed = 5f;
+    [Tooltip("Stick magnitude below which input is ignored.")]
     public float inputDeadzone = 0.20f;
     
     [Header("Physics")]
+    [Tooltip("Rigidbody mass. Heavier ships push harder in bumps and deal more impact damage (see Mass Damage Multiplier Min/Max).")]
     public float mass = 1.5f;
 
     [Header("Impact")]
@@ -50,6 +61,7 @@ public class ShipMusicalProfile : ScriptableObject
     public float damageCeiling = 120f;
 
     [Header("Fuel Tradeoffs")]
+    [Tooltip("Fuel tank size; the ship starts each session full. Shared fuel rules (low-fuel tell, void refuel) live on VehicleConfig.")]
     public float capacity = 10f;              // tank size (Vehicle energyLevel starts here)
     [Range(0.25f, 2f)] public float burnRate = 1.0f; // fuel units/sec at full trigger pressure
     [Tooltip("Seconds of continuously holding boost before fuel drain (both the flat burnRate cost and " +

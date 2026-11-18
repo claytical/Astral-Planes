@@ -103,7 +103,7 @@ public partial class InstrumentTrackController
         var gfm = GameFlowManager.Instance;
         if (gfm != null)
         {
-            foreach (var n in Object.FindObjectsByType<DiscoveryTrackNode>(FindObjectsSortMode.None))
+            foreach (var n in Object.FindObjectsByType<DiscoveryTrackNode>())
             {
                 if (n == null) continue;
                 var ex = n.GetComponent<Explode>();

@@ -8,7 +8,7 @@ using UnityEngine.Audio;
 /// DrumTrack and the carousel's RingPreviewPlayer all route through this table, so every profile of a
 /// role lands on the same ProceduralMixer bus. Loaded from Resources/Config/AudioMixConfig.
 /// </summary>
-[CreateAssetMenu(fileName = "AudioMixConfig", menuName = "Astral Planes/Music/Audio Mix Config")]
+[CreateAssetMenu(fileName = "AudioMixConfig", menuName = "Astral Planes/Music/Tracks & Mix/Audio Mix Config")]
 public class AudioMixConfig : ScriptableObject
 {
     [Serializable]

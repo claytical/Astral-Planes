@@ -1,3 +1,5 @@
+using UnityEngine;
+
 /// <summary>
 /// Competitive-mode scoring rules. Stateless; per-player totals live on PlayerStatsTracking so they
 /// survive vehicle respawns. All entry points are no-ops outside competitive mode.
@@ -13,14 +15,10 @@ public static class CompetitiveScoring
         GameFlowManager.Instance.SessionState.IsCompetitive;
 
     private static int PointsPerNote =>
-        GameFlowManager.Instance?.competitiveScoringConfig != null
-            ? GameFlowManager.Instance.competitiveScoringConfig.pointsPerNote
-            : DefaultPointsPerNote;
+        GameFlowManager.Instance != null ? Mathf.Max(1, GameFlowManager.Instance.pointsPerNote) : DefaultPointsPerNote;
 
     private static int Multiplier =>
-        GameFlowManager.Instance?.competitiveScoringConfig != null
-            ? GameFlowManager.Instance.competitiveScoringConfig.discoveryMultiplier
-            : DefaultMultiplier;
+        GameFlowManager.Instance != null ? Mathf.Max(1, GameFlowManager.Instance.discoveryMultiplier) : DefaultMultiplier;
 
     /// <summary>True when this depleting hit should own a multiplier burst (competitive mode, owner has a tracker).</summary>
     public static bool CanGrantMultiplier(PlayerStatsTracking owner) => owner != null && IsActive;

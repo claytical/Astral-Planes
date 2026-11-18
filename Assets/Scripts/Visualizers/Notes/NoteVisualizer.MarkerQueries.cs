@@ -133,7 +133,7 @@ public partial class NoteVisualizer
     // are owned by the caller (Vehicle.TickNoteTrail rides the vehicle's NoteTether curve) —
     // this method only manages the per-vehicle cue GameObject lifecycle. Position keeps
     // updating even while hidden so the cue is correctly placed the moment it reappears.
-    public void SetManualReleaseCuePosition(Transform vehicle, Vector3 worldPos, bool visible)
+    public void SetManualReleaseCuePosition(Transform vehicle, Vector3 worldPos, bool visible, float alpha = 1f)
     {
         if (releaseCuePrefab == null || vehicle == null) return;
         if (!isActiveAndEnabled) return;
@@ -152,7 +152,12 @@ public partial class NoteVisualizer
         }
 
         var sr = cue.GetComponentInChildren<SpriteRenderer>();
-        if (sr != null) sr.enabled = visible;
+        if (sr != null)
+        {
+            sr.enabled = visible;
+            var c = sr.color;
+            if (!Mathf.Approximately(c.a, alpha)) { c.a = alpha; sr.color = c; }
+        }
     }
 
     /// <summary>

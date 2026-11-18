@@ -129,7 +129,7 @@ public class TrackSelectionJoinController : MonoBehaviour
         if (ControlTutorialDirector.Instance != null && ControlTutorialDirector.Instance.IsPrimaryTutorialRunning) return;
 
         var assignedIds = new HashSet<int>();
-        foreach (var lp in FindObjectsByType<LocalPlayer>(FindObjectsSortMode.None))
+        foreach (var lp in FindObjectsByType<LocalPlayer>())
         {
             var pi = lp.GetComponent<PlayerInput>();
             if (pi == null) continue;

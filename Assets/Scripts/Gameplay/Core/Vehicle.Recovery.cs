@@ -122,8 +122,7 @@ public partial class Vehicle
         for (int i = 0; i < contacts; i++)
             AppendStuckColliderInfo(sb, _stuckContacts[i].collider, gen, $"normal={_stuckContacts[i].normal} sep={_stuckContacts[i].separation:F3}");
 
-        var filter = new ContactFilter2D();
-        filter.NoFilter();
+        var filter = ContactFilter2D.noFilter;
         filter.useTriggers = false;
         _stuckOverlaps.Clear();
         int overlaps = rb.Overlap(filter, _stuckOverlaps);

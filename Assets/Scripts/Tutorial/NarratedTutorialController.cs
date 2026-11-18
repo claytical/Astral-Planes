@@ -52,7 +52,7 @@ public class NarratedTutorialController : MonoBehaviour
     static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         if (scene.name != GameplayScene) return;
-        if (FindFirstObjectByType<NarratedTutorialController>() != null) return;
+        if (FindAnyObjectByType<NarratedTutorialController>() != null) return;
         new GameObject("NarratedTutorialController").AddComponent<NarratedTutorialController>();
     }
 
@@ -67,7 +67,7 @@ public class NarratedTutorialController : MonoBehaviour
     /// </summary>
     public static NarratedTutorialController RunNow()
     {
-        var existing = FindFirstObjectByType<NarratedTutorialController>();
+        var existing = FindAnyObjectByType<NarratedTutorialController>();
         if (existing != null)
         {
             existing.StopAllCoroutines();
@@ -93,7 +93,7 @@ public class NarratedTutorialController : MonoBehaviour
             float waited = 0f;
             while (waited < 15f)
             {
-                if (ptm == null) ptm = FindFirstObjectByType<PhaseTransitionManager>();
+                if (ptm == null) ptm = FindAnyObjectByType<PhaseTransitionManager>();
                 if (ptm != null && ptm.CurrentPhaseIndex >= 0) break;
                 waited += Time.unscaledDeltaTime;
                 yield return null;
@@ -516,7 +516,7 @@ public class NarratedTutorialController : MonoBehaviour
     {
         if (Time.unscaledTime - _vehicleCacheTime > 0.5f)
         {
-            _vehicleCache = FindObjectsByType<Vehicle>(FindObjectsSortMode.None);
+            _vehicleCache = FindObjectsByType<Vehicle>();
             _vehicleCacheTime = Time.unscaledTime;
         }
         for (int i = 0; i < _vehicleCache.Length; i++)

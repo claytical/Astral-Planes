@@ -4,7 +4,6 @@ public class HideParentTextForChild : MonoBehaviour
 {
     public GameObject childToWatch;
 
-    private bool changeToStatus = true;
     void Update()
     {
         if (childToWatch.transform.childCount > 0)

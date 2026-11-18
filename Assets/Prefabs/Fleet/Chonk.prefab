@@ -113,11 +113,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5dec19ea9ed44ac5a17cd98379b5df04, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VehicleReleaseCue
-  ringStartRadius: 1
-  ringEndRadius: 0.5
-  ringAlphaStart: 0.1
-  ringAlphaEnd: 0.754
-  sortingOrderOffset: 1
 --- !u!212 &1970310610805977373
 SpriteRenderer:
   serializedVersion: 3

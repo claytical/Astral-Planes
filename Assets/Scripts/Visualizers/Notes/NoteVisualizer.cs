@@ -38,7 +38,6 @@ public partial class NoteVisualizer : MonoBehaviour
     [Tooltip("How fast the ambient tint eases back to white once no notes are active.")]
     [SerializeField] private float ambientFadeToWhiteSpeed = 4f;
     [Header("Playhead Trail (Particles)")]
-    [SerializeField] private bool playheadTrailEnabled = true;
 
 // Particles per world unit traveled (higher = denser trail).
     [SerializeField] private float playheadTrailEmitPerWorldUnit = 45f;

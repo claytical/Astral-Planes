@@ -3,7 +3,7 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody2D))]
 public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
 {
-    [SerializeField] private DiscoveryTrackNodeDustInteractorConfig config;
+    [SerializeField] private DiscoveryTrackNodeConfig config;
 
     private static readonly Vector2Int[] kNeighbours8 =
     {

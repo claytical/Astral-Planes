@@ -164,6 +164,7 @@ public partial class Vehicle
             if (releaseCue == null) releaseCue = gameObject.AddComponent<VehicleReleaseCue>();
         }
         releaseCue.centerAnchor = NoteCoreAnchor;
+        releaseCue.config = vehicleConfig;
 
         // Armed releases don't block the cue: the window state skips armed steps, so it reports the
         // NEXT queued note — keeping the open fill up through a quick run of notes while held.

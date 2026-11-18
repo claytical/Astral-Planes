@@ -7,60 +7,38 @@ public class Fuel : MonoBehaviour
     [Header("Runtime Fuel")]
     public Image fuelFill;
 
-    [Header("Fuel Change FX")]
-    [SerializeField] private float changeEpsilon = 0.0005f;       // ignore float-noise no-op updates
-    [SerializeField] private float intensityPerFullDelta = 0.05f; // ratio delta that maps to intensity 1
-    [SerializeField] private float intensityDecayPerSecond = 3.5f;
-    [SerializeField] private float swellScale = 0.18f;    // peak scale offset on gain
-    [SerializeField] private float squeezeScale = 0.14f;  // peak scale offset on drain
-    [SerializeField] private float shakeAmplitudeDegrees = 6f;
-    [SerializeField] private float gainShakeFrequency = 9f;   // slower "absorb" wobble
-    [Tooltip("Rotation wobble frequency while draining against near-zero resistance (drainWeight01 = 0): fast, buzzy.")]
-    [SerializeField] private float lightDrainShakeFrequency = 20f;
-    [Tooltip("Rotation wobble frequency while draining against max resistance (drainWeight01 = 1, e.g. Bass dust): slow, heavy judder.")]
-    [SerializeField] private float heavyDrainShakeFrequency = 4f;
-    [SerializeField] private Color gainTint = Color.white;
-    [SerializeField] private Color drainTint = Color.black;
-    [SerializeField, Range(0f, 1f)] private float maxTintLerp = 0.6f;
+    // All tuning lives on VehicleConfig → "Fuel Bar (HUD)" and "Fuel Status Tells".
+    // PlayerStats.SetStats passes the vehicle's config in; until then the Resources default is used.
+    private const string DefaultConfigPath = "Profiles/Vehicles/DefaultVehicleConfig";
+    private static VehicleConfig s_defaultConfig;
+    private VehicleConfig _config;
 
-    [Header("Drain Heaviness (e.g. plowing resistant dust)")]
-    [Tooltip("Baseline shake/squeeze intensity while actively draining against near-zero resistance (drainWeight01 = 0).")]
-    [SerializeField] private float minResistanceIntensity = 0.02f;
-    [Tooltip("Baseline shake/squeeze intensity while actively draining against max resistance (drainWeight01 = 1, e.g. Bass dust).")]
-    [SerializeField] private float maxResistanceIntensity = 3f;
-    [Tooltip("Rotation wobble peak degrees as a function of drainWeight01 (0=lightest material, 1=heaviest). " +
-             "Default keys encode: Rhythm~0.1→~0.1°, Lead~0.275→~0.25°, mid Harmony/Groove~0.6→~1°, Bass~0.815→~2°.")]
-    [SerializeField] private AnimationCurve shakeAmplitudeByResistance = new AnimationCurve(
-        new Keyframe(0f,     0.1f),
-        new Keyframe(0.275f, 0.25f),
-        new Keyframe(0.6f,   1f),
-        new Keyframe(0.815f, 2f),
-        new Keyframe(1f,     2.3f));
-    [Tooltip("Fraction of maxTintLerp reached at drainWeight01 = 0; heavier drains darken closer to the full drainTint.")]
-    [SerializeField, Range(0f, 1f)] private float minHeavyTintMul = 0.5f;
+    private VehicleConfig C
+    {
+        get
+        {
+            if (_config != null) return _config;
+            if (s_defaultConfig == null)
+            {
+                s_defaultConfig = Resources.Load<VehicleConfig>(DefaultConfigPath);
+                if (s_defaultConfig == null)
+                {
+                    Debug.LogError($"[Fuel] No VehicleConfig at Resources/{DefaultConfigPath}; using field defaults.");
+                    s_defaultConfig = ScriptableObject.CreateInstance<VehicleConfig>();
+                }
+            }
+            return s_defaultConfig;
+        }
+    }
 
-    // Status tells (LEGIBILITY_AUDIT.md D2): persistent states layered under the change FX above.
-    [Header("Low Fuel Warning")]
-    [Tooltip("Fuel ratio below which the bar pulses (keep in sync with VehicleConfig.lowFuelThreshold01).")]
-    [SerializeField, Range(0.01f, 0.9f)] private float lowFuelThreshold01 = 0.2f;
-    [SerializeField] private Color lowFuelTint = new Color(1f, 0.35f, 0.2f, 1f);
-    [SerializeField, Range(0f, 1f)] private float lowFuelTintMax = 0.75f;
-    [SerializeField] private float lowFuelPulseHz = 1.2f;
-    [SerializeField] private float lowFuelPulseHzEmpty = 3.5f;
-    [SerializeField] private float lowFuelScalePulse = 0.06f;
-
-    [Header("Refueling (gravity void) Shimmer")]
-    [SerializeField] private Color refuelTint = new Color(0.85f, 1f, 1f, 1f);
-    [SerializeField] private float refuelShimmerHz = 2f;
-    [SerializeField, Range(0f, 1f)] private float refuelTintMax = 0.55f;
-    [SerializeField] private float refuelScalePulse = 0.04f;
+    public void SetConfig(VehicleConfig config) => _config = config;
 
     private bool _refueling;
 
     /// <summary>Set by the vehicle while it is passively refueling (inside a gravity void).</summary>
     public void SetRefueling(bool refueling) => _refueling = refueling;
 
-    private bool IsLowFuel => _hasLastRatio && _lastRatio > 0f && _lastRatio < lowFuelThreshold01;
+    private bool IsLowFuel => _hasLastRatio && _lastRatio > 0f && _lastRatio < C.lowFuelThreshold01;
     private bool HasStatus => IsLowFuel || _refueling;
 
     // Rest color with status tints applied; the change FX lerp away from this instead of the
@@ -71,17 +49,17 @@ public class Fuel : MonoBehaviour
         scaleMul = 1f;
         if (IsLowFuel)
         {
-            float urgency = 1f - _lastRatio / lowFuelThreshold01;
-            float hz = Mathf.Lerp(lowFuelPulseHz, lowFuelPulseHzEmpty, urgency);
+            float urgency = 1f - _lastRatio / C.lowFuelThreshold01;
+            float hz = Mathf.Lerp(C.lowFuelPulseHz, C.lowFuelPulseHzEmpty, urgency);
             float p = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * hz * Mathf.PI * 2f);
-            c = Color.Lerp(c, lowFuelTint, lowFuelTintMax * p);
-            scaleMul *= 1f + lowFuelScalePulse * p;
+            c = Color.Lerp(c, C.lowFuelGlowColor, C.fuelBarLowFuelTintMax * p);
+            scaleMul *= 1f + C.fuelBarLowFuelScalePulse * p;
         }
         if (_refueling)
         {
-            float p = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * refuelShimmerHz * Mathf.PI * 2f);
-            c = Color.Lerp(c, refuelTint, refuelTintMax * (0.4f + 0.6f * p));
-            scaleMul *= 1f + refuelScalePulse * p;
+            float p = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * C.fuelBarRefuelShimmerHz * Mathf.PI * 2f);
+            c = Color.Lerp(c, C.voidRefuelGlowColor, C.fuelBarRefuelTintMax * (0.4f + 0.6f * p));
+            scaleMul *= 1f + C.fuelBarRefuelScalePulse * p;
         }
         c.a = _baseFillColor.a;
         return c;
@@ -130,15 +108,15 @@ public class Fuel : MonoBehaviour
         {
             _gaining = false;
             _activeDrainWeight = Mathf.Max(_activeDrainWeight, weight01);
-            _intensity = Mathf.Max(_intensity, Mathf.Lerp(minResistanceIntensity, maxResistanceIntensity, weight01));
+            _intensity = Mathf.Max(_intensity, Mathf.Lerp(C.fuelBarMinResistanceIntensity, C.fuelBarMaxResistanceIntensity, weight01));
         }
         else if (_hasLastRatio)
         {
             float delta = ratio - _lastRatio;
-            if (Mathf.Abs(delta) > changeEpsilon)
+            if (Mathf.Abs(delta) > C.fuelBarChangeEpsilon)
             {
                 _gaining = delta > 0f;
-                float triggered = Mathf.Clamp01(Mathf.Abs(delta) / Mathf.Max(0.0001f, intensityPerFullDelta));
+                float triggered = Mathf.Clamp01(Mathf.Abs(delta) / Mathf.Max(0.0001f, C.fuelBarIntensityPerFullDelta));
                 _intensity = Mathf.Max(_intensity, triggered);
             }
         }
@@ -165,7 +143,7 @@ public class Fuel : MonoBehaviour
         }
 
         _atRestVisual = false;
-        _intensity = Mathf.MoveTowards(_intensity, 0f, intensityDecayPerSecond * Time.deltaTime);
+        _intensity = Mathf.MoveTowards(_intensity, 0f, C.fuelBarIntensityDecayPerSecond * Time.deltaTime);
 
         // Heavier resistance judders slower and bigger; lighter resistance buzzes fast and small.
         // Peak wobble degrees are driven directly by _activeDrainWeight (mirroring frequency) so
@@ -176,19 +154,19 @@ public class Fuel : MonoBehaviour
         float shakeEnvelope01;
         if (_gaining)
         {
-            freq = gainShakeFrequency;
-            shakeDegPeak = shakeAmplitudeDegrees;
+            freq = C.fuelBarGainShakeFrequency;
+            shakeDegPeak = C.fuelBarGainShakeDegrees;
             shakeEnvelope01 = Mathf.Clamp01(_intensity);
         }
         else
         {
-            freq = Mathf.Lerp(lightDrainShakeFrequency, heavyDrainShakeFrequency, _activeDrainWeight);
-            shakeDegPeak = shakeAmplitudeByResistance.Evaluate(_activeDrainWeight);
+            freq = Mathf.Lerp(C.fuelBarLightDrainShakeFrequency, C.fuelBarHeavyDrainShakeFrequency, _activeDrainWeight);
+            shakeDegPeak = C.fuelBarShakeByResistance.Evaluate(_activeDrainWeight);
             // Normalize by this weight's own achievable _intensity peak so the envelope reaches
             // 1 while sustained regardless of material — otherwise light materials (whose
             // _intensity peak sits well under 1) would be doubly suppressed by both a small
             // shakeDegPeak AND a perpetually-partial envelope.
-            float peakIntensityForWeight = Mathf.Max(0.0001f, Mathf.Lerp(minResistanceIntensity, maxResistanceIntensity, _activeDrainWeight));
+            float peakIntensityForWeight = Mathf.Max(0.0001f, Mathf.Lerp(C.fuelBarMinResistanceIntensity, C.fuelBarMaxResistanceIntensity, _activeDrainWeight));
             shakeEnvelope01 = Mathf.Clamp01(_intensity / peakIntensityForWeight);
         }
         _shakePhase += Time.deltaTime * freq * Mathf.PI * 2f;
@@ -200,16 +178,16 @@ public class Fuel : MonoBehaviour
         Color restColor = StatusRestColor(out float statusScale);
         if (_rect != null)
         {
-            float scaleOffset = (_gaining ? swellScale : -squeezeScale) * _intensity;
+            float scaleOffset = (_gaining ? C.fuelBarSwellScale : -C.fuelBarSqueezeScale) * _intensity;
             _rect.localScale = _baseScale * (1f + scaleOffset) * statusScale;
         }
 
         if (fuelFill != null)
         {
             float tintLerpAmount = _gaining
-                ? maxTintLerp
-                : maxTintLerp * Mathf.Lerp(minHeavyTintMul, 1f, _activeDrainWeight);
-            Color target = Color.Lerp(restColor, _gaining ? gainTint : drainTint, tintLerpAmount);
+                ? C.fuelBarMaxTintLerp
+                : C.fuelBarMaxTintLerp * Mathf.Lerp(C.fuelBarMinHeavyTintMul, 1f, _activeDrainWeight);
+            Color target = Color.Lerp(restColor, _gaining ? C.fuelBarGainTint : C.fuelBarDrainTint, tintLerpAmount);
             fuelFill.color = Color.Lerp(restColor, target, Mathf.Clamp01(_intensity));
         }
     }

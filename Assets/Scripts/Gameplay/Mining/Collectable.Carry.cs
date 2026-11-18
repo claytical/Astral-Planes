@@ -88,7 +88,7 @@ public partial class Collectable
                 particles.Apply(scaleTarget);
 
                 var col = energySprite.color;
-                col.a = Mathf.Lerp(col.a, Mathf.Lerp(0.45f, 0.95f, pulse), 0.15f);
+                col.a = Mathf.Lerp(col.a, Mathf.Lerp(trailIdleAlpha, trailReadyAlpha, pulse), trailAlphaLerp);
                 energySprite.color = col;
             }
 

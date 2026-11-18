@@ -15,7 +15,7 @@ public partial class GameFlowManager
             intro.SetActive(false);
             if (setup != null)
             {
-                var title = FindObjectsByType<TextMeshProUGUI>(FindObjectsSortMode.None).FirstOrDefault();
+                var title = FindObjectsByType<TextMeshProUGUI>().FirstOrDefault();
                 if (title != null)
                 {
                     title.text = "Select your vessel...";

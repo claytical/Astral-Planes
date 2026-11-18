@@ -8,34 +8,35 @@ using UnityEngine;
 ///    It stays up across a held-button cascade while each next note's window is open, so a run of
 ///    quick notes reads as one continuous "hold" window.
 ///
-/// Driven every frame by Vehicle.TickReleaseApproachCue. Self-contained: Vehicle adds this
-/// component at runtime if the prefab lacks it, and the ring sprite is generated procedurally.
-/// (Replaces the original growing-circle + step-bar cue, inert since its setters were removed.)
+/// All tuning (radii, opacity, pulse, thickness, sorting) lives on VehicleConfig under
+/// "Release Cue" and is read every frame, so Inspector tweaks show live in Play mode.
+/// Driven every frame by Vehicle.TickReleaseApproachCue, which also assigns <see cref="config"/>.
+/// Self-contained: Vehicle adds this component at runtime if the prefab lacks it, and the
+/// ring/disc sprites are generated procedurally.
 /// </summary>
 [DisallowMultipleComponent]
 public class VehicleReleaseCue : MonoBehaviour
 {
-    [Header("Approach Ring")]
-    [Tooltip("Ring radius when it first appears, as a multiple of the ship sprite's radius.")]
-    [SerializeField] private float ringStartRadiusMul = 2.5f;
-    [Tooltip("Ring radius as the window opens, as a multiple of the ship sprite's radius (just outside the hull).")]
-    [SerializeField] private float ringEndRadiusMul = 1.15f;
-    [SerializeField, Range(0f, 1f)] private float ringAlphaStart = 0.15f;
-    [SerializeField, Range(0f, 1f)] private float ringAlphaEnd = 0.85f;
-    [Tooltip("Sorting order relative to the vehicle sprite (negative = behind the hull).")]
-    [SerializeField] private int sortingOrderOffset = 1;
+    // Fallbacks used only if no VehicleConfig is assigned (mirror VehicleConfig defaults).
+    private const float kDefRingStartRadiusMul = 2.5f;
+    private const float kDefRingEndRadiusMul = 1.15f;
+    private const float kDefRingAlphaStart = 0.10f;
+    private const float kDefRingAlphaEnd = 0.75f;
+    private const float kDefRingThickness01 = 0.07f;
+    private const float kDefDiscRadiusMul = 1.15f;
+    private const float kDefDiscAlphaMin = 0.05f;
+    private const float kDefDiscAlphaMax = 0.15f;
+    private const float kDefDiscPulseHz = 3f;
+    private const int kDefSortingOffset = 1;
 
-    [Header("Open Window")]
-    [Tooltip("Filled disc radius while the window is open, as a multiple of the ship sprite's radius. Match Ring End Radius Mul so the outline fills in place.")]
-    [SerializeField] private float openRadiusMul = 1.15f;
-    [SerializeField, Range(0f, 1f)] private float openAlphaMin = 0.12f;
-    [SerializeField, Range(0f, 1f)] private float openAlphaMax = 0.30f;
-    [Tooltip("Pulse rate of the filled disc while the window is open.")]
-    [SerializeField] private float openPulseHz = 3f;
+    /// <summary>Shared tuning source (Vehicle.vehicleConfig). Assigned by Vehicle each frame.</summary>
+    [System.NonSerialized] public VehicleConfig config;
 
-    private const float kRingThickness01 = 0.07f; // ring band as a fraction of the sprite radius
+    /// <summary>World point the ring is centered on (Vehicle.NoteCoreAnchor); falls back to this transform.</summary>
+    [System.NonSerialized] public Transform centerAnchor;
 
     private static Sprite s_ringSprite;
+    private static float s_ringSpriteThickness = -1f;
     private static Sprite s_discSprite;
 
     private SpriteRenderer _ring;
@@ -44,9 +45,6 @@ public class VehicleReleaseCue : MonoBehaviour
     private float _approach01;
     private Color _color = Color.white;
     private float _hullRadiusWorld = 0.35f;
-
-    /// <summary>World point the ring is centered on (Vehicle.NoteCoreAnchor); falls back to this transform.</summary>
-    public Transform centerAnchor;
 
     /// <summary>
     /// approach01: 0 = hidden, (0..1] = window approaching (1 = opening now).
@@ -87,24 +85,32 @@ public class VehicleReleaseCue : MonoBehaviour
         EnsureRing();
         _ring.enabled = true;
 
+        var cfg = config;
         float radius;
         Color c = _color;
         if (_open)
         {
             _ring.sprite = GetDiscSprite();
-            radius = _hullRadiusWorld * openRadiusMul;
+            radius = _hullRadiusWorld * (cfg != null ? cfg.releaseDiscRadiusMul : kDefDiscRadiusMul);
+            float hz = cfg != null ? cfg.releaseDiscPulseHz : kDefDiscPulseHz;
+            float aMin = cfg != null ? cfg.releaseDiscAlphaMin : kDefDiscAlphaMin;
+            float aMax = cfg != null ? cfg.releaseDiscAlphaMax : kDefDiscAlphaMax;
             // Start at the dim end, then pulse.
             float t = Time.time - _openStartTime;
-            float pulse = 0.5f - 0.5f * Mathf.Cos(t * 2f * Mathf.PI * Mathf.Max(0.01f, openPulseHz));
-            c.a = Mathf.Lerp(openAlphaMin, openAlphaMax, pulse);
+            float pulse = 0.5f - 0.5f * Mathf.Cos(t * 2f * Mathf.PI * Mathf.Max(0.01f, hz));
+            c.a = Mathf.Lerp(aMin, aMax, pulse);
         }
         else
         {
-            _ring.sprite = GetRingSprite();
+            _ring.sprite = GetRingSprite(cfg != null ? cfg.releaseCueRingThickness01 : kDefRingThickness01);
+            float rStart = cfg != null ? cfg.releaseRingStartRadiusMul : kDefRingStartRadiusMul;
+            float rEnd = cfg != null ? cfg.releaseRingEndRadiusMul : kDefRingEndRadiusMul;
+            float aStart = cfg != null ? cfg.releaseRingAlphaStart : kDefRingAlphaStart;
+            float aEnd = cfg != null ? cfg.releaseRingAlphaEnd : kDefRingAlphaEnd;
             // Ease-in so the ring visibly accelerates into the hull right before the window.
             float u = _approach01 * _approach01;
-            radius = _hullRadiusWorld * Mathf.Lerp(ringStartRadiusMul, ringEndRadiusMul, u);
-            c.a = Mathf.Lerp(ringAlphaStart, ringAlphaEnd, _approach01);
+            radius = _hullRadiusWorld * Mathf.Lerp(rStart, rEnd, u);
+            c.a = Mathf.Lerp(aStart, aEnd, _approach01);
         }
         _ring.color = c;
 
@@ -123,24 +129,31 @@ public class VehicleReleaseCue : MonoBehaviour
         var go = new GameObject("Release Approach Ring");
         go.transform.SetParent(transform, false);
         _ring = go.AddComponent<SpriteRenderer>();
-        _ring.sprite = GetRingSprite();
+        _ring.sprite = GetRingSprite(config != null ? config.releaseCueRingThickness01 : kDefRingThickness01);
 
         var hull = GetComponent<SpriteRenderer>();
         if (hull != null)
         {
             _ring.sortingLayerID = hull.sortingLayerID;
-            _ring.sortingOrder = hull.sortingOrder + sortingOrderOffset;
+            _ring.sortingOrder = hull.sortingOrder + (config != null ? config.releaseCueSortingOffset : kDefSortingOffset);
         }
     }
 
-    // Procedural thin annulus, 1 world unit across at scale 1.
-    private static Sprite GetRingSprite()
+    // Procedural thin annulus, 1 world unit across at scale 1. Rebuilt only when thickness changes.
+    private static Sprite GetRingSprite(float thickness01)
     {
-        if (s_ringSprite != null) return s_ringSprite;
+        thickness01 = Mathf.Clamp(thickness01, 0.01f, 0.5f);
+        if (s_ringSprite != null && Mathf.Abs(s_ringSpriteThickness - thickness01) < 0.0005f) return s_ringSprite;
+        if (s_ringSprite != null)
+        {
+            var oldTex = s_ringSprite.texture;
+            Destroy(s_ringSprite);
+            if (oldTex != null) Destroy(oldTex);
+        }
         const int n = 128;
         var tex = new Texture2D(n, n, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
         float r = n * 0.5f;
-        float inner = 1f - kRingThickness01;
+        float inner = 1f - thickness01;
         const float soft = 0.025f;
         for (int y = 0; y < n; y++)
         for (int x = 0; x < n; x++)
@@ -152,6 +165,7 @@ public class VehicleReleaseCue : MonoBehaviour
         }
         tex.Apply();
         s_ringSprite = Sprite.Create(tex, new Rect(0, 0, n, n), new Vector2(0.5f, 0.5f), n);
+        s_ringSpriteThickness = thickness01;
         return s_ringSprite;
     }
 

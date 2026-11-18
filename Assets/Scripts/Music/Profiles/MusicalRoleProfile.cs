@@ -35,12 +35,14 @@ public struct DustColorSet
     public Color shadowColor;  // regrowth / memory / deny feedback
 }
 
-[CreateAssetMenu(menuName = "Astral Planes/Music/Role/Musical Role Profile", fileName = "NewMusicalRoleProfile")]
+[CreateAssetMenu(menuName = "Astral Planes/Music/Roles/Musical Role Profile", fileName = "NewMusicalRoleProfile")]
 public class MusicalRoleProfile : ScriptableObject
 {
+    [Tooltip("Which musical role (Bass / Lead / Harmony / Groove) this profile defines. One profile per role is loaded from Resources/Profiles/Musical Roles.")]
     public MusicalRole role;
 
     [Header("Visuals & Styling")]
+    [Tooltip("Dust colors for this role: Base = normal presence, Shadow = regrowth / memory / deny feedback.")]
     public DustColorSet dustColors;
     [Range(0f, 1f)]
     [Tooltip("Baseline alpha for this role when used as a semantic color (track / DiscoveryTrackNode / imprints).")]

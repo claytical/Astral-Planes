@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VehicleConfig
   maxAngularVelocityDegPerSec: 540
   manualReleaseQueueCapacity: 9
+  releaseApproachLookaheadSeconds: 1.25
   occupiedStepVelocityMultiplier: 1.25
   occupiedStepOctaveAccent: 1
   manualReleaseUseArmLock: 1
@@ -22,6 +23,19 @@ MonoBehaviour:
   manualReleaseAutoCommitEpsSteps: 0.35
   manualReleaseGracePeriodSteps: 1
   postCommitRingCollisionImmunitySeconds: 0.5
+  ringBreakMinImpactSpeed: 8
+  ringPhaseGhostAlpha: 0.45
+  releaseRingStartRadiusMul: 2.5
+  releaseRingEndRadiusMul: 1.15
+  releaseRingAlphaStart: 0.01
+  releaseRingAlphaEnd: 0.5
+  releaseCueRingThickness01: 0.07
+  releaseDiscRadiusMul: 1.15
+  releaseDiscAlphaMin: 0.05
+  releaseDiscAlphaMax: 0.15
+  releaseDiscPulseHz: 3
+  releaseCueSortingOffset: 1
+  energyCueAlpha: 1
   plowFadeSeconds: 0.04
   inputTimeout: 0.15
   enableRecovery: 1
@@ -48,8 +62,87 @@ MonoBehaviour:
   spawnRestPocketRadiusCells: 1
   spawnRestPocketFadeSeconds: 0.05
   spawnRestPocketDelaySeconds: 0
-  trailSlotSpacing: 0.1
-  trailFirstSlotOffset: 0.3
-  trailHistoryCapacity: 48
+  tetherHullRadiusScale: 0.9
   drainFeedbackShrinkScale: 0.7
   drainFeedbackDuration: 0.25
+  lowFuelThreshold01: 0.2
+  lowFuelGlowColor: {r: 1, g: 0.35, b: 0.2, a: 1}
+  lowFuelPulseHz: 1.2
+  lowFuelPulseHzEmpty: 3.5
+  voidRefuelGlowColor: {r: 0.75, g: 0.95, b: 1, a: 1}
+  statusGlowRadiusMul: 1.6
+  statusGlowMaxAlpha: 0.45
+  fuelBarChangeEpsilon: 0.0005
+  fuelBarIntensityPerFullDelta: 0.05
+  fuelBarIntensityDecayPerSecond: 3.5
+  fuelBarSwellScale: 0.15
+  fuelBarSqueezeScale: 0.1
+  fuelBarGainShakeDegrees: 1
+  fuelBarGainShakeFrequency: 9
+  fuelBarLightDrainShakeFrequency: 2
+  fuelBarHeavyDrainShakeFrequency: 15
+  fuelBarGainTint: {r: 1, g: 1, b: 1, a: 1}
+  fuelBarDrainTint: {r: 0, g: 0, b: 0, a: 1}
+  fuelBarMaxTintLerp: 0.6
+  fuelBarMinResistanceIntensity: 0.02
+  fuelBarMaxResistanceIntensity: 1
+  fuelBarShakeByResistance:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0.1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.275
+      value: 0.25
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.6
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.815
+      value: 2
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 2.3
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  fuelBarMinHeavyTintMul: 0.5
+  fuelBarLowFuelTintMax: 0.75
+  fuelBarLowFuelScalePulse: 0.06
+  fuelBarRefuelShimmerHz: 2
+  fuelBarRefuelTintMax: 0.55
+  fuelBarRefuelScalePulse: 0.04
+  turbulenceLateralAccel: 45
+  turbulenceFrequency: 7
+  turbulenceAuthorityPenalty01: 0.5

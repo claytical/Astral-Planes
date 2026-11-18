@@ -102,10 +102,9 @@ public partial class CosmicDustGenerator : MonoBehaviour
     private Func<MusicalRole, MusicalRoleProfile> _resolveRoleProfileDelegate =>
         _resolveRoleProfileDelegateBacking ??= _roleDensity.GetResolvedRoleProfile;
 
-    [Header("Dust Visual Timings")]
-    [SerializeField] private DustVisualTimingSettings dustVisualTimingSettings;
-    private DustVisualTimings DustTimings => dustVisualTimingSettings != null
-        ? dustVisualTimingSettings.Timings
+    // Cell animation timings live on CosmicDustGeneratorConfig → "Cell Animation Timing".
+    private DustVisualTimings DustTimings => config != null
+        ? config.dustTimings.Sanitized()
         : DustVisualTimings.Default;
     
     // --- Extracted controllers (refactor targets) ---

@@ -68,7 +68,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e57fdc6c382d84fbd9a88b06e96a0172, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  config: {fileID: 11400000, guid: a3416aa415c5470fb21ce2d4a75d42c6, type: 2}
+  config: {fileID: 11400000, guid: 1e481e2fa5214b7d92089f14a4a608b0, type: 2}
 --- !u!114 &1784781495894534207
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -81,7 +81,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: faa4693963b0b40518ccad23f88e8645, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  config: {fileID: 11400000, guid: 45ea7ca1235d4457abeac443261c0831, type: 2}
+  config: {fileID: 11400000, guid: 1e481e2fa5214b7d92089f14a4a608b0, type: 2}
   outerSprite: {fileID: 2442014530722922072}
   innerSprite: {fileID: 3197535283754970742}
   spritePivotOuter: {fileID: 0}

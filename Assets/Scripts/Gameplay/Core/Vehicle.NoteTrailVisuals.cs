@@ -200,7 +200,8 @@ public partial class Vehicle
                 UpdateVehicleTether(viz);
 
                 if (_vehicleTether.IsShown)
-                    viz?.SetManualReleaseCuePosition(transform, _vehicleTether.EvaluatePosition01(_vehicleTether.ReleaseProgress01), _vehicleTether.IsApproaching);
+                    viz?.SetManualReleaseCuePosition(transform, _vehicleTether.EvaluatePosition01(_vehicleTether.ReleaseProgress01), _vehicleTether.IsApproaching,
+                        vehicleConfig != null ? vehicleConfig.energyCueAlpha : 1f);
                 else
                     viz?.ClearManualReleaseCue(transform);
             }

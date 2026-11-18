@@ -488,7 +488,7 @@ public sealed class SceneFlowCoordinator
     {
         if (_gameFlow.activeDrumTrack == null) return;
 
-        var voices = UnityEngine.Object.FindObjectsByType<MidiVoice>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        var voices = UnityEngine.Object.FindObjectsByType<MidiVoice>(FindObjectsInactive.Include);
         foreach (var v in voices)
         {
             if (v == null) continue;
@@ -998,7 +998,7 @@ public sealed class SceneFlowCoordinator
                 var allVehicles = _gameFlow.GetVehicles();
                 var vehicleList = allVehicles != null && allVehicles.Count > 0
                     ? new List<Vehicle>(allVehicles)
-                    : new List<Vehicle>(UnityEngine.Object.FindObjectsByType<Vehicle>(FindObjectsSortMode.None));
+                    : new List<Vehicle>(UnityEngine.Object.FindObjectsByType<Vehicle>());
                 foreach (var v in vehicleList)
                 {
                     if (v == null || !v.isActiveAndEnabled) continue;

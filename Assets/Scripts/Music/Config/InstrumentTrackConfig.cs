@@ -1,10 +1,10 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "InstrumentTrackConfig", menuName = "Astral Planes/Music/Track/Instrument Track Config")]
+[CreateAssetMenu(fileName = "InstrumentTrackConfig", menuName = "Astral Planes/Music/Tracks & Mix/Instrument Track Config")]
 public class InstrumentTrackConfig : ScriptableObject
 {
     [Header("Ascension")]
-    [Tooltip("Fallback ascend-loop count when RoleMotifNoteSetConfig.ascendLoops is 0.")]
+    [Tooltip("Fallback ascend-loop count when the motif's RoleMotifNoteSetConfig.ascendLoops is 0. (NoteAscensionDirector.ascendLoops is a separate marker-animation default.)")]
     [Min(1)] public int defaultAscendLoops = 4;
     public int ascensionLoopsPerExtraBin = 2;
 

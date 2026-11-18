@@ -24,6 +24,7 @@ public partial class Vehicle : MonoBehaviour
     private ContactFilter2D _pressureFilter;
     public ShipMusicalProfile profile;
     [SerializeField] private VehicleConfig vehicleConfig;
+    public VehicleConfig Config => vehicleConfig;
     [HideInInspector] public float capacity = 10f;
     private float _burnRateMultiplier = 1f; // Multiplier for the burn rate based on trigger pressure
     [HideInInspector] public float arcadeMaxSpeed = 14f;

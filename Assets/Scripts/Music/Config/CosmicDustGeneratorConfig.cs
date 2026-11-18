@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "CosmicDustGeneratorConfig", menuName = "Astral Planes/Dust/Cosmic Dust Generator Config")]
+[CreateAssetMenu(fileName = "CosmicDustGeneratorConfig", menuName = "Astral Planes/Dust & Maze/Cosmic Dust Generator Config")]
 public class CosmicDustGeneratorConfig : ScriptableObject
 {
     [Header("Grid & Collision")]
@@ -39,7 +39,12 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     public float zapFadeSeconds = 1.5f;
     [Tooltip("Sprite scale-out duration when a star drain clears a cell. Shorter = punchier.")]
     [Min(0.01f)] public float zapScaleOutSeconds = 0.12f;
-    
+
+    [Header("Cell Animation Timing")]
+    [Tooltip("Per-cell grow/shrink/fade durations for regrow and vehicle-carve clears. " +
+             "(Was the separate DustVisualTimingSettings asset.)")]
+    public DustVisualTimings dustTimings = DustVisualTimings.Default;
+
     [Header("Generic Fill Resistance")]
     [Range(0f, 1f), Tooltip("Baseline carve resistance for MusicalRole.None dust, baked into the " +
         "imprint at spawn/regrow time instead of the previous hardcoded 0. Default 0 reproduces " +

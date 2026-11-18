@@ -383,7 +383,7 @@ public sealed class PorousBorderParams
     }
 }
 
-[CreateAssetMenu(menuName = "Astral Planes/Dust/Maze/Maze Pattern Config", fileName = "MazePatternConfig")]
+[CreateAssetMenu(menuName = "Astral Planes/Dust & Maze/Maze Pattern Config", fileName = "MazePatternConfig")]
 public class MazePatternConfig : ScriptableObject
 {
     public MazePatternType patternType = MazePatternType.FullFill;

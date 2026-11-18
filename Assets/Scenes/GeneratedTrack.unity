@@ -197,7 +197,6 @@ MonoBehaviour:
   firstPlayConfirmOrbPrefab: {fileID: 296242526}
   ambientSnapSpeed: 14
   ambientFadeToWhiteSpeed: 4
-  playheadTrailEnabled: 1
   playheadTrailEmitPerWorldUnit: 45
   playheadTrailMaxEmitPerFrame: 160
   playheadTrailWorldZOverride: NaN
@@ -10826,8 +10825,6 @@ MonoBehaviour:
   dustPrefab: {fileID: 1781116594832268, guid: a986e36244edb4025b376db19f27984c, type: 3}
   activeDustRoot: {fileID: 823134540}
   config: {fileID: 11400000, guid: 587d53622e0ba4950b2686c0a418ab89, type: 2}
-  dustVisualTimingSettings: {fileID: 11400000, guid: 99b1bf1eb1b214eed942252efa203990,
-    type: 2}
   tileDiameterWorld: 0.5
   vehicleMask:
     serializedVersion: 2
@@ -12249,12 +12246,6 @@ MonoBehaviour:
   mainCamera: {fileID: 269415559}
   warpPrefab: {fileID: 1113209529470810508, guid: 5962a9437261f4908b0f4999318283dd,
     type: 3}
-  commitDepth01: 0.55
-  minCommitSpeed: 2.25
-  outwardSpeedBleed: 18
-  returnToPlaySpeed: 8
-  innerSettleBuffer: 0.08
-  settleSpeedThreshold: 1
   wrapEnabled: 0
 --- !u!1 &1532169429
 GameObject:

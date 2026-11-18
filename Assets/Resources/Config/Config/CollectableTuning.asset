@@ -45,6 +45,9 @@ MonoBehaviour:
     trailDriftRadius: 0.18
     trailDriftSpeed: 1.1
     trailDriftFocusMul: 0.15
+    trailIdleAlpha: 0.45
+    trailReadyAlpha: 0.95
+    trailAlphaLerp: 0.15
   dustCollision:
     dustCollisionEnterImpulse: 0.75
     dustCollisionStayForce: 2

@@ -1,18 +1,26 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "DrumTrackConfig", menuName = "Astral Planes/Music/Track/Drum Track Config")]
+[CreateAssetMenu(fileName = "DrumTrackConfig", menuName = "Astral Planes/Music/Tracks & Mix/Drum Track Config")]
 public class DrumTrackConfig : ScriptableObject
 {
     [Header("Grid Sizing")]
+    [Tooltip("Reference screen width (px) for grid auto-sizing; with Reference Columns this fixes the cell size in pixels.")]
     public int referenceWidthPx = 1920;
+    [Tooltip("Number of grid columns at the reference width. Cell px = Reference Width Px / Reference Columns.")]
     public int referenceColumns = 36;
+    [Tooltip("Pixels reserved at the bottom of the screen (note visualizer strip) that the play area must not cover.")]
     public int uiBottomPaddingPx = 160;
+    [Tooltip("Pixels reserved at the top of the screen that the play area must not cover.")]
     public int uiTopPaddingPx = 52;
+    [Tooltip("Extra world-unit inset applied to each edge of the play area.")]
     public float gridPadding = 0f;
+    [Tooltip("Compute grid columns/rows from the screen size using the reference values above.")]
     public bool autoSizeSpawnGridToScreen = true;
+    [Tooltip("Freeze the play area once computed so a resolution/camera change mid-session doesn't shift the grid.")]
     public bool lockPlayAreaAfterInit = true;
 
     [Header("Beat Timing")]
+    [Tooltip("Width (in steps) of the on-beat timing window used when judging collectable pickup timing.")]
     public float timingWindowSteps = 0.25f;
 
     [Header("Carve-Driven Intensity")]
@@ -52,6 +60,7 @@ public class DrumTrackConfig : ScriptableObject
     public float minClipDwellSeconds = 4f;
 
     [Header("Clip Poll Mode")]
+    [Tooltip("When drum intensity is re-evaluated: LoopBoundary = once per loop, BinFill = when a track fills a bin, Continuous = every Intensity Poll Interval Seconds.")]
     public ClipPollMode clipPollMode = ClipPollMode.LoopBoundary;
     [Tooltip("Minimum seconds between BinFill-mode re-evaluations, to prevent thrashing when multiple tracks fill bins close together.")]
     public float binFillPollDebounceSeconds = 0.15f;

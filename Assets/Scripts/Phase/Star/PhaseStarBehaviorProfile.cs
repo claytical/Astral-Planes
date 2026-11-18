@@ -4,7 +4,7 @@ using UnityEngine;
 // current maze — nav mode (Direct / CorridorFollow / LaneGlide / RingOrbit / Burrow) plus
 // multipliers on the speed/jitter/orbit/replan/keep-clear values below — comes from the motif's
 // MazePatternConfig.starNavigation (StarNavigationParams) and stacks on top of this profile.
-[CreateAssetMenu(menuName = "Astral Planes/Phase/PhaseStar Behavior Profile", fileName = "PhaseStarBehaviorProfile")]
+[CreateAssetMenu(menuName = "Astral Planes/Phase & Star/PhaseStar Behavior Profile", fileName = "PhaseStarBehaviorProfile")]
 public class PhaseStarBehaviorProfile : ScriptableObject
 {
 
@@ -16,7 +16,7 @@ public class PhaseStarBehaviorProfile : ScriptableObject
     public bool starKeepsDustClear = true;
 
     [Min(0)]
-    [Tooltip("Radius in grid cells for the keep-clear pocket when the star is idle/armed.")]
+    [Tooltip("Radius in grid cells for the keep-clear pocket when the star is idle/armed. Each maze adds MazePatternConfig.starNavigation.keepClearRadiusOffset on top. (The ship's own pocket is ShipMusicalProfile.vehicleKeepClearRadiusCells.)")]
     public int starKeepClearRadiusCells = 2;
 
     [Header("Self-heal / Deadlock Recovery")]

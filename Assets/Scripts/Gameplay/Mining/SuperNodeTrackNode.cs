@@ -6,57 +6,51 @@ public class SuperNodeTrackNode : TrackNode
     [SerializeField] private SpriteRenderer _renderer;
     [SerializeField] private Explode        _explode;
 
-    [Header("Speed (difficulty-scaled)")]
-    [SerializeField] private float minSpeed = 1.5f;
-    [SerializeField] private float maxSpeed = 4.5f;
+    [Tooltip("Movement, lifetime and look. Shared asset: Resources/Config/Config/SuperNodeTrackNodeConfig.")]
+    [SerializeField] private SuperNodeTrackNodeConfig config;
 
-    [Header("Lifetime (difficulty-scaled)")]
-    [SerializeField] private int maxLifetimeLoops = 5;
-    [SerializeField] private int minLifetimeLoops = 1;
+    private SuperNodeTrackNodeConfig Cfg
+    {
+        get
+        {
+            if (config != null) return config;
+            Debug.LogError($"{name}: SuperNodeTrackNodeConfig not assigned — using field defaults. Assign one in the Inspector.");
+            config = ScriptableObject.CreateInstance<SuperNodeTrackNodeConfig>();
+            return config;
+        }
+    }
 
-    [Header("Direction")]
-    [SerializeField] private float reactionDelayMin   = 0.12f;
-    [SerializeField] private float reactionDelayMax   = 0.35f;
-    [SerializeField] private float pathCommitDuration = 0.7f;
-    [SerializeField] private float continuityBias     = 0.6f;
-    [SerializeField] private float turnJitterDeg      = 14f;
-
-    [Header("Burst-Pause")]
-    [SerializeField] private float burstDuration         = 0.55f;
-    [SerializeField] private float pauseDuration         = 0.30f;
-    [SerializeField] private float burstSpeedMultiplier  = 1.8f;
-    [SerializeField] private float pauseSpeedMultiplier  = 0.55f;
-
-    [Header("Hesitation")]
-    [SerializeField] private float turnRate   = 7f;
-    [SerializeField] private float hesitation = 0.12f;
-
-    [Header("Dust Attraction")]
-    [SerializeField] private float lookaheadDistance  = 1.5f;
-    [SerializeField] private float wallHugBonus       = 1.0f;
-    [SerializeField] private float sideCheckDistance  = 1.5f;
-
-    [Header("Stall")]
-    [SerializeField] private float stallCheckInterval  = 0.5f;
-    [SerializeField] private float stallMoveThreshold  = 0.15f;
-
-    [Header("Flee")]
-    [SerializeField] private float fleeRadius          = 3.5f;
-    [SerializeField] private float fleeSpeedMultiplier = 1.5f;
-
-    [Header("Collection")]
-    [SerializeField] private float spawnGraceSeconds  = 0.2f;
-    [SerializeField] private int   ascendLoopsOverride = 3;
-
-    [Header("Dust Carving")]
-    [SerializeField] private float dustFadeSeconds = 0.15f;
-    [Tooltip("-1 = the carved cell's role regrowthDelay (maze base for role-less cells); >= 0 overrides it.")]
-    [SerializeField] private float dustRegrowDelay = -1f;
+    private float minSpeed => Cfg.minSpeed;
+    private float maxSpeed => Cfg.maxSpeed;
+    private int maxLifetimeLoops => Cfg.maxLifetimeLoops;
+    private int minLifetimeLoops => Cfg.minLifetimeLoops;
+    private float reactionDelayMin => Cfg.reactionDelayMin;
+    private float reactionDelayMax => Cfg.reactionDelayMax;
+    private float pathCommitDuration => Cfg.pathCommitDuration;
+    private float continuityBias => Cfg.continuityBias;
+    private float turnJitterDeg => Cfg.turnJitterDeg;
+    private float burstDuration => Cfg.burstDuration;
+    private float pauseDuration => Cfg.pauseDuration;
+    private float burstSpeedMultiplier => Cfg.burstSpeedMultiplier;
+    private float pauseSpeedMultiplier => Cfg.pauseSpeedMultiplier;
+    private float turnRate => Cfg.turnRate;
+    private float hesitation => Cfg.hesitation;
+    private float lookaheadDistance => Cfg.lookaheadDistance;
+    private float wallHugBonus => Cfg.wallHugBonus;
+    private float sideCheckDistance => Cfg.sideCheckDistance;
+    private float stallCheckInterval => Cfg.stallCheckInterval;
+    private float stallMoveThreshold => Cfg.stallMoveThreshold;
+    private float fleeRadius => Cfg.fleeRadius;
+    private float fleeSpeedMultiplier => Cfg.fleeSpeedMultiplier;
+    private float spawnGraceSeconds => Cfg.spawnGraceSeconds;
+    private int ascendLoopsOverride => Cfg.ascendLoopsOverride;
+    private float dustFadeSeconds => Cfg.dustFadeSeconds;
+    private float dustRegrowDelay => Cfg.dustRegrowDelay;
+    private float faceTurnRate => Cfg.faceTurnRate;
+    private float wobbleDeg => Cfg.wobbleDeg;
+    private Vector2 wobbleHzRange => Cfg.wobbleHzRange;
 
     [Header("Visual")]
-    [SerializeField] private float         faceTurnRate  = 420f;
-    [SerializeField] private float         wobbleDeg     = 12f;
-    [SerializeField] private Vector2       wobbleHzRange = new Vector2(2.5f, 4.5f);
     [SerializeField] private ParticleSystem _particles;
 
     public InstrumentTrack AssignedTrack { get; private set; }

@@ -161,6 +161,9 @@ public partial class Collectable : MonoBehaviour
     private float trailDriftRadius => tuning.noteTrail.trailDriftRadius;
     private float trailDriftSpeed => tuning.noteTrail.trailDriftSpeed;
     private float trailDriftFocusMul => tuning.noteTrail.trailDriftFocusMul;
+    private float trailIdleAlpha => tuning.noteTrail.trailIdleAlpha;
+    private float trailReadyAlpha => tuning.noteTrail.trailReadyAlpha;
+    private float trailAlphaLerp => tuning.noteTrail.trailAlphaLerp;
 
     /// <summary>
     /// The prefab's particle systems all use Scaling Mode = Local (each reads only its own

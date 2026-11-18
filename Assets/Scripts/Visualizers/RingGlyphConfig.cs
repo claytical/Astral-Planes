@@ -11,7 +11,7 @@ using UnityEngine.Serialization;
 // Gameplay-only and track-selection-only fields are collapsed into foldout drawers by
 // Assets/Editor/RingGlyphConfigEditor.cs (its name lists must be updated when adding such a field;
 // unlisted fields appear in the shared section).
-[CreateAssetMenu(fileName = "RingGlyphConfig", menuName = "Astral Planes/Visualizers/Ring Glyph Config")]
+[CreateAssetMenu(fileName = "RingGlyphConfig", menuName = "Astral Planes/Rings & Records/Ring Glyph Config")]
 public class RingGlyphConfig : ScriptableObject
 {
     [Header("Layout (Shared)")]

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Astral Planes/Gameplay/Mining/Discovery Track Node Locomotion Profile", fileName = "DiscoveryTrackNodeLocomotionProfile")]
+[CreateAssetMenu(menuName = "Astral Planes/Discovery Nodes/Locomotion Profile (per role)", fileName = "DiscoveryTrackNodeLocomotionProfile")]
 public class DiscoveryTrackNodeLocomotionProfile : ScriptableObject
 {
     [Header("Linear Motion")]
@@ -18,7 +18,7 @@ public class DiscoveryTrackNodeLocomotionProfile : ScriptableObject
 
     [Header("Combat & Lifespan")]
     [Min(1)] public int strength = 100;
-    [Tooltip("Loops before this node expires. 0 = never (only used when no NoteSet override applies).")]
+    [Tooltip("Loops before this node expires. 0 = never. Only used when the motif's RoleMotifNoteSetConfig.mineNodeExpireAfterLoops is 0 (that value wins when set).")]
     [Min(0)] public int expireAfterLoops = 0;
 
     [Header("Decision Timing")]

@@ -16,3 +16,13 @@ MonoBehaviour:
   driveCarvingMotionFromNoteSet: 1
   outlineSpriteRhythm: {fileID: -2473249655151002397, guid: 999ccfb33204c4ac3a8058191b131873,
     type: 3}
+  dustDragScalar: 0.85
+  extraBrake: 0
+  escapePushForce: 5
+  exhaustEnergyFraction: 0.15
+  defaultThinkingSpinDegPerSec: 480
+  defaultFaceTurnDegPerSec: 420
+  defaultWobbleDeg: 12
+  wobbleHzRange: {x: 2.5, y: 4.5}
+  innerCounterFactor: -0.4
+  escapeSpinBoost: 1.2

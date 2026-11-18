@@ -53,36 +53,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SuperNodeTrackNode
   _renderer: {fileID: 2442014530722922072}
   _explode: {fileID: 8668376557347016044}
-  minSpeed: 1.5
-  maxSpeed: 4.5
-  maxLifetimeLoops: 5
-  minLifetimeLoops: 1
-  reactionDelayMin: 0.12
-  reactionDelayMax: 0.35
-  pathCommitDuration: 0.7
-  continuityBias: 0.6
-  turnJitterDeg: 14
-  burstDuration: 0.55
-  pauseDuration: 0.3
-  burstSpeedMultiplier: 1.8
-  pauseSpeedMultiplier: 0.55
-  turnRate: 7
-  hesitation: 0.12
-  lookaheadDistance: 1.5
-  wallHugBonus: 1
-  sideCheckDistance: 1.5
-  stallCheckInterval: 0.5
-  stallMoveThreshold: 0.15
-  fleeRadius: 3.5
-  fleeSpeedMultiplier: 1.5
-  spawnGraceSeconds: 0.2
-  minImpactSpeed: 1.5
-  ascendLoopsOverride: 3
-  dustFadeSeconds: 0.15
-  dustRegrowDelay: -1
-  faceTurnRate: 420
-  wobbleDeg: 12
-  wobbleHzRange: {x: 2.5, y: 4.5}
+  config: {fileID: 11400000, guid: 5162c0be2c27488498816ad3f8f08008, type: 2}
   _particles: {fileID: 0}
 --- !u!114 &8668376557347016044
 MonoBehaviour:

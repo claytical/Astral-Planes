@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "CollectableTuning", menuName = "Astral Planes/Gameplay/Mining/Collectable Tuning")]
+[CreateAssetMenu(fileName = "CollectableTuning", menuName = "Astral Planes/Collectables/Collectable Tuning")]
 public class CollectableTuning : ScriptableObject
 {
     [Header("Base Motion")]
@@ -163,6 +163,15 @@ public sealed class NoteTrailParams
 
     [Tooltip("Drift radius shrinks to this fraction as release pulse approaches 1 (energy focuses).")]
     public float trailDriftFocusMul = 0.15f;
+
+    [Range(0f, 1f), Tooltip("Carried-note opacity while idle in the trail (release window far away).")]
+    public float trailIdleAlpha = 0.45f;
+
+    [Range(0f, 1f), Tooltip("Carried-note opacity at full release-ready glow.")]
+    public float trailReadyAlpha = 0.95f;
+
+    [Range(0.01f, 1f), Tooltip("Per-frame smoothing toward the target opacity (higher = snappier).")]
+    public float trailAlphaLerp = 0.15f;
 
     [Tooltip("Impulse a collectable gets when it bounces off a ship whose manual-release queue is full (the pickup is refused instead of dropping the oldest carried note into a time bomb).")]
     public float queueFullBounceImpulse = 2.5f;

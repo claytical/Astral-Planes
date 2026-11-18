@@ -11,15 +11,6 @@ public class Boundaries : MonoBehaviour
     public Camera mainCamera;
     public GameObject warpPrefab;
 
-    [Header("Vehicle Wrap Feel")]
-    [Range(0.05f, 0.95f)]
-    [SerializeField] private float commitDepth01 = 0.55f;
-    [SerializeField] private float minCommitSpeed = 2.25f;
-    [SerializeField] private float outwardSpeedBleed = 18f;
-    [SerializeField] private float returnToPlaySpeed = 8f;
-    [SerializeField] private float innerSettleBuffer = 0.08f;
-    [SerializeField] private float settleSpeedThreshold = 1.0f;
-
     [Header("Wrap")]
     [SerializeField] private bool wrapEnabled = true;
 

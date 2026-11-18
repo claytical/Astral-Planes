@@ -18,15 +18,10 @@ public partial class GameFlowManager : MonoBehaviour
     [Header("Ring Glyph (Motif Rings)")]
     [SerializeField] private MotifRingGlyphApplicator motifRingGlyphApplicator;
     [SerializeField] private BinRingController binRingController;
-    [SerializeField, Min(0f)] private float motifBridgeHoldSeconds = 4f;
     [Header("Phase-In FX")]
     [Tooltip("Particle system prefab instantiated at each vehicle position when a new " +
              "phase begins.  Should be a short burst (self-destruct or timed).")]
     [SerializeField] private ParticleSystem vehiclePhaseInFxPrefab;
-
-    [Tooltip("Seconds to wait after the vehicle phase-in FX before spawning the PhaseStar. " +
-             "Gives the player a moment to orient before the star walks in.")]
-    [SerializeField, Min(0f)] private float vehiclePhaseInDelaySeconds = 1.2f;
 
     [Header("Path Choice")]
     [Tooltip("Everything about path-choice exits — placement, the four road looks, feel and " +
@@ -91,8 +86,10 @@ public partial class GameFlowManager : MonoBehaviour
     public List<LocalPlayer> localPlayers = new();
 
     [Header("Competitive Mode")]
-    [Tooltip("Scoring tunables. Falls back to 1 point/note, x2 multiplier when unassigned.")]
-    public CompetitiveScoringConfig competitiveScoringConfig;
+    [Min(1), Tooltip("Points awarded for each note a player places in competitive mode.")]
+    public int pointsPerNote = 1;
+    [Min(1), Tooltip("Multiplier on note points for the player whose vehicle depleted the DiscoveryTrackNode, until that burst clears.")]
+    public int discoveryMultiplier = 2;
 
     [SerializeField] private Transform playerStatsGrid; // assign via inspector if possible
     public Transform PlayerStatsGrid => playerStatsGrid;
@@ -101,12 +98,6 @@ public partial class GameFlowManager : MonoBehaviour
     // Scratch list for dust regrow veto (prevents collider "trap" when a cell regrows under a vehicle).
     private readonly List<Vector2Int> _vehicleCellsScratch = new List<Vector2Int>(8);
     public List<InstrumentTrack> _activeTracks = new();
-    [Header("Phase Bridge Audio")]
-    [Tooltip("Seconds to fade out the outgoing motif during the bridge cinematic.")]
-    [SerializeField] private float phaseBridgeFadeOutSeconds = 1.0f;
-
-    [Tooltip("Seconds to fade in the next motif after the new phase begins.")]
-    [SerializeField] private float phaseBridgeFadeInSeconds  = 0.6f;
     public bool GhostCycleInProgress
     {
         get => SessionState?.GhostCycleInProgress ?? false;
@@ -409,9 +400,9 @@ public partial class GameFlowManager : MonoBehaviour
     public void ClearActiveTracks() => _activeTracks?.Clear();
     public void SetPlayerStatsGrid(Transform grid) => playerStatsGrid = grid;
     public void ClearPlayerStatsGrid() => playerStatsGrid = null;
-    public float GetMotifBridgeHoldSeconds() => motifBridgeHoldSeconds;
+    public float GetMotifBridgeHoldSeconds() => PathExitConfig.motifBridgeHoldSeconds;
     public MotifRingGlyphApplicator GetMotifRingGlyphApplicator() => motifRingGlyphApplicator;
-    public float GetVehiclePhaseInDelaySeconds() => vehiclePhaseInDelaySeconds;
+    public float GetVehiclePhaseInDelaySeconds() => PathExitConfig.vehiclePhaseInDelaySeconds;
     public DrumTrack ResolveDrumTrack() =>
         activeDrumTrack != null ? activeDrumTrack : (activeDrumTrack = FindAnyObjectByType<DrumTrack>());
     public static Color QuantizeToColor32(Color c)

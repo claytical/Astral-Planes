@@ -65,6 +65,7 @@ public class PlayerStats : MonoBehaviour
         if (vehicle != null)
         {
             vehicleIcon.sprite = vehicle.GetBaseSprite();
+            if (fuel != null) fuel.SetConfig(vehicle.Config);
             UpdateFuel(_currentVehicle.capacity, _currentVehicle.capacity);
         }
         else {Debug.LogWarning("There is no vehicle attached to this object.");}

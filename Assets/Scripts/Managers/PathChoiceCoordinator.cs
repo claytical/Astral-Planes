@@ -37,7 +37,7 @@ public sealed class PathChoiceCoordinator
     {
         // The bottom exit sits right on the NoteViz "Line of Ascent"; nothing ascends during the
         // interstitial, so hide it for the duration and always restore it (idempotent).
-        var ascension = Object.FindFirstObjectByType<NoteAscensionDirector>();
+        var ascension = Object.FindAnyObjectByType<NoteAscensionDirector>();
         ascension?.SetAscentLineVisible(false);
         yield return _gameFlow.StartCoroutine(RunPathChoiceAndAdvanceInner());
         DestroyLockedStubs(); // idempotent; covers every exit path out of the inner routine
@@ -598,7 +598,7 @@ public sealed class PathChoiceCoordinator
         _winnerVehicle = null;
 
         // Bring the Line of Ascent back before the next motif starts (the wrapper also restores it).
-        Object.FindFirstObjectByType<NoteAscensionDirector>()?.SetAscentLineVisible(true);
+        Object.FindAnyObjectByType<NoteAscensionDirector>()?.SetAscentLineVisible(true);
 
         yield return _gameFlow.StartCoroutine(_sceneFlow.StartChosenMotifOrPhase(chosenPhase, chosenMotif, mirroredEdge, exitAnchorCell, chosenKind));
     }

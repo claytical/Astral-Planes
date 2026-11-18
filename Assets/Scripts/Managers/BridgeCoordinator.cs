@@ -232,14 +232,14 @@ public sealed class BridgeCoordinator
         foreach (var v in _gameFlow.GetVehicles())
             v?.ClearPendingNotesForBridge();
 
-        foreach (var c in Object.FindObjectsByType<Collectable>(FindObjectsSortMode.None))
+        foreach (var c in Object.FindObjectsByType<Collectable>())
             if (c != null) Object.Destroy(c.gameObject);
 
         // A carried wisp lives only until its motif's first loop ends; never into the next bridge.
-        foreach (var w in Object.FindObjectsByType<Wisp>(FindObjectsSortMode.None))
+        foreach (var w in Object.FindObjectsByType<Wisp>())
             if (w != null) w.Dismiss();
 
-        foreach (var n in Object.FindObjectsByType<DiscoveryTrackNode>(FindObjectsSortMode.None))
+        foreach (var n in Object.FindObjectsByType<DiscoveryTrackNode>())
         {
             if (n == null) continue;
             var explode = n.GetComponent<Explode>();

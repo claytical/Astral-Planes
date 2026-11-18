@@ -48,11 +48,7 @@ public class HarmonyDirector : MonoBehaviour
     private readonly Dictionary<InstrumentTrack, List<int>> _trackSeq = new();
     private readonly Dictionary<InstrumentTrack, int> _trackPos = new();
     private ChordProgressionProfile _pendingProfile;
-    [Tooltip("If true, on Start() we snap immediately to the current motif's profile, if any.")]
-    [SerializeField] private int remixRings = 0;
-    [SerializeField, Range(0f, 4f)] private float commitWindowBeats = 1f; // last N beats before downbeat
     [SerializeField] private bool burnIfOutsideWindow;            // consume rings even if mistimed (no chord change)
-    [SerializeField] private bool spreadOverLoops = true;                 // retune 1 track per loop if true
     [SerializeField] private bool seedFromProfileOnPhaseStart;    // leave false for Option C
 
     [Header("Motif Integration")]

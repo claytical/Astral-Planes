@@ -3,7 +3,7 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody2D))]
 public class DiscoveryTrackNodeCharacterVis : MonoBehaviour
 {
-    [SerializeField] private DiscoveryTrackNodeCharacterVisConfig config;
+    [SerializeField] private DiscoveryTrackNodeConfig config;
 
     [Header("Sprites (outer/inner optional)")]
     [SerializeField] SpriteRenderer outerSprite;

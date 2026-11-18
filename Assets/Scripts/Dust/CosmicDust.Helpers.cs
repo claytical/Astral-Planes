@@ -13,10 +13,10 @@ public struct DustVisualSettings {
 [System.Serializable]
 public struct DustVisualTimings
 {
-    [Min(0.01f)] public float regrowSpriteScaleInSeconds; // regrow sprite scale 0->1
-    [Min(0.01f)] public float clearSpriteScaleOutSeconds; // clear sprite scale 1->0
-    [Min(0.01f)] public float regrowParticleGrowInSeconds; // particle emission/alpha ramp on regrow
-    [Min(0.01f)] public float clearFadeOutSeconds; // clear tint/alpha fade out (if used)
+    [Min(0.01f), Tooltip("Regrow: sprite scale 0→1 duration.")] public float regrowSpriteScaleInSeconds;
+    [Min(0.01f), Tooltip("Clear: sprite scale 1→0 duration (also the default pre-explode scale-out).")] public float clearSpriteScaleOutSeconds;
+    [Min(0.01f), Tooltip("Regrow: particle emission/alpha ramp-in duration.")] public float regrowParticleGrowInSeconds;
+    [Min(0.01f), Tooltip("Vehicle carve: tint/alpha fade-out duration.")] public float clearFadeOutSeconds;
 
     public static DustVisualTimings Default => new DustVisualTimings
     {

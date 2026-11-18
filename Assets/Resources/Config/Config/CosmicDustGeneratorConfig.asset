@@ -24,8 +24,12 @@ MonoBehaviour:
   voidDustGrowInSeconds: 0.4
   voidRingRippleFraction: 0.35
   zapFadeSeconds: 1.5
-  zapRegrowDelaySeconds: -1
   zapScaleOutSeconds: 0.12
+  dustTimings:
+    regrowSpriteScaleInSeconds: 0.2
+    clearSpriteScaleOutSeconds: 0.2
+    regrowParticleGrowInSeconds: 1
+    clearFadeOutSeconds: 0.2
   mazeTint: {r: 0.3962264, g: 0.3962264, b: 0.3962264, a: 0.6}
   genericFillTint: {r: 0.16037738, g: 0.16037738, b: 0.16037738, a: 0.6}
   solidDustTint: {r: 0.2599235, g: 0.299533, b: 0.31132078, a: 1}

@@ -28,7 +28,7 @@ public class AudioBalanceDebugPanel : MonoBehaviour
     private void Awake()
     {
         if (previewPlayer == null) previewPlayer = GetComponent<RingPreviewPlayer>();
-        if (previewPlayer == null) previewPlayer = FindFirstObjectByType<RingPreviewPlayer>();
+        if (previewPlayer == null) previewPlayer = FindAnyObjectByType<RingPreviewPlayer>();
     }
 
     private void Update()

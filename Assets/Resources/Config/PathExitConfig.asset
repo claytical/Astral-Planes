@@ -117,3 +117,5 @@ MonoBehaviour:
   entryRoadCloseSeconds: 0.6
   offscreenMargin: 2
   travelTimeoutSeconds: 3
+  vehiclePhaseInDelaySeconds: 1.2
+  motifBridgeHoldSeconds: 2

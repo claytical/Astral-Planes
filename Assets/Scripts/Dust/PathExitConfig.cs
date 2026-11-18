@@ -20,7 +20,7 @@ public enum PathExitKind
 /// SceneFlowCoordinator via GameFlowManager.PathExitConfig. Every field has a working default,
 /// so an empty asset (or none at all) plays fine.
 /// </summary>
-[CreateAssetMenu(menuName = "Astral Planes/Path Exit Config", fileName = "PathExitConfig")]
+[CreateAssetMenu(menuName = "Astral Planes/Path Exit/Path Exit Config", fileName = "PathExitConfig")]
 public class PathExitConfig : ScriptableObject
 {
     public enum RoadPalette
@@ -212,6 +212,10 @@ public class PathExitConfig : ScriptableObject
     [Min(0f)] public float offscreenMargin = 2f;
     [Tooltip("Max seconds to drive vehicles out through an exit (or in at the next maze) before snapping them.")]
     [Min(0f)] public float travelTimeoutSeconds = 3f;
+    [Tooltip("Seconds to wait after the vehicle phase-in FX before spawning the next PhaseStar — a moment to orient before the star walks in.")]
+    [Min(0f)] public float vehiclePhaseInDelaySeconds = 1.2f;
+    [Tooltip("Fallback bridge (motif snapshot) hold length in seconds, used only when the loop length can't be read from the track controller.")]
+    [Min(0f)] public float motifBridgeHoldSeconds = 2f;
 
     public RoadLook Look(PathExitKind kind) => kind switch
     {
