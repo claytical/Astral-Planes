@@ -76,6 +76,8 @@ public class NarratedTutorialScript : ScriptableObject
     public TutorialStage[] stages;
     public TutorialInterruption discoveryEscaped;
     public TutorialInterruption noteDiscarded;
+    [Tooltip("Shown when a vehicle runs dry in the tutorial motif and is refilled to half instead of exploding.")]
+    public TutorialInterruption outOfEnergy;
 
     /// <summary>
     /// Loads and validates the tutorial JSON. Returns null (after logging why) if it is missing or

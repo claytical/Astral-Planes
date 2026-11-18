@@ -13,7 +13,7 @@ public class NarratedTutorialController : MonoBehaviour
 {
     const string GameplayScene = "GeneratedTrack";
 
-    enum Interruption { None, Escaped, Discarded }
+    enum Interruption { None, Escaped, Discarded, OutOfEnergy }
 
     NarratedTutorialScript _script;
     TutorialPromptView _view;
@@ -184,6 +184,7 @@ public class NarratedTutorialController : MonoBehaviour
         TutorialEvents.DiscoveryEscaped    += OnEscaped;
         TutorialEvents.NoteDiscarded       += OnDiscarded;
         TutorialEvents.CommitPressedWithoutNote += OnCommitWithoutNote;
+        TutorialEvents.OutOfEnergyRescued  += OnOutOfEnergyRescued;
     }
 
     void Unsubscribe()
@@ -201,6 +202,7 @@ public class NarratedTutorialController : MonoBehaviour
         TutorialEvents.DiscoveryEscaped    -= OnEscaped;
         TutorialEvents.NoteDiscarded       -= OnDiscarded;
         TutorialEvents.CommitPressedWithoutNote -= OnCommitWithoutNote;
+        TutorialEvents.OutOfEnergyRescued  -= OnOutOfEnergyRescued;
     }
 
     void OnCarved()
@@ -264,6 +266,10 @@ public class NarratedTutorialController : MonoBehaviour
         if (!_playingInterruption && _pending == Interruption.None && IsChaseStage(_stage))
             _pending = Interruption.Escaped;
     }
+
+    // Any stage, and it outranks the other interruptions: a near-death is the more important lesson.
+    // If another interruption is mid-playback this queues and plays right after it.
+    void OnOutOfEnergyRescued(Vehicle v) => _pending = Interruption.OutOfEnergy;
 
     void OnCommitWithoutNote()
     {
@@ -542,7 +548,12 @@ public class NarratedTutorialController : MonoBehaviour
         var kind = _pending;
         _pending = Interruption.None;
 
-        var seq = kind == Interruption.Escaped ? _script.discoveryEscaped : _script.noteDiscarded;
+        var seq = kind switch
+        {
+            Interruption.Escaped     => _script.discoveryEscaped,
+            Interruption.OutOfEnergy => _script.outOfEnergy,
+            _                        => _script.noteDiscarded,
+        };
         _playingInterruption = true;
         if (seq?.lines != null)
         {
@@ -554,6 +565,7 @@ public class NarratedTutorialController : MonoBehaviour
             }
         }
         _playingInterruption = false;
-        _pending = Interruption.None;
+        // _pending is not cleared here: it was cleared on entry, and anything set since (only a
+        // rescue can be, the others ignore events during playback) should play next.
     }
 }

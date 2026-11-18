@@ -85,12 +85,30 @@ public partial class Vehicle
 
         }
 
+    private const float TutorialRescueEnergyFraction = 0.5f;
+
+    // Phase 0 is the tutorial motif (same test NarratedTutorialController uses to auto-start).
+    private static bool IsTutorialMotif()
+    {
+        var ptm = GameFlowManager.Instance != null ? GameFlowManager.Instance.phaseTransitionManager : null;
+        return ptm != null && ptm.CurrentPhaseIndex == 0;
+    }
+
     private void ConsumeEnergy(float amount)
         {
             // Competitive match over: gameplay is frozen, so survivors must not drain or die while results show.
             if (GameFlowManager.Instance != null && GameFlowManager.Instance.MatchEnded) return;
             energyLevel -= amount;
             energyLevel = Mathf.Max(0, energyLevel);
+
+            // Tutorial motif: running dry refills the tank to half instead of ending the run,
+            // and the narrated tutorial explains why (TutorialEvents.OutOfEnergyRescued).
+            if (energyLevel <= 0 && !_isDead && IsTutorialMotif())
+            {
+                energyLevel = capacity * TutorialRescueEnergyFraction;
+                TutorialEvents.RaiseOutOfEnergyRescued(this);
+            }
+
             // !_isDead guards against re-entering the death cascade if this vehicle is drained
             // again after already dying (e.g. overlapping bomb blast radii in the same frame) —
             // without it, Explode/DiscardCarriedCollectables/OnVehicleDied/CheckAllPlayersOutOfEnergy

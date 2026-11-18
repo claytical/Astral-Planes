@@ -140,14 +140,16 @@ public partial class Collectable
     /// Timeline ghost pulse: fired by DrumTrack.OnStepChanged (absolute step on the
     /// expanded leader loop). When the playhead crosses this note's step, the drifting
     /// collectable sounds its note softly (half authored velocity) and dances in a
-    /// fresh direction for the note's duration.
+    /// fresh direction for the note's duration. If a committed loop note already occupies
+    /// this step (another carried note was placed here), the ghost stays silent so the track
+    /// sounds a single note; the visual pulse still plays.
     /// </summary>
     private void HandleTimelineStep(int step, int leaderSteps)
     {
         if (_handled || _inCarry) return;
         if (step != intendedStep) return;
 
-        if (assignedInstrumentTrack != null)
+        if (assignedInstrumentTrack != null && !assignedInstrumentTrack.IsPersistentStepOccupied(intendedStep))
         {
             if (GameFlowManager.VerboseLogging) Debug.Log(
                 $"[DUST_PULSE] track={assignedInstrumentTrack.name} intendedStep={intendedStep} assignedNote={assignedNote}");

@@ -21,6 +21,7 @@ public static class TutorialEvents
     public static event Action RingCompleted;
     public static event Action IntroRecordHidden;               // the motif-start ring record has finished fading out
     public static event Action CommitPressedWithoutNote;        // commit/release pressed while carrying nothing
+    public static event Action<Vehicle> OutOfEnergyRescued;     // tutorial motif: a vehicle hit 0 energy and was refilled instead of dying
 
     public static void RaiseCellCarvedByVehicle() => CellCarvedByVehicle?.Invoke();
     public static void RaiseTentacleAppeared()    => TentacleAppeared?.Invoke();
@@ -36,4 +37,5 @@ public static class TutorialEvents
     public static void RaiseRingCompleted()       => RingCompleted?.Invoke();
     public static void RaiseIntroRecordHidden()   => IntroRecordHidden?.Invoke();
     public static void RaiseCommitPressedWithoutNote() => CommitPressedWithoutNote?.Invoke();
+    public static void RaiseOutOfEnergyRescued(Vehicle v) => OutOfEnergyRescued?.Invoke(v);
 }

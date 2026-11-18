@@ -114,6 +114,11 @@
       "You meant to do that, right?"
     ]
   },
+  "outOfEnergy": {
+    "lines": [
+      "Easy on the boost, that could have been the end of your journey."
+    ]
+  },
   "cueWindowTexts": [
     "Now!",
     "Here!"

@@ -54,8 +54,13 @@ public partial class CosmicDust
 
         if (effectiveResistance >= 1f) return;
 
+        // Hull contact chips at the ship's own plow rate (same rule as the footprint in
+        // Vehicle.DoPlowTick) instead of carving instantly — otherwise hull size, not plow
+        // stats, decides how much harvestable dust a ship reveals beside its footprint.
+        // Progress shares ChipDustByVehicle's per-cell accumulator with the plow.
+        int chipAmount = vehicle.profile != null ? Mathf.Max(1, vehicle.profile.plowChipAmount) : 1;
         TriggerCarveEmissionSpike();
-        gen.CarveDustByVehicle(gp, _timings.clearFadeOutSeconds, vehicle.profile);
+        gen.ChipDustByVehicle(gp, chipAmount, _timings.clearFadeOutSeconds, bypass, vehicle.profile);
         TriggerChargeTintPulse();
     }
 

@@ -79,11 +79,11 @@ MonoBehaviour:
   growingRootAlpha: 0.669
   growingTipAlpha: 0.554
   drainingBaseAlpha: 0.751
-  noiseAmp: 0.15
-  noiseSpeed: 1.5
-  weaveAmplitude: 0.15
-  weaveWavelength: 2
-  weaveSpeed: 1.01
+  noiseAmp: 0.1
+  noiseSpeed: 1.25
+  weaveAmplitude: 0.1
+  weaveWavelength: 2.1
+  weaveSpeed: 0.5
   shimmerEnabled: 1
   shimmerRatePerUnit: 5
   shimmerLifetime: 0.35
@@ -93,7 +93,7 @@ MonoBehaviour:
   boreFadeSeconds: 0.15
   boreTimeout: 1
   vineFollowSharpness: 10
-  vineMeander: 0.35
+  vineMeander: 0.512
   vineMeanderMaxCells: 1.25
   vineMeanderSpacingCells: 2.5
   vineRootSlackCells: 0.5
