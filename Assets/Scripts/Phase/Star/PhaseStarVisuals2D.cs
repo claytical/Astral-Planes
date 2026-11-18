@@ -14,25 +14,21 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     public Sprite activeDiamond;
     public Sprite activeDiamondRhythm;
 
-    [Tooltip("Seconds for the applied visual angle to settle to a new target angle.")]
-    [SerializeField, Min(0.01f)] private float diamondAngleSmoothTime = 0.06f;
-
-    [Header("Dim (Disarmed) Look")]
-    [SerializeField, Range(0f, 1f)] private float dimRgbMul = 0.55f;
-    [SerializeField] private bool dimUsesFixedTint = true;
-
-    // Poke feedback (LEGIBILITY_AUDIT.md B1): every rejected poke gets a quick head-shake of
-    // the diamonds ("not now").
-    [Header("Poke Feedback: Not Ready (head shake)")]
-    [SerializeField, Min(0.05f)] private float notReadyShakeSeconds = 0.35f;
-    [SerializeField, Min(0f)] private float notReadyShakeDeg = 18f;
-    [SerializeField, Min(0.5f)] private float notReadyShakeHz = 7f;
-
-    // Sleep (LEGIBILITY_AUDIT.md B2): an armed star blocked by another sequence in flight is
-    // drawn desaturated + slowed so "one star at a time" reads before anyone pokes it.
-    [Header("Sleep (blocked by another sequence)")]
-    [SerializeField, Range(0f, 1f)] private float sleepDesaturate01 = 0.65f;
-    [SerializeField, Range(0f, 1f)] private float sleepAlphaMul = 0.6f;
+    [Tooltip("Shared PhaseStar tuning (Resources/Config/PhaseStarConfig). Unassigned = that asset is loaded.")]
+    [SerializeField] private PhaseStarConfig config;
+    private PhaseStarConfig _cfg;
+    private PhaseStarConfig Cfg => _cfg ??= PhaseStarConfig.OrDefault(config, this);
+    // Shared tuning (PhaseStarConfig → 2. Look)
+    private float diamondAngleSmoothTime => Cfg.diamondAngleSmoothTime;
+    private float dimRgbMul => Cfg.dimRgbMul;
+    private bool dimUsesFixedTint => Cfg.dimUsesFixedTint;
+    private float notReadyShakeSeconds => Cfg.notReadyShakeSeconds;
+    private float notReadyShakeDeg => Cfg.notReadyShakeDeg;
+    private float notReadyShakeHz => Cfg.notReadyShakeHz;
+    private float sleepDesaturate01 => Cfg.sleepDesaturate01;
+    private float sleepAlphaMul => Cfg.sleepAlphaMul;
+    private float dualMaxSeparationDeg => Cfg.dualMaxSeparationDeg;
+    private Color dimShardTint => Cfg.dimShardTint;
 
     private float _notReadyShakeStart = -999f;
     public bool Sleeping { get; set; }
@@ -43,13 +39,6 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     [SerializeField] private bool traceParticleState;
     [SerializeField, Min(0f)] private float particleAlphaDriftTolerance = 0.02f;
     private float _expectedParticleAlpha = -1f;
-
-    [Header("Dual Diamond")]
-    [Tooltip("Max angular separation between the two counter-rotating diamonds at zero charge.")]
-    [SerializeField] private float dualMaxSeparationDeg = 45f;
-
-    [Header("Dim / Hidden Shard Tint")]
-    [SerializeField] private Color dimShardTint = new Color(0.5f, 0.5f, 0.5f, 0.5f);
 
     private SpriteRenderer[] _shardSpriteRenderers;
 
@@ -253,7 +242,6 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     {
         _notReadyShakeStart = Time.time;
     }
-
 
     public void HideAll()
     {

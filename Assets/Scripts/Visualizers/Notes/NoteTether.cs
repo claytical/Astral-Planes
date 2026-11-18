@@ -13,39 +13,58 @@ public class NoteTether : MonoBehaviour
     public InstrumentTrack boundStartTrack;
     public int boundStartStep = -1;
     public NoteVisualizer boundVisualizer;
+    // Tuning lives on the "Tether Effect" prefab (Prefabs/Effects/Collection). Code defaults
+    // below match that prefab so a fresh component looks the same.
     [Header("Curve")]
-    [Range(8,128)] public int segments = 32;
-    public float sag = 0.6f;          // how much the curve dips
-    public float noiseAmp = 0.15f;    // lateral wobble
-    public float noiseSpeed = 1.5f;
+    [Tooltip("Points along the cable. Higher = smoother curve, more cost per tether.")]
+    [Range(8,128)] public int segments = 57;
+    [Tooltip("How far the cable droops between its ends (x120 screen px).")]
+    public float sag = 0.2f;
+    [Tooltip("Side-to-side wobble of the cable (x35 screen px). Tapers off near the marker end.")]
+    public float noiseAmp = 0.3f;
+    [Tooltip("How fast the wobble changes.")]
+    public float noiseSpeed = 2f;
     [Header("Shimmer (Particles)")]
+    [Tooltip("Sparkle particles along the cable.")]
     public bool shimmerEnabled = true;
-    public float shimmerRatePerUnit = 6f;    // particles per second per unit of curve length
+    [Tooltip("Sparkles per second per world unit of cable length.")]
+    public float shimmerRatePerUnit = 6f;
+    [Tooltip("Seconds each sparkle lives.")]
     public float shimmerLifetime = 0.35f;
+    [Tooltip("Sparkle size in world units.")]
     public float shimmerSize = 0.03f;
+    [Tooltip("Sparkle opacity (randomized down to 60% of this). Color comes from the role color.")]
     public float shimmerAlpha = 0.5f;
 
     private ParticleSystem _shimmerPS;
     private float _curveLength;
 
     [Header("Style")]
-    public float baseWidth = 0.05f;
-    public Color baseColor = new Color(1f,1f,1f,0.35f);
-    public Color litColor  = Color.white;
-    public float fadeAfterSeconds = 0.4f;
+    [Tooltip("Cable width. The release-progress widening below multiplies this.")]
+    public float baseWidth = 0.25f;
+    [Tooltip("Cable color before it is bound. Replaced by the note's role color when the tether is connected.")]
+    public Color baseColor = new Color(1f,1f,1f,0.6039216f);
 
     private LineRenderer _lr;
     private Vector3[] _points;
     private CollectableParticles _dripEmitter;
+    [Header("Drip (Particles)")]
+    [Tooltip("Starting speed of the droplets pushed along the cable from the note end; they slow to 20% over their life.")]
     [SerializeField] private float dripBaseSpeed = 0.6f;
-    [SerializeField] private float dripGravity   = 0.0f;
-    [SerializeField] private float _endpointNullGrace = 0.6f;  // was 0.1f — allow layout/marker creation
+    [Tooltip("Particle gravity on the droplets. 0 = no fall; they only follow the cable direction.")]
+    [SerializeField] private float dripGravity   = 0.5f;
+    [Header("Plumbing")]
+    [Tooltip("Seconds a missing end (e.g. its marker not created yet) is tolerated. After that the tether destroys itself unless the end can still be rebound.")]
+    [SerializeField] private float _endpointNullGrace = 0.6f;
     private float _endpointNullTimer = 0f;
     private float _rebindPollInterval = 0.05f;
     private float _rebindTimer = 0f;
-    [SerializeField] private Camera worldCamera;   // optional override; falls back to Camera.main
-    [SerializeField] private Camera uiCamera;      // optional override for Screen Space - Camera canvas
-    [SerializeField] private float worldZOverride = float.NaN; // if set, force the tether's Z
+    [Tooltip("Optional. Empty = Camera.main.")]
+    [SerializeField] private Camera worldCamera;
+    [Tooltip("Optional. Camera for a Screen Space - Camera canvas, if the marker lives on one.")]
+    [SerializeField] private Camera uiCamera;
+    [Tooltip("Forces the tether's Z. NaN = use the endpoints' Z.")]
+    [SerializeField] private float worldZOverride = float.NaN;
     private Vector3 _lastEndWorld;
 
     // Vehicle-tail start override — set each frame by Vehicle via SetStartWorldPos().

@@ -11,10 +11,11 @@ public partial class NoteVisualizer : MonoBehaviour
     [Header("Playhead")]
     public RectTransform playheadLine;
     public ParticleSystem playheadParticles;
-    [Range(0f, 1f)]
-    [SerializeField] private float _playheadEnergy01 = 0f;       // what we actually render
+    private float _playheadEnergy01 = 0f;                        // what we actually render
     private float _playheadEnergyTarget01 = 0f;                  // what game logic asks for
+    [Tooltip("How fast the playhead's particle energy moves toward its target, per second (0-1 units).")]
     [SerializeField] private float _playheadEnergyLerpSpeed = 4f;
+    [Tooltip("Seconds the playhead flashes the role color when a note is released.")]
     [SerializeField] private float releasePulseSeconds = 0.18f;
     [Tooltip("Fallback color used when no MusicalRole profile can be resolved for the releasing note.")]
     [SerializeField] private Color releasePulseColorFallback = new Color(1f, 0.2f, 0.9f, 1f); // hot magenta-ish
@@ -26,7 +27,6 @@ public partial class NoteVisualizer : MonoBehaviour
     [Header("Manual Release Cue")]
     [Tooltip("Prefab for the ghost/cue that travels between the vehicle and the next unlit placeholder marker.")]
     public GameObject releaseCuePrefab;
-    [SerializeField] private Color failureColor = new Color(1f, 0.12f, 0.05f, 1f);
     [Header("Track Rows (one per InstrumentTrack in controller order)")]
     public List<RectTransform> trackRows;
     public NoteMarkerRegistry noteMarkers = new();
@@ -38,14 +38,10 @@ public partial class NoteVisualizer : MonoBehaviour
     [Tooltip("How fast the ambient tint eases back to white once no notes are active.")]
     [SerializeField] private float ambientFadeToWhiteSpeed = 4f;
     [Header("Playhead Trail (Particles)")]
-
-// Particles per world unit traveled (higher = denser trail).
+    [Tooltip("Particles per world unit the playhead travels. Higher = denser trail.")]
     [SerializeField] private float playheadTrailEmitPerWorldUnit = 45f;
-
-// Safety cap so a hitch doesn't emit thousands.
+    [Tooltip("Safety cap so a frame hitch doesn't emit thousands of particles at once.")]
     [SerializeField] private int playheadTrailMaxEmitPerFrame = 160;
-
-// Optional: keep particle Z stable (useful if your world-space canvas depth fights sorting).
     [Tooltip("Override Z-depth for playhead trail particles. Leave as NaN to use actual world Z.")]
     [SerializeField] private float playheadTrailWorldZOverride = float.NaN;
 

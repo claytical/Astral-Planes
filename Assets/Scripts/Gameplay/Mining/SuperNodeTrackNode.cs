@@ -6,7 +6,7 @@ public class SuperNodeTrackNode : TrackNode
     [SerializeField] private SpriteRenderer _renderer;
     [SerializeField] private Explode        _explode;
 
-    [Tooltip("Movement, lifetime and look. Shared asset: Resources/Config/Config/SuperNodeTrackNodeConfig.")]
+    [Tooltip("Movement, lifetime and look. Shared asset: Resources/Config/SuperNodeTrackNodeConfig.")]
     [SerializeField] private SuperNodeTrackNodeConfig config;
 
     private SuperNodeTrackNodeConfig Cfg

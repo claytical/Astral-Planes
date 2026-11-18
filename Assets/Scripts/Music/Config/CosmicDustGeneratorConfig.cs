@@ -28,7 +28,16 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     [Range(0.25f, 1.25f)] public float regrowVetoBoxMul = 0.85f;
     public int regrowVetoMaxHits = 8;
 
-    [Header("Void Grow")]
+    [Header("Gravity Void")]
+    // Everything about the gravity void except the vehicle side (VehicleConfig → "Gravity Void
+    // Detection", "Gravity Void Refuel", and voidEjectExitSpeedMultiplier under Recovery).
+    // Density easing of new rings: "Regrow Density Easing" below.
+    [Tooltip("Visual scale multiplier on the gravity void prefab when it spawns. Detection radius is VehicleConfig.voidProbeRadiusWorld.")]
+    public float gravityVoidScale = 1f;
+    [Min(1), Tooltip("Width (grid cells) of each concentric ring the gravity void imprints into the dust as it expands.")]
+    public int voidRingWidthCells = 1;
+    [Tooltip("Seconds between gravity void imprint ticks (how fast the void's rings spread through the dust).")]
+    public float gravityVoidImprintTickSeconds = 0.05f;
     [Tooltip("Sprite scale-in and tint fade duration for gravity void dust.")]
     [Range(0.1f, 2f)] public float voidDustGrowInSeconds = 0.40f;
     [Tooltip("Fraction of a ring burst's growInSeconds spent rippling outward from the inner edge before each cell starts its own grow-in tween. 0 = old synchronous pop.")]
@@ -132,9 +141,9 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     [Range(0f, 1f)] public float regrowSpeedPreviewGlowBoost01 = 0.05f;
 
     [Header("Regrow Density Easing")]
-    [Tooltip("Shared with GravityVoidController.ApplyDensityThrottle — solid fraction at which density pressure starts easing (regrow slows, new void-growth rings halve).")]
+    [Tooltip("Also throttles the Gravity Void — solid fraction at which density pressure starts easing (regrow slows, new void-growth rings halve).")]
     [Range(0f, 1f)] public float densityThrottleHalfAt = 0.5f;
-    [Tooltip("Shared with GravityVoidController.ApplyDensityThrottle — solid fraction at which easing is at its strongest (regrow at its slowest, new void-growth rings skipped).")]
+    [Tooltip("Also throttles the Gravity Void — solid fraction at which easing is at its strongest (regrow at its slowest, new void-growth rings skipped).")]
     [Range(0f, 1f)] public float densityThrottleSkipAt = 0.8f;
     [Tooltip("Regrow delay multiplier applied once solid fraction reaches densityThrottleSkipAt. Ramps smoothly from 1x at densityThrottleHalfAt. 1 = no easing.")]
     [Min(1f)] public float regrowDensityEaseMaxMultiplier = 2.5f;

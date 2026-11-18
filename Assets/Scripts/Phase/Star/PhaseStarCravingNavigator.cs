@@ -5,15 +5,16 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class PhaseStarCravingNavigator : MonoBehaviour
 {
-    [Header("Hunter Targeting")]
-    [Tooltip("How often target selection replans while hunting (zap cadence steering).")]
-    [SerializeField] private float replanIntervalSeconds = 0.3f;
-    [Tooltip("If the current cell becomes invalid, immediately reacquire a new target.")]
-    [SerializeField] private bool retargetOnTargetLost = true;
-
-    [Header("Sniffer (per-role diamond facing)")]
-    [Tooltip("How often ambient dust direction is rescanned when not lock-zapping.")]
-    [SerializeField] private float snifferIntervalSeconds = 0.25f;
+    [Tooltip("Shared PhaseStar tuning (Resources/Config/PhaseStarConfig). Unassigned = that asset is loaded.")]
+    [SerializeField] private PhaseStarConfig config;
+    private PhaseStarConfig _cfg;
+    private PhaseStarConfig Cfg => _cfg ??= PhaseStarConfig.OrDefault(config, this);
+    // Shared tuning (PhaseStarConfig → 4. Targeting)
+    private bool retargetOnTargetLost => Cfg.retargetOnTargetLost;
+    private float snifferIntervalSeconds => Cfg.snifferIntervalSeconds;
+    private int wanderMinHops => Cfg.wanderMinHops;
+    // Effective interval: behavior profile (or config fallback) × the maze's replan multiplier. Set in Initialize.
+    private float _replanInterval = 0.5f;
 
     private GameFlowManager _gfm;
     private PhaseStar _star;
@@ -38,9 +39,6 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
     private readonly Dictionary<MusicalRole, float> _nearestSqDistPerRoleScratch = new(4);
 
     // Maze-aware navigation (StarNavigationParams on the motif's MazePatternConfig).
-    [Header("Wander (pathing modes)")]
-    [Tooltip("When no colored dust is reachable, wander to an open cell at least this many steps away.")]
-    [SerializeField, Min(1)] private int wanderMinHops = 6;
 
     private PhaseStarNavMode _navMode = PhaseStarNavMode.Direct;
     private int _pathLookaheadCells = 2;
@@ -61,8 +59,8 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         PhaseStarNavMode navMode = PhaseStarNavMode.Direct)
     {
         nav ??= StarNavigationParams.Default;
-        float baseInterval = profile != null ? profile.mazeNavReplanInterval : replanIntervalSeconds;
-        replanIntervalSeconds = Mathf.Max(0.1f, baseInterval * nav.replanIntervalMultiplier);
+        float baseInterval = profile != null ? profile.mazeNavReplanInterval : Cfg.replanIntervalSeconds;
+        _replanInterval = Mathf.Max(0.1f, baseInterval * nav.replanIntervalMultiplier);
 
         _navMode = navMode == PhaseStarNavMode.Auto ? PhaseStarNavMode.Direct : navMode;
         _pathLookaheadCells = Mathf.Max(1, nav.pathLookaheadCells);
@@ -196,7 +194,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         _hasTarget = true;
         _targetCell = cell;
         RefreshTargetDir();
-        _replanTimer = replanIntervalSeconds;
+        _replanTimer = _replanInterval;
     }
 
     public void ClearLockOn(Vector2Int cell)
@@ -245,7 +243,7 @@ public sealed class PhaseStarCravingNavigator : MonoBehaviour
         _replanTimer -= dt;
         if (_replanTimer <= 0f)
         {
-            _replanTimer = replanIntervalSeconds;
+            _replanTimer = _replanInterval;
             HuntTick();
         }
 

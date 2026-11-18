@@ -9,7 +9,7 @@ using UnityEngine;
 public partial class AstralPlanesToolSuiteWindow : EditorWindow
 {
     private const string MenuRootPrefix = "Astral Planes/";
-    private const string FallbackFolder = "Assets/Resources/Config/Config";
+    private const string FallbackFolder = "Assets/Resources/Config";
 
     private static readonly string[] GroupOrder =
         { "Music", "Dust", "Gameplay", "Phase", "Visualizers", "Platform" };

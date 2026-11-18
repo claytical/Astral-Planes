@@ -13,3 +13,5 @@ Updated 2026-11-17. See ECOSYSTEM.md (PhaseStar, Star Maze Navigation & Vines) f
 - `PhaseStarVisuals2D` owns visual presentation states (bright/dim/hidden/sleeping/dual-diamond rendering, not-ready shake).
 
 The old safety bubble is gone; no bubble state remains in the visuals.
+
+Tuning: all shared numbers live on `PhaseStarConfig` (Resources/Config/PhaseStarConfig.asset), read by each component through private properties. Per-star-type values are on `PhaseStarBehaviorProfile`; per-maze steering on `MazePatternConfig.StarNavigationParams`.

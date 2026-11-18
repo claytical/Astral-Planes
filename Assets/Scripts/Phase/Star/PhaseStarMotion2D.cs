@@ -13,56 +13,24 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
     public Func<IReadOnlyList<Vector2>> VehiclePositionsProvider;
 
-    [Serializable]
-    private sealed class VehicleAvoidanceTuning
-    {
-        public float radius = 3.0f;
-        public float exponent = 2.0f;
-        public float strength = 1.0f;
-        [Range(0f, 2f)] public float huntWeight = 1.0f;
-    }
-
-
-    [Serializable]
-    private sealed class SteeringTuning
-    {
-        public float maxAccel = 4.0f;
-        public float huntAccel = 18.0f;
-    }
-
-    [SerializeField, Min(0f)] private float pushDecayPerSecond = 5f;
-    [Tooltip("While frozen (dormant charging, paused for a sibling) the star doesn't steer, but stays " +
-             "pushable so a ship can never be pinned against it. A shove decays back to rest at this rate (world units/s^2).")]
-    [SerializeField, Min(0f)] private float frozenSettleDeceleration = 20f;
-
-    [Serializable]
-    private sealed class GhostDriftTuning
-    {
-        [Tooltip("Slow wander speed while dormant (world units/s).")]
-        public float driftSpeed = 0.35f;
-        [Tooltip("How quickly the star eases into its wander velocity.")]
-        public float driftAccel = 1.5f;
-        [Tooltip("Speed the star is flung away at when a ship passes through it.")]
-        public float scatterSpeed = 4f;
-        [Tooltip("How much of the ship's own heading the scatter inherits (0 = straight away from the ship).")]
-        [Range(0f, 1f)] public float scatterFollowsShip = 0.5f;
-        [Tooltip("Turbulence strength handed to the ship while it overlaps the star (0..1).")]
-        [Range(0f, 1f)] public float turbulence01 = 0.8f;
-        [Tooltip("How long the turbulence lingers after the ship leaves the star.")]
-        public float turbulenceSeconds = 0.6f;
-    }
-
-    // Dormant (charging) stars are faint, so instead of being a wall a ship can get pinned on
-    // they're a drifting ghost: ships pass through, get buffeted, and scatter the star elsewhere.
-    [Header("Dormant Ghost Drift")]
-    [SerializeField] private GhostDriftTuning ghost = new();
-
-    [Header("Anti-Jump")]
-    [SerializeField] private bool enableUnstickImpulse = false;
-    [SerializeField, Min(0.05f)] private float stuckThresholdSeconds = 0.22f;
-    [SerializeField, Min(0f)] private float unstickImpulseSpeed = 6f;
-    [SerializeField, Min(0f)] private float hardClampOvershootWorld = 1.0f;
-    [SerializeField, Min(0f)] private float softEdgeVelocityDamp = 8f;
+    [Tooltip("Shared PhaseStar tuning (Resources/Config/PhaseStarConfig). Unassigned = that asset is loaded.")]
+    [SerializeField] private PhaseStarConfig config;
+    private PhaseStarConfig _cfg;
+    private PhaseStarConfig Cfg => _cfg ??= PhaseStarConfig.OrDefault(config, this);
+    // Shared tuning (PhaseStarConfig → 3. Motion). Dormant stars are ghosts: ships pass through,
+    // get buffeted, and scatter the star elsewhere (ghost.*).
+    private PhaseStarConfig.ScreenBoundsTuning bounds => Cfg.bounds;
+    private PhaseStarConfig.VehicleAvoidanceTuning avoidance => Cfg.avoidance;
+    private PhaseStarConfig.SteeringTuning steering => Cfg.steering;
+    private PhaseStarConfig.NavigatorBlendTuning navBlend => Cfg.navBlend;
+    private PhaseStarConfig.GhostDriftTuning ghost => Cfg.ghost;
+    private float pushDecayPerSecond => Cfg.pushDecayPerSecond;
+    private float frozenSettleDeceleration => Cfg.frozenSettleDeceleration;
+    private bool enableUnstickImpulse => Cfg.enableUnstickImpulse;
+    private float stuckThresholdSeconds => Cfg.stuckThresholdSeconds;
+    private float unstickImpulseSpeed => Cfg.unstickImpulseSpeed;
+    private float hardClampOvershootWorld => Cfg.hardClampOvershootWorld;
+    private float softEdgeVelocityDamp => Cfg.softEdgeVelocityDamp;
 
     private Vector2 _pushVelocity = Vector2.zero;
     private float _speedMul = 1f;
@@ -108,25 +76,6 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
             _rb.constraints = RigidbodyConstraints2D.FreezeRotation;
         }
     }
-
-    [Serializable]
-    private sealed class ScreenBoundsTuning
-    {
-        public bool kinematicMode = false;
-        public float screenPadding = 0.5f;
-    }
-
-    [Serializable]
-    private sealed class NavigatorBlendTuning
-    {
-        [Range(0f, 1f)] public float snifferWeight = 0.35f;
-    }
-
-    [Header("Motion Tuning")]
-    [SerializeField] private ScreenBoundsTuning bounds = new();
-    [SerializeField] private VehicleAvoidanceTuning avoidance = new();
-    [SerializeField] private SteeringTuning steering = new();
-    [SerializeField] private NavigatorBlendTuning navBlend = new();
 
     private GameFlowManager _gfm;
     private Rigidbody2D _rb;
@@ -199,7 +148,6 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         _nav = nav ?? StarNavigationParams.Default;
         _navMode = navMode == PhaseStarNavMode.Auto ? PhaseStarNavMode.Direct : navMode;
         _geom = geom;
-
 
         VehiclePositionsProvider ??= DefaultVehiclePositionsProvider;
 
@@ -299,7 +247,6 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         ApplyVelocity(newVelDrift, dt);
         _stuckTimer = 0f;
     }
-
 
     private Vector2 ResolveDesiredHuntDirection(Vector2 huntDir, Vector2 currentPos)
     {

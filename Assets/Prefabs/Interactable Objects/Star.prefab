@@ -51,7 +51,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1eaacfeda51b74f0cbfbedcd115b6bac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  tentacleActivationDelay: 0.5
+  config: {fileID: 11400000, guid: a59d7d6167714ad7a57b138b08e557f9, type: 2}
   behaviorProfile: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
   superNodePrefab: {fileID: 8730078499695705973, guid: c5258c4bcb110474b86f088239f5a013,
     type: 3}
@@ -59,15 +59,7 @@ MonoBehaviour:
   motion: {fileID: 6224665215610089654}
   dust: {fileID: 4631393831486629443}
   cravingNavigator: {fileID: 4892159809986813886}
-  disarmedPushScale: 0.1
   _tracePhaseStar: 1
-  shardMinAlpha: 0.5
-  accumulatorRotSpeed: 90
-  drainTiltDeg: 5
-  drainTiltSpeed: 1.8
-  chargeDisplayLerpSpeed: 2.5
-  tentacleBloomMinScale: 0.22
-  dormantSeedScale: 0.08
   _assignedMotif: {fileID: 0}
 --- !u!114 &6754461597857711404
 MonoBehaviour:
@@ -81,25 +73,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6ec2414d78bee4cefb1fb09a98770885, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  config: {fileID: 11400000, guid: a59d7d6167714ad7a57b138b08e557f9, type: 2}
   diamond: {fileID: -7233868419342923855, guid: 77d43200dcc0742699b7b608603f6ac0,
     type: 3}
   activeDiamond: {fileID: 1211849485947851915, guid: 2567647a21ff74869b8d376521716000,
     type: 3}
   activeDiamondRhythm: {fileID: -2473249655151002397, guid: 999ccfb33204c4ac3a8058191b131873,
     type: 3}
-  diamondAngleSmoothTime: 0.06
-  dimRgbMul: 0.08
-  dimUsesFixedTint: 0
-  notReadyShakeSeconds: 0.35
-  notReadyShakeDeg: 18
-  notReadyShakeHz: 7
-  sleepDesaturate01: 0.65
-  sleepAlphaMul: 0.6
   particles: {fileID: 382306593780773728}
   traceParticleState: 0
   particleAlphaDriftTolerance: 0.02
-  dualMaxSeparationDeg: 45
-  dimShardTint: {r: 0.3584906, g: 0.3584906, b: 0.3584906, a: 0.6431373}
 --- !u!114 &4631393831486629443
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -112,42 +95,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bba0079a903794a8a837947d21c08145, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarDustAffect
-  minContactTime: 1
-  colorTransitionTime: 0.75
-  drainBuildupSeconds: 0.35
-  siphonTravelSeconds: 0.5
-  siphonBrightness: 0.85
-  tentacleGrowSpeed: 1.5
-  tentacleRetractSpeed: 4
-  tentacleFlowSpeed: 0.5
-  tentacleWidth: 0.15
-  dissolveDuration: 1
-  fallbackTentaclesPerRole: 8
+  config: {fileID: 11400000, guid: a59d7d6167714ad7a57b138b08e557f9, type: 2}
   tentacleMaterial: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee, type: 2}
-  invalidTargetRetryFrames: 3
-  invalidTargetRetryMs: 120
-  growingRootAlpha: 0.669
-  growingTipAlpha: 0.554
-  drainingBaseAlpha: 0.751
-  boreSeconds: 0.25
-  boreFadeSeconds: 0.15
-  boreTimeout: 1
-  vineFollowSharpness: 10
-  vineMeander: 0.35
-  vineMeanderMaxCells: 1.25
-  vineMeanderSpacingCells: 2.5
-  vineRootSlackCells: 0.5
-  noiseAmp: 0.15
-  noiseSpeed: 1.5
-  weaveAmplitude: 0.15
-  weaveWavelength: 2
-  weaveSpeed: 1.01
-  shimmerEnabled: 1
-  shimmerRatePerUnit: 5
-  shimmerLifetime: 0.35
-  shimmerSize: 0.04
-  shimmerAlpha: 0.45
-  interTentacleStartInterval: 0
 --- !u!114 &6224665215610089654
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -160,33 +109,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 046395d4bfb814e78a40f94065987a0a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarMotion2D
-  pushDecayPerSecond: 5
-  frozenSettleDeceleration: 20
-  ghost:
-    driftSpeed: 0.35
-    driftAccel: 1.5
-    scatterSpeed: 4
-    scatterFollowsShip: 0.5
-    turbulence01: 0.8
-    turbulenceSeconds: 0.6
-  enableUnstickImpulse: 0
-  stuckThresholdSeconds: 0.22
-  unstickImpulseSpeed: 1
-  hardClampOvershootWorld: 1
-  softEdgeVelocityDamp: 8
-  bounds:
-    kinematicMode: 0
-    screenPadding: 0.5
-  avoidance:
-    radius: 3
-    exponent: 2
-    strength: 1
-    huntWeight: 1
-  steering:
-    maxAccel: 4
-    huntAccel: 18
-  navBlend:
-    snifferWeight: 0.734
+  config: {fileID: 11400000, guid: a59d7d6167714ad7a57b138b08e557f9, type: 2}
 --- !u!114 &4892159809986813886
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -199,10 +122,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 687ec4739b9ad4c0da0976e45b7d5a84, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarCravingNavigator
-  replanIntervalSeconds: 0.5
-  retargetOnTargetLost: 1
-  snifferIntervalSeconds: 2
-  wanderMinHops: 6
+  config: {fileID: 11400000, guid: a59d7d6167714ad7a57b138b08e557f9, type: 2}
 --- !u!58 &1335835332103871931
 CircleCollider2D:
   m_ObjectHideFlags: 0

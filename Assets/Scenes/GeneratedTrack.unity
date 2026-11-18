@@ -178,7 +178,6 @@ MonoBehaviour:
   ascensionDirector: {fileID: 45202787}
   playheadLine: {fileID: 657963291}
   playheadParticles: {fileID: 264452581}
-  _playheadEnergy01: 0
   _playheadEnergyLerpSpeed: 4
   releasePulseSeconds: 0.18
   releasePulseColorFallback: {r: 1, g: 0.2, b: 0.9, a: 1}
@@ -188,7 +187,6 @@ MonoBehaviour:
     type: 3}
   releaseCuePrefab: {fileID: 1316711709889716, guid: 8ebf85a8692064c7b81417bf7bbcc9e6,
     type: 3}
-  failureColor: {r: 1, g: 0.12, b: 0.05, a: 1}
   trackRows:
   - {fileID: 728040985}
   - {fileID: 1373048478}

@@ -21,6 +21,9 @@ MonoBehaviour:
   regrowVetoRetryDelaySeconds: 0.5
   regrowVetoBoxMul: 0.85
   regrowVetoMaxHits: 8
+  gravityVoidScale: 1
+  voidRingWidthCells: 1
+  gravityVoidImprintTickSeconds: 0.05
   voidDustGrowInSeconds: 0.4
   voidRingRippleFraction: 0.35
   zapFadeSeconds: 1.5

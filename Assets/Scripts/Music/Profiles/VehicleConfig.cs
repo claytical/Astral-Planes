@@ -97,7 +97,7 @@ public class VehicleConfig : ScriptableObject
     public float voidEjectExitSpeedMultiplier = 0.35f;
 
     [Header("Gravity Void Detection")]
-    [Tooltip("Radius (world units) of the overlap probe that decides whether the ship is inside a gravity void. Also sets the rim margin for void ejects.")]
+    [Tooltip("Radius (world units) of the overlap probe that decides whether the ship is inside a gravity void. Also sets the rim margin for void ejects. The void's own size, rings and timing are on CosmicDustGeneratorConfig → Gravity Void.")]
     public float voidProbeRadiusWorld = 0.6f;
 
     [Header("Gravity Void Refuel")]

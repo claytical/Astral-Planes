@@ -203,8 +203,6 @@ MonoBehaviour:
   shimmerAlpha: 0.5
   baseWidth: 0.25
   baseColor: {r: 1, g: 1, b: 1, a: 0.6039216}
-  litColor: {r: 1, g: 1, b: 1, a: 1}
-  fadeAfterSeconds: 0.4
   dripBaseSpeed: 0.6
   dripGravity: 0.5
   _endpointNullGrace: 0.6

@@ -62,6 +62,15 @@ public partial class InstrumentTrackController : MonoBehaviour
         return motif?.GetInstrumentProfileForVoice(t.assignedRole, t.voiceIndex);
     }
 
+    private CosmicDustGeneratorConfig VoidCfg
+    {
+        get
+        {
+            if (_gfm == null) _gfm = GameFlowManager.Instance;
+            return _gfm != null && _gfm.dustGenerator != null ? _gfm.dustGenerator.config : null;
+        }
+    }
+
     private void EnsureGravityVoid()
     {
         if (_gravityVoid != null) return;
@@ -70,9 +79,10 @@ public partial class InstrumentTrackController : MonoBehaviour
             getGfm: () => { if (_gfm == null) _gfm = GameFlowManager.Instance; return _gfm; },
             getPrefab: () => gravityVoidPrefab,
             getParent: () => gravityVoidParent,
-            getGravityVoidScale: () => config.gravityVoidScale,
-            getVoidRingWidthCells: () => config.voidRingWidthCells,
-            getGravityVoidImprintTickSeconds: () => config.gravityVoidImprintTickSeconds,
+            // Gravity void tuning lives on CosmicDustGeneratorConfig → "Gravity Void".
+            getGravityVoidScale: () => VoidCfg?.gravityVoidScale ?? 1f,
+            getVoidRingWidthCells: () => VoidCfg?.voidRingWidthCells ?? 1,
+            getGravityVoidImprintTickSeconds: () => VoidCfg?.gravityVoidImprintTickSeconds ?? 0.05f,
             getPlayheadBin: () => GetTransportFrame().playheadBin,
             getFilledBinCountForRole: role => GetTrackForRole(role)?.GetFilledBinCount() ?? 0);
     }

@@ -18,6 +18,21 @@ public partial class PhaseStar : MonoBehaviour
     // -------------------- Profile-driven tuning (authoring surface) --------------------
     // PhaseStar no longer owns duplicated serialized fields for these knobs; they come from PhaseStarBehaviorProfile.
     // Defaults here are used only if behaviorProfile is missing.
+    [Tooltip("Shared PhaseStar tuning (Resources/Config/PhaseStarConfig). Unassigned = that asset is loaded.")]
+    [SerializeField] private PhaseStarConfig config;
+    private PhaseStarConfig _cfg;
+    private PhaseStarConfig Cfg => _cfg ??= PhaseStarConfig.OrDefault(config, this);
+    // Shared tuning (PhaseStarConfig → 1. Charge & Shards)
+    private float disarmedPushScale => Cfg.disarmedPushScale;
+    private float shardMinAlpha => Cfg.shardMinAlpha;
+    private float accumulatorRotSpeed => Cfg.accumulatorRotSpeed;
+    private float drainTiltDeg => Cfg.drainTiltDeg;
+    private float drainTiltSpeed => Cfg.drainTiltSpeed;
+    private float chargeDisplayLerpSpeed => Cfg.chargeDisplayLerpSpeed;
+    private float tentacleBloomMinScale => Cfg.tentacleBloomMinScale;
+    private float dormantSeedScale => Cfg.dormantSeedScale;
+    private float tentacleActivationDelay => Cfg.tentacleActivationDelay;
+
     [SerializeField] private GameObject superNodePrefab;  // rainbow shard prefab (collider + visual)
     private SoloVoice soloVoice;                          // runtime cache, resolved via FindAnyObjectByType
 
@@ -49,7 +64,6 @@ public partial class PhaseStar : MonoBehaviour
 
     // Optional clamp so crazy physics spikes don't blow things up
     const float MaxImpactStrength = 40f;
-    [SerializeField, Min(0f)] private float disarmedPushScale = 0.6f;
     private bool _awaitingCollectableClear { get => _interactionState.Interaction.AwaitingCollectableClear; set => _interactionState.Interaction.AwaitingCollectableClear = value; }
     private bool _hasReceivedEnergy { get => _interactionState.ChargeVisual.HasReceivedEnergy; set => _interactionState.ChargeVisual.HasReceivedEnergy = value; }   // set true on first drain delivery; drives gray→role color lerp
     private PhaseStarDisarmReason _disarmReason
@@ -67,30 +81,11 @@ public partial class PhaseStar : MonoBehaviour
 
     [SerializeField] private bool _tracePhaseStar = true;
 
-    [Header("Shard Visuals (Charge-Alpha)")]
-    [Tooltip("Minimum alpha for a shard with zero charge — keeps it ghost-visible.")]
-    [SerializeField, Range(0f, 0.5f)] private float shardMinAlpha = 0.08f;
-
-
-
     // -------------------- State & caches --------------------
     private PhaseStarState _state = PhaseStarState.WaitingForPoke;
 
     // Accumulator diamond rotation (deg, cumulative). Accumulator rotates at -accumulatorRotSpeed;
     // the scout rotates at +scoutRotSpeed in PhaseStarDustAffect. Opposite signs = opposite directions.
-    [SerializeField, Range(10f, 360f)] private float accumulatorRotSpeed = 90f;
-    [SerializeField] private float drainTiltDeg   = 5f;    // max tilt ± while draining
-    [SerializeField] private float drainTiltSpeed  = 1.8f; // oscillation cycles/sec
-
-    [Header("Charge Display")]
-    [Tooltip("Lerp speed for the visual charge fill (units/sec in 0-1 space). " +
-             "Lower = slower, smoother rise from empty to full.")]
-    [SerializeField, Min(0.1f)] private float chargeDisplayLerpSpeed = 2.5f;
-
-    [Tooltip("Minimum diamond scale while tentacles are actively drawing/draining, so shards bloom out of the particle field before charge is visible.")]
-    [SerializeField, Range(0f, 1f)] private float tentacleBloomMinScale = 0.22f;
-    [Tooltip("Baseline star seed scale shown during dormant dust-calling so the particle force exists before tentacles finish charging.")]
-    [SerializeField, Range(0f, 0.5f)] private float dormantSeedScale = 0.08f;
 
     private float _displayedCharge01 { get => _interactionState.ChargeVisual.DisplayedCharge01; set => _interactionState.ChargeVisual.DisplayedCharge01 = value; }
 

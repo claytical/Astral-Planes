@@ -7,70 +7,49 @@ using UnityEngine.Serialization;
 [DisallowMultipleComponent]
 public sealed partial class PhaseStarDustAffect : MonoBehaviour
 {
-    [Header("Zap Cadence")]
-    [Tooltip("Hold time on target before a zap is committed.")]
-    [SerializeField] private float minContactTime = .01f;
-    [Tooltip("Blend duration from seek colors into active drain colors.")]
-    [SerializeField] private float colorTransitionTime = 0.5f;
-
-    [Header("Drain Polish")]
-    [Tooltip("Anticipation window after contact: the cell shudders/brightens before the drain fires. 0 = legacy instant chip.")]
-    [SerializeField, Min(0f)] private float drainBuildupSeconds = 0.35f;
-    [Tooltip("Travel time of the siphon energy packet from tentacle tip to the star root.")]
-    [SerializeField, Min(0.05f)] private float siphonTravelSeconds = 0.5f;
-    [Tooltip("How far the siphon packet color is pushed toward white.")]
-    [SerializeField, Range(0f, 1f)] private float siphonBrightness = 0.85f;
-
-    [Header("Tentacle Motion")]
-    [Tooltip("Regrow speed for tentacle extension (progress per second).")]
-    [SerializeField] private float tentacleGrowSpeed = 0.35f;   // progress/sec (0-1 range)
-    [Tooltip("Retract speed after zap resolve or target loss.")]
-    [SerializeField] private float tentacleRetractSpeed = 12f;
-    [SerializeField] private float tentacleFlowSpeed = 1.2f;
-    [SerializeField] private float tentacleWidth = 0.13f;
-    [SerializeField] private float dissolveDuration = 0.8f;
-    [FormerlySerializedAs("maxLinesPerRole")]
-    [SerializeField, Min(1)] private int fallbackTentaclesPerRole = 10;
+    [Header("References")]
     [SerializeField] private Material tentacleMaterial;
-    [SerializeField, Min(1)] private int invalidTargetRetryFrames = 3;
-    [SerializeField, Min(0f)] private float invalidTargetRetryMs = 120f;
 
-    [Header("Line Visual")]
-    [SerializeField, Range(0f, 1f)] private float growingRootAlpha  = 0.65f;
-    [SerializeField, Range(0f, 1f)] private float growingTipAlpha   = 0.40f;
-    [SerializeField, Range(0f, 1f)] private float drainingBaseAlpha = 0.45f;
-
-    [Header("Vine Routing")]
-    [Tooltip("Pause at each dust cell the vine has to break through (no open route to the target).")]
-    [SerializeField, Min(0f)] private float boreSeconds = 0.25f;
-    [Tooltip("Fade time of a dust cell broken by a vine (regrows normally, as StarBurrow).")]
-    [SerializeField, Min(0.01f)] private float boreFadeSeconds = 0.15f;
-    [Tooltip("A blocking cell still solid after this long (Cosmic Block / uncarveable) makes the vine give up and retract.")]
-    [SerializeField, Min(0.1f)] private float boreTimeout = 1.0f;
-    [Tooltip("How quickly the drawn vine catches up to its route when the star is bumped. Lower = looser, more whip.")]
-    [SerializeField, Min(0.5f)] private float vineFollowSharpness = 10f;
-    [Tooltip("Curviness: sideways bend offset as a fraction of the run between bends. 0 = straight runs between corners.")]
-    [SerializeField, Range(0f, 1f)] private float vineMeander = 0.35f;
-    [Tooltip("Max sideways offset of a bend, in cells (bends are also shrunk to stay off dust).")]
-    [SerializeField, Min(0f)] private float vineMeanderMaxCells = 1.25f;
-    [Tooltip("Roughly one bend per this many cells of vine length. Lower = wigglier.")]
-    [SerializeField, Min(1f)] private float vineMeanderSpacingCells = 2.5f;
-    [Tooltip("Star within this many cells of a root breadcrumb → the vine shortens to it (pushed back along itself).")]
-    [SerializeField, Min(0.1f)] private float vineRootSlackCells = 0.5f;
-
-    [Header("Tether Style")]
-    [SerializeField] private float noiseAmp   = 0.15f;
-    [SerializeField] private float noiseSpeed = 1.5f;
-    [SerializeField] private float weaveAmplitude = 0.1f;
-    [SerializeField, Min(0.01f)] private float weaveWavelength = 1.8f;
-    [SerializeField] private float weaveSpeed = 1.1f;
-
-    [Header("Shimmer")]
-    [SerializeField] private bool  shimmerEnabled     = true;
-    [SerializeField] private float shimmerRatePerUnit = 5f;
-    [SerializeField] private float shimmerLifetime    = 0.35f;
-    [SerializeField] private float shimmerSize        = 0.04f;
-    [SerializeField] private float shimmerAlpha       = 0.45f;
+    [Tooltip("Shared PhaseStar tuning (Resources/Config/PhaseStarConfig). Unassigned = that asset is loaded.")]
+    [SerializeField] private PhaseStarConfig config;
+    private PhaseStarConfig _cfg;
+    private PhaseStarConfig Cfg => _cfg ??= PhaseStarConfig.OrDefault(config, this);
+    // Shared tuning (PhaseStarConfig → 5. Tentacles)
+    private float minContactTime => Cfg.minContactTime;
+    private float colorTransitionTime => Cfg.colorTransitionTime;
+    private float drainBuildupSeconds => Cfg.drainBuildupSeconds;
+    private float siphonTravelSeconds => Cfg.siphonTravelSeconds;
+    private float siphonBrightness => Cfg.siphonBrightness;
+    private float tentacleGrowSpeed => Cfg.tentacleGrowSpeed;
+    private float tentacleRetractSpeed => Cfg.tentacleRetractSpeed;
+    private float tentacleFlowSpeed => Cfg.tentacleFlowSpeed;
+    private float tentacleWidth => Cfg.tentacleWidth;
+    private float dissolveDuration => Cfg.dissolveDuration;
+    private int fallbackTentaclesPerRole => Cfg.fallbackTentaclesPerRole;
+    private int invalidTargetRetryFrames => Cfg.invalidTargetRetryFrames;
+    private float invalidTargetRetryMs => Cfg.invalidTargetRetryMs;
+    private float growingRootAlpha => Cfg.growingRootAlpha;
+    private float growingTipAlpha => Cfg.growingTipAlpha;
+    private float drainingBaseAlpha => Cfg.drainingBaseAlpha;
+    private float boreSeconds => Cfg.boreSeconds;
+    private float boreFadeSeconds => Cfg.boreFadeSeconds;
+    private float boreTimeout => Cfg.boreTimeout;
+    private float vineFollowSharpness => Cfg.vineFollowSharpness;
+    private float vineMeander => Cfg.vineMeander;
+    private float vineMeanderMaxCells => Cfg.vineMeanderMaxCells;
+    private float vineMeanderSpacingCells => Cfg.vineMeanderSpacingCells;
+    private float vineRootSlackCells => Cfg.vineRootSlackCells;
+    private float noiseAmp => Cfg.noiseAmp;
+    private float noiseSpeed => Cfg.noiseSpeed;
+    private float weaveAmplitude => Cfg.weaveAmplitude;
+    private float weaveWavelength => Cfg.weaveWavelength;
+    private float weaveSpeed => Cfg.weaveSpeed;
+    private bool shimmerEnabled => Cfg.shimmerEnabled;
+    private float shimmerRatePerUnit => Cfg.shimmerRatePerUnit;
+    private float shimmerLifetime => Cfg.shimmerLifetime;
+    private float shimmerSize => Cfg.shimmerSize;
+    private float shimmerAlpha => Cfg.shimmerAlpha;
+    private float interTentacleStartInterval => Cfg.interTentacleStartInterval;
 
     private const int   SplinePoints      = 32;
     private const float KeepClearTick     = 0.15f;
@@ -146,10 +125,6 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
     private MusicalRole _attunedRole = MusicalRole.None;
     private readonly TentacleVinePlanner _vinePlanner = new TentacleVinePlanner();
 
-    [Header("Zap Stagger")]
-    [Tooltip("Optional pacing between successive tentacle activations. 0 (default) = every available carved cell grows a tentacle immediately, up to the node payload; > 0 = one activation per interval.")]
-    [SerializeField, Min(0f)] private float interTentacleStartInterval = 0f;
-
     private bool _tentaclesActive;
     private bool _acquisitionEnabled = true;
     private bool _isRetractAllInProgress;
@@ -216,7 +191,6 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
         if (!active)
             ResetTentacles();
     }
-
 
     public void SetAcquisitionEnabled(bool enabled, string reason)
     {

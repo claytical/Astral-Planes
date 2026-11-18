@@ -3,10 +3,6 @@ using UnityEngine;
 
 public partial class PhaseStar
 {
-    [SerializeField, Min(0f)]
-    [Tooltip("Delay after the star becomes visible (dormant reveal) before tentacles begin hunting/growing.")]
-    private float tentacleActivationDelay = 0.5f;
-
     private bool _pendingDormantActivation;
     private Coroutine _waitForDustCo;
     private Coroutine _tentacleActivationCo;

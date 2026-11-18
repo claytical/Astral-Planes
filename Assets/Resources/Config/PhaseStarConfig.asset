@@ -1,0 +1,99 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 279790a59ea14cc7ba2b5ad467880f5c, type: 3}
+  m_Name: PhaseStarConfig
+  m_EditorClassIdentifier: Assembly-CSharp::PhaseStarConfig
+  tentacleActivationDelay: 0.5
+  shardMinAlpha: 0.5
+  chargeDisplayLerpSpeed: 2.5
+  tentacleBloomMinScale: 0.22
+  dormantSeedScale: 0.08
+  accumulatorRotSpeed: 90
+  drainTiltDeg: 5
+  drainTiltSpeed: 1.8
+  disarmedPushScale: 0.1
+  diamondAngleSmoothTime: 0.06
+  dualMaxSeparationDeg: 45
+  dimShardTint: {r: 0.3584906, g: 0.3584906, b: 0.3584906, a: 0.6431373}
+  dimRgbMul: 0.08
+  dimUsesFixedTint: 0
+  notReadyShakeSeconds: 0.35
+  notReadyShakeDeg: 18
+  notReadyShakeHz: 7
+  sleepDesaturate01: 0.65
+  sleepAlphaMul: 0.6
+  bounds:
+    kinematicMode: 0
+    screenPadding: 0.5
+  avoidance:
+    radius: 3
+    exponent: 2
+    strength: 1
+    huntWeight: 1
+  steering:
+    maxAccel: 4
+    huntAccel: 18
+  navBlend:
+    snifferWeight: 0.734
+  ghost:
+    driftSpeed: 0.35
+    driftAccel: 1.5
+    scatterSpeed: 4
+    scatterFollowsShip: 0.5
+    turbulence01: 0.8
+    turbulenceSeconds: 0.6
+  pushDecayPerSecond: 5
+  frozenSettleDeceleration: 20
+  hardClampOvershootWorld: 1
+  softEdgeVelocityDamp: 8
+  enableUnstickImpulse: 0
+  stuckThresholdSeconds: 0.22
+  unstickImpulseSpeed: 1
+  replanIntervalSeconds: 0.5
+  retargetOnTargetLost: 1
+  snifferIntervalSeconds: 2
+  wanderMinHops: 6
+  minContactTime: 1
+  colorTransitionTime: 0.75
+  interTentacleStartInterval: 0
+  fallbackTentaclesPerRole: 8
+  invalidTargetRetryFrames: 3
+  invalidTargetRetryMs: 120
+  drainBuildupSeconds: 0.35
+  siphonTravelSeconds: 0.5
+  siphonBrightness: 0.85
+  tentacleGrowSpeed: 1
+  tentacleRetractSpeed: 4
+  tentacleFlowSpeed: 0.5
+  dissolveDuration: 1
+  tentacleWidth: 0.15
+  growingRootAlpha: 0.669
+  growingTipAlpha: 0.554
+  drainingBaseAlpha: 0.751
+  noiseAmp: 0.15
+  noiseSpeed: 1.5
+  weaveAmplitude: 0.15
+  weaveWavelength: 2
+  weaveSpeed: 1.01
+  shimmerEnabled: 1
+  shimmerRatePerUnit: 5
+  shimmerLifetime: 0.35
+  shimmerSize: 0.04
+  shimmerAlpha: 0.45
+  boreSeconds: 0.25
+  boreFadeSeconds: 0.15
+  boreTimeout: 1
+  vineFollowSharpness: 10
+  vineMeander: 0.35
+  vineMeanderMaxCells: 1.25
+  vineMeanderSpacingCells: 2.5
+  vineRootSlackCells: 0.5

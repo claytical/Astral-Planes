@@ -29,7 +29,4 @@ MonoBehaviour:
   commitStingerHarmony: {fileID: 0}
   commitStingerGroove: {fileID: 0}
   commitStingerDrums: {fileID: 0}
-  gravityVoidScale: 1
-  voidRingWidthCells: 1
-  gravityVoidImprintTickSeconds: 0.05
   cohortWindowFraction: 0.5
