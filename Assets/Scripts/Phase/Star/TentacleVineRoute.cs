@@ -122,6 +122,19 @@ public sealed class TentacleVinePlanner
     private readonly List<Vector2> _cellWorld = new List<Vector2>(64);
     private readonly List<bool> _mandatory = new List<bool>(64);
 
+    // Per-run predicate state: cached delegates read these instead of capturing locals, so a
+    // plan doesn't allocate closures (Run samples the predicates synchronously).
+    private Vector2Int _runTarget, _runFrom;
+    private Func<Vector2Int, bool> _runHardWall;
+    private DrumTrack _runDrum;
+    private Func<Vector2Int, bool> _isHard, _isSoft;
+
+    private bool IsHardForRun(Vector2Int c) =>
+        c != _runTarget && c != _runFrom && _runHardWall != null && _runHardWall(c);
+
+    private bool IsSoftForRun(Vector2Int c) =>
+        c != _runTarget && c != _runFrom && _runDrum != null && _runDrum.HasDustAt(c);
+
     /// <summary>
     /// Plans root → target. <paramref name="outNodes"/> starts at <paramref name="rootWorld"/> and
     /// ends at the target cell centre. Returns false (straight-line fallback written) when no route
@@ -149,9 +162,15 @@ public sealed class TentacleVinePlanner
 
         _seeds.Clear();
         _seeds.Add(from);
-        _reach.Run(w, h, 0, _seeds,
-            c => c != target && c != from && hardWall != null && hardWall(c),
-            c => c != target && c != from && drum.HasDustAt(c));
+        _runTarget = target;
+        _runFrom = from;
+        _runHardWall = hardWall;
+        _runDrum = drum;
+        _isHard ??= IsHardForRun;
+        _isSoft ??= IsSoftForRun;
+        _reach.Run(w, h, 0, _seeds, _isHard, _isSoft);
+        _runHardWall = null;
+        _runDrum = null;
 
         if (!_reach.TryGetBestNear(target, out var node, out int cost))
             return WriteStraight(rootWorld, targetWorld, outNodes);

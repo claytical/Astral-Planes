@@ -156,10 +156,11 @@ public partial class NoteVisualizer
         }
         if (stepColor != _lastPlayheadEmissionColor)
         {
-            _playheadEmissionGradient.SetKeys(
-                new[] { new GradientColorKey(stepColor, 0f), new GradientColorKey(stepColor, 1f) },
-                new[] { new GradientAlphaKey(0.85f, 0f), new GradientAlphaKey(0.0f, 1f) }
-            );
+            s_twoColorKeys[0] = new GradientColorKey(stepColor, 0f);
+            s_twoColorKeys[1] = new GradientColorKey(stepColor, 1f);
+            s_twoAlphaKeys[0] = new GradientAlphaKey(0.85f, 0f);
+            s_twoAlphaKeys[1] = new GradientAlphaKey(0.0f, 1f);
+            _playheadEmissionGradient.SetKeys(s_twoColorKeys, s_twoAlphaKeys);
             _lastPlayheadEmissionColor = stepColor;
         }
         col.color = _playheadEmissionGradient;
@@ -265,8 +266,19 @@ public partial class NoteVisualizer
         );
     }
 
+    // Scratch keys shared by the playhead and ambient-tint gradients (SetKeys copies them).
+    private static readonly GradientColorKey[] s_twoColorKeys = new GradientColorKey[2];
+    private static readonly GradientAlphaKey[] s_twoAlphaKeys = new GradientAlphaKey[2];
+
+    private Canvas _screenWidthCanvas;
+    private RectTransform _screenWidthRect;
+
     private float GetScreenWidth() {
-        RectTransform rt = _worldSpaceCanvas.GetComponent<RectTransform>();
-        return rt.rect.width;
+        if (_screenWidthCanvas != _worldSpaceCanvas || _screenWidthRect == null)
+        {
+            _screenWidthCanvas = _worldSpaceCanvas;
+            _screenWidthRect = _worldSpaceCanvas.GetComponent<RectTransform>();
+        }
+        return _screenWidthRect.rect.width;
     }
 }

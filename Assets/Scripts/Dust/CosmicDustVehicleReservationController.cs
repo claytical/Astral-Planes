@@ -25,6 +25,26 @@ public sealed class CosmicDustVehicleReservationController
     private readonly List<Vector2Int> _tmpClaimed = new List<Vector2Int>(512);
     private readonly List<Vector2Int> _reservedVehicleCells = new List<Vector2Int>(64);
 
+    // Scratch footprint (the exclusion map copies it, so one set can be reused) and cached
+    // claim-owner keys: keep-clear refreshes run every ~0.1s per ship / 0.15s per star.
+    private readonly HashSet<Vector2Int> _nextFootprint = new HashSet<Vector2Int>();
+    private readonly Dictionary<int, string> _vehicleOwnerKeys = new Dictionary<int, string>();
+    private readonly Dictionary<int, string> _trailOwnerKeys = new Dictionary<int, string>();
+
+    private string VehicleOwnerKey(int ownerId)
+    {
+        if (!_vehicleOwnerKeys.TryGetValue(ownerId, out var key))
+            _vehicleOwnerKeys[ownerId] = key = $"Vehicle#{ownerId}";
+        return key;
+    }
+
+    private string TrailOwnerKey(int ownerId)
+    {
+        if (!_trailOwnerKeys.TryGetValue(ownerId, out var key))
+            _trailOwnerKeys[ownerId] = key = $"VehicleTrail#{ownerId}";
+        return key;
+    }
+
     public CosmicDustVehicleReservationController(
         CosmicDustExclusionMap exclusions,
         Func<int> drumsWidth,
@@ -61,7 +81,8 @@ public sealed class CosmicDustVehicleReservationController
         int r = Mathf.Max(0, radiusCells);
 
         // Build new footprint (disk).
-        var next = new HashSet<Vector2Int>();
+        var next = _nextFootprint;
+        next.Clear();
         DustGridMath.FillDisk(next, centerCell, r, w, h);
 
         _tmpReleased.Clear();
@@ -69,7 +90,7 @@ public sealed class CosmicDustVehicleReservationController
         _exclusions.UpdateVehicleFootprint(ownerId, next, _tmpReleased, _tmpClaimed);
 
         // DustClaimManager is the authority for keep-clear vetoes.
-        string claimOwner = $"Vehicle#{ownerId}";
+        string claimOwner = VehicleOwnerKey(ownerId);
         var dustClaims = _dustClaims();
         if (dustClaims != null)
         {
@@ -118,7 +139,7 @@ public sealed class CosmicDustVehicleReservationController
         _exclusions.ReleaseVehicleFootprint(ownerId, _tmpReleased);
 
         // DustClaimManager is the authority for keep-clear vetoes.
-        string claimOwner = $"Vehicle#{ownerId}";
+        string claimOwner = VehicleOwnerKey(ownerId);
         var dustClaims = _dustClaims();
         if (dustClaims != null)
         {
@@ -142,7 +163,8 @@ public sealed class CosmicDustVehicleReservationController
 
         radiusCells = Mathf.Max(0, radiusCells);
 
-        var next = new HashSet<Vector2Int>();
+        var next = _nextFootprint;
+        next.Clear();
         DustGridMath.FillDisk(next, centerCell, radiusCells, w, h);
 
         _exclusions.UpdateStarPocket(next, _tmpReleased, _tmpClaimed);
@@ -185,7 +207,7 @@ public sealed class CosmicDustVehicleReservationController
     {
         var dustClaims = _dustClaims();
         if (dustClaims == null) return;
-        dustClaims.ClaimCell($"VehicleTrail#{ownerId}", cell, DustClaimType.KeepClear, seconds: Mathf.Max(0.01f, ttlSeconds), refresh: true);
+        dustClaims.ClaimCell(TrailOwnerKey(ownerId), cell, DustClaimType.KeepClear, seconds: Mathf.Max(0.01f, ttlSeconds), refresh: true);
     }
 
     // Called when a cell ages out of the trail's ring buffer. TTL expiry alone is passive (only
@@ -194,7 +216,7 @@ public sealed class CosmicDustVehicleReservationController
     public void ReleaseTrailCell(int ownerId, Vector2Int cell)
     {
         var dustClaims = _dustClaims();
-        dustClaims?.ReleaseCell($"VehicleTrail#{ownerId}", cell, DustClaimType.KeepClear);
+        dustClaims?.ReleaseCell(TrailOwnerKey(ownerId), cell, DustClaimType.KeepClear);
         if (_isPermanentClearCell(cell)) return;
         _requestRegrowCellAt(cell);
     }

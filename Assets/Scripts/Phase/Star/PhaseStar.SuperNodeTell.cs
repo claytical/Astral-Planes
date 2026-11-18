@@ -38,8 +38,25 @@ public partial class PhaseStar
     private bool IsStarVisibleForTell()
     {
         if (_burstOffScreen || _isDisposing || _previewVisual == null) return false;
-        var sr = _previewVisual.GetComponent<SpriteRenderer>();
+        if (_tellRendererSource != _previewVisual)
+        {
+            _tellRendererSource = _previewVisual;
+            _tellRenderer = _previewVisual.GetComponent<SpriteRenderer>();
+        }
+        var sr = _tellRenderer;
         return sr != null && sr.enabled && sr.gameObject.activeInHierarchy;
+    }
+
+    private Transform _tellRendererSource;
+    private SpriteRenderer _tellRenderer;
+    private Material _superRingMaterial;
+
+    // The ring needs its own material (its tint fades per frame), so it is owned and destroyed here.
+    private void DestroySuperRingMaterial()
+    {
+        if (_superRingMaterial == null) return;
+        Destroy(_superRingMaterial);
+        _superRingMaterial = null;
     }
 
     private void TickSuperNodeTell(float dt)
@@ -67,7 +84,7 @@ public partial class PhaseStar
         // Gradient carries the role stripes at full alpha; fade/breath ride the material tint
         // (Sprites/Default multiplies vertex color by _Color), so nothing allocates per frame.
         float breath = 0.85f + 0.15f * Mathf.Sin(Time.time * kSuperRingBreathHz * Mathf.PI * 2f);
-        _superRing.material.color = new Color(1f, 1f, 1f, _superRingAlpha * breath);
+        _superRingMaterial.color = new Color(1f, 1f, 1f, _superRingAlpha * breath);
         _superRing.transform.Rotate(0f, 0f, -kSuperRingSpinDeg * dt);
 
         // Constant world size regardless of the star root's scale.
@@ -92,7 +109,8 @@ public partial class PhaseStar
         _superRing.loop = true;
         _superRing.positionCount = kSuperRingSegments;
         _superRing.widthMultiplier = kSuperRingWidth;
-        _superRing.material = new Material(Shader.Find("Sprites/Default"));
+        if (_superRingMaterial == null) _superRingMaterial = new Material(SharedMaterials.SpriteDefault);
+        _superRing.sharedMaterial = _superRingMaterial;
         _superRing.sortingOrder = Mathf.Max(0, _baseSortingOrder - 1); // behind the diamonds
         for (int i = 0; i < kSuperRingSegments; i++)
         {

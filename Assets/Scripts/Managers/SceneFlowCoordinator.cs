@@ -104,7 +104,8 @@ public sealed class SceneFlowCoordinator
     public IEnumerator ReturnToJoinScreen()
     {
         yield return _session.DestroyPlayersForSelection();
-        Hangar.Instance?.ResetForNewSession();
+        var hangar = Hangar.Instance;
+        if (hangar != null) hangar.ResetForNewSession();
         yield return _gameFlow.StartCoroutine(TransitionToScene("TrackSelection"));
     }
 
@@ -114,7 +115,7 @@ public sealed class SceneFlowCoordinator
         yield return null;
 
         if (_sceneHandlers.TryGetValue(sceneName, out var handler))
-            handler?.Invoke();
+            if (handler != null) handler.Invoke();
     }
 
     // Lives under GameFlowManager's DontDestroyOnLoad object, so it survives the
@@ -209,7 +210,7 @@ public sealed class SceneFlowCoordinator
             _gameFlow.dustGenerator.ResumeRegrowthAfterBridge();
 
         _bridge.StampMotifStartTime();
-        _gameFlow.controller?.BeginNewMotif("MotifBridge");
+        if (_gameFlow.controller != null) _gameFlow.controller.BeginNewMotif("MotifBridge");
 
         if (_gameFlow.phaseTransitionManager == null)
         {
@@ -223,14 +224,14 @@ public sealed class SceneFlowCoordinator
         {
             _gameFlow.phaseTransitionManager.AdvancePhase("GFM/StartNextMotifInPhase(Exhausted)");
             yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
-            _gameFlow.activeDrumTrack?.BeginMotifTransport("GFM/StartNextMotifInPhase(Exhausted)");
+            if (_gameFlow.activeDrumTrack != null) _gameFlow.activeDrumTrack.BeginMotifTransport("GFM/StartNextMotifInPhase(Exhausted)");
             _gameFlow.StartCoroutine(RevealAndFadeRecordAfterMaze());
             yield break;
         }
 
         yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
         // Play begins now: restart the drums so the playhead's step 0 lines up with it.
-        _gameFlow.activeDrumTrack?.BeginMotifTransport("GFM/StartNextMotifInPhase");
+        if (_gameFlow.activeDrumTrack != null) _gameFlow.activeDrumTrack.BeginMotifTransport("GFM/StartNextMotifInPhase");
         // Not yielded — mirrors StartChosenMotifOrPhase: the name → record sequence plays
         // over gameplay instead of holding up the bridge.
         _gameFlow.StartCoroutine(RevealAndFadeRecordAfterMaze());
@@ -247,15 +248,15 @@ public sealed class SceneFlowCoordinator
         if (banner != null) yield return banner;
 
         var binRings = _gameFlow.GetBinRingController();
-        binRings?.ShowInitialRecord();
-        yield return new WaitForSeconds(binRings?.GetRecordHoldDuration(RecordHoldDurationFallback) ?? RecordHoldDurationFallback);
-        binRings?.FadeInitialRecordOut();
+        if (binRings != null) binRings.ShowInitialRecord();
+        yield return new WaitForSeconds(binRings != null ? binRings.GetRecordHoldDuration(RecordHoldDurationFallback) : RecordHoldDurationFallback);
+        if (binRings != null) binRings.FadeInitialRecordOut();
     }
 
     public void HandleTrackFinishedSceneSetup()
     {
         _session.SetGameOverState();
-        _gameFlow.harmony?.Initialize(null, null);
+        if (_gameFlow.harmony != null) _gameFlow.harmony.Initialize(null, null);
     }
 
     public void HandleTrackSelectionSceneSetup()
@@ -328,18 +329,19 @@ public sealed class SceneFlowCoordinator
         // then it fades out concurrently with the maze growing in (see the
         // FadeInitialRecordOut call right before StartNextPhaseMazeAndStar below).
         var firstMotifBinRings = _gameFlow.GetBinRingController();
-        firstMotifBinRings?.ShowInitialRecord();
-        yield return new WaitForSeconds(firstMotifBinRings?.GetRecordHoldDuration(RecordHoldDurationFallback) ?? RecordHoldDurationFallback);
+        if (firstMotifBinRings != null) firstMotifBinRings.ShowInitialRecord();
+        yield return new WaitForSeconds(firstMotifBinRings != null ? firstMotifBinRings.GetRecordHoldDuration(RecordHoldDurationFallback) : RecordHoldDurationFallback);
 
         foreach (var lp in _session.Players)
-            lp?.Launch();
+            if (lp != null) lp.Launch();
 
         yield return null;
 
         if (_gameFlow.phaseTransitionManager.currentMotif != null)
             _gameFlow.harmony.SetActiveProfile(_gameFlow.phaseTransitionManager.currentMotif.chordProgression, true);
 
-        _gameFlow.GetBinRingController()?.FadeInitialRecordOut(MazeSpawnDuration);
+        var ringsToFade = _gameFlow.GetBinRingController();
+        if (ringsToFade != null) ringsToFade.FadeInitialRecordOut(MazeSpawnDuration);
         yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
         // Drums start only now (record hold + maze growth are silent) so bar 1 step 0 is
         // where play begins, not partway through the first loop.
@@ -564,7 +566,7 @@ public sealed class SceneFlowCoordinator
             _gameFlow.dustGenerator.ResumeRegrowthAfterBridge();
 
         _bridge.StampMotifStartTime();
-        _gameFlow.controller?.BeginNewMotif("MotifBridge");
+        if (_gameFlow.controller != null) _gameFlow.controller.BeginNewMotif("MotifBridge");
 
         if (_gameFlow.phaseTransitionManager == null)
         {
@@ -584,7 +586,7 @@ public sealed class SceneFlowCoordinator
         var entryPortal = SpawnEntryPortal(entryEdge, entryCells, phaseIndex, motifIndex, entryKind, out var entryGeo);
 
         yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false, vehicleCellOverrides: entryCells));
-        entryPortal?.Swallow();   // road surges to life as the vehicles come through
+        if (entryPortal != null) entryPortal.Swallow();   // road surges to life as the vehicles come through
         yield return _gameFlow.StartCoroutine(DriveVehiclesInFromOffscreen(entryCells, entryPortal, entryGeo));
 
         if (entryPortal != null)
@@ -592,7 +594,7 @@ public sealed class SceneFlowCoordinator
 
         // Play begins now: restart the drums on the new motif's entry clip so the playhead's
         // step 0 lines up with it. Before the wisp carry so it lives one full new loop.
-        _gameFlow.activeDrumTrack?.BeginMotifTransport("GFM/PathChoice");
+        if (_gameFlow.activeDrumTrack != null) _gameFlow.activeDrumTrack.BeginMotifTransport("GFM/PathChoice");
 
         // An uncaught wisp whose exit the player followed reappears now (despawns at first loop boundary).
         Vector2Int wispEntryCell = default;
@@ -602,7 +604,7 @@ public sealed class SceneFlowCoordinator
         Wisp.BeginPendingCarry(haveEntryCell ? _gameFlow.activeDrumTrack : null, entryEdge, wispEntryCell);
 
         foreach (var lp in lockedOwners)
-            lp?.SetInputLocked(false);
+            if (lp != null) lp.SetInputLocked(false);
 
         _gameFlow.PlayVehiclePhaseInFx();
         // Not yielded — starts once input is back and the drive-in/FX have the player's
@@ -952,8 +954,8 @@ public sealed class SceneFlowCoordinator
 
         if (doHardReset)
         {
-            _gameFlow.controller?.BeginNewMotif("Next PhaseStart");
-            _gameFlow.noteViz?.BeginNewMotif_ClearAll(true);
+            if (_gameFlow.controller != null) _gameFlow.controller.BeginNewMotif("Next PhaseStart");
+            if (_gameFlow.noteViz != null) _gameFlow.noteViz.BeginNewMotif_ClearAll(true);
         }
 
         if (drums == null || dust == null)

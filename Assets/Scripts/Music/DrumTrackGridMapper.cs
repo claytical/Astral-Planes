@@ -439,6 +439,20 @@ public sealed class DrumTrackGridMapper
         if (GameFlowManager.VerboseLogging) Debug.Log($"[GridAutoSize] screen={Screen.width}x{sh} cellPx={cellPx:F2} -> grid={refCols}x{refRows} (reference-locked)");
     }
 
+    // Non-allocating overlap query for ValidateSpawnGrid (runs every ~10s over every note cell).
+    // The filter matches OverlapCircleAll's defaults: DefaultRaycastLayers, triggers per
+    // Physics2D.queriesHitTriggers.
+    private static readonly Collider2D[] s_validateHits = new Collider2D[64];
+    private static ContactFilter2D s_validateFilter;
+
+    private static ContactFilter2D ValidateFilter()
+    {
+        s_validateFilter.useLayerMask = true;
+        s_validateFilter.layerMask = Physics2D.DefaultRaycastLayers;
+        s_validateFilter.useTriggers = Physics2D.queriesHitTriggers;
+        return s_validateFilter;
+    }
+
     public void ValidateSpawnGrid()
     {
         var gfm = _gfm();
@@ -461,16 +475,15 @@ public sealed class DrumTrackGridMapper
                     continue;
 
                 Vector3 worldPos = GridToWorldPosition(new Vector2Int(x, y));
-                Collider2D[] hits = Physics2D.OverlapCircleAll(worldPos, 0.25f);
+                int hitCount = Physics2D.OverlapCircle(worldPos, 0.25f, ValidateFilter(), s_validateHits);
 
                 bool objectPresent = false;
-                foreach (var hit in hits)
+                for (int h = 0; h < hitCount; h++)
                 {
-                    if (hit.GetComponent<Collectable>())
-                    {
+                    var hit = s_validateHits[h];
+                    s_validateHits[h] = null;
+                    if (!objectPresent && hit != null && hit.TryGetComponent<Collectable>(out _))
                         objectPresent = true;
-                        break;
-                    }
                 }
 
                 if (!objectPresent)

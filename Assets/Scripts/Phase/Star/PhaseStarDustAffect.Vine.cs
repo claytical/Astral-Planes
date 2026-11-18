@@ -18,23 +18,42 @@ public partial class PhaseStarDustAffect
     private int PlanVineRoute(Tentacle tentacle, Vector2 starPos, DrumTrack drum, List<Vector2> outNodes)
     {
         if (_gfm == null) _gfm = GameFlowManager.Instance;
-        var gen = _gfm?.dustGenerator;
         var target = tentacle.targetCell;
 
-        bool HardCommon(Vector2Int c) =>
-            (gen != null && gen.IsBlockAt(c)) || IsReservedByAnotherTentacle(c, tentacle);
+        // Wall predicates are cached delegates over these fields (planning is synchronous), so a
+        // tentacle start doesn't allocate closures.
+        _planGen = _gfm != null ? _gfm.dustGenerator : null;
+        _planTentacle = tentacle;
+        _hardCommon ??= HardCommon;
+        _hardProtectRole ??= HardProtectRole;
 
-        bool HardProtectRole(Vector2Int c)
+        try
         {
-            if (HardCommon(c)) return true;
-            return _attunedRole != MusicalRole.None && gen != null &&
-                   gen.TryGetDustAt(c, out var d) && d != null && d.Role == _attunedRole;
-        }
-
-        if (_vinePlanner.TryPlan(drum, starPos, target, HardProtectRole, outNodes, out int crossings))
+            if (_vinePlanner.TryPlan(drum, starPos, target, _hardProtectRole, outNodes, out int crossings))
+                return crossings;
+            _vinePlanner.TryPlan(drum, starPos, target, _hardCommon, outNodes, out crossings);
             return crossings;
-        _vinePlanner.TryPlan(drum, starPos, target, HardCommon, outNodes, out crossings);
-        return crossings;
+        }
+        finally
+        {
+            _planGen = null;
+            _planTentacle = null;
+        }
+    }
+
+    private CosmicDustGenerator _planGen;
+    private Tentacle _planTentacle;
+    private System.Func<Vector2Int, bool> _hardCommon;
+    private System.Func<Vector2Int, bool> _hardProtectRole;
+
+    private bool HardCommon(Vector2Int c) =>
+        (_planGen != null && _planGen.IsBlockAt(c)) || IsReservedByAnotherTentacle(c, _planTentacle);
+
+    private bool HardProtectRole(Vector2Int c)
+    {
+        if (HardCommon(c)) return true;
+        return _attunedRole != MusicalRole.None && _planGen != null &&
+               _planGen.TryGetDustAt(c, out var d) && d != null && d.Role == _attunedRole;
     }
 
     private void BeginVineRoute(Tentacle tentacle, Vector2 starPos, DrumTrack drum)

@@ -256,6 +256,7 @@ public partial class PhaseStar : MonoBehaviour
         if (dust)
         {
             dust.Initialize(behaviorProfile, this, nav, navMode);
+            dust.OnAttuned -= OnAttuned_SetRole; // re-Initialize must not double-subscribe
             dust.OnAttuned += OnAttuned_SetRole;
         }
         if (drum != null && !_subscribedLoopBoundary)
@@ -328,8 +329,6 @@ public partial class PhaseStar : MonoBehaviour
     private void OnDisable()
     {
         s_live.Remove(this);
-        ResolveGameFlowManager();
-        var drum = _gfm?.activeDrumTrack;
         SafeUnsubscribeAll();
         CleanupManagedCoroutines();
     }
@@ -341,5 +340,6 @@ public partial class PhaseStar : MonoBehaviour
         ReleaseUnassignedDrainCells();
         SafeUnsubscribeAll();
         CleanupManagedCoroutines();
+        DestroySuperRingMaterial();
     }
 }

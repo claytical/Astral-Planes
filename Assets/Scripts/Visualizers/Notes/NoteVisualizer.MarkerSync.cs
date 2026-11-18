@@ -1,10 +1,16 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 public partial class NoteVisualizer
 {
+    // Scratch collections for the sync/canonicalize passes (burst and expansion events).
+    // None of these passes re-enter each other while a scratch is being iterated.
+    private readonly List<(InstrumentTrack, int)> _syncKeyScratch = new List<(InstrumentTrack, int)>(64);
+    private readonly HashSet<int> _canonicalLoopSteps = new HashSet<int>();
+    private readonly HashSet<Transform> _orphanOwnedScratch = new HashSet<Transform>();
+    private readonly List<GameObject> _orphanDestroyScratch = new List<GameObject>(32);
+
    public void ForceSyncMarkersToPersistentLoop(InstrumentTrack track)
 {
     if (track == null) return;
@@ -33,10 +39,12 @@ public partial class NoteVisualizer
     //    Do NOT destroy ascending markers mid-flight.
     if (noteMarkers != null)
     {
-        var keys = noteMarkers.Keys.ToList();
+        var keys = _syncKeyScratch;
+        keys.Clear();
+        foreach (var k in noteMarkers.Keys)
+            if (k.Item1 == track) keys.Add(k);
         foreach (var key in keys)
         {
-            if (key.Item1 != track) continue;
 
             int step = key.Item2;
 
@@ -47,8 +55,7 @@ public partial class NoteVisualizer
 
             if (noteMarkers.TryGetValue(key, out var tr) && tr != null)
             {
-                var tag = tr.GetComponent<MarkerTag>();
-                if (tag != null && tag.isAscending)
+                if (tr.TryGetComponent<MarkerTag>(out var tag) && tag.isAscending)
                     continue; // keep in-flight ascension markers intact
 
                 // Safe to destroy (orphan / out-of-window)
@@ -67,8 +74,7 @@ public partial class NoteVisualizer
         var child = row.GetChild(i);
         if (!child) continue;
 
-        var tag = child.GetComponent<MarkerTag>();
-        if (tag == null) continue;
+        if (!child.TryGetComponent<MarkerTag>(out var tag)) continue;
         if (tag.track != track) continue;
         if (tag.isAscending) continue;
 
@@ -104,7 +110,11 @@ public partial class NoteVisualizer
         if (trackIndex < 0 || trackIndex >= trackRows.Count) return;
         var row = trackRows[trackIndex];
 
-        var loopSteps = new HashSet<int>(track.GetPersistentLoopNotes().Select(n => n.Item1));
+        var loopSteps = _canonicalLoopSteps;
+        loopSteps.Clear();
+        var loopNotes = track.GetPersistentLoopNotes();
+        if (loopNotes != null)
+            foreach (var n in loopNotes) loopSteps.Add(n.Item1);
 
         RemoveStaleMarkerEntries(track);
         NormalizeTagsOnRow(row, track, loopSteps, currentBurstId);
@@ -117,7 +127,8 @@ public partial class NoteVisualizer
 
     private void RemoveStaleMarkerEntries(InstrumentTrack track)
     {
-        var toRemove = new List<(InstrumentTrack, int)>();
+        var toRemove = _syncKeyScratch;
+        toRemove.Clear();
         foreach (var kv in noteMarkers)
         {
             if (kv.Key.Item1 == track && (kv.Value == null || kv.Value.gameObject == null))
@@ -207,7 +218,8 @@ public partial class NoteVisualizer
 
     private void PruneStaleMarkerDictEntries(InstrumentTrack track)
     {
-        var toRemove = new List<(InstrumentTrack, int)>();
+        var toRemove = _syncKeyScratch;
+        toRemove.Clear();
         foreach (var kv in noteMarkers)
         {
             if (kv.Key.Item1 != track) continue;
@@ -239,21 +251,23 @@ public partial class NoteVisualizer
     var row = trackRows[trackIndex];
 
     // Build dict-owned set for this track once (prevents O(n^2) checks)
-    var owned = new HashSet<Transform>();
+    var owned = _orphanOwnedScratch;
+    owned.Clear();
     foreach (var kv in noteMarkers)
     {
         if (kv.Key.Item1 != track) continue;
         if (kv.Value) owned.Add(kv.Value);
     }
 
-    var toDestroy = new List<GameObject>();
+    var toDestroy = _orphanDestroyScratch;
+    toDestroy.Clear();
 
     for (int i = 0; i < row.childCount; i++)
     {
         var child = row.GetChild(i);
         if (!child) continue;
 
-        var tag = child.GetComponent<MarkerTag>();
+        child.TryGetComponent<MarkerTag>(out var tag);
 
         // If untagged and not dict-owned, it's unmanaged "mystery" content.
         if (tag == null)
@@ -287,8 +301,7 @@ public partial class NoteVisualizer
         // Extra safety: if the dict-owned marker is ascending, do not destroy anything for this key.
         if (duplicateForKey)
         {
-            var dictTag = tr.GetComponent<MarkerTag>();
-            if (dictTag != null && dictTag.isAscending)
+            if (tr.TryGetComponent<MarkerTag>(out var dictTag) && dictTag.isAscending)
                 duplicateForKey = false;
         }
 
@@ -299,5 +312,7 @@ public partial class NoteVisualizer
 
     foreach (var go in toDestroy)
         SafeDestroy(go);
+    toDestroy.Clear();
+    owned.Clear();
 }
 }

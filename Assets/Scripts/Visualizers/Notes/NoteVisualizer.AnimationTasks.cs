@@ -118,10 +118,11 @@ public partial class NoteVisualizer
         }
         if (_ambientTintColor != _lastAppliedAmbientTintColor)
         {
-            _ambientTintGradient.SetKeys(
-                new[] { new GradientColorKey(_ambientTintColor, 0f), new GradientColorKey(_ambientTintColor, 1f) },
-                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) }
-            );
+            s_twoColorKeys[0] = new GradientColorKey(_ambientTintColor, 0f);
+            s_twoColorKeys[1] = new GradientColorKey(_ambientTintColor, 1f);
+            s_twoAlphaKeys[0] = new GradientAlphaKey(1f, 0f);
+            s_twoAlphaKeys[1] = new GradientAlphaKey(0f, 1f);
+            _ambientTintGradient.SetKeys(s_twoColorKeys, s_twoAlphaKeys);
             _lastAppliedAmbientTintColor = _ambientTintColor;
         }
         col.color = _ambientTintGradient;

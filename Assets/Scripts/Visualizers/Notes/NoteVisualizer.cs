@@ -238,12 +238,14 @@ public partial class NoteVisualizer : MonoBehaviour
     public float GetTopWorldY() => GetWorldCornerY(1);
     private float GetBottomWorldY() => GetWorldCornerY(0); // bottom-left corner
 
+    private static readonly Vector3[] s_worldCorners = new Vector3[4];
+    private RectTransform _selfRect;
+
     private float GetWorldCornerY(int cornerIndex)
     {
-        RectTransform rt = GetComponent<RectTransform>();
-        Vector3[] worldCorners = new Vector3[4];
-        rt.GetWorldCorners(worldCorners);
-        return worldCorners[cornerIndex].y;
+        if (_selfRect == null) _selfRect = (RectTransform)transform;
+        _selfRect.GetWorldCorners(s_worldCorners);
+        return s_worldCorners[cornerIndex].y;
     }
     public Transform GetUIParent() => _uiParent;
 }

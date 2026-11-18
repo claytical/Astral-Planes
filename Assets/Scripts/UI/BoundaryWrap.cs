@@ -66,6 +66,26 @@ public class BoundaryWrap : MonoBehaviour
     private const float WrapCooldown = 0.3f;
     private static readonly Dictionary<Rigidbody2D, float> _lastWrapTime = new();
     private static readonly Dictionary<Rigidbody2D, float> _lastMineBounceTime = new();
+
+    // The cooldown maps are static (shared by every boundary) and keyed by Rigidbody2D, so they
+    // would otherwise keep every vehicle/node body ever wrapped for the whole app session.
+    // Entries only matter for a fraction of a second, so dropping them on scene load is safe.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void RegisterCooldownReset()
+    {
+        _lastWrapTime.Clear();
+        _lastMineBounceTime.Clear();
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoadedClearCooldowns;
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoadedClearCooldowns;
+    }
+
+    private static void OnSceneLoadedClearCooldowns(UnityEngine.SceneManagement.Scene scene,
+        UnityEngine.SceneManagement.LoadSceneMode mode)
+    {
+        if (mode != UnityEngine.SceneManagement.LoadSceneMode.Single) return;
+        _lastWrapTime.Clear();
+        _lastMineBounceTime.Clear();
+    }
     private readonly Dictionary<Rigidbody2D, Vehicle> _vehicleCache = new();
 
     private BoxCollider2D _self;

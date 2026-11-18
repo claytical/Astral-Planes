@@ -49,20 +49,25 @@ public partial class NoteVisualizer
         }
     }
 
+    private readonly Dictionary<int, Transform> _reconcileChosenByStep = new Dictionary<int, Transform>(64);
+    private readonly Dictionary<int, MarkerTag> _reconcileChosenTagByStep = new Dictionary<int, MarkerTag>(64);
+
     // Pass 1: scan row children, pick the canonical marker per step using priority rules,
     // then force noteMarkers to point at the canonical transform.
     private Dictionary<int, Transform> ReconcileDuplicateMarkersInRow(RectTransform row, InstrumentTrack track)
     {
-        var chosenByStep = new Dictionary<int, Transform>(64);
-        var chosenTagByStep = new Dictionary<int, MarkerTag>(64);
+        // Scratch dictionaries: the result is consumed immediately by RepositionAndPruneMarkers.
+        var chosenByStep = _reconcileChosenByStep;
+        var chosenTagByStep = _reconcileChosenTagByStep;
+        chosenByStep.Clear();
+        chosenTagByStep.Clear();
 
         for (int i = 0; i < row.childCount; i++)
         {
             var child = row.GetChild(i);
             if (!child) continue;
 
-            var tag = child.GetComponent<MarkerTag>();
-            if (tag == null || tag.track != track) continue;
+            if (!child.TryGetComponent<MarkerTag>(out var tag) || tag.track != track) continue;
 
             int step = tag.step;
             if (step < 0) continue;
@@ -136,8 +141,7 @@ public partial class NoteVisualizer
             var child = row.GetChild(i);
             if (!child) continue;
 
-            var tag = child.GetComponent<MarkerTag>();
-            if (tag == null || tag.track != track) continue;
+            if (!child.TryGetComponent<MarkerTag>(out var tag) || tag.track != track) continue;
 
             int step = tag.step;
             if (step < 0) continue;
@@ -202,7 +206,6 @@ public partial class NoteVisualizer
     private static bool IsAscending(Transform tf)
     {
         if (tf == null) return false;
-        var tag = tf.GetComponent<MarkerTag>();
-        return tag != null && tag.isAscending;
+        return tf.TryGetComponent<MarkerTag>(out var tag) && tag.isAscending;
     }
 }

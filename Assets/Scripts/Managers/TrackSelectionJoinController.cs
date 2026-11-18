@@ -51,6 +51,7 @@ public class TrackSelectionJoinController : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void RegisterHook()
     {
+        SceneManager.sceneLoaded -= OnSceneLoaded; // idempotent if domain reload is disabled
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
 

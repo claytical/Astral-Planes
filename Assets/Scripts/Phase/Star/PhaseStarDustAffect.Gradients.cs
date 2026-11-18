@@ -2,6 +2,13 @@ using UnityEngine;
 
 public partial class PhaseStarDustAffect
 {
+    // Scratch key arrays: Gradient.SetKeys copies them, so they are reused across tentacles
+    // and frames (the drain pulse rebuilds its gradient every frame).
+    private static readonly GradientColorKey[] s_colorKeys3 = new GradientColorKey[3];
+    private static readonly GradientAlphaKey[] s_alphaKeys5 = new GradientAlphaKey[5];
+    private static readonly GradientColorKey[] s_colorKeys5 = new GradientColorKey[5];
+    private static readonly GradientAlphaKey[] s_alphaKeys6 = new GradientAlphaKey[6];
+
     private void BuildGrowingGradient(Tentacle tentacle, Color roleColor)
     {
         float alpha = tentacle.alphaScale;
@@ -15,22 +22,17 @@ public partial class PhaseStarDustAffect
         tentacle.lastGrowingGradientRoleColor = roleColor;
         tentacle.lastGrowingGradientAlphaScale = alpha;
 
-        tentacle.gradient.SetKeys(
-            new[]
-            {
-                new GradientColorKey(roleColor * 0.6f, 0f),
-                new GradientColorKey(Color.white,      0.5f),
-                new GradientColorKey(roleColor,        1f),
-            },
-            new[]
-            {
-                new GradientAlphaKey(growingRootAlpha * alpha * 0.1f, 0f),
-                new GradientAlphaKey(growingRootAlpha * alpha,        0.12f),
-                new GradientAlphaKey(drainingBaseAlpha * alpha,       0.5f),
-                new GradientAlphaKey(growingTipAlpha * alpha * 0.7f,  0.88f),
-                new GradientAlphaKey(0f,                              1f),
-            }
-        );
+        var ck = s_colorKeys3;
+        ck[0] = new GradientColorKey(roleColor * 0.6f, 0f);
+        ck[1] = new GradientColorKey(Color.white,      0.5f);
+        ck[2] = new GradientColorKey(roleColor,        1f);
+        var ak = s_alphaKeys5;
+        ak[0] = new GradientAlphaKey(growingRootAlpha * alpha * 0.1f, 0f);
+        ak[1] = new GradientAlphaKey(growingRootAlpha * alpha,        0.12f);
+        ak[2] = new GradientAlphaKey(drainingBaseAlpha * alpha,       0.5f);
+        ak[3] = new GradientAlphaKey(growingTipAlpha * alpha * 0.7f,  0.88f);
+        ak[4] = new GradientAlphaKey(0f,                              1f);
+        tentacle.gradient.SetKeys(ck, ak);
     }
 
     private void BuildGradient(Tentacle tentacle, Color roleColor, float dustCharge01 = 1f)
@@ -48,24 +50,19 @@ public partial class PhaseStarDustAffect
                 float edge1 = Mathf.Min(1f, colorFront + 0.08f);
                 Color dustTipColor = Color.Lerp(Color.gray, roleColor, dustCharge01);
 
-                tentacle.gradient.SetKeys(
-                    new[]
-                    {
-                        new GradientColorKey(roleColor * 0.6f, 0f),
-                        new GradientColorKey(Color.white,      edge0),
-                        new GradientColorKey(roleColor,        edge1),
-                        new GradientColorKey(dustTipColor,     0.92f),
-                        new GradientColorKey(dustTipColor,     1f),
-                    },
-                    new[]
-                    {
-                        new GradientAlphaKey(0.1f * alpha,                    0f),
-                        new GradientAlphaKey(drainingBaseAlpha * alpha,       edge0),
-                        new GradientAlphaKey(0.85f * alpha,                   edge1),
-                        new GradientAlphaKey(dustCharge01 * 0.5f * alpha,     0.92f),
-                        new GradientAlphaKey(0f,                              1f),
-                    }
-                );
+                var ck = s_colorKeys5;
+                ck[0] = new GradientColorKey(roleColor * 0.6f, 0f);
+                ck[1] = new GradientColorKey(Color.white,      edge0);
+                ck[2] = new GradientColorKey(roleColor,        edge1);
+                ck[3] = new GradientColorKey(dustTipColor,     0.92f);
+                ck[4] = new GradientColorKey(dustTipColor,     1f);
+                var ak = s_alphaKeys5;
+                ak[0] = new GradientAlphaKey(0.1f * alpha,                0f);
+                ak[1] = new GradientAlphaKey(drainingBaseAlpha * alpha,   edge0);
+                ak[2] = new GradientAlphaKey(0.85f * alpha,               edge1);
+                ak[3] = new GradientAlphaKey(dustCharge01 * 0.5f * alpha, 0.92f);
+                ak[4] = new GradientAlphaKey(0f,                          1f);
+                tentacle.gradient.SetKeys(ck, ak);
                 return;
             }
 
@@ -116,25 +113,20 @@ public partial class PhaseStarDustAffect
         Color dustTipColor = Color.Lerp(Color.gray, roleColor, dustCharge01);
         float tipAlpha     = dustCharge01 * 0.6f * alpha;
 
-        tentacle.gradient.SetKeys(
-            new[]
-            {
-                new GradientColorKey(roleColor,    0f),
-                new GradientColorKey(bright,       p1),
-                new GradientColorKey(roleColor,    p2),
-                new GradientColorKey(dustTipColor, 0.92f),
-                new GradientColorKey(dustTipColor, 1f),
-            },
-            new[]
-            {
-                new GradientAlphaKey(drainingBaseAlpha * alpha,        0f),
-                new GradientAlphaKey(drainingBaseAlpha * 0.5f * alpha, p0),
-                new GradientAlphaKey(pulsePeakAlpha,                   p1),
-                new GradientAlphaKey(drainingBaseAlpha * 0.5f * alpha, p2),
-                new GradientAlphaKey(tipAlpha,                         0.92f),
-                new GradientAlphaKey(0f,                               1f),
-            }
-        );
+        var ck = s_colorKeys5;
+        ck[0] = new GradientColorKey(roleColor,    0f);
+        ck[1] = new GradientColorKey(bright,       p1);
+        ck[2] = new GradientColorKey(roleColor,    p2);
+        ck[3] = new GradientColorKey(dustTipColor, 0.92f);
+        ck[4] = new GradientColorKey(dustTipColor, 1f);
+        var ak = s_alphaKeys6;
+        ak[0] = new GradientAlphaKey(drainingBaseAlpha * alpha,        0f);
+        ak[1] = new GradientAlphaKey(drainingBaseAlpha * 0.5f * alpha, p0);
+        ak[2] = new GradientAlphaKey(pulsePeakAlpha,                   p1);
+        ak[3] = new GradientAlphaKey(drainingBaseAlpha * 0.5f * alpha, p2);
+        ak[4] = new GradientAlphaKey(tipAlpha,                         0.92f);
+        ak[5] = new GradientAlphaKey(0f,                               1f);
+        tentacle.gradient.SetKeys(ck, ak);
     }
 
     private Color GetRoleColor(MusicalRole role)

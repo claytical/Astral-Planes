@@ -33,7 +33,8 @@ public partial class MotifRingGlyphApplicator
         // thing stopping HideGameplayRingStackAfterLoopBoundary's ordinary per-bin auto-hide
         // from scaling the stack to zero mid-pass; a wait performed before this coroutine even
         // starts wouldn't be covered by that guard.
-        var drum = GameFlowManager.Instance?.activeDrumTrack;
+        var gfmForDrum = GameFlowManager.Instance;
+        var drum = gfmForDrum != null ? gfmForDrum.activeDrumTrack : null;
         if (drum != null && drum.leaderStartDspTime > 0)
         {
             double loopBoundaryDsp = drum.leaderStartDspTime + drum.GetLoopLengthInSeconds();
@@ -70,9 +71,12 @@ public partial class MotifRingGlyphApplicator
 
         // The timeline's notes follow the record into the distance. The loop keeps playing
         // (unseen) through the interstitial maze until a path is chosen and BeginNewMotif clears it.
-        GameFlowManager.Instance?.noteViz?.SendLoopMarkersWithRecord(
-            transform, spinDuration,
-            spinDuration + rollDuration + (config != null ? config.scaleDownDuration : 0.5f));
+        var gfmForViz = GameFlowManager.Instance;
+        var viz = gfmForViz != null ? gfmForViz.noteViz : null;
+        if (viz != null)
+            viz.SendLoopMarkersWithRecord(
+                transform, spinDuration,
+                spinDuration + rollDuration + (config != null ? config.scaleDownDuration : 0.5f));
 
         // Restore to full scale — handles both "hidden after deformation" and "mid-fade interrupted".
         transform.localScale = _fitScale.sqrMagnitude > 0.0001f ? _fitScale : Vector3.one;
