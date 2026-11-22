@@ -314,7 +314,31 @@ public partial class PhaseStar
             TransitionZapState(ZapProgressState.Zapping, role, $"refresh:{reason}");
         }
         if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar:Zap] refreshed role={_requiredZapRole} requiredZaps={requiredZapCount} currentZaps={zappedCount} changed={descriptorChanged} reason={reason}");
+        ReportDustSupply(role, reason);
         return true;
+    }
+
+    private bool _dustSupplyShortWarned;
+
+    // Dead-end tell: warns (once per star) when the role's remaining territory, excluding cells
+    // held by star nodes, can't cover this star's remaining zaps. Held cells come back when their
+    // node dies, so this flags "stalls until a node resolves" or, if it persists, a true dead end.
+    private void ReportDustSupply(MusicalRole role, string reason)
+    {
+        var gen = ResolveGameFlowManager()?.dustGenerator;
+        if (gen == null || role == MusicalRole.None) return;
+
+        var supply = gen.GetRoleSupply(role);
+        int remaining = RemainingZapCount;
+        if (GameFlowManager.VerboseLogging)
+            Debug.Log($"[DUST:SUPPLY] star refresh ({reason}) remainingZaps={remaining} available={supply.Available} {supply.Describe(role)}");
+
+        if (supply.Available < remaining && !_dustSupplyShortWarned)
+        {
+            _dustSupplyShortWarned = true;
+            Debug.LogWarning($"[DUST:SUPPLY] {role} star may stall: remainingZaps={remaining} > available={supply.Available} " +
+                $"({supply.Describe(role)})");
+        }
     }
 
     private void PrimeZapRequirementForRole(MusicalRole role, InstrumentTrack track)

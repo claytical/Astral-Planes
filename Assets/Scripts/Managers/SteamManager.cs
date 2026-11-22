@@ -123,6 +123,15 @@ public class SteamManager : MonoBehaviour {
 		}
 
 		s_EverInitialized = true;
+
+		// Ring saves sync via Steam Auto-Cloud (configured on the partner site, not in code).
+		// Always logged so Player.log shows whether a missing sync is the user's cloud toggle.
+		try {
+			Debug.Log($"[SaveData] Steam Cloud: account={SteamRemoteStorage.IsCloudEnabledForAccount()} app={SteamRemoteStorage.IsCloudEnabledForApp()}");
+		}
+		catch (System.Exception e) {
+			Debug.LogWarning($"[SaveData] Steam Cloud status unavailable: {e.Message}");
+		}
 	}
 
 	// This should only ever get called on first load and after an Assembly reload, You should never Disable the Steamworks Manager yourself.

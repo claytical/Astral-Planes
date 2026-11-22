@@ -111,6 +111,10 @@ public sealed class SceneFlowCoordinator
 
     public IEnumerator TransitionToScene(string sceneName)
     {
+        // Wisp bridge samples live on DontDestroyOnLoad objects so they can span a motif bridge,
+        // which never crosses a scene load — so any scene change (quit, back-out, game over,
+        // session start) must silence them or they keep playing in the menus.
+        Wisp.FadeOutActiveBridgeSamples(0.25f);
         SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
         yield return null;
 

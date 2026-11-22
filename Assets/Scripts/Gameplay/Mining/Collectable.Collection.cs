@@ -83,6 +83,8 @@ public partial class Collectable
             StopCoroutine(_spawnArrivalRoutine);
             _spawnArrivalRoutine = null;
             SetSpawnArrivalProtection(false);
+            _colorSat01 = 1f; // collected mid-flight: carry it in full colour
+            ApplySaturationTint(assignedInstrumentTrack);
             if (_rb != null && _rb.bodyType == RigidbodyType2D.Kinematic)
                 _rb.bodyType = RigidbodyType2D.Dynamic;
         }

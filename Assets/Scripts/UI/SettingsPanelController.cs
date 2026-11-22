@@ -1,9 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
 // Main.unity settings: the Global/OpenSettings action (gamepad Select/View/Share/Minus) toggles
-// the "Publish Settings" modal, shown through the generic ModalMenu. The Global action map is
+// the "Settings" modal (Publish Settings, Reset All Progress), shown through the generic ModalMenu. The Global action map is
 // enabled directly off the InputActionAsset (not through any PlayerInput), because Main.unity
 // is the title/boot scene and often has zero LocalPlayer instances joined yet.
 //
@@ -55,19 +56,68 @@ public class SettingsPanelController : MonoBehaviour
         }
         if (ModalMenu.ShouldSuppressInput) return;
 
+        ShowRoot();
+    }
+
+    // _spec always tracks the modal this controller opened last, so Select toggles any of them
+    // closed. ModalMenu closes before invoking a choice, so callbacks can open the next modal.
+    private void Show(ModalMenuSpec spec)
+    {
+        _spec = spec;
+        ModalMenu.Show(spec);
+    }
+
+    private void ShowRoot()
+    {
+        Show(new ModalMenuSpec
+        {
+            title = "Settings",
+            options = new List<ModalMenuOption>
+            {
+                new ModalMenuOption("Publish Settings", ShowPublish),
+                new ModalMenuOption("Reset All Progress", ShowResetConfirm),
+            },
+        });
+    }
+
+    private void ShowPublish()
+    {
         bool publishOn = TelemetryConsent.HasDecided && TelemetryConsent.PublishFlightPlansEnabled;
-        _spec = new ModalMenuSpec
+        Show(new ModalMenuSpec
         {
             title = "Publish Settings",
             description = "Choose whether your flight records are published to the Living Score.",
             defaultIndex = publishOn ? 1 : 0,
+            onCancel = ShowRoot,
             options = new List<ModalMenuOption>
             {
                 new ModalMenuOption("Don't Publish", SetDoNotPublish),
                 new ModalMenuOption("Yes, Publish My Flight Records", SetPublish),
             },
-        };
-        ModalMenu.Show(_spec);
+        });
+    }
+
+    private void ShowResetConfirm()
+    {
+        Show(new ModalMenuSpec
+        {
+            title = "Reset All Progress",
+            description = "Erase all rings and settings and start over? This can't be undone.",
+            defaultIndex = 0,
+            onCancel = ShowRoot,
+            options = new List<ModalMenuOption>
+            {
+                new ModalMenuOption("Cancel", ShowRoot),
+                new ModalMenuOption("Erase Everything", ResetAndReload),
+            },
+        });
+    }
+
+    private static void ResetAndReload()
+    {
+        SaveDataReset.ResetAll();
+        // Carousel, title mode and tutorial gating all read the ring files on scene start.
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
     private static void SetPublish()

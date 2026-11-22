@@ -24,16 +24,7 @@ public class RingPreviewPlayer : MonoBehaviour
              "ring's actual (rotated) rim position instead of the un-rotated default.")]
     [SerializeField] private RingGlyphConfig ringGlyphConfig;
 
-    // Bass=0, Harmony=1, Lead=2, Groove=3, None=4, Rhythm=5
-    private static readonly Dictionary<MusicalRole, int> RoleChannel = new()
-    {
-        { MusicalRole.Bass,    0 },
-        { MusicalRole.Harmony, 1 },
-        { MusicalRole.Lead,    2 },
-        { MusicalRole.Groove,  3 },
-        { MusicalRole.None,    4 },
-        { MusicalRole.Rhythm,  5 },
-    };
+    private static Dictionary<MusicalRole, int> RoleChannel => RingPlaybackPlan.RoleChannel;
 
     private bool   _playing;
     private int    _totalSteps;
@@ -62,8 +53,9 @@ public class RingPreviewPlayer : MonoBehaviour
     /// the pulse starts.</summary>
     public event System.Action<MusicalRole, int, int, double, double> OnNoteApproach;
 
-    // [step] → list of (midiNote, midiChannel, vel127, durationMs, role)
-    private List<List<(int note, int channel, int vel127, int durationMs, MusicalRole role)>> _stepTable;
+    // [step] → notes starting on that step (from RingPlaybackPlan).
+    private List<List<RingPlaybackPlan.NoteEvent>> _stepTable;
+    private RingPlaybackPlan _plan;
 
     // Preset per channel, cached so FireStep can re-assert without a library call each frame.
     private int[] _channelPresets;
@@ -74,10 +66,8 @@ public class RingPreviewPlayer : MonoBehaviour
     private readonly List<GameObject> _clonedPlayers = new();
 
     // ── Gain trim ────────────────────────────────────────────────────────────────
-    // Profile resolved per role for the current motif; its volumeMultiplier is read live every
-    // prime so balance edits are heard on the next note. Snapshot value is the fallback.
-    private readonly Dictionary<MusicalRole, MusicalRoleProfile> _roleProfiles = new();
-    private readonly Dictionary<MusicalRole, float> _snapshotTrims = new();
+    // The plan's per-role profile volumeMultiplier is read live every prime so balance edits are
+    // heard on the next note; the snapshot's saved trim is the fallback.
     private readonly List<MusicalRole> _activeRoles = new();
 
     // ── Drum loop decks ──────────────────────────────────────────────────────────
@@ -91,12 +81,19 @@ public class RingPreviewPlayer : MonoBehaviour
     public MotifProfile CurrentMotif => _motif;
     public bool IsPlaying => _playing;
 
+    /// <summary>dsp time of step 0 of the current playback (0 when stopped).</summary>
+    public double LoopStartDsp => _loopStartDsp;
+    public float LoopLengthSec => _loopLengthSec;
+
+    /// <summary>The MIDI player each role sounds on (a per-bus clone, or the shared template).</summary>
+    public MidiStreamPlayer GetRolePlayer(MusicalRole role) => PlayerFor(role);
+
     /// <summary>Roles that have notes in the current snapshot, in RoleChannel order.</summary>
     public IReadOnlyList<MusicalRole> ActiveRoles => _activeRoles;
 
     /// <summary>The profile whose volumeMultiplier is applied to this role's preview channel.</summary>
     public MusicalRoleProfile GetRoleProfile(MusicalRole role) =>
-        _roleProfiles.TryGetValue(role, out var p) ? p : null;
+        _plan != null && _plan.RoleProfiles.TryGetValue(role, out var p) ? p : null;
 
     /// <summary>The current motif's drum loops: entryDrumLoops then intensityClipTags, de-duplicated.</summary>
     public IReadOnlyList<AudioClip> DrumLoops => _drumLoops;
@@ -303,107 +300,20 @@ public class RingPreviewPlayer : MonoBehaviour
     }
 
     // Live path parity: MusicalRoleProfile.volumeMultiplier → MPTK channel gain.
-    private float TrimFor(MusicalRole role)
-    {
-        if (_roleProfiles.TryGetValue(role, out var prof) && prof != null) return Mathf.Max(0f, prof.volumeMultiplier);
-        return _snapshotTrims.TryGetValue(role, out var t) ? Mathf.Max(0f, t) : 1f;
-    }
+    private float TrimFor(MusicalRole role) => _plan != null ? _plan.TrimFor(role) : 1f;
 
     public void Play(MotifSnapshot snap)
     {
         Stop();
 
-        if (snap == null || snap.CollectedNotes == null || snap.CollectedNotes.Count == 0 || snap.TotalSteps <= 0)
-            return;
+        var plan = RingPlaybackPlan.Build(snap, phaseLibrary);
+        if (plan == null) return;
+        var motif = plan.Motif;
 
-        if (phaseLibrary == null)
-        {
-            Debug.LogWarning("[RingPreviewPlayer] phaseLibrary not assigned.");
-            return;
-        }
-
-        // Match on PhaseId AND the motif at MotifIndex, so phases that (wrongly) share an id can't
-        // resolve to the first one in the list — the carousel matches rings by (PhaseId, MotifId) too.
-        PhaseLibrary.Phase phase = null;
-        if (!string.IsNullOrEmpty(snap.PhaseId))
-        {
-            bool MotifMatches(PhaseLibrary.Phase p) =>
-                string.IsNullOrEmpty(snap.MotifId) ||
-                (p.motifs != null && snap.MotifIndex >= 0 && snap.MotifIndex < p.motifs.Count &&
-                 p.motifs[snap.MotifIndex] != null && p.motifs[snap.MotifIndex].motifId == snap.MotifId);
-
-            phase = phaseLibrary.phases.Find(p => p != null && p.phaseId == snap.PhaseId && MotifMatches(p))
-                 ?? phaseLibrary.phases.Find(p => p != null && p.phaseId == snap.PhaseId);
-        }
-
-        if (phase == null)
-        {
-            if (snap.PhaseIndex < 0 || snap.PhaseIndex >= phaseLibrary.phases.Count)
-            {
-                Debug.LogWarning($"[RingPreviewPlayer] PhaseIndex {snap.PhaseIndex} out of range and PhaseId '{snap.PhaseId}' not found.");
-                return;
-            }
-
-            phase = phaseLibrary.phases[snap.PhaseIndex];
-            if (!string.IsNullOrEmpty(snap.PhaseId))
-                Debug.LogWarning($"[RingPreviewPlayer] PhaseId '{snap.PhaseId}' not found; falling back to index {snap.PhaseIndex}.");
-        }
-        if (snap.MotifIndex < 0 || snap.MotifIndex >= phase.motifs.Count)
-        {
-            Debug.LogWarning($"[RingPreviewPlayer] MotifIndex {snap.MotifIndex} out of range.");
-            return;
-        }
-
-        var motif = phase.motifs[snap.MotifIndex];
-        if (motif == null)
-            return;
-
-        float bpm = snap.Bpm > 0f ? snap.Bpm : (motif.bpm > 0f ? motif.bpm : 120f);
-        int stepsPerLoop = snap.TotalSteps > 0 ? snap.TotalSteps
-            : (motif.stepsPerLoop > 0 ? motif.stepsPerLoop : 16);
-
-        if (snap.StepDurationSec > 0f)
-        {
-            _stepDurationSec = snap.StepDurationSec;
-        }
-        else
-        {
-            // Legacy ring (saved before timing capture): re-derive from the MotifProfile.
-            AudioClip drumClip = null;
-            if (motif.intensityClipTags != null)
-                foreach (var t in motif.intensityClipTags) { if (t.clip != null) { drumClip = t.clip; break; } }
-            if (drumClip == null && motif.entryDrumLoops != null)
-                foreach (var c in motif.entryDrumLoops) { if (c != null) { drumClip = c; break; } }
-
-            _stepDurationSec = drumClip != null
-                ? drumClip.length / stepsPerLoop
-                : 60f / bpm * 4f / stepsPerLoop;
-        }
-
-        // Loop length = leader loop width at capture time; legacy rings infer it from
-        // the max allocated bin count across roles, capped at 5 (4 primary + 1 alternate).
-        int leaderBins = snap.LeaderBins;
-        if (leaderBins <= 0)
-        {
-            var roleBinCounts = new Dictionary<MusicalRole, HashSet<int>>();
-            if (snap.TrackBins != null)
-            {
-                foreach (var tb in snap.TrackBins)
-                {
-                    if (!roleBinCounts.TryGetValue(tb.Role, out var set))
-                        roleBinCounts[tb.Role] = set = new HashSet<int>();
-                    set.Add(tb.BinIndex);
-                }
-            }
-            int maxBinsPerRole = 0;
-            foreach (var kvp in roleBinCounts)
-                maxBinsPerRole = Mathf.Max(maxBinsPerRole, kvp.Value.Count);
-            leaderBins = Mathf.Min(maxBinsPerRole > 0 ? maxBinsPerRole : 1, 5);
-        }
-
-        _totalSteps    = leaderBins * stepsPerLoop;
-        _loopLengthSec = _totalSteps * _stepDurationSec;
-        _stepsPerLoop  = stepsPerLoop;
+        _stepDurationSec = plan.StepDurationSec;
+        _totalSteps      = plan.TotalSteps;
+        _loopLengthSec   = plan.LoopLengthSec;
+        _stepsPerLoop    = plan.StepsPerLoop;
 
         bool motifChanged = motif != _motif;
         RebuildDrumLoops(motif);
@@ -411,115 +321,12 @@ public class RingPreviewPlayer : MonoBehaviour
         if (motifChanged && PreferHighIntensity) _drumLoopIndex = Mathf.Max(0, PickHighIntensityLoopIndex());
         RefreshDrumVolume();
 
-        // Cache presets per channel — use the motif's own roleProfile, fall back to library.
-        _channelPresets = new int[16];
-        _roleProfiles.Clear();
-        _snapshotTrims.Clear();
-        foreach (var kvp in RoleChannel)
-        {
-            MusicalRoleProfile roleProf = null;
-            var voiceProfile = motif.GetInstrumentProfileForVoice(kvp.Key, 0);
-            if (voiceProfile != null)
-                roleProf = voiceProfile;
-            else
-                roleProf = MusicalRoleProfileLibrary.GetProfile(kvp.Key);
-            if (roleProf != null) _roleProfiles[kvp.Key] = roleProf;
-
-            // Saved playback profile (what was actually heard live) wins over re-derivation.
-            int presetToUse = roleProf != null ? roleProf.midiPreset : 0;
-            bool havePreset = roleProf != null;
-            if (snap.TrackBins != null)
-                foreach (var tb in snap.TrackBins)
-                    if (tb.Role == kvp.Key && tb.HasPlaybackProfile)
-                    {
-                        presetToUse = tb.MidiPreset;
-                        havePreset = true;
-                        _snapshotTrims[kvp.Key] = tb.VolumeMultiplier;
-                        break;
-                    }
-
-            if (havePreset && kvp.Value < 16)
-            {
-                _channelPresets[kvp.Value] = presetToUse;
-                if (GameFlowManager.VerboseLogging) Debug.Log($"[PREVIEW] Channel {kvp.Value} ({kvp.Key}) Preset {presetToUse}");
-            }
-        }
-
-        // Build step table: place notes at their absolute session step (silent regions
-        // where a track hadn't expanded stay silent, matching the live loop structure)
-        // and retune to the per-bin chord.
-        _stepTable = new List<List<(int, int, int, int, MusicalRole)>>(_totalSteps);
-        for (int i = 0; i < _totalSteps; i++)
-            _stepTable.Add(new List<(int, int, int, int, MusicalRole)>());
-
-        foreach (var entry in snap.CollectedNotes)
-        {
-            if (entry.Step < 0 || entry.Step >= _totalSteps) continue;
-
-            var role = entry.HasRole ? entry.Role : ResolveRoleForNote(snap.TrackBins, entry.BinIndex, entry.TrackColor);
-
-            // Saved pitch is already the final chord-quantized note the player heard; don't re-snap.
-            int retunedNote = entry.Note;
-
-            int ch = RoleChannel.TryGetValue(role, out int rc) ? rc : 4;
-
-            float v01  = entry.Velocity > 1.01f ? entry.Velocity / 127f : entry.Velocity;
-            int vel127 = ComputeVelocity(snap.TrackBins, role, v01);
-
-            // Session duration in MPTK ticks → ms via capture-time BPM (same math as
-            // MidiVoice.PlayNoteTicks). 0 ⇒ legacy ring, filled by the fallback below.
-            int dMs = entry.DurationTicks > 0
-                ? Mathf.Max(10, Mathf.RoundToInt(entry.DurationTicks * (60000f / (bpm * 480f))))
-                : 0;
-
-            _stepTable[entry.Step].Add((Mathf.Clamp(retunedNote, 0, 127), ch, vel127, dMs, role));
-        }
-
-        // Legacy fallback: notes without a stored duration get distance to next onset
-        // on the same channel.
-        var channelNoteSteps = new Dictionary<int, List<int>>();
-        for (int s = 0; s < _totalSteps; s++)
-            foreach (var e in _stepTable[s])
-            {
-                if (!channelNoteSteps.TryGetValue(e.channel, out var cList))
-                    channelNoteSteps[e.channel] = cList = new List<int>();
-                if (cList.Count == 0 || cList[cList.Count - 1] != s)
-                    cList.Add(s);
-            }
-
-        int floorMs = Mathf.Max(10, Mathf.RoundToInt(_stepDurationSec * 200f));
-        foreach (var kvp in channelNoteSteps)
-        {
-            int ch    = kvp.Key;
-            var steps = kvp.Value;
-            for (int i = 0; i < steps.Count; i++)
-            {
-                int thisStep = steps[i];
-                int nextStep = steps[(i + 1) % steps.Count];
-                int dist = nextStep > thisStep
-                    ? nextStep - thisStep
-                    : _totalSteps - thisStep + nextStep;
-                if (dist == 0) dist = _totalSteps;
-                int dMs = Mathf.Max(floorMs,
-                    Mathf.RoundToInt(dist * _stepDurationSec * 1000f * 0.95f));
-
-                var row = _stepTable[thisStep];
-                for (int j = 0; j < row.Count; j++)
-                {
-                    var n = row[j];
-                    if (n.channel == ch && n.durationMs == 0)
-                        row[j] = (n.note, n.channel, n.vel127, dMs, n.role);
-                }
-            }
-        }
+        _plan           = plan;
+        _channelPresets = plan.ChannelPresets;
+        _stepTable      = plan.Steps;
 
         _activeRoles.Clear();
-        foreach (var kvp in RoleChannel)
-        {
-            bool has = false;
-            for (int s = 0; s < _totalSteps && !has; s++) has = HasRole(_stepTable[s], kvp.Key);
-            if (has) _activeRoles.Add(kvp.Key);
-        }
+        _activeRoles.AddRange(plan.ActiveRoles);
 
         PrimeChannels();
 
@@ -531,6 +338,14 @@ public class RingPreviewPlayer : MonoBehaviour
         _playing         = true;
 
         if (_drumsEnabled) ScheduleDrumLoop(_drumLoopIndex);
+    }
+
+    /// <summary>Stops scheduling new notes but leaves sounding ones to finish their own duration and
+    /// release (unlike Stop, which sends NoteOff to everything). Used by RingAudioExporter for the tail.</summary>
+    public void StopFiring()
+    {
+        _playing = false;
+        StopDrums();
     }
 
     public void Stop()
@@ -623,8 +438,7 @@ public class RingPreviewPlayer : MonoBehaviour
 
     // Longest note at this step for a role — a chord shares one ring dip. Scans in place so the
     // per-step hot path doesn't allocate.
-    private static int LongestDurationMs(
-        List<(int note, int channel, int vel127, int durationMs, MusicalRole role)> notes, MusicalRole role)
+    private static int LongestDurationMs(List<RingPlaybackPlan.NoteEvent> notes, MusicalRole role)
     {
         int longest = 0;
         for (int i = 0; i < notes.Count; i++)
@@ -643,8 +457,7 @@ public class RingPreviewPlayer : MonoBehaviour
         return _loopStartDsp + loopsElapsed * _loopLengthSec + stepOffsetSec;
     }
 
-    private static bool HasRole(
-        List<(int note, int channel, int vel127, int durationMs, MusicalRole role)> notes, MusicalRole role)
+    private static bool HasRole(List<RingPlaybackPlan.NoteEvent> notes, MusicalRole role)
     {
         for (int i = 0; i < notes.Count; i++) if (notes[i].role == role) return true;
         return false;
@@ -706,15 +519,16 @@ public class RingPreviewPlayer : MonoBehaviour
         // ring angle, so only spawn one firework per role per step rather than one per note.
         _firedRoles.Clear();
 
-        foreach (var (note, ch, vel127, durationMs, role) in notes)
+        foreach (var n in notes)
         {
+            var role = n.role;
             PlayerFor(role).MPTK_PlayEvent(new MPTKEvent
             {
                 Command  = MPTKCommand.NoteOn,
-                Value    = note,
-                Channel  = ch,
-                Duration = durationMs,
-                Velocity = vel127,
+                Value    = n.note,
+                Channel  = n.channel,
+                Duration = n.durationMs,
+                Velocity = n.vel127,
             });
 
             if (OnNoteFired == null && OnNotePulse == null && OnNoteApproach == null) continue;
@@ -741,41 +555,6 @@ public class RingPreviewPlayer : MonoBehaviour
                 + (ringGlyphConfig != null ? ringGlyphConfig.ringStartAngleOffset : 0f);
             OnNoteFired.Invoke(role, step / _stepsPerLoop, angleRad);
         }
-    }
-
-    // Same tolerant, alpha-blind per-channel comparison MotifRingGlyphApplicator.RecordRings.cs
-    // uses to assign a note to its ring (AnimateApply/ApplyVinyl) — previously this
-    // used an exact Dictionary<(int,Color),MusicalRole> key (bitwise equality, alpha included),
-    // which could silently miss and fall back to default(MusicalRole) (== Bass), desyncing which
-    // ring's firework a note triggered from which ring its dip actually rendered on.
-    private static MusicalRole ResolveRoleForNote(
-        List<MotifSnapshot.TrackBinData> trackBins, int binIndex, Color noteColor)
-    {
-        if (trackBins == null) return default;
-        foreach (var tb in trackBins)
-        {
-            if (tb.BinIndex != binIndex) continue;
-            if (Mathf.Approximately(tb.TrackColor.r, noteColor.r) &&
-                Mathf.Approximately(tb.TrackColor.g, noteColor.g) &&
-                Mathf.Approximately(tb.TrackColor.b, noteColor.b))
-                return tb.Role;
-        }
-        return default;
-    }
-
-    // Mirrors the live path: role [min,max] velocity range. volumeMultiplier is NOT applied here —
-    // it's channel gain (PrimeChannels), same as MidiVoice.SetGainTrim on live tracks.
-    // Legacy rings (no saved profile) keep the old fixed 40–100 curve.
-    private static int ComputeVelocity(List<MotifSnapshot.TrackBinData> trackBins, MusicalRole role, float v01)
-    {
-        if (trackBins != null)
-            foreach (var tb in trackBins)
-            {
-                if (tb.Role != role || !tb.HasPlaybackProfile) continue;
-                float v = Mathf.Lerp(tb.MinVelocity, tb.MaxVelocity, Mathf.Clamp01(v01));
-                return Mathf.Clamp(Mathf.RoundToInt(v), 1, 127);
-            }
-        return Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(40f, 127f, v01)), 40, 100);
     }
 
     // Re-asserted before every step (self-heals once MPTK_Channels exists): each role's channel on

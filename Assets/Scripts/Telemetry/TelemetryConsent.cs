@@ -44,6 +44,20 @@ public static class TelemetryConsent
         }
     }
 
+    // Forget the choice entirely (Settings → Reset All Progress) so the first-run prompt returns.
+    public static void Reset()
+    {
+        _cached = null;
+        try
+        {
+            if (File.Exists(FilePath)) File.Delete(FilePath);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[TelemetryConsent] Failed to delete consent state: {e.Message}");
+        }
+    }
+
     private static ConsentFile LoadFile()
     {
         if (_cached != null) return _cached;

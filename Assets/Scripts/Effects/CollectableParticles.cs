@@ -36,6 +36,39 @@ public class CollectableParticles : MonoBehaviour
             fol.enabled = false; // no tether yet: pure fountain
         }
     }
+    /// <summary>
+    /// Tints newly emitted particles: the main fountain's colour-over-lifetime gradient
+    /// (with a soft white core) and the core system's start colour. Already-live particles
+    /// keep their colour and age out.
+    /// </summary>
+    public void SetTint(Color c)
+    {
+        if (coreParticleSystem != null)
+        {
+            ParticleSystem.MainModule core = coreParticleSystem.main;
+            core.startColor = c;
+        }
+        if (!particleSystem) return;
+
+        var g = new Gradient();
+        g.SetKeys(
+            new [] {
+                new GradientColorKey(c, 0f),
+                new GradientColorKey(Color.Lerp(c, Color.white, 0.2f), 0.45f),
+                new GradientColorKey(c, 1f)
+            },
+            new [] {
+                new GradientAlphaKey(0f, 0f),
+                new GradientAlphaKey(0.9f, 0.12f),
+                new GradientAlphaKey(0.75f, 0.85f),
+                new GradientAlphaKey(0f, 1f)
+            }
+        );
+        var col = particleSystem.colorOverLifetime;
+        col.enabled = true;
+        col.color   = g;
+    }
+
     public void ConfigureByDuration(int durationTicks, InstrumentTrack track)
 {
     if (!particleSystem || track == null) return;
@@ -54,34 +87,11 @@ public class CollectableParticles : MonoBehaviour
     var main  = particleSystem.main;
     var emis  = particleSystem.emission;
     var shape = particleSystem.shape;
-    var col   = particleSystem.colorOverLifetime;
     var sizeL = particleSystem.sizeOverLifetime;
     var noise = particleSystem.noise;
 
     // Color/gradient (track tint with a soft white core)
-    Color c = track.DisplayColor;
-    if (coreParticleSystem != null)
-    {
-        ParticleSystem.MainModule core = coreParticleSystem.main;
-        core.startColor = track.DisplayColor;
-    }
-
-    var g = new Gradient();
-    g.SetKeys(
-        new [] {
-            new GradientColorKey(c, 0f),
-            new GradientColorKey(Color.Lerp(c, Color.white, 0.2f), 0.45f),
-            new GradientColorKey(c, 1f)
-        },
-        new [] {
-            new GradientAlphaKey(0f, 0f),
-            new GradientAlphaKey(0.9f, 0.12f),
-            new GradientAlphaKey(0.75f, 0.85f),
-            new GradientAlphaKey(0f, 1f)
-        }
-    );
-    col.enabled = true;
-    col.color   = g;
+    SetTint(track.DisplayColor);
 
     bool isShort = durationSec <= 0.20f;
     bool isLong  = durationSec >= 0.60f;

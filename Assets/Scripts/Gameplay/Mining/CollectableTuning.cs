@@ -28,8 +28,12 @@ public class CollectableTuning : ScriptableObject
     [Header("Discard → Time Bomb")]
     public BombParams bomb = new();
 
+    [Header("Spawn Arrival Flight")]
+    public ArrivalFlightParams arrivalFlight = new();
+
     public void Validate()
     {
+        arrivalFlight ??= new ArrivalFlightParams();
         depositTiming ??= new DepositTimingParams();
         absorbVfx ??= new AbsorbVfxParams();
         idlePulse ??= new IdlePulseParams();
@@ -47,6 +51,20 @@ public class CollectableTuning : ScriptableObject
     }
 
     private void OnValidate() => Validate();
+}
+
+/// <summary>
+/// "Not catchable yet" tell: a note in its protected spawn-arrival flight is drawn
+/// desaturated, then blooms back to its role colour when it lands and becomes catchable.
+/// </summary>
+[Serializable]
+public sealed class ArrivalFlightParams
+{
+    [Tooltip("Colour saturation while the note is in its uncatchable spawn flight. 0 = grey, 1 = full role colour.")]
+    [Range(0f, 1f)] public float flightSaturation01 = 0.15f;
+
+    [Tooltip("Seconds for the colour to bloom back to full saturation after the note lands.")]
+    [Min(0f)] public float landColorBloomSeconds = 0.3f;
 }
 
 [Serializable]

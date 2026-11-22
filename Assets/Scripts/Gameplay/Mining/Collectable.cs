@@ -305,11 +305,14 @@ public partial class Collectable : MonoBehaviour
         if (track == null) return;
         _baseRootScale = transform.localScale;
         if (TryGetComponent(out CollectableParticles particleScript))
+        {
             particleScript.ConfigureByDuration(noteDurationTicks, track);
+            if (_colorSat01 < 1f) particleScript.SetTint(VisualTint(track.DisplayColor));
+        }
 
         if (energySprite != null)
         {
-            var c = track.DisplayColor;
+            var c = VisualTint(track.DisplayColor);
             c.a = Mathf.Clamp01(maxAlpha);
             energySprite.color = c;
 

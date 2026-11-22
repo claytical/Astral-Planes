@@ -63,6 +63,10 @@ public class MotifSnapshot
     // Core identity
     // -------------------------------------------------------------------------
 
+    /// <summary>Save-format stamp written by RingSessionStore. Rings below
+    /// RingSessionStore.CurrentSaveVersion (0 = pre-versioning builds) are discarded on load.</summary>
+    public int SaveVersion;
+
     public MazeArchetype Pattern;
 
     /// <summary>Serializable backing field. Use the Color property at runtime.</summary>

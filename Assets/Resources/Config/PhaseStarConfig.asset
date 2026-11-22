@@ -75,7 +75,7 @@ MonoBehaviour:
   tentacleRetractSpeed: 4
   tentacleFlowSpeed: 0.5
   dissolveDuration: 1
-  tentacleWidth: 0.15
+  tentacleWidth: 0.1
   growingRootAlpha: 0.669
   growingTipAlpha: 0.554
   drainingBaseAlpha: 0.751

@@ -14,6 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CosmicDustGeneratorConfig
   cellClearanceWorld: 0
   dustFootprintMul: 1.25
+  dustCoreEnabled: 1
+  dustCoreFootprintMul: 1.053
+  dustCoreScatter: 0.08
+  dustCoreParticleSize: 0.885
+  dustCoreEmissionMul: 0.6
+  dustCoreAlphaMul: 1
+  dustHazeAlphaMul: 0.599
   maxSpawnMillisPerFrame: 1.2
   hexGrowInSeconds: 0.45
   regrowCellsPerStep: 1
@@ -33,6 +40,9 @@ MonoBehaviour:
     clearSpriteScaleOutSeconds: 0.2
     regrowParticleGrowInSeconds: 1
     clearFadeOutSeconds: 0.2
+  noneCarveResistance01: 0
+  noneDrainResistance01: 0
+  noneMaxEnergyUnits: 1
   mazeTint: {r: 0.3962264, g: 0.3962264, b: 0.3962264, a: 0.6}
   genericFillTint: {r: 0.16037738, g: 0.16037738, b: 0.16037738, a: 0.6}
   solidDustTint: {r: 0.2599235, g: 0.299533, b: 0.31132078, a: 1}
@@ -41,6 +51,10 @@ MonoBehaviour:
   toroidal: 0
   minNotesPerBinPerVoice: 2
   maxNotesPerBinPerVoice: 16
+  minBpmForDensity: 80
+  maxBpmForDensity: 160
+  noteDensityWeight: 1
+  bpmDensityWeight: 0
   enableTintDiffusion: 1
   tintDiffusionInterval: 0.12
   tintDiffusionMaxCellsPerTick: 256

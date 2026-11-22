@@ -17,7 +17,11 @@ using UnityEngine;
 //   • No new wall when no OTHER active role still has unfilled bins: walling the
 //     only role that can still progress would deadlock the motif. Old blocks
 //     still revert.
-//   • The record spinning off (motif end) reverts everything.
+//   • The motif bridge starting reverts everything (HardStopRegrowthForBridge) and no
+//     new wall goes up until the bridge ends — the final ring's completion lands in the
+//     same frame the bridge starts, and a wall applied after the release would ignore
+//     the bridge's dust fade. When the record starts spinning off, any dust still solid
+//     is faded out so nothing outlives the record's exit animation.
 //
 //  "About to move" tell: while any track has a live collectable burst (its
 //  completion is the next ring, i.e. the next swap), the standing blocks shimmer
@@ -81,7 +85,7 @@ public class CosmicBlockField : MonoBehaviour
     /// <summary>A ring completed for <paramref name="track"/>'s role. Applied at end of frame.</summary>
     public void OnRingCompleted(InstrumentTrack track)
     {
-        if (track == null) return;
+        if (track == null || BridgeActive) return;
         _pendingTrack = track;
         _swapPending = true;
     }
@@ -94,8 +98,23 @@ public class CosmicBlockField : MonoBehaviour
         Gen?.ReleaseRoleBlock();
     }
 
-    // The final ring's notes have landed and the record is leaving: the walls go with it.
-    private void HandleRecordLeaving() => ReleaseAll();
+    // True from the moment the motif bridge begins until the next motif starts.
+    private static bool BridgeActive
+    {
+        get
+        {
+            var gfm = GameFlowManager.Instance;
+            return gfm != null && (gfm.BridgePending || gfm.GhostCycleInProgress);
+        }
+    }
+
+    // The final ring's notes have landed and the record starts its exit animation: the walls
+    // go with it, and any dust the bridge's staggered fade hasn't reached yet fades out now.
+    private void HandleRecordLeaving()
+    {
+        ReleaseAll();
+        Gen?.FadeOutRemainingSolidDust(0.3f);
+    }
 
     private void LateUpdate()
     {
@@ -109,6 +128,9 @@ public class CosmicBlockField : MonoBehaviour
         gen.ReleaseRoleBlock();
 
         if (track == null || track.assignedRole == MusicalRole.None) return;
+        // The final ring completes in the same frame the bridge starts (and releases the walls):
+        // walling now would make those cells immune to the bridge's dust fade.
+        if (BridgeActive) return;
         if (_boundApplicator != null && _boundApplicator.IsRecordLeaving) return;
         if (!AnyOtherRoleCanProgress(track)) return;
 

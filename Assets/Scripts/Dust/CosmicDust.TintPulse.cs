@@ -159,21 +159,8 @@ private void ClearRainbowParticleDirtyIfNeeded()
 
         target.a *= _growInAlpha01;
 
-        var ps = visual.particleSystem;
-        var main = ps.main;
-        main.startColor = target;
-
-        int count = ps.particleCount;
-        if (count <= 0) return;
-        if (!AllowLiveRewrite(budgeted)) return;
-
-        if (_colorParticleBuffer == null || _colorParticleBuffer.Length < count)
-            _colorParticleBuffer = new ParticleSystem.Particle[Mathf.Max(count, 32)];
-
-        int actual = ps.GetParticles(_colorParticleBuffer);
-        for (int i = 0; i < actual; i++)
-            _colorParticleBuffer[i].startColor = target;
-        ps.SetParticles(_colorParticleBuffer, actual);
+        // Core/haze split (CosmicDust.CoreHaze.cs): haze dimmed, core at full alpha.
+        RecolorBothLayers(target, int.MaxValue, budgeted);
     }
 
     // Cap on how many already-alive particles a single SetRainbowParticleColor call
@@ -195,24 +182,9 @@ private void ClearRainbowParticleDirtyIfNeeded()
     {
         if (visual.particleSystem == null) return;
 
-        var ps = visual.particleSystem;
-        var main = ps.main;
-        main.startColor = target;
-
-        int count = ps.particleCount;
-        if (count <= 0) return;
-        if (!AllowLiveRewrite(budgeted)) return;
-
-        if (_colorParticleBuffer == null || _colorParticleBuffer.Length < count)
-            _colorParticleBuffer = new ParticleSystem.Particle[Mathf.Max(count, 32)];
-
-        int actual = ps.GetParticles(_colorParticleBuffer);
-        int rewriteCount = Mathf.Min(actual, kRainbowParticleRewriteCap);
-        for (int i = 0; i < rewriteCount; i++)
-            _colorParticleBuffer[i].startColor = target;
-        // Only write back the particles we touched — writing `rewriteCount` (not `actual`)
-        // leaves any remaining particles fully untouched in the live system.
-        ps.SetParticles(_colorParticleBuffer, rewriteCount);
+        // Same per-layer write as SetDustColorAllParticles, capped at kRainbowParticleRewriteCap
+        // live particles per layer (CosmicDust.CoreHaze.cs RecolorLayer).
+        RecolorBothLayers(target, kRainbowParticleRewriteCap, budgeted);
     }
     // Explode lives on a child of the prefab; look it up once instead of every tint change.
     private Explode _explodeCached;

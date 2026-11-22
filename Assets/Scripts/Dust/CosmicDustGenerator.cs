@@ -340,6 +340,10 @@ public partial class CosmicDustGenerator : MonoBehaviour
         // Dust brightness legibility (CosmicDust.Legibility.cs) must darken exactly like the
         // spawn-time hidden-role preview (ApplyHiddenColorPreview).
         CosmicDust.SetLegibilityParams(config.hiddenRoleColorDarken01, !config.hideDustColorAtSpawn);
+        // Core/haze split (CosmicDust.CoreHaze.cs) — must precede the first cell Instantiate.
+        CosmicDust.SetCoreHazeParams(config.dustCoreEnabled, config.dustCoreFootprintMul, config.dustCoreScatter,
+                                     config.dustCoreEmissionMul, config.dustCoreAlphaMul, config.dustHazeAlphaMul,
+                                     config.dustCoreParticleSize);
         TryEnsureRefs();
         EnsureCellGrid();
         _regrowthScheduler.Initialize(config.regrowCellsPerStep, config.regrowColliderEnableDelaySeconds);

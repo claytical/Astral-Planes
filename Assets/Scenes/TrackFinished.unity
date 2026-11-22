@@ -751,7 +751,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: your voyage ends here...
+  m_text: Your trip has come to a conclusion...
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 2c3848f0c4a614fbe8a4e7e7a0f139e6, type: 2}
   m_sharedMaterial: {fileID: -9011169692788812194, guid: 2c3848f0c4a614fbe8a4e7e7a0f139e6,
@@ -999,6 +999,11 @@ MonoBehaviour:
   wobbleTiltMin: 60
   wobbleTiltMax: 65
   wobbleSpeed: 0.1
+  previewPlayer: {fileID: 0}
+  unfinishedGlyphConfig: {fileID: 0}
+  unfinishedGlyphScale: 1
+  unfinishedOffset: {x: 0, y: 0, z: 0}
+  unfinishedEuler: {x: 0, y: 0, z: 0}
 --- !u!1001 &3624332205232336851
 PrefabInstance:
   m_ObjectHideFlags: 0

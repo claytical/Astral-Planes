@@ -6,6 +6,57 @@ public partial class Collectable
 {
     private Vector2Int? _arrivalTargetCell;
 
+    // ── Grey-in-flight tell ─────────────────────────────────────────────────────────────
+    // A note in its protected spawn flight can't be caught, so it flies desaturated and
+    // blooms back to its role colour on landing (CollectableTuning.arrivalFlight).
+    // 1 = full role colour; ApplyTrackVisuals reads it through VisualTint.
+    private float _colorSat01 = 1f;
+    private Coroutine _landColorBloomRoutine;
+    private CollectableParticles _tintParticles;
+
+    private Color VisualTint(Color role)
+    {
+        if (_colorSat01 >= 1f) return role;
+        float lum = role.r * 0.299f + role.g * 0.587f + role.b * 0.114f;
+        var grey = new Color(lum, lum, lum, role.a);
+        return Color.Lerp(grey, role, Mathf.Clamp01(_colorSat01));
+    }
+
+    /// <summary>Pushes the current saturation onto the energy sprite (rgb only — the idle
+    /// pulse owns alpha) and the note's particles.</summary>
+    private void ApplySaturationTint(InstrumentTrack track)
+    {
+        if (track == null) return;
+        Color tint = VisualTint(track.DisplayColor);
+        if (energySprite != null)
+        {
+            var c = energySprite.color;
+            c.r = tint.r; c.g = tint.g; c.b = tint.b;
+            energySprite.color = c;
+        }
+        if (_tintParticles == null) TryGetComponent(out _tintParticles);
+        if (_tintParticles != null) _tintParticles.SetTint(tint);
+    }
+
+    private IEnumerator LandColorBloomRoutine(InstrumentTrack track)
+    {
+        float from = _colorSat01;
+        float dur = tuning.arrivalFlight.landColorBloomSeconds;
+        float t = 0f;
+        while (t < dur)
+        {
+            // Collected, carried or armed as a bomb mid-bloom: those paths own the colour now.
+            if (_handled || _isBomb || ReportedCollected) { _colorSat01 = 1f; _landColorBloomRoutine = null; yield break; }
+            t += Time.deltaTime;
+            _colorSat01 = Mathf.Lerp(from, 1f, Mathf.SmoothStep(0f, 1f, t / dur));
+            ApplySaturationTint(track);
+            yield return null;
+        }
+        _colorSat01 = 1f;
+        if (!(_handled || _isBomb || ReportedCollected)) ApplySaturationTint(track);
+        _landColorBloomRoutine = null;
+    }
+
     /// <summary>
     /// Grid cell a ship must reach to collect this note: its landing cell while in arrival
     /// flight, else where it is now. False once it has been collected/carried or is a bomb.
@@ -35,6 +86,12 @@ public partial class Collectable
         // Protect before the first frame of flight: vehicles pass through and
         // cannot collect until the note lands.
         SetSpawnArrivalProtection(true);
+
+        // Fly grey: uncatchable until it lands.
+        EnsureTuning();
+        if (_landColorBloomRoutine != null) { StopCoroutine(_landColorBloomRoutine); _landColorBloomRoutine = null; }
+        _colorSat01 = Mathf.Clamp01(tuning.arrivalFlight.flightSaturation01);
+        ApplySaturationTint(track);
 
         // Where this note will be once it lands — Cosmic Block doorways keep it reachable
         // even while it's still in flight (CosmicDustGenerator.Blocks.cs).
@@ -156,7 +213,16 @@ public partial class Collectable
         _spawnArrivalRoutine = null;
         SetSpawnArrivalProtection(false);
 
+        // Initialize → ApplyTrackVisuals re-tints at the current (flight) saturation, so the
+        // bloom below is the only colour change on landing — no snap to full colour first.
         Initialize(note, duration, track, noteSet, steps);
+
+        if (_colorSat01 < 1f)
+        {
+            if (tuning.arrivalFlight.landColorBloomSeconds > 0f)
+                _landColorBloomRoutine = StartCoroutine(LandColorBloomRoutine(track));
+            else { _colorSat01 = 1f; ApplySaturationTint(track); }
+        }
     }
 
     /// <summary>

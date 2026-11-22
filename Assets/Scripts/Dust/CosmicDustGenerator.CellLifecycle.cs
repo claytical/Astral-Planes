@@ -270,6 +270,24 @@ public partial class CosmicDustGenerator
         }
     }
 
+    /// <summary>
+    /// Fades every still-solid cell immediately (no stagger). Safety net at record spin-off so
+    /// nothing from BeginSlowFadeAllDust's stagger outlives the record's exit; pending
+    /// DelayedFadeCell coroutines no-op once their cell is no longer Solid.
+    /// </summary>
+    public void FadeOutRemainingSolidDust(float fadeSeconds)
+    {
+        if (_gridState.CellState == null || _gridState.CellGo == null || _gridState.Width <= 0 || _gridState.Height <= 0) return;
+
+        for (int x = 0; x < _gridState.Width; x++)
+        for (int y = 0; y < _gridState.Height; y++)
+        {
+            if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
+            if (_gridState.CellGo[x, y] == null) continue;
+            ClearCell(new Vector2Int(x, y), DustClearMode.FadeAndHide, fadeSeconds: fadeSeconds, scheduleRegrow: false);
+        }
+    }
+
     private IEnumerator DelayedFadeCell(Vector2Int gp, float delay)
     {
         if (delay > 0f) yield return new WaitForSeconds(delay);

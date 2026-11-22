@@ -65,6 +65,7 @@ public partial class CosmicDust
         // 1.0 = exactly touches neighbour, >1.0 = overlaps, <1.0 = gap.
         _spriteScaleTarget   = Mathf.Max(0.01f, footprintMul);
         ApplyCellRelativeParticleSizing();
+        ApplyCoreLayerScale();
         RebuildColliderForCurrentScale();
     }
     // Opt-in (visual.particleCellFraction > 0): size particles in CELL units so the footprint tracks the real tile size.

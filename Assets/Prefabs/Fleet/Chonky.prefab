@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &4168806788870612557
+--- !u!1 &2104688266029273276
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,7 +8,7 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1383125709855397745}
+  - component: {fileID: 4080205086938498475}
   m_Layer: 0
   m_Name: Soul
   m_TagString: Untagged
@@ -16,18 +16,18 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1383125709855397745
+--- !u!4 &4080205086938498475
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4168806788870612557}
+  m_GameObject: {fileID: 2104688266029273276}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.11, z: -5}
-  m_LocalScale: {x: 1, y: 1, z: 2}
-  m_ConstrainProportionsScale: 1
+  m_LocalPosition: {x: 0, y: 0.02, z: 4}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2614095863033673403}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -41,15 +41,15 @@ GameObject:
   m_Component:
   - component: {fileID: 2614095863033673403}
   - component: {fileID: 6267414685674281640}
-  - component: {fileID: 3578195568965101081}
+  - component: {fileID: -5537427112232193646}
   - component: {fileID: 1970310610805977373}
   - component: {fileID: 3138199776794840757}
   - component: {fileID: 964252887607637339}
-  - component: {fileID: 8149024708097562625}
-  - component: {fileID: 3950095537606724021}
-  - component: {fileID: 4401660043213845751}
+  - component: {fileID: -6477047892044132563}
+  - component: {fileID: -6350030188441898904}
+  - component: {fileID: 5156754409828882777}
   m_Layer: 0
-  m_Name: Scuttle
+  m_Name: Chonky
   m_TagString: Vehicle
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -64,11 +64,11 @@ Transform:
   m_GameObject: {fileID: 5120608187766906454}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 5}
+  m_LocalPosition: {x: 0, y: 0, z: -4}
   m_LocalScale: {x: 0.5, y: 0.5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 1383125709855397745}
+  - {fileID: 4080205086938498475}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &6267414685674281640
@@ -83,25 +83,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8cc3f778eb7936e43bbe5a524e758f03, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  profile: {fileID: 11400000, guid: 7343449aa16af45f0940599fa5ece9fa, type: 2}
+  profile: {fileID: 11400000, guid: 95b113260e35b48afbf6575191140b15, type: 2}
   vehicleConfig: {fileID: 11400000, guid: 5eac3be187b634316af147683372ab22, type: 2}
-  capacity: 60
+  capacity: 90
   arcadeMaxSpeed: 14
   vehicleKeepClearRadiusCells: 1
   soulSprite: {fileID: 0}
   gravityVoidMask:
     serializedVersion: 2
     m_Bits: 512
-  energyLevel: 60
+  energyLevel: 90
   boosting: 0
-  trail: {fileID: 5973205746167519599, guid: ae1d684c553f50e4da4037ae2b6369fe, type: 3}
+  trail: {fileID: 5973205746167519599, guid: 070d68466c77cc24185568fa6b7bc036, type: 3}
   thrustClip: {fileID: 8300000, guid: babee597526a4d747940af2b291e0c61, type: 3}
   playerStatsUI: {fileID: 0}
   playerStats: {fileID: 0}
   rb: {fileID: 0}
   releaseCue: {fileID: 0}
-  noteCoreAnchor: {fileID: 1383125709855397745}
---- !u!114 &3578195568965101081
+  noteCoreAnchor: {fileID: 4080205086938498475}
+--- !u!114 &-5537427112232193646
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -162,12 +162,12 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 200
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 21300000, guid: 3fd1b8bb2f97d434da42e4b7d2d576ae, type: 3}
+  m_Sprite: {fileID: 21300000, guid: e59a5c71d467a4658abddbcb26fda1e2, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 0.9, y: 0.98}
+  m_Size: {x: 2.2, y: 1.5}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -185,7 +185,7 @@ Rigidbody2D:
   m_Simulated: 1
   m_UseFullKinematicContacts: 0
   m_UseAutoMass: 0
-  m_Mass: 1
+  m_Mass: 1.5
   m_LinearDamping: 0
   m_AngularDamping: 0
   m_GravityScale: 0
@@ -222,7 +222,7 @@ MonoBehaviour:
   explosionTint: {r: 1, g: 1, b: 1, a: 1}
   multiplyWithAuthoredColor: 1
   tintTrails: 1
---- !u!82 &8149024708097562625
+--- !u!82 &-6477047892044132563
 AudioSource:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -231,7 +231,7 @@ AudioSource:
   m_GameObject: {fileID: 5120608187766906454}
   m_Enabled: 1
   serializedVersion: 4
-  OutputAudioMixerGroup: {fileID: -854998193656957392, guid: 07985bf4f6d469340930e958ef313c14,
+  OutputAudioMixerGroup: {fileID: 5833623550140716882, guid: 07985bf4f6d469340930e958ef313c14,
     type: 2}
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 0}
@@ -320,7 +320,7 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
---- !u!114 &3950095537606724021
+--- !u!114 &-6350030188441898904
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -333,7 +333,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   effectsMixerGroup: {fileID: 0}
---- !u!60 &4401660043213845751
+--- !u!60 &5156754409828882777
 PolygonCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -371,43 +371,60 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 1.36, y: 1.23}
-    newSize: {x: 0.9, y: 0.98}
+    oldSize: {x: 2.2, y: 1.5}
+    newSize: {x: 2.2, y: 1.5}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
   m_Points:
     m_Paths:
-    - - {x: 0.17999999, y: -0.59499997}
-      - {x: 0.22, y: -0.615}
-      - {x: 0.59, y: -0.615}
-      - {x: 0.68, y: -0.515}
-      - {x: 0.68, y: -0.305}
-      - {x: 0.64, y: -0.16499999}
-      - {x: 0.32999998, y: 0.415}
-      - {x: 0.17, y: 0.615}
-      - {x: -0.14, y: 0.615}
-      - {x: -0.16, y: 0.60499996}
-      - {x: -0.34, y: 0.405}
-      - {x: -0.66999996, y: -0.235}
-      - {x: -0.68, y: -0.275}
-      - {x: -0.68, y: -0.515}
-      - {x: -0.57, y: -0.615}
-      - {x: -0.22, y: -0.615}
-      - {x: -0.17, y: -0.565}
-      - {x: -0.14999999, y: -0.475}
-      - {x: 0.12, y: -0.525}
-    - - {x: -0.089999996, y: -0.114999995}
-      - {x: -0.089999996, y: -0.105}
-      - {x: 0, y: 0.005}
-      - {x: 0.01, y: -0.015}
-      - {x: 0.049999997, y: -0.055}
-      - {x: 0.049999997, y: -0.065}
-      - {x: 0.08, y: -0.095}
-      - {x: 0.08, y: -0.105}
-      - {x: 0.12, y: -0.155}
-      - {x: 0.12, y: -0.175}
-      - {x: 0.13, y: -0.185}
-      - {x: -0.13, y: -0.175}
+    - - {x: -0.02, y: -0.56}
+      - {x: 0.17, y: -0.66999996}
+      - {x: 0.29999998, y: -0.74}
+      - {x: 0.38, y: -0.75}
+      - {x: 0.65999997, y: -0.75}
+      - {x: 0.74, y: -0.72999996}
+      - {x: 0.88, y: -0.65999997}
+      - {x: 1.0699999, y: -0.5}
+      - {x: 1.1, y: -0.37}
+      - {x: 1.1, y: 0.04}
+      - {x: 1.03, y: 0.19}
+      - {x: 0.96, y: 0.28}
+      - {x: 0.84999996, y: 0.38}
+      - {x: 0.65999997, y: 0.5}
+      - {x: 0.39999998, y: 0.63}
+      - {x: 0.06, y: 0.75}
+      - {x: -0.08, y: 0.75}
+      - {x: -0.11, y: 0.74}
+      - {x: -0.53, y: 0.58}
+      - {x: -0.83, y: 0.41}
+      - {x: -1.05, y: 0.19}
+      - {x: -1.1, y: 0.049999997}
+      - {x: -1.1, y: -0.37}
+      - {x: -1.06, y: -0.5}
+      - {x: -0.95, y: -0.61}
+      - {x: -0.74, y: -0.72999996}
+      - {x: -0.65999997, y: -0.75}
+      - {x: -0.38, y: -0.75}
+      - {x: -0.31, y: -0.72999996}
+      - {x: -0.14999999, y: -0.65999997}
+      - {x: -0.06, y: -0.59999996}
+    - - {x: -0.14999999, y: -0.089999996}
+      - {x: -0.16, y: -0.049999997}
+      - {x: -0.17, y: 0.04}
+      - {x: -0.16, y: 0.049999997}
+      - {x: -0.14, y: 0.11}
+      - {x: -0.099999994, y: 0.16}
+      - {x: -0.06, y: 0.17}
+      - {x: -0.049999997, y: 0.17999999}
+      - {x: 0.04, y: 0.17999999}
+      - {x: 0.11, y: 0.13}
+      - {x: 0.14999999, y: 0.06}
+      - {x: 0.14999999, y: -0.06}
+      - {x: 0.12, y: -0.11}
+      - {x: 0.089999996, y: -0.12}
+      - {x: 0.08, y: -0.13}
+      - {x: -0.089999996, y: -0.13}
+      - {x: -0.099999994, y: -0.12}
   m_UseDelaunayMesh: 1

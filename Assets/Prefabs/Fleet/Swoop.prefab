@@ -18,7 +18,7 @@ GameObject:
   - component: {fileID: 4257441000810657983}
   - component: {fileID: 3138199776794840757}
   m_Layer: 0
-  m_Name: X-agong
+  m_Name: Swoop
   m_TagString: Vehicle
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

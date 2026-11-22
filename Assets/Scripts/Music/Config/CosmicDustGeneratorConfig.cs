@@ -9,6 +9,25 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     [Tooltip("Sprite footprint relative to one grid cell. >1.0 = overlap with neighbours, blending the grid into a dustier cloud.")]
     [Range(0.8f, 1.6f)] public float dustFootprintMul = 1.4f;
 
+    [Header("Core / Haze (open-vs-closed legibility)")]
+    [Tooltip("Adds a dense 'core' particle layer to each dust cell, sized to the collider, under the overlapping " +
+             "'haze' bloom. Read when cells spawn — toggling mid-run only affects newly created cells.")]
+    public bool dustCoreEnabled = true;
+    [Tooltip("Side of the core's square emitter, in cells (1.0 = exactly the collider). Adjacent solid cores tile " +
+             "into a continuous field. The haze keeps dustFootprintMul.")]
+    [Range(0.5f, 1.3f)] public float dustCoreFootprintMul = 0.95f;
+    [Tooltip("Extra random offset per core particle, in cells. Lower = crisper corridor edge; higher = softer, " +
+             "but walls creep into corridors by about this much.")]
+    [Range(0f, 0.5f)] public float dustCoreScatter = 0.05f;
+    [Tooltip("Core particle diameter, in cells. Larger fills seams more but softens/extends wall edges by ~half this.")]
+    [Range(0.1f, 1.5f)] public float dustCoreParticleSize = 0.6f;
+    [Tooltip("Core emission rate relative to the haze's.")]
+    [Range(0f, 2f)] public float dustCoreEmissionMul = 0.6f;
+    [Tooltip("Core alpha relative to the cell's tint alpha.")]
+    [Range(0f, 2f)] public float dustCoreAlphaMul = 1f;
+    [Tooltip("Haze alpha relative to the cell's tint alpha (only when a core exists). Lower = clearer corridors, thinner bloom.")]
+    [Range(0f, 1f)] public float dustHazeAlphaMul = 0.4f;
+
     [Header("Spawn")]
     [Tooltip("Frame budget for initial maze spawn (milliseconds). Tune for target hardware.")]
     public float maxSpawnMillisPerFrame = 1.2f;
@@ -48,6 +67,13 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     public float zapFadeSeconds = 1.5f;
     [Tooltip("Sprite scale-out duration when a star drain clears a cell. Shorter = punchier.")]
     [Min(0.01f)] public float zapScaleOutSeconds = 0.12f;
+
+    [Header("Commit Tightening")]
+    [Min(0), Tooltip("Each committed note permanently clears one cell of that role's territory (the maze " +
+        "closes in as the song builds). Tightening stops for a role once its remaining live territory " +
+        "would fall below this many cells, so its PhaseStar can always still be fed. Keep it at or " +
+        "above the largest riff note count in any motif, plus a buffer.")]
+    public int commitClearMinTerritoryPerRole = 16;
 
     [Header("Cell Animation Timing")]
     [Tooltip("Per-cell grow/shrink/fade durations for regrow and vehicle-carve clears. " +

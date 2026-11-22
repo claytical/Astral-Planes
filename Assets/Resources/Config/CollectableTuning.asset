@@ -48,6 +48,7 @@ MonoBehaviour:
     trailIdleAlpha: 0.45
     trailReadyAlpha: 0.95
     trailAlphaLerp: 0.15
+    queueFullBounceImpulse: 2.5
   dustCollision:
     dustCollisionEnterImpulse: 0.75
     dustCollisionStayForce: 2
@@ -56,7 +57,7 @@ MonoBehaviour:
     blastRadius: 2
     drainMultiplier: 1
     edgeDamageFraction: 0.25
-    minFuseSeconds: 0.75
+    minFuseSeconds: 2
     earlyDetonationGraceSeconds: 0.25
     minPulseHz: 0.6
     maxPulseHz: 4
@@ -73,3 +74,6 @@ MonoBehaviour:
     telegraphPulseMin: 0.9
     knockbackImpulse: 6
     knockbackEdgeFraction: 0.2
+  arrivalFlight:
+    flightSaturation01: 0.15
+    landColorBloomSeconds: 0.3

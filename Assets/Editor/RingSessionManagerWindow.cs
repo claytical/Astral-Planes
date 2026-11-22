@@ -115,6 +115,8 @@ public class RingSessionManagerWindow : EditorWindow
         if (_library == null)
             EditorGUILayout.HelpBox("Resources/Phase Library not found; orphan detection and fixes are unavailable.", MessageType.Warning);
 
+        DrawAudioExportPanel();
+
         using (new EditorGUILayout.HorizontalScope())
         {
             using (new EditorGUILayout.VerticalScope(GUILayout.Width(position.width * 0.55f)))
@@ -150,6 +152,13 @@ public class RingSessionManagerWindow : EditorWindow
                     FixRows(_rows.Where(r => r.checkedForAction).ToList());
                 if (GUILayout.Button($"Delete Checked ({checkedCount})", EditorStyles.toolbarButton, GUILayout.Width(120)))
                     DeleteRows(_rows.Where(r => r.checkedForAction).ToList());
+                if (GUILayout.Button($"Export Art Checked ({checkedCount})", EditorStyles.toolbarButton, GUILayout.Width(140)))
+                    ExportArtForRows(_rows.Where(r => r.checkedForAction && r.snap != null).ToList());
+                if (GUILayout.Button($"Export MIDI Checked ({checkedCount})", EditorStyles.toolbarButton, GUILayout.Width(140)))
+                    ExportMidiForRows(_rows.Where(r => r.checkedForAction && r.snap != null).ToList());
+                using (new EditorGUI.DisabledScope(!CanExportAudio(out _)))
+                    if (GUILayout.Button($"Export Audio Checked ({checkedCount})", EditorStyles.toolbarButton, GUILayout.Width(145)))
+                        ExportAudioForRows(_rows.Where(r => r.checkedForAction && r.snap != null).ToList());
             }
         }
     }
@@ -217,6 +226,17 @@ public class RingSessionManagerWindow : EditorWindow
             if (GUILayout.Button("Reveal File")) EditorUtility.RevealInFinder(r.path);
             if (GUILayout.Button("Open File")) EditorUtility.OpenWithDefaultApp(r.path);
             if (GUILayout.Button("Delete")) DeleteRows(new List<Row> { r });
+        }
+        using (new EditorGUI.DisabledScope(r.snap == null))
+        {
+            if (GUILayout.Button($"Export Album Art ({RingAlbumArtRenderer.DefaultSize}×{RingAlbumArtRenderer.DefaultSize})…"))
+                ExportArtForRow(r);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("Export MIDI…")) ExportMidiForRow(r);
+                using (new EditorGUI.DisabledScope(!CanExportAudio(out _)))
+                    if (GUILayout.Button("Export Audio…")) ExportAudioForRows(new List<Row> { r });
+            }
         }
 
         if (r.snap == null)
@@ -402,6 +422,267 @@ public class RingSessionManagerWindow : EditorWindow
         File.WriteAllText(target, JsonUtility.ToJson(r.snap, true));
         if (!string.Equals(target, r.path, StringComparison.Ordinal)) File.Delete(r.path);
         return true;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Album art
+    // ---------------------------------------------------------------------------------------------
+
+    private const string ArtDirPrefKey = "AstralPlanes.RingSessionManager.AlbumArtDir";
+
+    private static string ArtDir
+    {
+        get => EditorPrefs.GetString(ArtDirPrefKey, Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+        set => EditorPrefs.SetString(ArtDirPrefKey, value);
+    }
+
+    // "{phase}_{motif} {Phase name} - {Motif name}", so a folder of exports sorts in play order.
+    private string ArtFileName(MotifSnapshot s) => ExportBaseName(s) + ".png";
+
+    private string ExportBaseName(MotifSnapshot s)
+    {
+        var phase = _library?.phases?.FirstOrDefault(p => p != null && p.phaseId == s.PhaseId);
+        var motif = phase?.motifs?.FirstOrDefault(m => m != null && m.motifId == s.MotifId);
+        string motifName = motif != null && !string.IsNullOrEmpty(motif.displayName) ? motif.displayName : s.MotifId;
+        string name = phase != null ? $"{phase.phaseName} - {motifName}" : motifName;
+        foreach (char c in Path.GetInvalidFileNameChars()) name = name.Replace(c, '-');
+        return $"{s.PhaseIndex}_{s.MotifIndex} {name}";
+    }
+
+    private void ExportArtForRow(Row r)
+    {
+        string path = EditorUtility.SaveFilePanel("Export Album Art", ArtDir, ArtFileName(r.snap), "png");
+        if (string.IsNullOrEmpty(path)) return;
+        ArtDir = Path.GetDirectoryName(path);
+
+        var png = RingAlbumArtRenderer.RenderPng(r.snap);
+        if (png == null) return;
+        File.WriteAllBytes(path, png);
+        Debug.Log($"[RingSessionManager] Exported album art to {path}");
+        EditorUtility.RevealInFinder(path);
+    }
+
+    private void ExportArtForRows(List<Row> rows)
+    {
+        if (rows.Count == 0) return;
+        string dir = EditorUtility.SaveFolderPanel("Export Album Art To Folder", ArtDir, "");
+        if (string.IsNullOrEmpty(dir)) return;
+        ArtDir = dir;
+
+        int exported = 0;
+        try
+        {
+            for (int i = 0; i < rows.Count; i++)
+            {
+                var r = rows[i];
+                string file = ArtFileName(r.snap);
+                if (EditorUtility.DisplayCancelableProgressBar("Exporting album art", file, i / (float)rows.Count)) break;
+                var png = RingAlbumArtRenderer.RenderPng(r.snap);
+                if (png == null) continue;
+                File.WriteAllBytes(Path.Combine(dir, file), png);
+                exported++;
+            }
+        }
+        finally { EditorUtility.ClearProgressBar(); }
+
+        Debug.Log($"[RingSessionManager] Exported {exported} album images to {dir}");
+        EditorUtility.RevealInFinder(dir);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // MIDI
+    // ---------------------------------------------------------------------------------------------
+
+    private const string MidiDirPrefKey = "AstralPlanes.RingSessionManager.MidiDir";
+
+    private static string MidiDir
+    {
+        get => EditorPrefs.GetString(MidiDirPrefKey, Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+        set => EditorPrefs.SetString(MidiDirPrefKey, value);
+    }
+
+    private void ExportMidiForRow(Row r)
+    {
+        string baseName = ExportBaseName(r.snap);
+        string path = EditorUtility.SaveFilePanel("Export MIDI", MidiDir, baseName + ".mid", "mid");
+        if (string.IsNullOrEmpty(path)) return;
+        MidiDir = Path.GetDirectoryName(path);
+        if (RingMidiExporter.Export(r.snap, _library, path, baseName))
+            EditorUtility.RevealInFinder(path);
+    }
+
+    private void ExportMidiForRows(List<Row> rows)
+    {
+        if (rows.Count == 0) return;
+        string dir = EditorUtility.SaveFolderPanel("Export MIDI To Folder", MidiDir, "");
+        if (string.IsNullOrEmpty(dir)) return;
+        MidiDir = dir;
+
+        int exported = 0;
+        foreach (var r in rows)
+        {
+            string baseName = ExportBaseName(r.snap);
+            if (RingMidiExporter.Export(r.snap, _library, Path.Combine(dir, baseName + ".mid"), baseName)) exported++;
+        }
+        Debug.Log($"[RingSessionManager] Exported {exported} of {rows.Count} MIDI files to {dir}");
+        EditorUtility.RevealInFinder(dir);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Audio (Play mode: captured live through the scene's RingPreviewPlayer)
+    // ---------------------------------------------------------------------------------------------
+
+    private const string AudioPrefPrefix = "AstralPlanes.RingSessionManager.Audio.";
+    private static string AudioDir
+    {
+        get => EditorPrefs.GetString(AudioPrefPrefix + "Dir", Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+        set => EditorPrefs.SetString(AudioPrefPrefix + "Dir", value);
+    }
+    private static int AudioLoops
+    {
+        get => EditorPrefs.GetInt(AudioPrefPrefix + "Loops", 4);
+        set => EditorPrefs.SetInt(AudioPrefPrefix + "Loops", value);
+    }
+    private static float AudioTail
+    {
+        get => EditorPrefs.GetFloat(AudioPrefPrefix + "Tail", 4f);
+        set => EditorPrefs.SetFloat(AudioPrefPrefix + "Tail", value);
+    }
+    private static bool AudioStems
+    {
+        get => EditorPrefs.GetBool(AudioPrefPrefix + "Stems", true);
+        set => EditorPrefs.SetBool(AudioPrefPrefix + "Stems", value);
+    }
+    private static bool AudioMp3
+    {
+        get => EditorPrefs.GetBool(AudioPrefPrefix + "Mp3", true);
+        set => EditorPrefs.SetBool(AudioPrefPrefix + "Mp3", value);
+    }
+    private static string LamePath
+    {
+        get => EditorPrefs.GetString(AudioPrefPrefix + "Lame", "/opt/homebrew/bin/lame");
+        set => EditorPrefs.SetString(AudioPrefPrefix + "Lame", value);
+    }
+
+    private bool _showAudioPanel;
+    private RingAudioExporter _exporter;
+    private float _exportProgress;
+    private string _exportLabel = "";
+
+    private bool ExportRunning => _exporter != null && _exporter.IsBusy;
+
+    private static RingPreviewPlayer FindPreviewPlayer() =>
+        Application.isPlaying ? UnityEngine.Object.FindAnyObjectByType<RingPreviewPlayer>() : null;
+
+    private bool CanExportAudio(out string reason)
+    {
+        if (!Application.isPlaying) { reason = "Enter Play mode in a scene with the PhaseLibraryCarousel to export audio."; return false; }
+        if (FindPreviewPlayer() == null) { reason = "No RingPreviewPlayer in the playing scene (it lives on the PhaseLibraryCarousel prefab)."; return false; }
+        if (ExportRunning) { reason = "An audio export is running."; return false; }
+        reason = null;
+        return true;
+    }
+
+    private void DrawAudioExportPanel()
+    {
+        if (ExportRunning)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                var rect = GUILayoutUtility.GetRect(10, 18, GUILayout.ExpandWidth(true));
+                EditorGUI.ProgressBar(rect, _exportProgress, $"Recording {_exportLabel}  ({_exportProgress:P0})");
+                if (GUILayout.Button("Cancel", GUILayout.Width(60))) _exporter.Cancel();
+            }
+            return;
+        }
+
+        _showAudioPanel = EditorGUILayout.Foldout(_showAudioPanel, "Audio export options", true);
+        if (!_showAudioPanel) return;
+
+        using (new EditorGUI.IndentLevelScope())
+        {
+            AudioLoops = Mathf.Clamp(EditorGUILayout.IntField("Loops", AudioLoops), 1, 64);
+            AudioTail  = Mathf.Clamp(EditorGUILayout.FloatField("Tail (sec)", AudioTail), 0f, 30f);
+            AudioStems = EditorGUILayout.Toggle("Per-role stems", AudioStems);
+            AudioMp3   = EditorGUILayout.Toggle("Also encode MP3 (mix)", AudioMp3);
+            if (AudioMp3)
+            {
+                LamePath = EditorGUILayout.TextField("lame path", LamePath);
+                if (!File.Exists(LamePath))
+                    EditorGUILayout.HelpBox("lame not found at that path; MP3s will be skipped.", MessageType.Warning);
+            }
+            if (!CanExportAudio(out var reason))
+                EditorGUILayout.HelpBox(reason, MessageType.Info);
+            else
+                EditorGUILayout.HelpBox("Audio is recorded in real time (loops × loop length + tail per ring). " +
+                                        "Other scene audio is muted while it runs; drums are off.", MessageType.None);
+        }
+    }
+
+    private void ExportAudioForRows(List<Row> rows)
+    {
+        if (rows.Count == 0 || !CanExportAudio(out _)) return;
+        string dir = EditorUtility.SaveFolderPanel("Export Audio To Folder", AudioDir, "");
+        if (string.IsNullOrEmpty(dir)) return;
+        AudioDir = dir;
+
+        var jobs = rows.Select(r => new RingAudioExporter.Job { snap = r.snap, baseName = ExportBaseName(r.snap) }).ToList();
+        bool mp3 = AudioMp3 && File.Exists(LamePath);
+        string lame = LamePath;
+
+        _exporter = RingAudioExporter.GetOrCreate();
+        void OnProgress(float f, string label) { _exportProgress = f; _exportLabel = label; Repaint(); }
+        void OnWav(string path)
+        {
+            // MP3 for the mix only; stems stay lossless for the DAW.
+            if (mp3 && Path.GetFileName(Path.GetDirectoryName(path)) != "Stems") EncodeMp3(lame, path);
+        }
+        void OnDone(int count)
+        {
+            _exporter.OnProgress   -= OnProgress;
+            _exporter.OnWavWritten -= OnWav;
+            _exporter.OnFinished   -= OnDone;
+            Debug.Log($"[RingSessionManager] Exported audio for {count} of {jobs.Count} rings to {dir}");
+            EditorUtility.RevealInFinder(dir);
+            Repaint();
+        }
+        _exporter.OnProgress   += OnProgress;
+        _exporter.OnWavWritten += OnWav;
+        _exporter.OnFinished   += OnDone;
+
+        _exporter.Begin(FindPreviewPlayer(), jobs, dir, new RingAudioExporter.Options
+        {
+            loops   = AudioLoops,
+            tailSec = AudioTail,
+            stems   = AudioStems,
+        });
+    }
+
+    private static void EncodeMp3(string lame, string wavPath)
+    {
+        string mp3Path = Path.ChangeExtension(wavPath, ".mp3");
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo(lame, $"--quiet -V0 \"{wavPath}\" \"{mp3Path}\"")
+            {
+                UseShellExecute = false,
+                CreateNoWindow  = true,
+            };
+            var proc = new System.Diagnostics.Process { StartInfo = psi, EnableRaisingEvents = true };
+            proc.Exited += (_, _) =>
+            {
+                if (proc.ExitCode == 0) Debug.Log($"[RingSessionManager] Encoded {mp3Path}");
+                else Debug.LogWarning($"[RingSessionManager] lame exited {proc.ExitCode} for {wavPath}");
+                proc.Dispose();
+            };
+            proc.Start();
+        }
+        catch (Exception e) { Debug.LogWarning($"[RingSessionManager] MP3 encode failed for {wavPath}: {e.Message}"); }
+    }
+
+    private void Update()
+    {
+        if (ExportRunning) Repaint();
     }
 
     private void DeleteRows(List<Row> rows)

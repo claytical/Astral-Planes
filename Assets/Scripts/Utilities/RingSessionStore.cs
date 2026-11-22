@@ -10,6 +10,15 @@ using UnityEngine;
 /// </summary>
 public static class RingSessionStore
 {
+    // Bump to wipe every ring saved by an older build (each ring carries its own stamp, so this
+    // survives Steam Cloud syncing individual files). 0 = rings saved before versioning existed.
+    //
+    // Steam Auto-Cloud (partner site, app 3598920) syncs RingSessions/ring_*.json from the
+    // WinAppDataLocalLow root, with Mac/Linux root overrides. Keep the folder name, file pattern
+    // and company/product names stable, or cloud saves stop matching. Writes go through a .tmp
+    // file (not matched by the pattern) so a crash mid-write never uploads a truncated ring.
+    public const int CurrentSaveVersion = 1;
+
     private static string SaveDirectory =>
         Application.persistentDataPath + "/RingSessions/";
 
@@ -21,10 +30,20 @@ public static class RingSessionStore
         if (!Directory.Exists(SaveDirectory))
             Directory.CreateDirectory(SaveDirectory);
 
+        snap.SaveVersion = CurrentSaveVersion;
         snap.SavedAtUtcTicks = DateTime.UtcNow.Ticks;
         string path = FilePath(snap.PhaseIndex, snap.MotifIndex);
-        File.WriteAllText(path, JsonUtility.ToJson(snap, true));
+        WriteAtomic(path, JsonUtility.ToJson(snap, true));
         if (GameFlowManager.VerboseLogging) Debug.Log($"[RingSessionStore] Saved → {path}");
+    }
+
+    // Write to a sibling .tmp, then swap it in, so the cloud-synced ring_*.json is never partial.
+    private static void WriteAtomic(string path, string contents)
+    {
+        string tmp = path + ".tmp";
+        File.WriteAllText(tmp, contents);
+        if (File.Exists(path)) File.Replace(tmp, path, null);
+        else File.Move(tmp, path);
     }
 
     public static List<MotifSnapshot> LoadAllRingsFromDisk()
@@ -32,9 +51,21 @@ public static class RingSessionStore
 #if UNITY_EDITOR
         string mockDir = Path.Combine(Application.streamingAssetsPath, "RingSessions");
         if (Directory.Exists(mockDir) && Directory.GetFiles(mockDir, "ring_*.json").Length > 0)
-            return LoadFromDirectory(mockDir);
+            return LoadFromDirectory(mockDir, enforceVersion: false); // never delete mock rings
 #endif
-        return LoadFromDirectory(SaveDirectory);
+        return LoadFromDirectory(SaveDirectory, enforceVersion: true);
+    }
+
+    /// <summary>Deletes every saved ring (Settings → Reset All Progress). Deletes files, not the
+    /// folder, so Steam Auto-Cloud sees per-file deletions and propagates them on clean exit.</summary>
+    public static void DeleteAll()
+    {
+        if (Directory.Exists(SaveDirectory))
+        {
+            foreach (var file in Directory.GetFiles(SaveDirectory, "ring_*.json")) File.Delete(file);
+            foreach (var file in Directory.GetFiles(SaveDirectory, "ring_*.json.tmp")) File.Delete(file);
+        }
+        Debug.Log($"[RingSessionStore] Deleted all rings in {SaveDirectory}");
     }
 
     private static PhaseLibrary _migrationLibrary;
@@ -69,7 +100,7 @@ public static class RingSessionStore
         return false;
     }
 
-    private static List<MotifSnapshot> LoadFromDirectory(string dir)
+    private static List<MotifSnapshot> LoadFromDirectory(string dir, bool enforceVersion)
     {
         var result = new List<MotifSnapshot>();
         if (!Directory.Exists(dir)) return result;
@@ -81,6 +112,15 @@ public static class RingSessionStore
             try
             {
                 var snap = JsonUtility.FromJson<MotifSnapshot>(File.ReadAllText(file));
+                if (snap == null) continue;
+
+                // Migration: rings from an older save format are wiped, not converted.
+                if (enforceVersion && snap.SaveVersion < CurrentSaveVersion)
+                {
+                    File.Delete(file);
+                    Debug.Log($"[RingSessionStore] Discarded v{snap.SaveVersion} save (current v{CurrentSaveVersion}): {file}");
+                    continue;
+                }
 
                 // One-time migration: legacy rings predate PhaseId. Backfill it from the
                 // *current* PhaseLibrary while PhaseIndex is still trustworthy (i.e. before
@@ -92,7 +132,7 @@ public static class RingSessionStore
                     if (!string.IsNullOrEmpty(resolvedId))
                     {
                         snap.PhaseId = resolvedId;
-                        File.WriteAllText(file, JsonUtility.ToJson(snap, true));
+                        WriteAtomic(file, JsonUtility.ToJson(snap, true));
                         if (GameFlowManager.VerboseLogging)
                             Debug.Log($"[RingSessionStore] Migrated {file}: backfilled PhaseId={resolvedId}");
                     }

@@ -216,6 +216,9 @@ public partial class GameFlowManager : MonoBehaviour
         // on this persistent object. QuitToSelection nulls the scene refs they use, so stop them
         // first instead of letting them resume against torn-down state.
         AbortSessionCoroutines();
+        // Start fading any wisp bridge sample now rather than after players are torn down
+        // (TransitionToScene also does this as the catch-all for every scene load).
+        Wisp.FadeOutActiveBridgeSamples(0.25f);
         _quitRoutine = StartCoroutine(QuitToSelectionRoutine());
     }
 
