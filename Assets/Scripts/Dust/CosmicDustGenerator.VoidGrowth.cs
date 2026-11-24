@@ -18,6 +18,8 @@ public partial class CosmicDustGenerator
         int maxCellsThisCall = -1,
         int innerRadiusCellsExclusive = -1)
     {
+        // Motif done (record ready) or bridging: the field doesn't grow.
+        if (_regrowthSuppressed) return 0;
         EnsureCellGrid();
         _imprints.EnsureAllocated(2048);
 

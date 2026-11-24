@@ -209,8 +209,8 @@ public partial class CosmicDustGenerator
         return Mathf.Max(1, Mathf.CeilToInt(widest / cellWorld));
     }
 
-    // Seed = first active ship; targets = the other ships, every on-screen PhaseStar, live notes
-    // and queued note destinations. Stars matter: a walled-off star can dead-end the motif.
+    // Seed = first active ship; targets = the other ships, every on-screen PhaseStar, the record
+    // vault's mouth, live notes and queued note destinations. Stars matter: a walled-off star can dead-end the motif.
     private bool GatherReachSeedsAndTargets()
     {
         _reachSeeds.Clear();
@@ -234,6 +234,9 @@ public partial class CosmicDustGenerator
             var sc = drums.WorldToGridPosition(star.transform.position);
             if (IsInBounds(sc)) _reachTargets.Add(sc);
         }
+
+        // The record vault's mouth: the only way in to the record.
+        AddRecordVaultReachTargets(_reachTargets);
 
         var tracks = gfm.controller != null ? gfm.controller.tracks : null;
         if (tracks != null)

@@ -173,6 +173,8 @@ public sealed partial class StarPool
             {
                 _remainingEjectionsTotal = Mathf.Max(0, _remainingEjectionsTotal - 1);
                 if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] Harvest complete — remainingHarvests={_remainingEjectionsTotal}");
+                // Placeholder rings and record gates follow this count (not captures).
+                GameFlowManager.Instance?.OnMotifHarvestCounted(track, _remainingEjectionsTotal);
 
                 // Budget is committed at eject time, so stars for every dusty role may still
                 // be live when the last harvest lands. CheckBridgeGate requires no live stars —

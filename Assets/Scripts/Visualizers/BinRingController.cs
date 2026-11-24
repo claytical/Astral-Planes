@@ -39,10 +39,7 @@ public class BinRingController : MonoBehaviour
         if (_tracks != null)
             foreach (var t in _tracks)
                 if (t != null)
-                {
                     t.OnBinFilled += OnBinFilled;
-                    t.OnCollectableBurstCleared += OnCollectableBurstCleared;
-                }
     }
 
     void OnDestroy() => Teardown();
@@ -55,10 +52,7 @@ public class BinRingController : MonoBehaviour
         {
             foreach (var t in _tracks)
                 if (t != null)
-                {
                     t.OnBinFilled -= OnBinFilled;
-                    t.OnCollectableBurstCleared -= OnCollectableBurstCleared;
-                }
             _tracks = null;
         }
     }
@@ -127,24 +121,6 @@ public class BinRingController : MonoBehaviour
         GameFlowManager.Instance?.FocusRecordForRing(track.DisplayColor);
     }
 
-    // Fires once the last Collectable of a burst is resolved — placed (hadNotes)
-    // or discarded/lost (!hadNotes) — synchronously after OnBinFilled when the burst
-    // completed normally, so the remaining-progress rings animate in alongside the
-    // completion ring rather than at spawn time.
-    private void OnCollectableBurstCleared(InstrumentTrack track, int burstId, bool hadNotes)
-    {
-        if (!hadNotes) return; // no notes committed — nothing changed, nothing to show
-
-        if (_ringApplicator == null)
-            _ringApplicator = GameFlowManager.Instance?.GetMotifRingGlyphApplicator();
-        if (_ringApplicator == null) return;
-
-        var motif    = GameFlowManager.Instance?.phaseTransitionManager?.currentMotif;
-        int total    = Mathf.Max(1, motif?.nodesPerStar ?? 1);
-        int captured = _drumTrack != null && _drumTrack._starPool != null
-            ? _drumTrack._starPool.NodesCapturedThisMotif : 0;
-        int remaining = Mathf.Max(0, total - captured);
-
-        _ringApplicator.SetRemainingProgressRings(remaining);
-    }
+    // Placeholder rings after each harvest: GameFlowManager.OnMotifHarvestCounted (from StarPool),
+    // so they read the same harvest budget as the record's gates and the motif's completion.
 }

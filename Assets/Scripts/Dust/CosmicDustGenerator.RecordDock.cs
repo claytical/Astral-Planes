@@ -39,6 +39,7 @@ public partial class CosmicDustGenerator
     private readonly List<List<Vector2Int>> _vaultGates    = new List<List<Vector2Int>>(); // outermost first
     private readonly HashSet<Vector2Int>    _vaultGuarded  = new HashSet<Vector2Int>();    // walls + unopened gates
     private readonly List<Vector2Int>       _vaultScratch  = new List<Vector2Int>();
+    private readonly List<Vector2Int>       _vaultMouth    = new List<Vector2Int>();    // open cells at the channel's outer end
     private int       _vaultGatesOpened;
     private Color     _vaultGateTint = new Color(0.62f, 0.62f, 0.66f, 1f);
     private Coroutine _vaultRepairRoutine;
@@ -85,7 +86,19 @@ public partial class CosmicDustGenerator
         _vaultWalls.Clear();
         _vaultGates.Clear();
         _vaultGuarded.Clear();
+        _vaultMouth.Clear();
         _vaultGatesOpened = 0;
+    }
+
+    /// <summary>
+    /// Reach target for the role-wall watchdog (GatherReachSeedsAndTargets): while the vault stands,
+    /// the channel's mouth must stay reachable, so a Cosmic Block wall can never seal the only way
+    /// to the record (CarveDoorways leaves a doorway; EnsureTargetsReachable opens one).
+    /// </summary>
+    private void AddRecordVaultReachTargets(List<Vector2Int> targets)
+    {
+        if (!HasRecordVault || !IsRecordVaultSealed || _vaultMouth.Count == 0) return;
+        targets.Add(_vaultMouth[_vaultMouth.Count / 2]);
     }
 
     private void StopVaultRepair()
@@ -143,6 +156,7 @@ public partial class CosmicDustGenerator
         if (gateCount > 0)
         {
             foreach (var c in layout.Mouth) DespawnDustAtAndMarkPermanent(c); // the gates' outer face is open
+            _vaultMouth.AddRange(layout.Mouth);
             BuildVault(layout);
         }
         HasRecordVault    = true;
@@ -210,6 +224,7 @@ public partial class CosmicDustGenerator
         foreach (var c in layout.Interior) DespawnDustAtAndMarkPermanent(c);
         foreach (var c in layout.Mouth)    DespawnDustAtAndMarkPermanent(c);
         _vaultInterior.UnionWith(layout.Interior);
+        _vaultMouth.AddRange(layout.Mouth);
         if (layout.Gates.Count > 0 || layout.Walls.Count > 0) BuildVault(layout);
         HasRecordVault    = true;
         RecordVaultCenter = layout.Center;

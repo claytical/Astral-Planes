@@ -203,8 +203,9 @@ public partial class GameFlowManager
 
     /// <summary>
     /// A ring was recorded (BinRingController.OnBinFilled): spotlight the docked record while its
-    /// notes land, then pull back and open the next gate in <paramref name="ringColor"/>. Rings
-    /// recorded during a spotlight extend it, and their gates open together at the end.
+    /// notes land, then pull back and open whatever gates were earned meanwhile. Rings recorded
+    /// during a spotlight extend it, and their gates open together at the end.
+    /// Gates are counted by harvest, not here (<see cref="OnMotifHarvestCounted"/>).
     /// </summary>
     public void FocusRecordForRing(Color ringColor)
     {
@@ -212,18 +213,38 @@ public partial class GameFlowManager
         var rings = GetMotifRingGlyphApplicator();
         if (rings == null || !rings.IsDocked) return;
 
-        QueueGatesForRing(ringColor);
         if (_ringFocusRoutine == null)
             _ringFocusRoutine = StartCoroutine(RingFocusRoutine(rings));
     }
 
-    // One gate per ring when the channel has a gate per ring; otherwise rings share gates evenly.
-    private void QueueGatesForRing(Color ringColor)
+    /// <summary>
+    /// StarPool counted a harvest (a burst that put notes in a loop): the one number the record's
+    /// placeholders, its gates and the motif's completion all read. <paramref name="remaining"/> is
+    /// the harvest budget left after this one.
+    /// </summary>
+    public void OnMotifHarvestCounted(InstrumentTrack track, int remaining)
+    {
+        remaining = Mathf.Max(0, remaining);
+        var rings = GetMotifRingGlyphApplicator();
+        if (rings != null) rings.SetRemainingProgressRings(remaining);
+
+        if (!CanUseRecordRecovery || RecordReady || rings == null || !rings.IsDocked) return;
+        int total = Mathf.Max(1, phaseTransitionManager?.currentMotif?.nodesPerStar ?? _recordRingsTotal);
+        QueueGatesForRing(track != null ? track.DisplayColor : recordGateTint, total - remaining, total);
+        // Normally the ring's spotlight (FocusRecordForRing) is already running and opens these
+        // when it pulls back; a harvest without a new ring gets its own.
+        if (_ringFocusRoutine == null)
+            _ringFocusRoutine = StartCoroutine(RingFocusRoutine(rings));
+    }
+
+    // One gate per harvest when the channel has a gate per harvest; otherwise harvests share gates evenly.
+    private void QueueGatesForRing(Color ringColor, int harvested, int total)
     {
         if (dustGenerator == null) return;
         int gates = dustGenerator.RecordGateCount;
         if (gates <= 0) return;
-        _recordRingsRecorded++;
+        _recordRingsTotal    = total;
+        _recordRingsRecorded = Mathf.Clamp(harvested, 0, total);
         int target = _recordRingsRecorded >= _recordRingsTotal
             ? gates
             : Mathf.FloorToInt((float)_recordRingsRecorded * gates / Mathf.Max(1, _recordRingsTotal));
@@ -297,6 +318,10 @@ public partial class GameFlowManager
         // The route to the record must be open: role walls stop here (CosmicBlockField also
         // refuses new walls while RecordReady).
         dustGenerator.BlockField?.ReleaseAll();
+        // The motif is done: the field stops growing. Pending regrowth is dropped, half-grown
+        // cells fade out, and nothing regrows behind the ships on the way to the record. The
+        // next motif's start resumes it (SceneFlowCoordinator → ResumeRegrowthAfterBridge).
+        dustGenerator.HardStopRegrowthForBridge(hideTransientDust: true);
 
         OnRecordReady?.Invoke();
         _recordReadyRoutine = StartCoroutine(RecordReadyRoutine(rings, who));
