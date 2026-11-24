@@ -383,8 +383,8 @@ public partial class Collectable
             if (_cam == null) _cam = Camera.main;
             if (_cam == null) return;
             const float pad = 0.4f;
-            mn = (Vector2)_cam.ViewportToWorldPoint(Vector3.zero) + new Vector2(pad, pad);
-            mx = (Vector2)_cam.ViewportToWorldPoint(Vector3.one) - new Vector2(pad, pad);
+            mn = (Vector2)GameplayFrame.ViewportToWorld(Vector2.zero) + new Vector2(pad, pad); // unzoomed frame
+            mx = (Vector2)GameplayFrame.ViewportToWorld(Vector2.one) - new Vector2(pad, pad);
         }
 
         Vector2 pos = _rb.position;

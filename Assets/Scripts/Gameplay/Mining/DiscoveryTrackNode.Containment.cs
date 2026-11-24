@@ -41,8 +41,8 @@ public partial class DiscoveryTrackNode
 
         const float pad = 0.5f;
         Vector2 pos  = _rb.position;
-        Vector2 minB = _cam.ViewportToWorldPoint(new Vector3(0f, 0f, 0f));
-        Vector2 maxB = _cam.ViewportToWorldPoint(new Vector3(1f, 1f, 0f));
+        Vector2 minB = GameplayFrame.ViewportToWorld(Vector2.zero); // unzoomed frame
+        Vector2 maxB = GameplayFrame.ViewportToWorld(Vector2.one);
         bool hit = false;
 
         if (clampX)

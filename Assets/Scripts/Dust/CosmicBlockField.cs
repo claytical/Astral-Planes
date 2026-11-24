@@ -98,13 +98,14 @@ public class CosmicBlockField : MonoBehaviour
         Gen?.ReleaseRoleBlock();
     }
 
-    // True from the moment the motif bridge begins until the next motif starts.
+    // True from the moment the motif is complete (record docking, then the bridge) until the
+    // next motif starts. No new walls while the players head for the record.
     private static bool BridgeActive
     {
         get
         {
             var gfm = GameFlowManager.Instance;
-            return gfm != null && (gfm.BridgePending || gfm.GhostCycleInProgress);
+            return gfm != null && (gfm.BridgePending || gfm.GhostCycleInProgress || gfm.RecordReady);
         }
     }
 

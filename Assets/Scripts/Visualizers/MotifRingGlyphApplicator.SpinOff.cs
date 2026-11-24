@@ -90,6 +90,7 @@ public partial class MotifRingGlyphApplicator
         DestroyList(_remainingRings);
         _gameplayFadingOut       = false;
         _superNodeMode           = false;
+        _docked                  = false;
         _pendingDeformationCount = 0;
         transform.localScale     = Vector3.zero;
         transform.rotation       = Quaternion.identity;

@@ -129,6 +129,7 @@ public partial class CosmicDustGenerator
         // Safety net: no Cosmic Block may survive into a new maze. Normally they already reverted
         // with the departing record (CosmicBlockField) / HardStopRegrowthForBridge.
         ReleaseRoleBlock();
+        ResetRecordVault(); // the record's dock/vault belongs to the old maze
 
         try
         {
@@ -1022,7 +1023,14 @@ public partial class CosmicDustGenerator
             }
         }
 
+        const int starHoleRadiusCells    = 3;
+        const int vehicleHoleRadiusCells = 2;
+
+        // The record's vault comes first; the maze is laid out around it (RecordDock.cs).
+        bool vaultPlanned = PlanRecordVaultForMaze(starCell, vehicleCells, reserved, starHoleRadiusCells, vehicleHoleRadiusCells);
+
         var mazeResult = BuildMazeGrowthFromConfig(_activeMazePattern, starCell, reserved);
+        if (vaultPlanned) mazeResult.RemoveAll(e => IsRecordVaultCell(e.grid));
         if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] maze cell count={mazeResult.Count} ring cell count={preinjectCount}");
         LogMazeDiag("built", starCell, w, h, mazeResult.Count, preinjectCount);
 
@@ -1033,6 +1041,10 @@ public partial class CosmicDustGenerator
         yield return BuildMazeRoleImprintsRoutine(starCell, mazeResult);
 
         cellsToFill.AddRange(mazeResult);
+        if (vaultPlanned) cellsToFill.RemoveAll(e => IsRecordVaultCell(e.grid));
+
+        // Vault walls and the docked record appear first; the maze then grows in around them.
+        BuildPlannedRecordVault();
 
         float spawnDuration = Mathf.Clamp(totalSpawnDuration, 0.05f, 3.0f);
         if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] StaggeredGrowthFitDuration with spawnDuration={spawnDuration}");
@@ -1052,9 +1064,6 @@ public partial class CosmicDustGenerator
         EnterRuntimeVoidOnlyDustCreationMode();
         _spawnRoutine = null;
         LogMazeDiag("grown", starCell, w, h, mazeResult.Count, preinjectCount);
-
-        const int starHoleRadiusCells    = 3;
-        const int vehicleHoleRadiusCells = 2;
 
         CarvePermanentDisk(starCell, starHoleRadiusCells);
         if (vehicleCells != null)

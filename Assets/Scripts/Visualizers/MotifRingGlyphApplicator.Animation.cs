@@ -39,15 +39,21 @@ public partial class MotifRingGlyphApplicator
         PlayShake(config.denialShakeDuration, config.denialShakeAmplitude, config.denialShakeFrequency);
     }
 
+    // Resting localPosition the shake offsets from. Captured when no shake is running, so a shake
+    // restarted mid-way doesn't adopt the previous shake's offset. (The stack can rest anywhere:
+    // the play-area fit and the record dock both set its world position.)
+    private Vector3 _shakeBase;
+
     private void PlayShake(float duration, float amplitude, float frequency)
     {
         if (_shakeCoroutine != null) StopCoroutine(_shakeCoroutine);
+        else _shakeBase = transform.localPosition;
         _shakeCoroutine = StartCoroutine(ShakeRoutine(duration, amplitude, frequency));
     }
 
-    // Drives transform.localPosition. The only other writer is ClearGameplayRings, which resets it to
-    // zero after killing this coroutine, so this can't fight the show/hide (localScale), play-area
-    // fit (world position) or spin-off exit (rotation) coroutines that own the other transform fields.
+    // Drives transform.localPosition as an offset from _shakeBase. ClearGameplayRings resets it to
+    // zero after killing this coroutine. Shakes don't run while the record is moving (play-area fit
+    // and dock moves set world position between shakes, not during them).
     private IEnumerator ShakeRoutine(float duration, float amplitude, float frequency)
     {
         float t = 0f;
@@ -57,10 +63,10 @@ public partial class MotifRingGlyphApplicator
             float decay   = 1f - (t / duration);
             float offsetX = (Mathf.PerlinNoise(Time.time * frequency, 0f) - 0.5f) * 2f * amplitude * decay;
             float offsetY = (Mathf.PerlinNoise(0f, Time.time * frequency) - 0.5f) * 2f * amplitude * decay;
-            transform.localPosition = new Vector3(offsetX, offsetY, 0f);
+            transform.localPosition = _shakeBase + new Vector3(offsetX, offsetY, 0f);
             yield return null;
         }
-        transform.localPosition = Vector3.zero;
+        transform.localPosition = _shakeBase;
         _shakeCoroutine = null;
     }
 

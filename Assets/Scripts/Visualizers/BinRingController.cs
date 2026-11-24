@@ -122,6 +122,9 @@ public class BinRingController : MonoBehaviour
 
         _ringApplicator.BeginBinRingDeformation(
             binIndex, notes, totalSteps, track, track.assignedRole, track.DisplayColor);
+
+        // Co-op/solo: the camera zooms in on the docked record while this ring's notes land.
+        GameFlowManager.Instance?.FocusRecordForRing(track.DisplayColor);
     }
 
     // Fires once the last Collectable of a burst is resolved — placed (hadNotes)

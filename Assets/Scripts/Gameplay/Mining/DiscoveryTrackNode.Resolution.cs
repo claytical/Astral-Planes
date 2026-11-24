@@ -96,9 +96,10 @@ public partial class DiscoveryTrackNode
         if (_cam == null) _cam = Camera.main;
         if (_cam != null)
         {
-            float halfH = _cam.orthographicSize;
-            float halfW = halfH * _cam.aspect;
-            Vector2 camPos = _cam.transform.position;
+            // Unzoomed gameplay frame, so a presentation zoom doesn't count as "off-screen".
+            float halfH = GameplayFrame.HalfHeight;
+            float halfW = GameplayFrame.HalfWidth;
+            Vector2 camPos = GameplayFrame.Center;
 
             bool outsideX = worldPos.x < camPos.x - halfW - radius || worldPos.x > camPos.x + halfW + radius;
             bool outsideY = worldPos.y < camPos.y - halfH - radius || worldPos.y > camPos.y + halfH + radius;

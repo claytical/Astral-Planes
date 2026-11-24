@@ -299,4 +299,17 @@ public class RingGlyphConfig : ScriptableObject
              "(ordinary/path-choice motif transitions, where the new maze is already fully generated " +
              "by the time the record reappears).")]
     public float recordFadeOutDuration = 0.75f;
+
+    // Record recovery (MotifRingGlyphApplicator.Dock.cs): when the motif completes, the finished
+    // record is shown full-size, then shrinks and moves to its dock spot to be collected.
+    [Header("Record Dock (collection)")]
+    [Tooltip("The innermost placeholder ring (the next ring to record) pulses between remainingRingColor " +
+             "and this. Neutral on purpose: a ring only takes a role color once it is recorded.")]
+    public Color nextUpHighlightColor = new Color(0.95f, 0.95f, 1f, 1f);
+
+    [Tooltip("Seconds the finished record stays shown full-size before it shrinks to its dock spot.")]
+    public float dockHoldDuration = 1.0f;
+
+    [Tooltip("Seconds the finished record takes to shrink and move to its dock spot.")]
+    public float dockMoveDuration = 1.2f;
 }

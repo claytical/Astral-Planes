@@ -265,6 +265,9 @@ public partial class GameFlowManager : MonoBehaviour
         InstrumentTrackController itc = FindAnyObjectByType<InstrumentTrackController>(); 
         NoteVisualizer visualizer = FindAnyObjectByType<NoteVisualizer>();
 
+        // Out of energy while heading for a docked record: the run ends with it uncollected.
+        ResetRecordRecovery();
+
         // Before BeginGameOverFade: it stretches every loop note to 1920 ticks, which would
         // corrupt the unfinished record TrackFinished plays back.
         BridgeFlow?.CaptureUnfinishedSnapshot();

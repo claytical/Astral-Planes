@@ -459,7 +459,7 @@ public partial class MotifRingGlyphApplicator
         // Hide the stack after deformation — only when all concurrent deformations are done
         // and we are not in spin-off or SuperNode mode. Runs as its own coroutine so a newly
         // started bin's deformation can cancel it outright (see BeginBinRingDeformation).
-        if (!_superNodeMode && !_gameplayFadingOut && !_spinOffPending
+        if (!_superNodeMode && !_gameplayFadingOut && !HoldVisible
             && _pendingDeformationCount == 0)
         {
             _gameplayHideCoroutine = StartCoroutine(HideGameplayRingStackAfterLoopBoundary());
@@ -483,7 +483,7 @@ public partial class MotifRingGlyphApplicator
             try
             {
                 while (!boundaryHit && !_superNodeMode && !_gameplayFadingOut
-                       && !_spinOffPending && _pendingDeformationCount == 0)
+                       && !HoldVisible && _pendingDeformationCount == 0)
                     yield return null;
             }
             finally
@@ -492,7 +492,7 @@ public partial class MotifRingGlyphApplicator
             }
         }
 
-        if (_superNodeMode || _gameplayFadingOut || _spinOffPending
+        if (_superNodeMode || _gameplayFadingOut || HoldVisible
             || _pendingDeformationCount != 0)
         {
             _gameplayHideCoroutine = null;
@@ -502,13 +502,13 @@ public partial class MotifRingGlyphApplicator
         float dur          = config != null ? config.scaleDownDuration : 0.5f;
         Vector3 startScale = transform.localScale;
         float elapsed      = 0f;
-        while (elapsed < dur && !_gameplayFadingOut && !_spinOffPending && _pendingDeformationCount == 0)
+        while (elapsed < dur && !_gameplayFadingOut && !HoldVisible && _pendingDeformationCount == 0)
         {
             elapsed += Time.deltaTime;
             transform.localScale = Vector3.Lerp(startScale, Vector3.zero, elapsed / dur);
             yield return null;
         }
-        if (!_gameplayFadingOut && !_spinOffPending && _pendingDeformationCount == 0)
+        if (!_gameplayFadingOut && !HoldVisible && _pendingDeformationCount == 0)
         {
             transform.localScale = Vector3.zero;
             // A zero-scaled stack is invisible — its collider would otherwise collapse to a
@@ -567,15 +567,14 @@ public partial class MotifRingGlyphApplicator
         UpdateBackgroundDiscRadii(_gameplayRings.Count, totalRingCount);
         PhaseVehiclesInsideRing();
 
-        // Innermost not-yet-filled ring previews the motif's active role palette instead of
-        // staying flat gray — static if the motif has one role, cycling if it has several.
-        // Rebuilt every call, so completing a bin naturally hands the lerp off to the new
-        // frontmost placeholder ring.
+        // Innermost not-yet-filled ring is the next slot: it pulses between placeholder gray and a
+        // neutral highlight. Never a role color — a ring takes its color only once recorded, so the
+        // player assembles the record from whatever music they choose. Rebuilt every call, so
+        // completing a bin hands the pulse to the new frontmost placeholder.
         if (_remainingRings.Count > 0)
         {
-            var motif  = GameFlowManager.Instance?.phaseTransitionManager?.currentMotif;
-            var colors = motif?.GetActiveRoleColors();
-            _nextUpColorCoroutine = StartCoroutine(AnimateNextUpRingColorCycle(_remainingRings[0], colors));
+            var pulse = new List<Color> { config.remainingRingColor, config.nextUpHighlightColor };
+            _nextUpColorCoroutine = StartCoroutine(AnimateNextUpRingColorCycle(_remainingRings[0], pulse));
         }
     }
 
@@ -623,6 +622,8 @@ public partial class MotifRingGlyphApplicator
         _gameplayFadingOut       = false;
         _superNodeMode           = false;
         _spinOffPending          = false;
+        _docked                  = false;
+        _dockMoving              = false;
         _pendingDeformationCount = 0;
         _pendingRingNotes.Clear();
         DestroyList(_gameplayRings);

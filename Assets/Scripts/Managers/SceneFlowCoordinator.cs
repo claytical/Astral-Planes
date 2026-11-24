@@ -253,10 +253,9 @@ public sealed class SceneFlowCoordinator
         var banner = ShowMotifNameBanner();
         if (banner != null) yield return banner;
 
-        var binRings = _gameFlow.GetBinRingController();
-        if (binRings != null) binRings.ShowInitialRecord();
-        yield return new WaitForSeconds(binRings != null ? binRings.GetRecordHoldDuration(RecordHoldDurationFallback) : RecordHoldDurationFallback);
-        if (binRings != null) binRings.FadeInitialRecordOut();
+        // Co-op/solo: the record appears trapped in its vault in the field and the camera zooms in
+        // on it, then out (GameFlowManager.IntroduceRecord). Competitive: full-size, hold, fade.
+        yield return _gameFlow.IntroduceRecord();
     }
 
     public void HandleTrackFinishedSceneSetup()
@@ -289,6 +288,7 @@ public sealed class SceneFlowCoordinator
         }
 
         _bridge.ClearSessionMotifs();
+        _gameFlow.ResetRecordRecovery();
 
         float hardTimeout = 8f;
         float startTime = Time.time;
@@ -343,13 +343,17 @@ public sealed class SceneFlowCoordinator
         _gameFlow.dustGenerator.ManualStart();
         _gameFlow.SetupBinRingController();
 
-        // Very first motif of the session: show the record immediately, in darkness,
-        // before the maze exists. Hold at full opacity so the player registers it,
-        // then it fades out concurrently with the maze growing in (see the
-        // FadeInitialRecordOut call right before StartNextPhaseMazeAndStar below).
-        var firstMotifBinRings = _gameFlow.GetBinRingController();
-        if (firstMotifBinRings != null) firstMotifBinRings.ShowInitialRecord();
-        yield return new WaitForSeconds(firstMotifBinRings != null ? firstMotifBinRings.GetRecordHoldDuration(RecordHoldDurationFallback) : RecordHoldDurationFallback);
+        // Very first motif of the session. Competitive: show the record immediately, in darkness,
+        // before the maze exists, hold, then fade it while the maze grows in (below), as before.
+        // Co-op/solo: nothing yet — the record appears in its vault once the maze exists and the
+        // camera zooms in on it (IntroduceRecord, after StartNextPhaseMazeAndStar).
+        bool dockIntro = _session == null || !_session.IsCompetitive;
+        if (!dockIntro)
+        {
+            var firstMotifBinRings = _gameFlow.GetBinRingController();
+            if (firstMotifBinRings != null) firstMotifBinRings.ShowInitialRecord();
+            yield return new WaitForSeconds(firstMotifBinRings != null ? firstMotifBinRings.GetRecordHoldDuration(RecordHoldDurationFallback) : RecordHoldDurationFallback);
+        }
 
         foreach (var lp in _session.Players)
             if (lp != null) lp.Launch();
@@ -359,9 +363,13 @@ public sealed class SceneFlowCoordinator
         if (_gameFlow.phaseTransitionManager.currentMotif != null)
             _gameFlow.harmony.SetActiveProfile(_gameFlow.phaseTransitionManager.currentMotif.chordProgression, true);
 
-        var ringsToFade = _gameFlow.GetBinRingController();
-        if (ringsToFade != null) ringsToFade.FadeInitialRecordOut(MazeSpawnDuration);
+        if (!dockIntro)
+        {
+            var ringsToFade = _gameFlow.GetBinRingController();
+            if (ringsToFade != null) ringsToFade.FadeInitialRecordOut(MazeSpawnDuration);
+        }
         yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
+        if (dockIntro) _gameFlow.StartCoroutine(_gameFlow.IntroduceRecord());
         // Drums start only now (record hold + maze growth are silent) so bar 1 step 0 is
         // where play begins, not partway through the first loop.
         _gameFlow.activeDrumTrack.BeginMotifTransport("GFM/Setup");
@@ -752,14 +760,14 @@ public sealed class SceneFlowCoordinator
         {
             case BoundaryWrap.BoundarySide.Left:
                 if (boundaries != null && boundaries.leftBoundary != null) return boundaries.leftBoundary.bounds.max.x;
-                return cam != null ? -cam.orthographicSize * cam.aspect : (float?)null;
+                return cam != null ? GameplayFrame.Center.x - GameplayFrame.HalfWidth : (float?)null;
             case BoundaryWrap.BoundarySide.Right:
                 if (boundaries != null && boundaries.rightBoundary != null) return boundaries.rightBoundary.bounds.min.x;
-                return cam != null ? cam.orthographicSize * cam.aspect : (float?)null;
+                return cam != null ? GameplayFrame.Center.x + GameplayFrame.HalfWidth : (float?)null;
             case BoundaryWrap.BoundarySide.Top:
-                return cam != null ? cam.transform.position.y + cam.orthographicSize : (float?)null;
+                return cam != null ? GameplayFrame.Center.y + GameplayFrame.HalfHeight : (float?)null;
             default: // Bottom
-                return cam != null ? cam.transform.position.y - cam.orthographicSize : (float?)null;
+                return cam != null ? GameplayFrame.Center.y - GameplayFrame.HalfHeight : (float?)null;
         }
     }
 

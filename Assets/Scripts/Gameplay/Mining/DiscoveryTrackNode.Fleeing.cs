@@ -83,7 +83,7 @@ public partial class DiscoveryTrackNode
         {
             // Play area unavailable: fall back to camera geometry (no gap check possible).
             if (_cam == null) _cam = Camera.main;
-            if (_cam != null && CanEscapeFromWorldPos(posNow, _cam.orthographicSize * _cam.aspect, 2f))
+            if (_cam != null && CanEscapeFromWorldPos(posNow, GameplayFrame.HalfWidth, 2f))
             {
                 HandleEscape();
                 return;

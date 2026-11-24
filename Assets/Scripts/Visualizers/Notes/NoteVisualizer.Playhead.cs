@@ -16,6 +16,14 @@ public partial class NoteVisualizer
 
         Vector3 now = playheadParticles.transform.position;
 
+        // The playhead rides the HUD, so a camera zoom (CameraZoomDirector) sweeps it through the
+        // world: emitting then would draw a stray line. Pause and reseed until the camera is home.
+        if (CameraZoomDirector.CameraAway)
+        {
+            _hasLastPlayheadParticleWorldPos = false;
+            return;
+        }
+
         // First frame after enable/reset: just seed the position.
         if (!_hasLastPlayheadParticleWorldPos)
         {

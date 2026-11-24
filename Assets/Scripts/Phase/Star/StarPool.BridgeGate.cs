@@ -93,8 +93,10 @@ public sealed partial class StarPool
             return;
         }
 
-        if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] CheckBridgeGate: PASS remainingTotal=0 captured={_nodesCapturedThisMotif} — triggering bridge.");
-        gfm.BeginMotifBridge("StarPool");
+        if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] CheckBridgeGate: PASS remainingTotal=0 captured={_nodesCapturedThisMotif} — motif complete.");
+        // Co-op/solo: the record docks and the bridge waits for a ship to collect it.
+        // Competitive: bridges immediately (GameFlowManager.RecordRecovery.cs).
+        gfm.OnMotifHarvestComplete("StarPool");
     }
 
     private bool AllTracksEmpty()

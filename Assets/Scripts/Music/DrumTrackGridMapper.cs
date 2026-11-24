@@ -70,8 +70,9 @@ public sealed class DrumTrackGridMapper
         if (cam == null) return false;
 
         // Prefer orthographic projection (your game is 2D). If not orthographic, fall back to viewport corners.
-        float halfH = cam.orthographicSize;
-        float halfW = halfH * cam.aspect;
+        // Unzoomed gameplay frame (a presentation zoom must not move the grid).
+        float halfH = GameplayFrame.HalfHeight;
+        float halfW = GameplayFrame.HalfWidth;
         float left, right, bottom, top;
         float z = cam.orthographic ? 0f : Mathf.Abs(cam.transform.position.z);
 
@@ -200,6 +201,9 @@ public sealed class DrumTrackGridMapper
         if (_gfm() == null || _spawnGrid() == null) return false;
         // 1) Spawn-grid occupancy (nodes, notes, etc.)
         if (!_spawnGrid().IsCellAvailable(x, y))
+            return false;
+        // 1b) Never inside the record's vault (sealed until the motif completes).
+        if (_dust() != null && _dust().IsRecordVaultCell(new Vector2Int(x, y)))
             return false;
         // 2) Dust blocks spawning (your decision 8A: no spawning inside dust)
         if (_dust() != null && _dust().HasDustAt(new Vector2Int(x, y)))
@@ -503,9 +507,8 @@ public sealed class DrumTrackGridMapper
             return 0f;
         }
 
-        float z          = -cam.transform.position.z;
-        Vector3 bottomLeft = cam.ViewportToWorldPoint(new Vector3(0f, 0f, z));
-        Vector3 topRight   = cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
+        Vector3 bottomLeft = GameplayFrame.ViewportToWorld(Vector2.zero); // unzoomed frame
+        Vector3 topRight   = GameplayFrame.ViewportToWorld(Vector2.one);
         var config = _config();
         return (topRight.x - config.gridPadding) - (bottomLeft.x + config.gridPadding);
     }

@@ -324,6 +324,8 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
     private void RefreshPlayAreaFit(int ringCount, float? actualOuterRadiusOverride = null)
     {
         if (config == null || ringCount == 0) return;
+        // Docked in the field: keep the outer edge at the dock radius instead of filling the play area.
+        if (_docked) { FitDocked(ringCount, actualOuterRadiusOverride); return; }
 
         var gfm = GameFlowManager.Instance;
         if (gfm?.activeDrumTrack != null && gfm.activeDrumTrack.TryGetPlayAreaWorld(out var area))

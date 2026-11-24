@@ -9,6 +9,7 @@ public partial class CosmicDustGenerator
         // star zap/burrow, bombs, SuperNode) funnels through here. Teardown reverts them first
         // (ReleaseRoleBlock) — see CosmicDustGenerator.Blocks.cs.
         if (HasCellFlag(gp, CellFlags.RoleBlocked)) return;
+        if (IsSealedVaultShell(gp)) return; // the record's vault wall (RecordDock.cs)
         if (!TryGetCellState(gp, out var st)) return;
         if (st == DustCellState.Empty || st == DustCellState.Clearing || st == DustCellState.PendingRegrow) {
             // Optionally refresh regrow timer even if already empty.
@@ -152,6 +153,7 @@ public partial class CosmicDustGenerator
     {
         if (!IsInBounds(cell)) return;
         if (IsBlockAt(cell)) return; // Cosmic Block: never drained, never held
+        if (IsSealedVaultShell(cell)) return;
         if (!TryGetCellState(cell, out var st) || st != DustCellState.Solid) return;
 
         SetCellFlag(cell, CellFlags.ZapForceGray);
@@ -195,6 +197,7 @@ public partial class CosmicDustGenerator
         {
             var cell = _roleSweepScratch[i];
             if (IsBlockAt(cell)) continue; // Cosmic Block: not swept, not held
+            if (IsSealedVaultShell(cell)) continue;
             SetCellFlag(cell, CellFlags.ZapForceGray);
             var req = new DustClearRequest(DustInteractionMode.Zap, DustClearMode.FadeAndHide, config.zapFadeSeconds, false, DustClearSource.TrackFilled, -1f, true);
             ClearCellByInteraction(cell, req);
@@ -209,6 +212,7 @@ public partial class CosmicDustGenerator
         // DespawnDustAt no-ops on cells already in _permanentClearCells (its own idempotency
         // guard for repeat calls), so it must run BEFORE this cell is added to that set — not
         // after — or the actual hide/collider-disable/state-clear work never happens.
+        if (IsSealedVaultShell(gridPos)) return;
         DespawnDustAt(gridPos);
         _permanentClearCells.Add(gridPos);
         _regrow?.CancelRegrow(gridPos);
@@ -325,6 +329,7 @@ public partial class CosmicDustGenerator
     {
         if (_permanentClearCells.Contains(gridPos)) return;
         if (IsBlockAt(gridPos)) return; // Cosmic Block: indestructible
+        if (IsSealedVaultShell(gridPos)) return;
 
         // Immediate logical clear (no fade). This is used for hard removals
         // (eg. collectable pockets) where we want topology open immediately.

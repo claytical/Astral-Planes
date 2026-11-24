@@ -412,9 +412,9 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         if (_cam == null) _cam = Camera.main;
         if (_cam == null) return Vector2.zero;
 
-        const float z = 0f;
-        var min = (Vector2)_cam.ViewportToWorldPoint(new Vector3(0f, 0f, z));
-        var max = (Vector2)_cam.ViewportToWorldPoint(new Vector3(1f, 1f, z));
+        // Unzoomed gameplay frame — a presentation zoom must not squeeze stars (GameplayFrame).
+        var min = (Vector2)GameplayFrame.ViewportToWorld(Vector2.zero);
+        var max = (Vector2)GameplayFrame.ViewportToWorld(Vector2.one);
 
         float margin = bounds.screenPadding + 1.5f;
         Vector2 push = Vector2.zero;
@@ -439,9 +439,8 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         if (_cam == null) _cam = Camera.main;
         if (_cam == null || _rb == null) return;
 
-        const float z = 0f;
-        Vector2 min = (Vector2)_cam.ViewportToWorldPoint(new Vector3(0f, 0f, z)) + Vector2.one * bounds.screenPadding;
-        Vector2 max = (Vector2)_cam.ViewportToWorldPoint(new Vector3(1f, 1f, z)) - Vector2.one * bounds.screenPadding;
+        Vector2 min = (Vector2)GameplayFrame.ViewportToWorld(Vector2.zero) + Vector2.one * bounds.screenPadding;
+        Vector2 max = (Vector2)GameplayFrame.ViewportToWorld(Vector2.one) - Vector2.one * bounds.screenPadding;
 
         Vector2 pos = _rb.position;
 

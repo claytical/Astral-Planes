@@ -377,6 +377,8 @@ public sealed class InstrumentTrackCompositionSpawner
             if (!Collectable.IsCellFreeStatic(gp)) return true;
             // Never inside a Cosmic Block (an indestructible wall).
             if (dustGen != null && dustGen.IsBlockAt(gp)) return true;
+            // Never inside the record's vault (sealed until the motif completes).
+            if (dustGen != null && dustGen.IsRecordVaultCell(gp)) return true;
             Vector2 wp = (Vector2)drumTrack.GridToWorldPosition(gp);
             return Physics2D.OverlapBox(wp, halfExtents * 2f, 0f, spawnBlockedMask) != null;
         }

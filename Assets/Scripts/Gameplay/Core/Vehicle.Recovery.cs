@@ -156,7 +156,8 @@ public partial class Vehicle
     var cam = Camera.main;
     if (cam == null) return false;
 
-    Vector3 vp = cam.WorldToViewportPoint(transform.position);
+    // Unzoomed gameplay frame: a presentation zoom must never trigger recovery.
+    Vector3 vp = GameplayFrame.WorldToViewport(transform.position);
 
     // If behind camera (z < 0), treat as OOB.
     if (vp.z < 0f) return true;

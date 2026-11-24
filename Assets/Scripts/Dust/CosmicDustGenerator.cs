@@ -921,7 +921,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         var cam = Camera.main;
         if (!cam) return true; // don't cull if camera not ready
 
-        Vector3 viewport = cam.WorldToViewportPoint(worldPos);
+        Vector3 viewport = GameplayFrame.WorldToViewport(worldPos); // unzoomed frame
 
         // NEW: if point is behind/at camera plane, don't trust x/y.
         if (viewport.z <= 0.001f) return false;

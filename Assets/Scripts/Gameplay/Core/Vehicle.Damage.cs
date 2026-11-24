@@ -76,7 +76,14 @@ public partial class Vehicle
         }
 
         var ringApplicator = coll.gameObject.GetComponent<MotifRingGlyphApplicator>();
-        if (ringApplicator != null)
+        var gfmForRecord = GameFlowManager.Instance;
+        if (ringApplicator != null && ringApplicator.IsDocked && gfmForRecord != null && gfmForRecord.RecordReady)
+        {
+            // Record recovery: the finished record is waiting to be collected. Any touch collects it
+            // (once it's collectable); no tether breaks or denial shake on a finished record.
+            gfmForRecord.TryCollectRecord(this);
+        }
+        else if (ringApplicator != null)
         {
             // Only a deliberate hit breaks a note: boosting, or a hard enough impact.
             // relativeVelocity is the pre-solve impact speed (rb.linearVelocity is already post-bounce here).
