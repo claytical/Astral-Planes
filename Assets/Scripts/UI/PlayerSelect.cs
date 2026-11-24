@@ -203,6 +203,28 @@ public class PlayerSelect : MonoBehaviour
         group.alpha = confirmedAlpha;
     }
 
+    [Tooltip("Panel alpha at the end of a hold-to-leave (the moment the player leaves).")]
+    [Range(0f, 1f)] public float leaveHoldMinAlpha = 0.1f;
+
+    private CanvasGroup _leaveGroup;
+
+    /// <summary>
+    /// In-world cue while the player holds Back to leave a multiplayer session: the whole panel
+    /// fades toward leaveHoldMinAlpha as the hold fills (0 = untouched, 1 = about to leave).
+    /// Multiplies with the confirmed-icon dim, which lives on a child CanvasGroup.
+    /// </summary>
+    public void SetLeaveProgress(float t01)
+    {
+        if (_leaveGroup == null)
+        {
+            if (t01 <= 0f) return;
+            _leaveGroup = GetComponent<CanvasGroup>();
+            if (_leaveGroup == null) _leaveGroup = gameObject.AddComponent<CanvasGroup>();
+        }
+        float eased = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t01));
+        _leaveGroup.alpha = Mathf.Lerp(1f, leaveHoldMinAlpha, eased);
+    }
+
     /// <summary>Inverse of Confirm(): returns to the groove-style stage with the full (undimmed) selection UI.</summary>
     public void Unconfirm()
     {

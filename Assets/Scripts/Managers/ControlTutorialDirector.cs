@@ -13,8 +13,7 @@ public partial class ControlTutorialDirector : MonoBehaviour
         Hidden,
         PressAnyAuto,
         JoinSouth,
-        TutorialSequenceTimed,
-        TutorialSequenceInputGated
+        Sandbox      // GeneratedTrack control sandbox: ControlSandboxDirector drives the panel
     }
 
     [Header("Primary (global)")]
@@ -27,9 +26,6 @@ public partial class ControlTutorialDirector : MonoBehaviour
     [Header("Primary behavior")]
     [SerializeField, Min(0.1f)] private float pressAnyStepSeconds = 1.0f;
     [SerializeField] private bool pressAnyLoop = true;
-
-    [SerializeField, Min(0.1f)] private float tutorialStepSeconds = 1.2f; // Drift -> Boost -> Charge timing
-    [SerializeField] private bool useInputGatedTutorial = true;
 
     [SerializeField] private Vector3 primaryFullScale    = Vector3.one;
     [SerializeField] private Vector3 primaryCompactScale = new Vector3(0.5f, 0.5f, 1f);
@@ -207,8 +203,7 @@ public partial class ControlTutorialDirector : MonoBehaviour
         primaryInstance.gameObject.SetActive(true);
 
         primaryInstance.transform.localScale =
-            (_desiredMode == PrimaryMode.TutorialSequenceTimed ||
-             _desiredMode == PrimaryMode.TutorialSequenceInputGated ||
+            (_desiredMode == PrimaryMode.Sandbox ||
              _desiredMode == PrimaryMode.JoinSouth)
                 ? primaryFullScale
                 : primaryCompactScale;
@@ -238,42 +233,11 @@ public partial class ControlTutorialDirector : MonoBehaviour
                 );
                 break;
 
-            case PrimaryMode.TutorialSequenceTimed:
+            case PrimaryMode.Sandbox:
+                // ControlSandboxDirector owns the panel from here (BeginSandboxPanel).
                 primaryInstance.SetVisible(true);
-                _primaryTutorialRunning = true;
-                primaryInstance.StartTimedTutorial(stepSeconds: tutorialStepSeconds, immediateFirst: true);
-                break;
-
-            case PrimaryMode.TutorialSequenceInputGated:
-                primaryInstance.SetVisible(true);
-                _primaryTutorialRunning = true;
-                primaryInstance.StartInputGatedTutorial(BuildInputGatedPredicates(), immediateFirst: true);
                 break;
         }
-    }
-
-    private Func<bool>[] BuildInputGatedPredicates()
-    {
-        var sequence = primaryInstance ? primaryInstance.TutorialSequence : null;
-        if (sequence == null || sequence.Length == 0) return Array.Empty<Func<bool>>();
-
-        var players = _tutorialPlayers;
-        var predicates = new Func<bool>[sequence.Length];
-        for (int i = 0; i < sequence.Length; i++)
-        {
-            var instr = sequence[i];
-            predicates[i] = instr switch
-            {
-                ControlTutorialHighlight.Instruction.Drift =>
-                    () => players.Any(p => p && p.GetMoveInput().magnitude > 0.35f),
-                ControlTutorialHighlight.Instruction.Boost =>
-                    () => players.Any(p => p && p.GetMoveInput().magnitude > 0.35f && p.GetThrustInput() > 0.35f),
-                ControlTutorialHighlight.Instruction.Release =>
-                    () => players.Any(p => p && p.GetChooseInput()),
-                _ => () => true
-            };
-        }
-        return predicates;
     }
 
     // ======================================================================
@@ -324,6 +288,7 @@ public partial class ControlTutorialDirector : MonoBehaviour
         if (!lp || !mini) return;
 
         _mini[lp] = mini;
+        mini.SetControllerContext(lp.PrimaryGamepad()); // per-player Nintendo A/B swap
 
         // If caller provided a parent override, re-parent now (for precise UI alignment).
         if (parentOverride)
@@ -371,49 +336,39 @@ public partial class ControlTutorialDirector : MonoBehaviour
     // ======================================================================
     // Primary tutorial gating
     // ======================================================================
-    /// Called when all players confirmed in TrackSelection.
-    public void BeginPrimaryTutorialSequence()
+    /// <summary>
+    /// GeneratedTrack control sandbox: hands the primary panel to ControlSandboxDirector, which
+    /// presents/docks it per command. Live stick/trigger input from <paramref name="players"/> keeps
+    /// flowing into it every frame (Update). Returns null if the scene has no panel.
+    /// </summary>
+    public ControlTutorialHighlight BeginSandboxPanel(IEnumerable<LocalPlayer> players,
+        float dockScale, float dockMargin, float dockLerpSpeed, RectTransform avoidRect)
     {
-        SendToAllMinis(m => m.Clear(immediate: true, hideText: true));
-        // Tutorial participants are the joined players. (Previously derived from the per-player
-        // minis, which are no longer created during ship select; an empty list left every
-        // input-gated step unsatisfiable.)
         _tutorialPlayers = new List<LocalPlayer>();
-        var sessionPlayers = GameFlowManager.Instance != null && GameFlowManager.Instance.SessionState != null
-            ? GameFlowManager.Instance.SessionState.Players : null;
-        if (sessionPlayers != null)
-            foreach (var lp in sessionPlayers)
+        if (players != null)
+            foreach (var lp in players)
                 if (lp) _tutorialPlayers.Add(lp);
 
-        // The confirmed-ship dim is only for the pre-tutorial wait; the tutorial owns the screen.
-        if (Hangar.Instance != null) Hangar.Instance.SetSelectionVisible(false);
-
-        // "Place" (south button) is only relevant if someone manually releases notes.
-        // Skip it when every player chose Cozy Co-Pilot (Auto).
-        if (primaryInstance)
-        {
-            bool needsPlace = _tutorialPlayers.Count == 0
-                              || _tutorialPlayers.Any(p => p.PlacementMethod == NotePlacementMethod.Manual);
-            primaryInstance.ConfigureSequence(includeRelease: needsPlace);
-        }
-
-        _desiredMode = useInputGatedTutorial
-            ? PrimaryMode.TutorialSequenceInputGated
-            : PrimaryMode.TutorialSequenceTimed;
-
+        _desiredMode = PrimaryMode.Sandbox;
         _primaryTutorialRunning = true;
         ApplyDesiredPrimaryMode();
+        if (!primaryInstance) return null;
+
+        primaryInstance.BeginSandbox(dockScale, dockMargin, dockLerpSpeed, avoidRect);
+        return primaryInstance;
     }
 
-    /// Compatibility method: if something still calls this, it will attempt to step manually.
-    /// With timed tutorial, this is normally unnecessary, but it won’t break anything.
-    /// Called by input to skip the current step's wait and advance immediately.
-    public void SkipCurrentTutorialStep()
+    /// <summary>Ends the control sandbox. <paramref name="completed"/> = played through (not skipped/aborted).</summary>
+    public void EndSandboxPanel(bool completed)
     {
-        if (!_primaryTutorialRunning || !primaryInstance) return;
-        primaryInstance.SkipCurrentTimedStep();
+        bool wasRunning = _desiredMode == PrimaryMode.Sandbox;
+        _primaryTutorialRunning = false;
+        _desiredMode = PrimaryMode.Hidden;
+        _tutorialPlayers.Clear();
+        if (primaryInstance) primaryInstance.EndSandbox(immediate: false);
+        if (wasRunning && completed) OnTutorialCompleted?.Invoke();
     }
-    
+
     public void HidePrimary()
     {
         _desiredMode = PrimaryMode.Hidden;
@@ -451,13 +406,9 @@ public partial class ControlTutorialDirector : MonoBehaviour
 
     private void HandlePrimaryTutorialFinished()
     {
-        OnTutorialCompleted?.Invoke();
+        // The control lesson now runs as the GeneratedTrack sandbox (EndSandboxPanel), which
+        // never raises OnTutorialFinished; this only tidies up if some other mode ends a sequence.
         _primaryTutorialRunning = false;
-
-        // Hide primary and proceed
         if (primaryInstance) primaryInstance.HideAndClear(immediate: true);
-
-        if (GameFlowManager.Instance != null)
-            GameFlowManager.Instance.BeginGameAfterTutorial();
     }
 }

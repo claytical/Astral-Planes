@@ -67,14 +67,17 @@ public partial class LocalPlayer
 
     private IEnumerator HoldToLeaveSelectRoutine()
     {
+        // The panel fading out with the hold is the cue that this is leaving, not just undoing.
         float t = 0f;
         while (t < HoldToLeaveSelectSeconds)
         {
             t += Time.unscaledDeltaTime;
+            _selection?.SetLeaveProgress(t / HoldToLeaveSelectSeconds);
             yield return null;
         }
         _leaveSelectHoldCo = null;
         LeaveShipSelect();
+        _selection?.SetLeaveProgress(0f); // only still here if LeaveShipSelect's guards refused
     }
 
     private void HandleLeaveReleased()
@@ -83,6 +86,7 @@ public partial class LocalPlayer
         {
             StopCoroutine(_leaveSelectHoldCo);
             _leaveSelectHoldCo = null;
+            _selection?.SetLeaveProgress(0f); // released early: panel snaps back
         }
 
         if (_leaveHoldCo == null) return;

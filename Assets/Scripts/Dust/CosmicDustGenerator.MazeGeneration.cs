@@ -931,6 +931,30 @@ public partial class CosmicDustGenerator
             _imprints.SetHiddenRole(cell, newVoice.role, newVoice.voiceIndex);
     }
 
+    // TEMP DIAGNOSTIC (control-sandbox "only the border grew" report): one line per maze build,
+    // always on, tallying why interior cells were vetoed and how many ended up Solid. Remove
+    // once the cause is found.
+    private void LogMazeDiag(string phase, Vector2Int starCell, int w, int h, int mazeCount, int preinject)
+    {
+        int solid = 0, spawnOccupied = 0, permClear = 0, keepClear = 0, dustThere = 0, voidGrow = 0;
+        var grid = _gfm != null ? _gfm.spawnGrid : null;
+        for (int x = 0; x < w; x++)
+        for (int y = 0; y < h; y++)
+        {
+            var c = new Vector2Int(x, y);
+            if (HasDustAt(c)) { solid++; dustThere++; }
+            if (grid != null && !grid.IsCellAvailable(x, y)) spawnOccupied++;
+            if (_permanentClearCells.Contains(c)) permClear++;
+            if (IsKeepClearCell(c)) keepClear++;
+            if (HasCellFlag(c, CellFlags.VoidGrow)) voidGrow++;
+        }
+        Debug.Log($"[MAZE:DIAG] {phase} motif='{phaseTransitionManager?.currentMotif?.name}' " +
+                  $"pattern='{_activeMazePattern?.name}' type={_activeMazePattern?.patternType} grid={w}x{h} star={starCell} " +
+                  $"busy={(_densitySnapshot != null ? _densitySnapshot.MotifBusyness01 : -1f):F2} mazeCells={mazeCount} preinject={preinject} " +
+                  $"solid={solid} spawnGridOccupied={spawnOccupied} permClear={permClear} keepClear={keepClear} voidGrow={voidGrow} " +
+                  $"sandbox={GameFlowManager.SandboxActive} bridge={_gfm?.BridgePending} rootActive={(activeDustRoot != null && activeDustRoot.gameObject.activeInHierarchy)}");
+    }
+
     public void ResetMazeGenerationFlag()
     {
         _mazeAlreadyGenerated = false;
@@ -1000,6 +1024,7 @@ public partial class CosmicDustGenerator
 
         var mazeResult = BuildMazeGrowthFromConfig(_activeMazePattern, starCell, reserved);
         if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] maze cell count={mazeResult.Count} ring cell count={preinjectCount}");
+        LogMazeDiag("built", starCell, w, h, mazeResult.Count, preinjectCount);
 
         _mazePatternCells = new HashSet<Vector2Int>(mazeResult.Count);
         foreach (var (cell, _) in mazeResult)
@@ -1026,6 +1051,7 @@ public partial class CosmicDustGenerator
         yield return _spawnRoutine;
         EnterRuntimeVoidOnlyDustCreationMode();
         _spawnRoutine = null;
+        LogMazeDiag("grown", starCell, w, h, mazeResult.Count, preinjectCount);
 
         const int starHoleRadiusCells    = 3;
         const int vehicleHoleRadiusCells = 2;

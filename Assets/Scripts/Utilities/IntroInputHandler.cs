@@ -13,11 +13,10 @@ public class IntroInputHandler : MonoBehaviour
     {
         if (inputReceived || !context.performed) return;
 
-        // East is reserved for "back" everywhere else in the game (see LocalPlayer.LeaveFlow.cs /
-        // TrackSelectionJoinController) — don't let it also skip the intro. On some HID layouts
-        // (e.g. Switch Pro) the default UI/Submit binding maps to buttonEast, so this must be
-        // filtered here rather than relying on the binding itself.
-        if (context.control != null && context.control.name == "buttonEast") return;
+        // The back button (East; South on a native Switch Pro, see PadSemantics) is reserved for
+        // "back" everywhere else in the game (LocalPlayer.LeaveFlow.cs /
+        // TrackSelectionJoinController) — don't let it also skip the intro.
+        if (PadSemantics.IsBackControl(context.control)) return;
 
         // The settings panel (Select/View button) can be open over this same title screen —
         // a Choose/South press meant to confirm a button in that panel must not also register

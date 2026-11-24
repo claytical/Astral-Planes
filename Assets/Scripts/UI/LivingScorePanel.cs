@@ -40,14 +40,11 @@ public class LivingScorePanel : MonoBehaviour
     private void OnDisable() => IsAwaitingChoice = false;
 
     // The scene's EventSystem resolves gamepad Submit/Cancel through Unity's built-in default UI
-    // actions, which bind them to the semantic */{Submit} and */{Cancel} composites rather than
-    // raw buttonSouth/buttonEast — Unity resolves those per controller layout, and for a Switch
-    // controller that follows Nintendo's own (physically swapped) confirm/back convention. That
-    // makes South never reach a Button's OnClick here, while every other confirm action in this
-    // game is hard-bound to raw buttonSouth via AstralPlanes.inputactions' "Choose" action and
-    // stays consistent across controllers. So LocalPlayer.HandleConfirm calls this directly off
-    // that same "Choose" press instead of relying on the EventSystem's own Submit routing —
-    // Navigate (stick/d-pad), unaffected by the Submit/Cancel remap, still moves the selection.
+    // actions (*/{Submit}, */{Cancel} usages), not through this game's "Choose" action. The game
+    // now follows Nintendo's A-confirms convention on Switch everywhere (PadSemantics), so the
+    // two agree on every controller, but LocalPlayer.HandleConfirm still calls this directly off
+    // the "Choose" press so confirmation never depends on the EventSystem's Submit routing.
+    // Navigate (stick/d-pad) still moves the selection.
     public static void ConfirmCurrentSelection()
     {
         var selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;

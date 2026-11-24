@@ -64,12 +64,10 @@ public partial class GameFlowManager
 
     public void CheckAllPlayersReady()
     {
+        // The control lesson is no longer a TrackSelection screen: everyone ready -> GeneratedTrack,
+        // which opens in the control sandbox (ControlSandboxDirector) before the first motif.
         SessionState.CheckAllPlayersReady(
-            beginTutorial: () =>
-            {
-                if (GameFlowManager.VerboseLogging) Debug.Log("[TUTORIAL] Begin Tutorial Sequence");
-                ControlTutorialDirector.Instance.BeginPrimaryTutorialSequence();
-            },
+            beginTutorial: BeginGameAfterTutorial,
             beginGameplay: BeginGameAfterTutorial);
     }
 
@@ -80,8 +78,21 @@ public partial class GameFlowManager
         CheckAllPlayersReady();
     }
 
+    /// <summary>
+    /// Set when leaving TrackSelection for a new session; consumed by
+    /// SceneFlowCoordinator.HandleTrackSceneSetupAsync, which then opens in the control sandbox.
+    /// </summary>
+    public bool RunControlSandbox { get; set; }
+
+    /// <summary>True while the GeneratedTrack control sandbox is running (before its path is taken).</summary>
+    public static bool SandboxActive { get; set; }
+
     public void BeginGameAfterTutorial()
     {
+        RunControlSandbox = true;
+        // Raised now, not when the sandbox starts: NarratedTutorialController starts on scene load
+        // (before setup reaches the sandbox) and would otherwise see phase 0 and begin narrating.
+        SandboxActive = true;
         SessionGenome.BootNewSessionSeed((int)Random.Range(0, 1000f));
         StartCoroutine(SceneFlow.TransitionToScene("GeneratedTrack"));
     }

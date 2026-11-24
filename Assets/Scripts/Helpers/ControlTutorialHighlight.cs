@@ -154,6 +154,7 @@ public partial class ControlTutorialHighlight : MonoBehaviour
     private void OnDisable()
     {
         StopAllModes();
+        RestoreSandboxPoseIfPending();
     }
 
     private void Update()

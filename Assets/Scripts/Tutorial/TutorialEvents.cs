@@ -8,6 +8,7 @@ using UnityEngine;
 public static class TutorialEvents
 {
     public static event Action CellCarvedByVehicle;
+    public static event Action<MusicalRole> RoleCellCarvedByVehicle; // same carve, with the cell's (revealed) role
     public static event Action TentacleAppeared;
     public static event Action<Transform> StarArmed;            // the armed star's transform
     public static event Action StarPoked;
@@ -24,6 +25,7 @@ public static class TutorialEvents
     public static event Action<Vehicle> OutOfEnergyRescued;     // tutorial motif: a vehicle hit 0 energy and was refilled instead of dying
 
     public static void RaiseCellCarvedByVehicle() => CellCarvedByVehicle?.Invoke();
+    public static void RaiseRoleCellCarvedByVehicle(MusicalRole role) => RoleCellCarvedByVehicle?.Invoke(role);
     public static void RaiseTentacleAppeared()    => TentacleAppeared?.Invoke();
     public static void RaiseStarArmed(Transform star) => StarArmed?.Invoke(star);
     public static void RaiseStarPoked()           => StarPoked?.Invoke();

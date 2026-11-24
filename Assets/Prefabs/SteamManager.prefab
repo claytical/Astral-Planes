@@ -73,7 +73,8 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   manifestRelativePath: steam_input/in_game_actions.vdf
-  actionSetName: Play
+  actionSetName: Game
+  driveGameplay: 1
 --- !u!114 &1479241644495446003
 MonoBehaviour:
   m_ObjectHideFlags: 0

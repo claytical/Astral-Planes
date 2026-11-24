@@ -63,6 +63,9 @@ public partial class LocalPlayer
 
     public bool GetChooseInput() => _confirmAction?.IsPressed() ?? false;
 
+    /// <summary>Play-map South (ReleaseNote) held — the control sandbox's hold-to-skip.</summary>
+    public bool IsReleaseHeld() => _releaseAction?.IsPressed() ?? false;
+
     private void FixedUpdate()
     {
         if (plane == null) return;

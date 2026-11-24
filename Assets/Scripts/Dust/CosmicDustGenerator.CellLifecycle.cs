@@ -138,6 +138,7 @@ public partial class CosmicDustGenerator
 
         SetCellFlag(cell, CellFlags.PlayerCarved);
         TutorialEvents.RaiseCellCarvedByVehicle();
+        TutorialEvents.RaiseRoleCellCarvedByVehicle(prospectiveRole);
 
         bool wasVoidCell = ClearCellFlag(cell, CellFlags.VoidGrow);
         if (wasVoidCell) _imprints.Remove(cell);

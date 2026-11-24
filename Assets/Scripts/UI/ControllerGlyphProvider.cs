@@ -2,11 +2,10 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// Resolves the "Select"/View/Share/Minus glyph for whatever controller is currently connected.
-// Detection order: Steam Input (when available) for real per-controller glyph art, falling
-// back to PlayerInput's currentControlScheme (already brand-named in AstralPlanes.inputactions)
-// when Steam Input isn't initialized, falling back to a hand-authored sprite per brand as a
-// last resort. Singleton, co-located on the SteamManager prefab alongside SteamManager /
+// Resolves the "Select"/View/Share/Minus glyph for a controller (a given pad, the first joined
+// player's, or the first enabled gamepad). Detection order: Steam Input's glyph PNG for the
+// button actually bound to the "Menu" action on that controller, falling back to a
+// hand-authored sprite per brand (brand from the device type, see SteamInputManager.BrandOf). Singleton, co-located on the SteamManager prefab alongside SteamManager /
 // SteamStatsManager / SteamInputManager so any scene can reach it via Instance.
 public class ControllerGlyphProvider : MonoBehaviour
 {
@@ -36,11 +35,17 @@ public class ControllerGlyphProvider : MonoBehaviour
         Instance = this;
     }
 
-    public Sprite GetOpenSettingsGlyph()
+    /// <summary>
+    /// Glyph for the Select/View/Share/Minus ("Menu") button on <paramref name="pad"/>, or on the
+    /// first joined player's / first enabled gamepad when null.
+    /// </summary>
+    public Sprite GetOpenSettingsGlyph(Gamepad pad = null)
     {
+        pad ??= ResolvePad();
+
         if (SteamInputManager.Initialized && SteamInputManager.Instance != null)
         {
-            string path = SteamInputManager.Instance.GetGlyphPngPath("OpenSettings");
+            string path = SteamInputManager.Instance.GetGlyphPngPath(pad, SteamInputManager.ActionMenu);
             if (!string.IsNullOrEmpty(path))
             {
                 var sprite = LoadSpriteFromDisk(path);
@@ -48,41 +53,40 @@ public class ControllerGlyphProvider : MonoBehaviour
             }
         }
 
-        return FallbackFor(GetActiveControllerBrand());
+        return FallbackFor(GetActiveControllerBrand(pad));
     }
 
-    public ControllerBrand GetActiveControllerBrand()
+    public ControllerBrand GetActiveControllerBrand(Gamepad pad = null)
     {
-        if (SteamInputManager.Initialized && SteamInputManager.Instance != null)
-        {
-            var brand = SteamInputManager.Instance.GetPrimaryControllerBrand();
-            if (brand != ControllerBrand.Unknown) return brand;
-        }
+        pad ??= ResolvePad();
+        if (pad != null) return SteamInputManager.BrandOf(pad);
 
-        return GetControllerBrandFromPlayerInput();
+        if (SteamInputManager.Initialized && SteamInputManager.Instance != null)
+            return SteamInputManager.Instance.GetControllerBrand();
+
+        return ControllerBrand.Unknown;
     }
 
-    private static ControllerBrand GetControllerBrandFromPlayerInput()
+    // First joined player's gamepad, else the first enabled gamepad (disabled natives are
+    // skipped, so under Steam Input this is a SteamInputGamepad).
+    private static Gamepad ResolvePad()
     {
         var players = GameFlowManager.Instance != null ? GameFlowManager.Instance.localPlayers : null;
-        if (players == null) return ControllerBrand.Unknown;
-
-        foreach (var player in players)
+        if (players != null)
         {
-            if (player == null) continue;
-            var playerInput = player.GetComponent<PlayerInput>();
-            if (playerInput == null) continue;
-
-            switch (playerInput.currentControlScheme)
+            foreach (var player in players)
             {
-                case "Xbox": return ControllerBrand.Xbox;
-                case "Playstation": return ControllerBrand.PlayStation;
-                case "Switch": return ControllerBrand.Switch;
-                case "Generic Gamepad": return ControllerBrand.Generic;
+                if (player == null) continue;
+                var playerInput = player.GetComponent<PlayerInput>();
+                if (playerInput == null) continue;
+                foreach (var device in playerInput.devices)
+                    if (device is Gamepad gp && gp.enabled) return gp;
             }
         }
 
-        return ControllerBrand.Unknown;
+        foreach (var gp in Gamepad.all)
+            if (gp.enabled) return gp;
+        return null;
     }
 
     private Sprite LoadSpriteFromDisk(string path)

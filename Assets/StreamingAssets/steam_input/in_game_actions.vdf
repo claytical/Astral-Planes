@@ -2,9 +2,9 @@
 {
 	"actions"
 	{
-		"Play"
+		"Game"
 		{
-			"title"			"#Set_Play"
+			"title"			"#Set_Game"
 
 			"StickPadGyro"
 			{
@@ -29,6 +29,10 @@
 				{
 					"title"	"#Action_Choose"
 				}
+				"Back"
+				{
+					"title"	"#Action_Back"
+				}
 				"West"
 				{
 					"title"	"#Action_West"
@@ -36,10 +40,6 @@
 				"North"
 				{
 					"title"	"#Action_North"
-				}
-				"South"
-				{
-					"title"	"#Action_South"
 				}
 				"LeftShoulder"
 				{
@@ -49,9 +49,29 @@
 				{
 					"title"	"#Action_RightShoulder"
 				}
-				"OpenSettings"
+				"Menu"
 				{
-					"title"	"#Action_OpenSettings"
+					"title"	"#Action_Menu"
+				}
+				"Start"
+				{
+					"title"	"#Action_Start"
+				}
+				"MenuUp"
+				{
+					"title"	"#Action_MenuUp"
+				}
+				"MenuDown"
+				{
+					"title"	"#Action_MenuDown"
+				}
+				"MenuLeft"
+				{
+					"title"	"#Action_MenuLeft"
+				}
+				"MenuRight"
+				{
+					"title"	"#Action_MenuRight"
 				}
 			}
 		}
@@ -61,16 +81,21 @@
 	{
 		"english"
 		{
-			"Set_Play"				"Play"
+			"Set_Game"				"Game"
 			"Action_Move"			"Move"
-			"Action_Thrust"			"Thrust"
-			"Action_Choose"			"Choose"
+			"Action_Thrust"			"Thrust / Boost"
+			"Action_Choose"			"Confirm / Release Note"
+			"Action_Back"			"Back / Leave"
 			"Action_West"			"West Action"
 			"Action_North"			"North Action"
-			"Action_South"			"South Action"
 			"Action_LeftShoulder"	"Left Shoulder"
 			"Action_RightShoulder"	"Right Shoulder"
-			"Action_OpenSettings"	"Open Settings"
+			"Action_Menu"			"Pause / Settings"
+			"Action_Start"			"Start / Join"
+			"Action_MenuUp"			"Menu Up"
+			"Action_MenuDown"		"Menu Down"
+			"Action_MenuLeft"		"Menu Left / Previous"
+			"Action_MenuRight"		"Menu Right / Next"
 		}
 	}
 }

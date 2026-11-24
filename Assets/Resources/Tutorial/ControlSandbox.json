@@ -1,0 +1,65 @@
+{
+  "holdSeconds": 4,
+  "stages": [
+    {
+      "id": "01_welcome",
+      "gateName": "None",
+      "lines": [
+        "Hello, Sonic Wanderer{s}! Before the music starts, let's take your ship for a spin."
+      ]
+    },
+    {
+      "id": "02_drift",
+      "gateName": "None",
+      "lines": [
+        "Tilt the stick to drift.",
+        "Drift around and get a feel for your ship.",
+        "Loop around a little. There's no rush."
+      ]
+    },
+    {
+      "id": "03_charge",
+      "gateName": "None",
+      "lines": [
+        "Hold Charge to push forward.",
+        "Charging burns energy, but it's the only way through dust.",
+        "Some dust has grown in. Charge into it."
+      ]
+    },
+    {
+      "id": "04_dust",
+      "gateName": "None",
+      "lines": [
+        "Dust takes the colour of a musical role.",
+        "Each colour carves differently. Bright dust gives way easily...",
+        "...while deep, heavy colours push back. Keep charging.",
+        "Carve through every colour."
+      ]
+    },
+    {
+      "id": "05_pathOpen",
+      "gateName": "None",
+      "lines": [
+        "Nicely done! A path is opening.",
+        "Follow it into the music."
+      ]
+    }
+  ],
+  "skipHint": {
+    "lines": [
+      "Welcome back! Hold your confirm button to skip ahead."
+    ]
+  },
+  "outOfEnergy": {
+    "lines": [
+      "Running on empty! Out here your tank refills, but in the music it won't.",
+      "Ease off Charge to save energy."
+    ]
+  },
+  "stuckOnHardDust": {
+    "lines": [
+      "Heavy dust takes more effort. Keep charging and it'll break.",
+      "Or try a brighter colour first."
+    ]
+  }
+}

@@ -50,7 +50,7 @@ public class MusicalRoleProfile : ScriptableObject
 
 
     [Header("Dust Energy")]
-    [Tooltip("HP of this dust cell. Cells with unbypassable resistance require (maxEnergyUnits ÷ plowChipAmount) plow ticks to clear.")]
+    [Tooltip("UNUSED since 2026-11-23: every dust cell is 1 HP so a colour carves the same whether first-grown or regrown. Hardness = carveResistance01.")]
     [Min(1)] public int maxEnergyUnits = 1;
 
     [Range(0f, 1f)]

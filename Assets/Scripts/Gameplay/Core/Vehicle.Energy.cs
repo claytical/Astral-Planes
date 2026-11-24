@@ -87,9 +87,11 @@ public partial class Vehicle
 
     private const float TutorialRescueEnergyFraction = 0.5f;
 
-    // Phase 0 is the tutorial motif (same test NarratedTutorialController uses to auto-start).
+    // Phase 0 is the tutorial motif (same test NarratedTutorialController uses to auto-start),
+    // plus the pre-motif control sandbox.
     private static bool IsTutorialMotif()
     {
+        if (GameFlowManager.SandboxActive) return true; // control sandbox: charging can never kill you
         var ptm = GameFlowManager.Instance != null ? GameFlowManager.Instance.phaseTransitionManager : null;
         return ptm != null && ptm.CurrentPhaseIndex == 0;
     }

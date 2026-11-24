@@ -38,8 +38,11 @@ public class SelectGlyphHint : MonoBehaviour
 
     private void OnDeviceChange(InputDevice device, InputDeviceChange change)
     {
+        // Enabled/Disabled: SteamInputManager disables native pads once Steam Input takes over,
+        // which changes which pad (and brand) the glyph should come from.
         if (change == InputDeviceChange.Added || change == InputDeviceChange.Removed
-            || change == InputDeviceChange.UsageChanged)
+            || change == InputDeviceChange.UsageChanged
+            || change == InputDeviceChange.Enabled || change == InputDeviceChange.Disabled)
         {
             Refresh();
         }

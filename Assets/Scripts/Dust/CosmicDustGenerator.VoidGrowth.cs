@@ -239,8 +239,10 @@ public partial class CosmicDustGenerator
     public void SpawnDustAtCells(
         IReadOnlyList<Vector2Int> cells,
         MusicalRole role, Color hue, float energy01, float growInSeconds,
-        bool solid = false)
+        bool solid = false, bool bloomed = false)
     {
+        // bloomed: cells rest at full role brightness (no latent darkening) — used by the
+        // control sandbox, where colour IS the lesson.
         if (cells == null || cells.Count == 0) return;
         EnsureCellGrid();
         _imprints.EnsureAllocated(256);
@@ -286,7 +288,7 @@ public partial class CosmicDustGenerator
 
             SetCellFlag(gp, CellFlags.VoidGrow);
             _regrowthScheduler.VoidGrowCoroutines[gp] =
-                StartCoroutine(VoidGrowCellNow(gp, spawnRole, spawnColor, growInSeconds));
+                StartCoroutine(VoidGrowCellNow(gp, spawnRole, spawnColor, growInSeconds, 0f, bloomed));
         }
     }
 
@@ -338,7 +340,7 @@ public partial class CosmicDustGenerator
     /// never explicitly "cleared" by gameplay — this bridges that gap so the
     /// collider doesn't linger as an invisible wall.
     /// </summary>
-    private IEnumerator VoidGrowCellNow(Vector2Int gp, MusicalRole role, Color tintWithAlpha, float growInSeconds, float startDelaySeconds = 0f)
+    private IEnumerator VoidGrowCellNow(Vector2Int gp, MusicalRole role, Color tintWithAlpha, float growInSeconds, float startDelaySeconds = 0f, bool bloomed = false)
     {
         if (!IsInBounds(gp)) { _regrowthScheduler.VoidGrowCoroutines.Remove(gp); yield break; }
 
@@ -378,6 +380,7 @@ public partial class CosmicDustGenerator
             var resistance = ResolveResistanceProfile(gp, role, context: "VoidGrowCellNow");
             dust.clearing.drainResistance01 = resistance.drainResistance01;
             dust.ApplyRoleAndCharge(role, tintWithAlpha, tintWithAlpha.a);
+            if (bloomed && role != MusicalRole.None) dust.BloomFlower(tintWithAlpha);
             if (role == MusicalRole.None) _imprints.ApplyHiddenHintToDust(gp, dust, _resolveRoleProfileDelegate);
             dust.SetFeedbackColors(Color.white, Color.darkGray);
             dust.Begin();

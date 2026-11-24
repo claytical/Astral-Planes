@@ -8,4 +8,5 @@ public partial class LocalPlayer
     private bool _inputLocked;
 
     public void SetInputLocked(bool locked) => _inputLocked = locked;
+    public bool IsInputLocked => _inputLocked;
 }

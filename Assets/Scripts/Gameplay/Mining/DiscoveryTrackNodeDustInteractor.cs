@@ -136,7 +136,7 @@ public class DiscoveryTrackNodeDustInteractor : MonoBehaviour
 
         Color roleColor = prof.GetBaseColor();
         roleColor.a = 1f;
-        dust.ApplyRoleAndCharge(role, roleColor, 1f, prof.maxEnergyUnits);
+        dust.ApplyRoleAndCharge(role, roleColor, 1f, 1); // every dust cell is 1 HP (see CommitRegrowCell)
         dust.clearing.drainResistance01 = prof.drainResistance01;
 
 //        gen.PaintDustExhaust(cell, role, 1f);

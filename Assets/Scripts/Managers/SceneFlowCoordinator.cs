@@ -66,6 +66,8 @@ public sealed class SceneFlowCoordinator
     {
         _setupInFlight = false;
         _motifBannerRoutine = null;
+        _gameFlow.RunControlSandbox = false;
+        GameFlowManager.SandboxActive = false;
         if (_screenFadeOverlay != null)
         {
             _screenFadeOverlay.alpha = 0f;
@@ -317,6 +319,19 @@ public sealed class SceneFlowCoordinator
             _gameFlow.phaseTransitionManager.StartChapter(_gameFlow.phaseTransitionManager.FirstPhaseIndex, "GFM/Setup");
         }
 
+        // New session from TrackSelection: open in the control sandbox. Its path into the
+        // resolved motif replaces the intro screen / record / maze sequence below.
+        GameFlowManager.SandboxActive = _gameFlow.RunControlSandbox;
+        if (_gameFlow.RunControlSandbox)
+        {
+            _gameFlow.RunControlSandbox = false;
+            yield return _gameFlow.StartCoroutine(RunControlSandboxThenFirstMotif());
+            _session.SetCurrentState(GameState.Playing);
+            _setupDone = true;
+            _setupInFlight = false;
+            yield break;
+        }
+
         // Runs after the chapter/motif is resolved so the intro shows the actual starting
         // motif's name. Transport hasn't started yet (BeginMotifTransport after the maze
         // below), so nothing plays underneath it.
@@ -355,6 +370,52 @@ public sealed class SceneFlowCoordinator
         _session.SetCurrentState(GameState.Playing);
         _setupDone = true;
         _setupInFlight = false;
+    }
+
+    // Control sandbox (ControlSandboxDirector): vehicles + role dust on an empty field, no
+    // PhaseStar (so no tentacles), no transport. When the lesson ends, a single rainbow road
+    // opens into the already-resolved motif and StartChosenMotifOrPhase brings it in exactly
+    // like any later motif (maze + star grow, transport starts, name/record reveal).
+    private IEnumerator RunControlSandboxThenFirstMotif()
+    {
+        var ptm = _gameFlow.phaseTransitionManager;
+        int phase = ptm.CurrentPhaseIndex;
+        int motif = Mathf.Max(0, ptm.currentMotifIndex);
+
+        _gameFlow.noteViz.Initialize();
+        _gameFlow.harmony.Initialize(_gameFlow.activeDrumTrack, _gameFlow.controller);
+        _gameFlow.activeDrumTrack.ManualStart();
+        _gameFlow.dustGenerator.ManualStart();
+        _gameFlow.dustGenerator.ApplyActiveRoles(ptm.currentMotif);
+        _gameFlow.SetupBinRingController();
+
+        foreach (var lp in _session.Players)
+            if (lp != null) lp.Launch();
+        yield return null;
+
+        // Same as the normal first-motif setup: the motif's chord progression must be active
+        // before its maze/transport start (StartChosenMotifOrPhase doesn't set it).
+        if (ptm.currentMotif != null)
+            _gameFlow.harmony.SetActiveProfile(ptm.currentMotif.chordProgression, true);
+
+        GameFlowManager.SandboxActive = true;
+        var director = ControlSandboxDirector.Create(_gameFlow, _session.Players, ptm.currentMotif);
+        yield return director.Run();
+
+        // The path: one road on the top edge into the session's motif. SandboxActive stays on
+        // until the vehicles are through it (fuel rescue, narration hold-off). Bridge flags are
+        // raised exactly as BridgeCoordinator does around a normal path choice: they suspend
+        // vehicle OOB recovery (which otherwise snaps the carried-off vehicle back on screen),
+        // the plow, and other mid-transition systems.
+        _session.SetBridgePending(true);
+        _session.SetGhostCycleInProgress(true);
+        yield return _gameFlow.StartCoroutine(_gameFlow.PathChoice.RunSingleExitAndAdvance(
+            BoundaryWrap.BoundarySide.Top, phase, motif));
+        _session.SetGhostCycleInProgress(false);
+        _session.SetBridgePending(false);
+
+        GameFlowManager.SandboxActive = false;
+        if (director != null) UnityEngine.Object.Destroy(director.gameObject);
     }
 
     private IEnumerator PlayIntroScreenSequenceAsync()

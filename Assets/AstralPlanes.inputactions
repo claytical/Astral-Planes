@@ -121,7 +121,18 @@
                     "path": "<Gamepad>/buttonSouth",
                     "interactions": "",
                     "processors": "",
-                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
+                    "groups": ";Generic Gamepad;Xbox;Playstation",
+                    "action": "Choose",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "ceba7151-2fc8-43d2-b622-d0a199e41ea8",
+                    "path": "<SwitchProControllerHID>/buttonEast",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Switch",
                     "action": "Choose",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -165,7 +176,18 @@
                     "path": "<Gamepad>/buttonEast",
                     "interactions": "",
                     "processors": "",
-                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
+                    "groups": ";Generic Gamepad;Xbox;Playstation",
+                    "action": "Leave",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "5a93fe1a-f056-4109-a9f6-3057a0fa84cb",
+                    "path": "<SwitchProControllerHID>/buttonSouth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Switch",
                     "action": "Leave",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -173,7 +195,7 @@
                 {
                     "name": "",
                     "id": "4b40a9b2-8579-4c3f-83ed-4b72d69497e7",
-                    "path": "<Gamepad>/dpad/down",
+                    "path": "<Gamepad>/dpad/up",
                     "interactions": "",
                     "processors": "",
                     "groups": "Generic Gamepad",
@@ -184,7 +206,7 @@
                 {
                     "name": "",
                     "id": "816ad38a-b761-45b4-91da-df4c573cf7e4",
-                    "path": "<Keyboard>/downArrow",
+                    "path": "<Keyboard>/upArrow",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -195,7 +217,7 @@
                 {
                     "name": "",
                     "id": "231baeb4-2fbb-49cd-8c58-bbe835f74ff1",
-                    "path": "<Gamepad>/dpad/up",
+                    "path": "<Gamepad>/dpad/down",
                     "interactions": "",
                     "processors": "",
                     "groups": "Generic Gamepad",
@@ -206,7 +228,7 @@
                 {
                     "name": "",
                     "id": "9b17b558-97bf-4d10-a04b-be45f9af0b37",
-                    "path": "<Keyboard>/upArrow",
+                    "path": "<Keyboard>/downArrow",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -499,7 +521,18 @@
                     "path": "<Gamepad>/buttonSouth",
                     "interactions": "",
                     "processors": "",
-                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
+                    "groups": ";Generic Gamepad;Xbox;Playstation",
+                    "action": "Choose",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "f73b95bc-c124-4630-931e-573abe43fdaa",
+                    "path": "<SwitchProControllerHID>/buttonEast",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Switch",
                     "action": "Choose",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -554,7 +587,18 @@
                     "path": "<Gamepad>/buttonEast",
                     "interactions": "",
                     "processors": "",
-                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
+                    "groups": ";Generic Gamepad;Xbox;Playstation",
+                    "action": "Leave",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "1fd0492b-f82c-4c50-8abf-a0f3f59bbcc2",
+                    "path": "<SwitchProControllerHID>/buttonSouth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Switch",
                     "action": "Leave",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -620,7 +664,18 @@
                     "path": "<Gamepad>/buttonSouth",
                     "interactions": "",
                     "processors": "",
-                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
+                    "groups": ";Generic Gamepad;Xbox;Playstation",
+                    "action": "Quit",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "542dd14a-82ca-4c27-8901-a5e02dd17bb8",
+                    "path": "<SwitchProControllerHID>/buttonEast",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Switch",
                     "action": "Quit",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -697,7 +752,18 @@
                     "path": "<Gamepad>/buttonSouth",
                     "interactions": "",
                     "processors": "",
-                    "groups": ";Playstation;Xbox;Switch;Generic Gamepad",
+                    "groups": ";Playstation;Xbox;Generic Gamepad",
+                    "action": "South",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "a6bdadeb-878a-488e-892e-eb3099c26603",
+                    "path": "<SwitchProControllerHID>/buttonEast",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Switch",
                     "action": "South",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -719,7 +785,18 @@
                     "path": "<Gamepad>/buttonSouth",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Generic Gamepad;Xbox;Playstation",
+                    "action": "ReleaseNote",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "9e25be76-8e0e-47f4-adbb-6d2b264caa8b",
+                    "path": "<SwitchProControllerHID>/buttonEast",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Switch",
                     "action": "ReleaseNote",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -767,7 +844,18 @@
                     "path": "<Gamepad>/buttonSouth",
                     "interactions": "",
                     "processors": "",
-                    "groups": ";Generic Gamepad;Switch;Xbox;Playstation",
+                    "groups": ";Generic Gamepad;Xbox;Playstation",
+                    "action": "Confirm",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "e78fbb47-510c-4e05-984c-810b6ff5959f",
+                    "path": "<SwitchProControllerHID>/buttonEast",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Switch",
                     "action": "Confirm",
                     "isComposite": false,
                     "isPartOfComposite": false

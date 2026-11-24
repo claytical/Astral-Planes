@@ -693,7 +693,7 @@ MonoBehaviour:
   labelAttentionScale: 0.06
   labelScaleLerpSpeed: 14
   deactivateLabelWhenHidden: 1
-  pressAnySequence: 06000000
+  pressAnySequence: 03000000040000000600000005000000
   driftText: Drift
   boostText: Charge
   releaseText: Place

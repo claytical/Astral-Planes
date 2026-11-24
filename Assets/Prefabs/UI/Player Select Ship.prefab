@@ -885,6 +885,7 @@ MonoBehaviour:
   vehicleStage: {fileID: 4922060745651089400}
   grooveStyleStage: {fileID: 8260500303877473233}
   confirmedAlpha: 0.4
+  leaveHoldMinAlpha: 0.1
 --- !u!1 &2419685079696790311
 GameObject:
   m_ObjectHideFlags: 0
@@ -1556,8 +1557,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Catch the notes.\nLet the cosmos handle the timing.
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 2c3848f0c4a614fbe8a4e7e7a0f139e6, type: 2}
-  m_sharedMaterial: {fileID: -9011169692788812194, guid: 2c3848f0c4a614fbe8a4e7e7a0f139e6,
+  m_fontAsset: {fileID: 11400000, guid: 44494664b08b349949171f46c5163415, type: 2}
+  m_sharedMaterial: {fileID: -3647163753829299946, guid: 44494664b08b349949171f46c5163415,
     type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -1582,8 +1583,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 37.9
-  m_fontSizeBase: 37.9
+  m_fontSize: 24
+  m_fontSizeBase: 24
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18

@@ -533,7 +533,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 color               = regrowTint,
                 carveResistance01   = (roleProfile != null ? roleProfile.carveResistance01 : config.noneCarveResistance01),
                 drainResistance01   = (roleProfile != null ? roleProfile.drainResistance01 : config.noneDrainResistance01),
-                maxEnergyUnits      = roleProfile != null ? roleProfile.maxEnergyUnits : config.noneMaxEnergyUnits,
+                maxEnergyUnits      = roleProfile != null ? 1 : config.noneMaxEnergyUnits,
                 role                = regrowRole,
                 healDelay           = 0f,
                 hiddenRole          = existingImp.hiddenRole,
@@ -541,7 +541,10 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
             var resistance = ResolveResistanceProfile(gp, regrowRole, context: "CommitRegrowCell");
             dust.clearing.drainResistance01 = resistance.drainResistance01;
-            int maxUnits = roleProfile != null ? roleProfile.maxEnergyUnits : config.noneMaxEnergyUnits;
+            // Every dust cell is 1 HP (2026-11-23): regrown/flowered cells used to take the role's
+            // maxEnergyUnits (up to 10) while first-growth cells had 1, so the same colour carved
+            // 5-10x slower once it had regrown. Hardness is carveResistance01 alone.
+            int maxUnits = roleProfile != null ? 1 : config.noneMaxEnergyUnits;
             // Brightness: PrepareForReuse zeroed the grow-in alpha ramp and Begin() below runs it
             // over the grow duration, so the full-brightness writes below (and the collider-enable
             // write after the settle delay) all fade in instead of popping.

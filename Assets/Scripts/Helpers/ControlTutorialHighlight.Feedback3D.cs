@@ -73,6 +73,7 @@ public partial class ControlTutorialHighlight
     private void UpdatePositionAnimation()
     {
         if (!_rootRectTransform) return;
+        if (UpdateSandboxPose()) return; // control sandbox: present/dock owns the pose (Dock.cs)
         var instr = CurrentInstruction;
 
         if (instr == Instruction.Drift || instr == Instruction.Boost || instr == Instruction.Release)

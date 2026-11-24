@@ -49,6 +49,46 @@ public class TutorialPromptView : MonoBehaviour
         else HideImmediate();
     }
 
+    /// <summary>
+    /// Binds to the authored lower-third panel at <paramref name="panelPath"/> (root name, then a
+    /// Transform.Find path, e.g. "Canvas/UI/Tutorial" with a TMP_Text child) in the active scene.
+    /// Returns null (after a warning) if it isn't there. Shared by every narrated sequence so they
+    /// all read from the same place on screen.
+    /// </summary>
+    public static TutorialPromptView BindAuthored(string panelPath, string logTag = "Tutorial")
+    {
+        string path = string.IsNullOrEmpty(panelPath) ? "Canvas/UI/Tutorial" : panelPath;
+        int slash = path.IndexOf('/');
+        string rootName = slash < 0 ? path : path.Substring(0, slash);
+        string rest = slash < 0 ? null : path.Substring(slash + 1);
+
+        var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+        foreach (var root in scene.GetRootGameObjects())
+        {
+            if (root.name != rootName) continue;
+            // Transform.Find reaches inactive children, unlike GameObject.Find.
+            var panel = rest == null ? root.transform : root.transform.Find(rest);
+            if (panel == null) continue;
+            var label = panel.GetComponentInChildren<TMP_Text>(true);
+            if (label == null) continue;
+            return Bind(panel, label);
+        }
+
+        Debug.LogWarning($"[{logTag}] Authored panel '{path}' (with a TMP_Text child) not found in '{scene.name}'; using a generated overlay.");
+        return null;
+    }
+
+    /// <summary>"{s}" is a plural suffix: "Wanderer{s}" -> "Wanderers" with 2+ players.</summary>
+    public static string ExpandTokens(string text)
+    {
+        if (string.IsNullOrEmpty(text) || !text.Contains("{s}")) return text;
+        int players = GameFlowManager.Instance?.SessionState?.Players?.Count ?? 1;
+        return text.Replace("{s}", players >= 2 ? "s" : "");
+    }
+
+    /// <summary>The bound panel's rect (null for a generated overlay) — lets other UI keep clear of it.</summary>
+    public RectTransform PanelRect => _group != null ? _group.transform as RectTransform : null;
+
     public static TutorialPromptView Create(Transform parent)
     {
         var root = new GameObject("TutorialPrompt", typeof(Canvas));

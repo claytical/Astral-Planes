@@ -755,7 +755,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
             left    |= gp.dpad.left.wasPressedThisFrame;
             up      |= gp.dpad.up.wasPressedThisFrame;
             down    |= gp.dpad.down.wasPressedThisFrame;
-            confirm |= gp.buttonSouth.wasPressedThisFrame;
+            confirm |= PadSemantics.ConfirmButton(gp).wasPressedThisFrame;
         }
 
         var kb = Keyboard.current;
@@ -922,14 +922,19 @@ public class PhaseLibraryCarousel : MonoBehaviour
 
     private IEnumerator ConfirmRoutine()
     {
+        // Record the pick FIRST (this runs synchronously inside Confirm()). The same confirm press
+        // can also fire Main's UI/Submit -> IntroInputHandler, which loads TrackSelection at the end
+        // of this frame and kills this coroutine at the fade yield below — previously before
+        // RequestStart ran, so the session silently fell back to the tutorial motif.
+        var entry = CurrentEntry;
+        PhaseLibraryStartConfig.RequestStart(entry.PhaseId, entry.PhaseIndex, entry.MotifIndex, entry.MotifId);
+
         // Fades the preview's own AudioSource to silence (see RingPreviewPlayer.StopAndFadeRoutine)
         // rather than guessing how long the synth's release tail needs — guarantees no residual
         // amplitude by the time the scene unload below destroys its MidiStreamPlayer mid-buffer.
         if (previewPlayer != null)
             yield return StartCoroutine(previewPlayer.StopAndFadeRoutine());
 
-        var entry = CurrentEntry;
-        PhaseLibraryStartConfig.RequestStart(entry.PhaseId, entry.PhaseIndex, entry.MotifIndex, entry.MotifId);
         onMotifConfirmed.Invoke();
         SceneManager.LoadScene(trackSelectionScene);
     }

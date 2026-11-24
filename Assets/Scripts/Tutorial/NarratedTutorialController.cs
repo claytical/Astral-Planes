@@ -89,6 +89,10 @@ public class NarratedTutorialController : MonoBehaviour
         // An on-demand start (pause menu) runs on any motif.
         if (!_manualStart)
         {
+            // The control sandbox runs first in a new session (phase 0 is already resolved
+            // under it); its own narration owns the panel until the vehicles take its path.
+            while (GameFlowManager.SandboxActive) yield return null;
+
             PhaseTransitionManager ptm = null;
             float waited = 0f;
             while (waited < 15f)
@@ -128,27 +132,7 @@ public class NarratedTutorialController : MonoBehaviour
     }
 
     // Binds to the authored panel (e.g. Canvas/UI/Tutorial + its TMP child), without editing the scene.
-    TutorialPromptView FindAuthoredView()
-    {
-        string path = string.IsNullOrEmpty(_script.panelPath) ? "Canvas/UI/Tutorial" : _script.panelPath;
-        int slash = path.IndexOf('/');
-        string rootName = slash < 0 ? path : path.Substring(0, slash);
-        string rest = slash < 0 ? null : path.Substring(slash + 1);
-
-        foreach (var root in SceneManager.GetActiveScene().GetRootGameObjects())
-        {
-            if (root.name != rootName) continue;
-            // Transform.Find reaches inactive children, unlike GameObject.Find.
-            var panel = rest == null ? root.transform : root.transform.Find(rest);
-            if (panel == null) continue;
-            var label = panel.GetComponentInChildren<TMPro.TMP_Text>(true);
-            if (label == null) continue;
-            return TutorialPromptView.Bind(panel, label);
-        }
-
-        Debug.LogWarning($"[NarratedTutorial] Authored panel '{path}' (with a TMP_Text child) not found in '{SceneManager.GetActiveScene().name}'; using a generated overlay.");
-        return null;
-    }
+    TutorialPromptView FindAuthoredView() => TutorialPromptView.BindAuthored(_script.panelPath, "NarratedTutorial");
 
     void OnDestroy()
     {
@@ -286,12 +270,7 @@ public class NarratedTutorialController : MonoBehaviour
 
     // "{s}" is a plural suffix: "Wanderer{s}" -> "Wanderers" with 2+ players. Read at show time
     // because players can still be joining/leaving when the tutorial starts.
-    static string ExpandTokens(string text)
-    {
-        if (string.IsNullOrEmpty(text) || !text.Contains("{s}")) return text;
-        int players = GameFlowManager.Instance?.SessionState?.Players?.Count ?? 1;
-        return text.Replace("{s}", players >= 2 ? "s" : "");
-    }
+    static string ExpandTokens(string text) => TutorialPromptView.ExpandTokens(text);
 
     // Shows a line and restarts the skip clock; a press made while it faded never skips the next line.
     IEnumerator ShowLine(string text, bool eventDriven)

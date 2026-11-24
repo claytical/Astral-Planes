@@ -79,16 +79,34 @@ public class NarratedTutorialScript : ScriptableObject
     [Tooltip("Shown when a vehicle runs dry in the tutorial motif and is refilled to half instead of exploding.")]
     public TutorialInterruption outOfEnergy;
 
+    [Header("Control sandbox only (ControlSandbox.json)")]
+    [Tooltip("Shown to returning players: how to skip the sandbox.")]
+    public TutorialInterruption skipHint;
+    [Tooltip("Shown once when someone has been charging into dust for a while without carving through.")]
+    public TutorialInterruption stuckOnHardDust;
+
+    /// <summary>The stage with this id, or null.</summary>
+    public TutorialStage StageById(string id)
+    {
+        if (stages == null) return null;
+        foreach (var st in stages)
+            if (st != null && st.id == id) return st;
+        return null;
+    }
+
     /// <summary>
     /// Loads and validates the tutorial JSON. Returns null (after logging why) if it is missing or
     /// invalid; callers should then simply not run the tutorial.
     /// </summary>
-    public static NarratedTutorialScript Load()
+    public static NarratedTutorialScript Load() => Load(ResourcePath);
+
+    /// <summary>Loads any dialogue file in this schema (e.g. the control sandbox's).</summary>
+    public static NarratedTutorialScript Load(string resourcePath)
     {
-        var ta = Resources.Load<TextAsset>(ResourcePath);
+        var ta = Resources.Load<TextAsset>(resourcePath);
         if (ta == null)
         {
-            Debug.LogError($"[NarratedTutorial] Missing dialogue file: Assets/Resources/{ResourcePath}.json");
+            Debug.LogError($"[NarratedTutorial] Missing dialogue file: Assets/Resources/{resourcePath}.json");
             return null;
         }
 
@@ -101,7 +119,7 @@ public class NarratedTutorialScript : ScriptableObject
         }
         catch (ArgumentException e)
         {
-            Debug.LogError($"[NarratedTutorial] Could not parse {ResourcePath}.json: {e.Message}");
+            Debug.LogError($"[NarratedTutorial] Could not parse {resourcePath}.json: {e.Message}");
             return null;
         }
 

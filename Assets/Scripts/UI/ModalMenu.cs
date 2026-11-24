@@ -248,8 +248,8 @@ public class ModalMenu : MonoBehaviour
         if (Mathf.Abs(v) > 0.6f && !_stickHeld && step == 0)
             step = vertical ? (v > 0f ? -1 : +1) : (v > 0f ? +1 : -1);
 
-        confirm |= pad.buttonSouth.wasPressedThisFrame;
-        cancel |= pad.buttonEast.wasPressedThisFrame;
+        confirm |= PadSemantics.ConfirmButton(pad).wasPressedThisFrame;
+        cancel |= PadSemantics.BackButton(pad).wasPressedThisFrame;
     }
 
     void UpdateStickLatch()

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 public partial class ControlTutorialHighlight
@@ -48,6 +49,22 @@ public partial class ControlTutorialHighlight
     private Vector3 _arrowsBaseScale= Vector3.one;
     private Vector3 _startBaseScale = Vector3.one;
 
+    // Controller this callout describes (a player's mini prompt). Null = the shared/primary
+    // prompt, which follows the first joined player's or first enabled gamepad.
+    private Gamepad _contextPad;
+
+    public void SetControllerContext(Gamepad pad) => _contextPad = pad;
+
+    private bool IsNintendoLayout()
+    {
+        ControllerBrand brand = _contextPad != null && _contextPad.added
+            ? SteamInputManager.BrandOf(_contextPad)
+            : ControllerGlyphProvider.Instance != null
+                ? ControllerGlyphProvider.Instance.GetActiveControllerBrand()
+                : ControllerBrand.Unknown;
+        return brand == ControllerBrand.Switch;
+    }
+
     private void TickButtonVisuals()
     {
         float lerp = 1f - Mathf.Exp(-tintLerpSpeed * Time.unscaledDeltaTime);
@@ -66,10 +83,13 @@ public partial class ControlTutorialHighlight
         ApplyVisuals(stickImage,  _stickBaseScale,  _stickW);
         ApplyVisuals(boostImage,  _boostBaseScale,  _boostW);
 
+        // ButtonId.South / East are semantic (confirm / back). On a Nintendo controller confirm
+        // is A, the east (right) face button, so the two weights trade images.
+        bool nintendo = IsNintendoLayout();
         ApplyVisuals(northImage,  _northBaseScale,  _northW);
-        ApplyVisuals(eastImage,   _eastBaseScale,   _eastW);
+        ApplyVisuals(eastImage,   _eastBaseScale,   nintendo ? _southW : _eastW);
         ApplyVisuals(westImage,   _westBaseScale,   _westW);
-        ApplyVisuals(southImage,  _southBaseScale,  _southW);
+        ApplyVisuals(southImage,  _southBaseScale,  nintendo ? _eastW : _southW);
 
         ApplyVisuals(arrowsImage, _arrowsBaseScale, _arrowsW);
         ApplyVisuals(startImage,  _startBaseScale,  _startW);

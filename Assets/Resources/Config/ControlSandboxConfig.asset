@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 428e91924fac43bbb6a23f2f5efda698, type: 3}
+  m_Name: ControlSandboxConfig
+  m_EditorClassIdentifier: Assembly-CSharp::ControlSandboxConfig
+  presentSeconds: 1.6
+  dockScale: 0.4
+  dockMargin: 32
+  dockLerpSpeed: 5
+  stepConfirmBeatSeconds: 0.6
+  driftPracticeSeconds: 2.5
+  chargePracticeSeconds: 1.5
+  cellsPerRole: 4
+  patchDissolveSeconds: 0.8
+  inputThreshold: 0.35
+  maxRoles: 3
+  patchRadiusCells: 3
+  patchRowFraction: 0.6
+  vehicleClearRadiusCells: 3
+  dustGrowInSeconds: 0.8
+  skipHoldSeconds: 1.5
+  stuckHintSeconds: 4

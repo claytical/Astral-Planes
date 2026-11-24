@@ -6,53 +6,47 @@
   <component name="ChangeListManager">
     <list default="true" id="ee3f15e8-7ba4-4031-a8ac-f90f56eebcb0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Astral-Planes/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Editor/RingSessionManagerWindow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Editor/RingSessionManagerWindow.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Effects/Spawn/Gas Explosion.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Effects/Spawn/Gas Explosion.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Chonk.prefab" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Chonk.prefab.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Scuttle.prefab" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/Scuttle.prefab.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/X-agong.prefab" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Fleet/X-agong.prefab.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Note.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/Interactable Objects/Note.prefab" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/CollectableTuning.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/CollectableTuning.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/CosmicDustGeneratorConfig.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/CosmicDustGeneratorConfig.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Resources/Config/PhaseStarConfig.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Resources/Config/PhaseStarConfig.asset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scenes/TrackFinished.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/TrackFinished.unity" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicBlockField.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicBlockField.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.SpriteScale.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.SpriteScale.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.TintPulse.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.TintPulse.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDust.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/AstralPlanes.inputactions" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/AstralPlanes.inputactions" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/SteamManager.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/SteamManager.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/UI/Control Scheme.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/UI/Control Scheme.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Prefabs/UI/Player Select Ship.prefab" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Prefabs/UI/Player Select Ship.prefab" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/GeneratedTrack.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scenes/TrackSelection.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scenes/TrackSelection.unity" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.CellLifecycle.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.CellLifecycle.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.Clearing.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.Clearing.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.MazeGeneration.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.MazeGeneration.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.VoidGrowth.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.VoidGrowth.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Dust/CosmicDustGenerator.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Effects/CollectableParticles.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Effects/CollectableParticles.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.Collection.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.Collection.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.SpawnArrival.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.SpawnArrival.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/Collectable.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/CollectableTuning.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/CollectableTuning.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.Energy.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Core/Vehicle.Energy.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeDustInteractor.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Gameplay/Mining/DiscoveryTrackNodeDustInteractor.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/ControlTutorialHighlight.ButtonVisuals.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/ControlTutorialHighlight.ButtonVisuals.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/ControlTutorialHighlight.Feedback3D.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/ControlTutorialHighlight.Feedback3D.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Helpers/ControlTutorialHighlight.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Helpers/ControlTutorialHighlight.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/ControlTutorialDirector.AbortHold.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/ControlTutorialDirector.AbortHold.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/ControlTutorialDirector.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/ControlTutorialDirector.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.PlayerFlow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/GameFlowManager.PlayerFlow.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/PathChoiceCoordinator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/PathChoiceCoordinator.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/SceneFlowCoordinator.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/SceneFlowCoordinator.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/SteamManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/SteamManager.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Config/CosmicDustGeneratorConfig.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Config/CosmicDustGeneratorConfig.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.ZapState.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Phase/Star/PhaseStar.ZapState.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Telemetry/TelemetryConsent.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Telemetry/TelemetryConsent.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/RingPreviewPlayer.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/RingPreviewPlayer.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/SettingsPanelController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/SettingsPanelController.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/MotifSnapshot.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/MotifSnapshot.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/RingSessionStore.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/RingSessionStore.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Diamond Outline.png" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Sprites/Diamond Outline.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Drifter.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Drifter.png.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Sprites/HeartDrive.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Sprites/HeartDrive.png.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Scout.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Scout.png.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Scuttle.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Scuttle.png.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Xagong.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/Sprites/Xagong.png.meta" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Assets/UniversalRenderPipelineGlobalSettings.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/UniversalRenderPipelineGlobalSettings.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/SteamInputManager.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/SteamInputManager.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Managers/TrackSelectionJoinController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Managers/TrackSelectionJoinController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Music/Profiles/MusicalRoleProfile.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Music/Profiles/MusicalRoleProfile.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Tutorial/NarratedTutorialController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Tutorial/NarratedTutorialController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Tutorial/NarratedTutorialScript.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Tutorial/NarratedTutorialScript.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Tutorial/TutorialEvents.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Tutorial/TutorialEvents.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Tutorial/TutorialPromptView.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Tutorial/TutorialPromptView.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/ControllerGlyphProvider.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/ControllerGlyphProvider.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/LivingScorePanel.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LivingScorePanel.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.ConfirmFlow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.ConfirmFlow.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.Input.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.Input.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.LeaveFlow.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.LeaveFlow.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.PathChoice.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/LocalPlayer.PathChoice.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/ModalMenu.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/ModalMenu.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/PhaseLibraryCarousel.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/PhaseLibraryCarousel.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/PlayerSelect.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/PlayerSelect.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/UI/SelectGlyphHint.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/UI/SelectGlyphHint.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/Scripts/Utilities/IntroInputHandler.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/Scripts/Utilities/IntroInputHandler.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/StreamingAssets/steam_input/in_game_actions.vdf" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/StreamingAssets/steam_input/in_game_actions.vdf" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/TextMesh Pro/Resources/Fonts &amp; Materials/LiberationSans SDF - Fallback.asset" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/TextMesh Pro/Resources/Fonts &amp; Materials/LiberationSans SDF - Fallback.asset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CONFIG_AUDIT.md" beforeDir="false" afterPath="$PROJECT_DIR$/CONFIG_AUDIT.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -363,7 +357,8 @@
       <workItem from="1793551912644" duration="95905000" />
       <workItem from="1794097582056" duration="11857000" />
       <workItem from="1794154242572" duration="47007000" />
-      <workItem from="1794367896347" duration="176015000" />
+      <workItem from="1794367896347" duration="181329000" />
+      <workItem from="1795472182302" duration="5249000" />
     </task>
     <servers />
   </component>

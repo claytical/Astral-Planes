@@ -7,6 +7,12 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// Replaces PlayerInputManager's automatic join detection with explicit per-frame scanning.
 ///
+/// Native Steam Input path (SteamInputManager.DrivesGameplay): every controller is exactly one
+/// SteamInputGamepad and all native gamepads are disabled, so the duplicate handling below is
+/// inert — disabled devices never report presses. Buttons are read through PadSemantics, so
+/// "confirm" is Choose (Switch A under Steam's Switch config) and "back" is Back.
+///
+/// Fallback path (no Steam Input) — the rest of this note applies:
 /// Steam registers each physical controller as multiple Unity InputDevices:
 ///   (a) Raw HID device  — native button layout (Switch Pro: physical-A = buttonEast,
 ///                          physical-B = buttonSouth).
@@ -32,6 +38,10 @@ using UnityEngine.SceneManagement;
 ///      East's join is deferred to release (tap = join, sustained hold = back out to the
 ///      carousel/Main scene). See UpdateHoldBackToCarousel(). South/Start joins stay instant.
 ///
+///   5. A gamepad whose player backed out while others stayed in must HOLD confirm
+///      (RejoinHoldSeconds) to rejoin; see UpdateRejoinHold(). A tap used to rejoin it
+///      instantly, which on Switch (A = confirm = join) brought back a player who had just left.
+///
 /// Requires PlayerInputManager.joinBehavior = JoinPlayersManually in the TrackSelection scene.
 /// Self-installs via RuntimeInitializeOnLoadMethod — no scene setup needed.
 /// </summary>
@@ -47,6 +57,16 @@ public class TrackSelectionJoinController : MonoBehaviour
     private int _holdBackDeviceId = -1;
     private float _holdBackStartTime;
     private const float HoldBackSeconds = 1.5f;
+
+    // Gamepads whose player backed out while someone else stayed in. A tap of confirm (A on
+    // Switch) would instantly rejoin them, which is exactly what a player who just left is
+    // likely to mash next, so they must hold confirm for RejoinHoldSeconds instead. Fresh
+    // gamepads still join on a tap. Cleared when nobody is left (nothing to protect).
+    private readonly HashSet<int> _lastAssignedIds = new();
+    private readonly HashSet<int> _leftDeviceIds = new();
+    private int _rejoinDeviceId = -1;
+    private float _rejoinStartTime;
+    private const float RejoinHoldSeconds = 1f;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void RegisterHook()
@@ -122,11 +142,14 @@ public class TrackSelectionJoinController : MonoBehaviour
         var pim = PlayerInputManager.instance;
         if (pim == null || !pim.joiningEnabled) return;
 
-        if (GameFlowManager.Instance?.CurrentState != GameState.Selection) return;
-
         // The tutorial roster is fixed when it begins; a mid-tutorial joiner would have no ship
         // and no tutorial participation.
-        if (ControlTutorialDirector.Instance != null && ControlTutorialDirector.Instance.IsPrimaryTutorialRunning) return;
+        if (GameFlowManager.Instance?.CurrentState != GameState.Selection
+            || (ControlTutorialDirector.Instance != null && ControlTutorialDirector.Instance.IsPrimaryTutorialRunning))
+        {
+            CancelRejoinHold(); // e.g. the remaining player readied up and the tutorial began
+            return;
+        }
 
         var assignedIds = new HashSet<int>();
         foreach (var lp in FindObjectsByType<LocalPlayer>())
@@ -137,17 +160,21 @@ public class TrackSelectionJoinController : MonoBehaviour
                 assignedIds.Add(dev.deviceId);
         }
 
-        UpdateHoldBackToCarousel(pim, assignedIds);
+        TrackLeftDevices(assignedIds);
 
-        // buttonSouth and startButton are instant join triggers. buttonEast is handled by
+        UpdateHoldBackToCarousel(pim, assignedIds);
+        UpdateRejoinHold(pim, assignedIds);
+
+        // Confirm and start are instant join triggers. Back is handled by
         // UpdateHoldBackToCarousel above: a quick tap joins (same as before), a sustained hold
-        // backs out to the carousel instead — see that method for why East can't also be
-        // instant here.
+        // backs out to the carousel instead — see that method for why Back can't also be
+        // instant here. Gamepads that just backed out are handled by UpdateRejoinHold.
         var candidates = InputSystem.devices
             .OfType<Gamepad>()
             .Where(gp => !assignedIds.Contains(gp.deviceId) &&
                          !_excludedIds.Contains(gp.deviceId) &&
-                         (gp.buttonSouth.wasPressedThisFrame ||
+                         !_leftDeviceIds.Contains(gp.deviceId) &&
+                         (PadSemantics.ConfirmButton(gp).wasPressedThisFrame ||
                           gp.startButton.wasPressedThisFrame))
             .OrderBy(g => g.deviceId)
             .ToList();
@@ -164,7 +191,7 @@ public class TrackSelectionJoinController : MonoBehaviour
         foreach (var gp in candidates)
         {
             string btn = null;
-            if      (gp.buttonSouth.wasPressedThisFrame && usedButtons.Add("south")) btn = "south";
+            if      (PadSemantics.ConfirmButton(gp).wasPressedThisFrame && usedButtons.Add("south")) btn = "south";
             else if (gp.startButton.wasPressedThisFrame && usedButtons.Add("start")) btn = "start";
 
             if (btn == null) continue;
@@ -205,10 +232,10 @@ public class TrackSelectionJoinController : MonoBehaviour
             var held = InputSystem.devices.OfType<Gamepad>()
                 .FirstOrDefault(g => g.deviceId == _holdBackDeviceId);
 
-            if (held == null || _excludedIds.Contains(held.deviceId) || !held.buttonEast.isPressed)
+            if (held == null || _excludedIds.Contains(held.deviceId) || !PadSemantics.BackButton(held).isPressed)
             {
                 // Released before the hold threshold (or device vanished) — treat as a tap: join.
-                bool releasedNotDisconnected = held != null && !held.buttonEast.isPressed;
+                bool releasedNotDisconnected = held != null && !PadSemantics.BackButton(held).isPressed;
                 CancelHoldBack();
 
                 if (releasedNotDisconnected && Time.unscaledTime - _lastJoinTime >= GraceSeconds)
@@ -236,13 +263,84 @@ public class TrackSelectionJoinController : MonoBehaviour
         }
 
         var starter = InputSystem.devices.OfType<Gamepad>()
-            .FirstOrDefault(gp => !_excludedIds.Contains(gp.deviceId) && gp.buttonEast.wasPressedThisFrame);
+            .FirstOrDefault(gp => !_excludedIds.Contains(gp.deviceId) && PadSemantics.BackButton(gp).wasPressedThisFrame);
         if (starter == null) return;
 
         _holdBackDeviceId = starter.deviceId;
         _holdBackStartTime = Time.unscaledTime;
         ControlTutorialDirector.Instance?.BeginAbortHoldUI("Back to Motif Selection", HoldBackSeconds);
     }
+
+    // A gamepad that was paired to a player last frame and isn't now (its player backed out)
+    // must hold confirm to rejoin while anyone else is still in.
+    private void TrackLeftDevices(HashSet<int> assignedIds)
+    {
+        if (assignedIds.Count == 0)
+        {
+            _leftDeviceIds.Clear();
+        }
+        else
+        {
+            foreach (int id in _lastAssignedIds)
+            {
+                if (assignedIds.Contains(id) || InputSystem.GetDeviceById(id) == null) continue;
+                if (_leftDeviceIds.Add(id))
+                    Debug.Log($"[JoinController] Device id={id} backed out; holding confirm is required to rejoin.");
+            }
+        }
+
+        _lastAssignedIds.Clear();
+        _lastAssignedIds.UnionWith(assignedIds);
+    }
+
+    private void UpdateRejoinHold(PlayerInputManager pim, HashSet<int> assignedIds)
+    {
+        if (_rejoinDeviceId >= 0)
+        {
+            var held = InputSystem.GetDeviceById(_rejoinDeviceId) as Gamepad;
+            if (held == null || assignedIds.Count == 0 || !_leftDeviceIds.Contains(held.deviceId)
+                || !PadSemantics.ConfirmButton(held).isPressed)
+            {
+                CancelRejoinHold();
+                return;
+            }
+
+            float elapsed = Time.unscaledTime - _rejoinStartTime;
+            ControlTutorialDirector.Instance?.UpdateRejoinHoldUI(elapsed / RejoinHoldSeconds);
+            if (elapsed < RejoinHoldSeconds) return;
+
+            _rejoinDeviceId = -1;
+            ControlTutorialDirector.Instance?.EndRejoinHoldUI();
+            _leftDeviceIds.Remove(held.deviceId);
+            Debug.Log($"[JoinController] Rejoin (held): {held.name} | id={held.deviceId}");
+            pim.JoinPlayer(pairWithDevices: new InputDevice[] { held });
+            _lastJoinTime = Time.unscaledTime;
+            assignedIds.Add(held.deviceId);
+            return;
+        }
+
+        if (assignedIds.Count == 0) return;
+
+        foreach (var gp in InputSystem.devices.OfType<Gamepad>())
+        {
+            if (!_leftDeviceIds.Contains(gp.deviceId) || assignedIds.Contains(gp.deviceId)) continue;
+            if (!PadSemantics.ConfirmButton(gp).wasPressedThisFrame) continue;
+
+            _rejoinDeviceId = gp.deviceId;
+            _rejoinStartTime = Time.unscaledTime;
+            ControlTutorialDirector.Instance?.BeginRejoinHoldUI(gp);
+            return;
+        }
+    }
+
+    private void CancelRejoinHold()
+    {
+        if (_rejoinDeviceId < 0) return;
+        _rejoinDeviceId = -1;
+        ControlTutorialDirector.Instance?.EndRejoinHoldUI();
+    }
+
+    private void OnDisable() => CancelRejoinHold();
 
     private void CancelHoldBack()
     {

@@ -72,6 +72,7 @@ Conventions: asset paths are relative to `Assets/`. "Inspector header" is the bo
 | Ring glyph layout/alpha/draw-in/shake (4 contexts) | `Resources/Config/{RingGlyph Canvas, RingGlyph Canvas Not Selected, Final Rings, In Game Ring Glyph}.asset` |
 | Carousel tilt/spin/spacing | `PhaseLibraryCarousel` component ⚠ |
 | Path exits (rainbow road), phase-in delay, bridge fallback hold | `Resources/Config/PathExitConfig.asset` (7. Timing) |
+| Control sandbox: panel present/dock, practice gates, role dust patches, skip hold | `Resources/Config/ControlSandboxConfig.asset` (dialogue: `Resources/Tutorial/ControlSandbox.json`) |
 | Competitive points per note, discovery multiplier | GameFlowManager in `Main.unity` → Competitive Mode |
 | Phase/chapter order | `Resources/Phase Library.asset` |
 | Telemetry | `Resources/Config/TelemetryConfig.asset` (the only copy now) |
@@ -113,6 +114,7 @@ Conventions: asset paths are relative to `Assets/`. "Inspector header" is the bo
 | MazePatternConfig | 43 | Dust & Maze/Maze Pattern Config | Maze generation + star nav |
 | WispConfig | 1 | Dust & Maze/Wisp Config | Wisps |
 | PathExitConfig | 1 | Path Exit/Path Exit Config | Exit portals |
+| ControlSandboxConfig | 1 | Control Sandbox Config | Pre-motif control sandbox |
 | PhaseLibrary | 1 | Phase & Star/Phase Chapter Library | Phase order |
 | PhaseStarBehaviorProfile | 3 | Phase & Star/PhaseStar Behavior Profile | Per-star-type speed, keep-clear, ejection |
 | PhaseStarConfig | 1 | Phase & Star/PhaseStar Config (all stars) | Shared star charge, look, motion, targeting, tentacles |

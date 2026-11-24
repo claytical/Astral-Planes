@@ -94,6 +94,67 @@ public sealed class PathChoiceCoordinator
             yield break;
         }
 
+        var targets = new List<ExitTarget>(mazeExits.Count);
+        foreach (var e in mazeExits)
+            targets.Add(new ExitTarget(MotifMaze.SideOf(e.Dir), e.Phase, e.Motif, ClassifyExit(e)));
+
+        yield return _gameFlow.StartCoroutine(RunExitsAndAdvance(targets, lockedPhaseDirs, spawnWisp: true,
+            onNoExits: () => _sceneFlow.StartNextMotifInPhase()));
+    }
+
+    private readonly struct ExitTarget
+    {
+        public readonly BoundaryWrap.BoundarySide Side;
+        public readonly int Phase, Motif;
+        public readonly PathExitKind Kind;
+        public ExitTarget(BoundaryWrap.BoundarySide side, int phase, int motif, PathExitKind kind)
+        { Side = side; Phase = phase; Motif = motif; Kind = kind; }
+    }
+
+    /// <summary>
+    /// Control sandbox hand-off: grows the same blind interstitial around the vehicles with a
+    /// single rainbow road on <paramref name="side"/> leading to (phase, motif). Driving into it
+    /// carries the vehicles out and starts that motif (StartChosenMotifOrPhase) — the session's
+    /// first motif arrives exactly the way every later motif does.
+    /// </summary>
+    public IEnumerator RunSingleExitAndAdvance(BoundaryWrap.BoundarySide side, int phase, int motif)
+    {
+        var ptm = _gameFlow.phaseTransitionManager;
+        var dust = _gameFlow.dustGenerator;
+        var drums = _gameFlow.activeDrumTrack;
+
+        // Fallback (no generator / no exit produced): start the motif straight from the mirrored edge.
+        System.Func<IEnumerator> direct = () => _sceneFlow.StartChosenMotifOrPhase(
+            phase, motif, SceneFlowCoordinator.MirrorSide(side), Vector2Int.zero, PathExitKind.NewMotif);
+
+        if (ptm == null || dust == null || drums == null)
+        {
+            yield return _gameFlow.StartCoroutine(direct());
+            yield break;
+        }
+
+        _playedKeys = new HashSet<(string, string)>();
+        foreach (var r in RingSessionStore.LoadAllRingsFromDisk())
+            _playedKeys.Add((r.PhaseId, r.MotifId));
+        var kind = IsPlayed(phase, motif) ? PathExitKind.VisitedMotif : PathExitKind.NewMotif;
+
+        var ascension = Object.FindAnyObjectByType<NoteAscensionDirector>();
+        ascension?.SetAscentLineVisible(false);
+        yield return _gameFlow.StartCoroutine(RunExitsAndAdvance(
+            new List<ExitTarget> { new ExitTarget(side, phase, motif, kind) },
+            lockedPhaseDirs: null, spawnWisp: false, onNoExits: direct));
+        ascension?.SetAscentLineVisible(true);
+    }
+
+    // Shared tail of every path choice: interstitial maze with one exit per target, wait for a
+    // vehicle to take one, carry everyone out, start the chosen motif.
+    private IEnumerator RunExitsAndAdvance(List<ExitTarget> targets, List<MazeArm> lockedPhaseDirs,
+        bool spawnWisp, System.Func<IEnumerator> onNoExits)
+    {
+        var ptm = _gameFlow.phaseTransitionManager;
+        var dust = _gameFlow.dustGenerator;
+        var drums = _gameFlow.activeDrumTrack;
+
         bool prevWrap = Boundaries.WrapEnabled;
         Boundaries.SetWrapEnabled(false); // no accidental screen-wrap through a tunnel mouth
 
@@ -126,10 +187,10 @@ public sealed class PathChoiceCoordinator
         pattern.patternType = MazePatternType.Tunnels;
         pattern.tunnels.corridorWidth = corridorWidth;
         pattern.tunnels.corridorStep = corridorWidth + 3; // thick-dust walls around the vehicle
-        pattern.porousBorder.exitCount = mazeExits.Count;
+        pattern.porousBorder.exitCount = targets.Count;
         pattern.porousBorder.topBottomCenterBand = _gameFlow.PathExitConfig.topBottomExitCenterBand;
-        foreach (var e in mazeExits)
-            pattern.porousBorder.exitSides.Add(MotifMaze.SideOf(e.Dir));
+        foreach (var t in targets)
+            pattern.porousBorder.exitSides.Add(t.Side);
 
         _allExits.Clear();
         _winnerExit = null;
@@ -145,21 +206,21 @@ public sealed class PathChoiceCoordinator
         if (exitInfos == null || exitInfos.Count == 0)
         {
             Boundaries.SetWrapEnabled(prevWrap);
-            yield return _gameFlow.StartCoroutine(_sceneFlow.StartNextMotifInPhase());
+            yield return _gameFlow.StartCoroutine(onNoExits());
             yield break;
         }
 
         // Match by edge, not list order: the generator reports one exit per requested side.
-        foreach (var target in mazeExits)
+        foreach (var target in targets)
         {
-            var side = MotifMaze.SideOf(target.Dir);
+            var side = target.Side;
             int infoIdx = exitInfos.FindIndex(i => i.Side == side);
             if (infoIdx < 0) continue;
-            _allExits.Add(CreateExitTrigger(drums, exitInfos[infoIdx], target.Phase, target.Motif, ClassifyExit(target)));
+            _allExits.Add(CreateExitTrigger(drums, exitInfos[infoIdx], target.Phase, target.Motif, target.Kind));
         }
 
-        SpawnWisp(drums, vehicleCells, ptm);
-        SpawnLockedStubs(drums, lockedPhaseDirs, ptm);
+        if (spawnWisp) SpawnWisp(drums, vehicleCells, ptm);
+        if (lockedPhaseDirs != null) SpawnLockedStubs(drums, lockedPhaseDirs, ptm);
 
         var exitAnchors = new List<Vector2Int>(_allExits.Count);
         foreach (var e in _allExits) exitAnchors.Add(e.AnchorCell);
