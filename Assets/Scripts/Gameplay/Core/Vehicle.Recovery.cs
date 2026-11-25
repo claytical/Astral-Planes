@@ -116,6 +116,14 @@ public partial class Vehicle
         var sb = new System.Text.StringBuilder();
         sb.Append($"[VEHICLE:STUCK] {name} pinned at {rb.position} (cell {(drumTrack != null ? drumTrack.WorldToGridPosition(rb.position).ToString() : "?")}) " +
                   $"input={_moveInput} boosting={boosting} energy={energyLevel:F2} plowDrain={_plowVelocityDrain:F2}");
+        if (gen != null && drumTrack != null)
+        {
+            Vector2Int own = drumTrack.WorldToGridPosition(rb.position);
+            string ownState = gen.TryGetCellState(own, out var ownSt) ? ownSt.ToString() : "?";
+            sb.Append($"\n  ownCell={own} state={ownState} interior={IsInteriorCell(own)} " +
+                      $"bridge={(gfm != null && (gfm.BridgePending || gfm.GhostCycleInProgress))} " +
+                      $"wedgeT={_wallWedgeSeconds:F2} locked={_movementLocked}");
+        }
 
         int contacts = rb.GetContacts(_stuckContacts);
         sb.Append($"\n  contacts={contacts}");
@@ -141,9 +149,11 @@ public partial class Vehicle
 
         var dust = col.GetComponentInParent<CosmicDust>();
         if (dust == null || gen == null || drumTrack == null) return;
-        Vector2Int gp = drumTrack.WorldToGridPosition(dust.transform.position);
+        // Registry cell, not re-derived from world position (that mislabels cells after grid drift).
+        bool fromRegistry = gen.TryGetCellOfDust(dust.gameObject, out var gp);
+        if (!fromRegistry) gp = drumTrack.WorldToGridPosition(dust.transform.position);
         string state = gen.TryGetCellState(gp, out var st) ? st.ToString() : "?";
-        sb.Append($" | dust cell={gp} state={state} role={dust.Role} charge={dust.Charge01:F2} " +
+        sb.Append($" | dust cell={gp}{(fromRegistry ? "" : "(pos)")} state={state} role={dust.Role} charge={dust.Charge01:F2} " +
                   $"tintA={dust.CurrentTint.a:F2} shownA={dust.DisplayedAlpha:F2} chippable={gen.CanVehicleChip(gp)} " +
                   $"liveRes={gen.GetLiveCarveResistance01(gp):F2}");
     }
@@ -245,6 +255,7 @@ public partial class Vehicle
         // Glide to the rim, then apply the outward exit impulse once arrived so we don't
         // immediately re-stick — impulse now lands after the animated return, not before it.
         BeginAnimatedRecovery(world, away * Mathf.Max(2.5f, arcadeMaxSpeed * vehicleConfig.voidEjectExitSpeedMultiplier), "void_trap_eject");
+        Debug.LogWarning($"[VEHICLE:RECOVER] {name} void eject to cell {emptyCell}", this);
         return true;
     }
 
@@ -321,6 +332,121 @@ public partial class Vehicle
     Debug.LogWarning($"[VEHICLE:RECOVER] {name} animated return complete (reason={reason})", this);
 }
 
+    // ---- Wall unwedge ----
+    // A ship pushing without moving for kWallWedgeSeconds while touching or overlapping dust it
+    // can never carve glides to the nearest interior cell with a cell of clearance all round.
+    // During the bridge (interstitial maze / path choice) every Solid wall counts: walls are
+    // uncarveable there and both the plow and RecoverIfNeeded are off. Outside it, only
+    // unchippable Solid cells count — chippable dust is the plow's job.
+    private const float kWallWedgeSeconds = 1.0f;
+    private float _wallWedgeSeconds;
+    private bool _wallUnwedgeFailLogged;
+
+    private void UpdateWallUnwedge()
+    {
+        if (rb == null || drumTrack == null || gfm == null || _movementLocked || _recoveryRoutine != null
+            || rb.bodyType != RigidbodyType2D.Dynamic || !isActiveAndEnabled)
+        {
+            ResetWallWedge();
+            return;
+        }
+
+        bool bridge = gfm.BridgePending || gfm.GhostCycleInProgress;
+        bool pushing = _moveInput.sqrMagnitude > 0.0001f;
+        if (!pushing || rb.linearVelocity.magnitude > vehicleConfig.stuckSpeedThreshold
+            || !TouchingUncarveableDust(bridge))
+        {
+            ResetWallWedge();
+            return;
+        }
+
+        _wallWedgeSeconds += Time.fixedDeltaTime;
+        if (_wallWedgeSeconds < kWallWedgeSeconds) return;
+        _wallWedgeSeconds = 0f;
+
+        Vector2Int here = drumTrack.WorldToGridPosition(rb.position);
+        if (!TryFindNearbyClearCell(here, maxRadius: 4, out var cell) &&
+            !TryFindNearbyClearCell(here, maxRadius: 8, out cell))
+        {
+            if (!_wallUnwedgeFailLogged)
+            {
+                _wallUnwedgeFailLogged = true;
+                Debug.LogWarning($"[VEHICLE:RECOVER] {name} unwedge failed at {here}: no interior clear/empty cell within 8 (bridge={bridge})", this);
+            }
+            return;
+        }
+        Vector2 world = (Vector2)drumTrack.GridToWorldPosition(cell);
+        BeginAnimatedRecovery(world, Vector2.zero, bridge ? "interstitial_unwedge" : "wall_unwedge");
+        Debug.LogWarning($"[VEHICLE:RECOVER] {name} unwedge {here} -> {cell} (bridge={bridge})", this);
+    }
+
+    private void ResetWallWedge()
+    {
+        _wallWedgeSeconds = 0f;
+        _wallUnwedgeFailLogged = false;
+    }
+
+    private static readonly List<Collider2D> _wedgeOverlaps = new List<Collider2D>(16);
+
+    private bool TouchingUncarveableDust(bool anySolid)
+    {
+        var gen = gfm != null ? gfm.dustGenerator : null;
+        if (gen == null) return false;
+        int n = rb.GetContacts(_stuckContacts);
+        for (int i = 0; i < n; i++)
+            if (IsUncarveableDustCollider(_stuckContacts[i].collider, gen, anySolid)) return true;
+
+        var filter = ContactFilter2D.noFilter;
+        filter.useTriggers = false;
+        _wedgeOverlaps.Clear();
+        int m = rb.Overlap(filter, _wedgeOverlaps);
+        for (int i = 0; i < m; i++)
+            if (IsUncarveableDustCollider(_wedgeOverlaps[i], gen, anySolid)) return true;
+        return false;
+    }
+
+    private bool IsUncarveableDustCollider(Collider2D col, CosmicDustGenerator gen, bool anySolid)
+    {
+        var dust = col != null ? col.GetComponentInParent<CosmicDust>() : null;
+        if (dust == null) return false;
+        if (!gen.TryGetCellOfDust(dust.gameObject, out var gp))
+            gp = drumTrack.WorldToGridPosition(dust.transform.position);
+        if (!gen.TryGetCellState(gp, out var st) || st != DustCellState.Solid) return false;
+        return anySolid || !gen.CanVehicleChip(gp);
+    }
+
+    // Nearest cell (not the current one) that is empty with every neighbour empty too, so the
+    // hull lands in open corridor rather than against the same wall. Falls back to any empty cell.
+    private bool TryFindNearbyClearCell(Vector2Int around, int maxRadius, out Vector2Int found)
+    {
+        found = around;
+        for (int r = 1; r <= maxRadius; r++)
+            for (int dx = -r; dx <= r; dx++)
+                for (int dy = -r; dy <= r; dy++)
+                {
+                    if (Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dy)) != r) continue;
+                    var c = new Vector2Int(around.x + dx, around.y + dy);
+                    if (IsInteriorCell(c) && IsCellClear(c)) { found = c; return true; }
+                }
+        return TryFindNearbyEmptyCell(around, maxRadius, out found) && found != around && IsInteriorCell(found);
+    }
+
+    // In-bounds and off the outer ring, so a glide never lands in a border gap or off-grid.
+    private bool IsInteriorCell(Vector2Int c)
+    {
+        if (drumTrack == null) return false;
+        int w = drumTrack.GetSpawnGridWidth(), h = drumTrack.GetSpawnGridHeight();
+        return c.x > 0 && c.x < w - 1 && c.y > 0 && c.y < h - 1;
+    }
+
+    private bool IsCellClear(Vector2Int c)
+    {
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dy = -1; dy <= 1; dy++)
+                if (!IsCellEmpty(new Vector2Int(c.x + dx, c.y + dy))) return false;
+        return true;
+    }
+
     private bool TryFindNearbyEmptyCell(Vector2Int around, int maxRadius, out Vector2Int found) {
         found = around;
 
@@ -365,7 +491,13 @@ public partial class Vehicle
     // Cells are pooled forever and never destroyed, so TryGetDustAt() alone can't tell us
     // whether a cell is currently passable — it only tells us whether dust ever spawned
     // there. "Empty enough to respawn into" means the cell isn't currently Solid.
+    // Off-grid cells have no state, which used to read as "empty" and let a glide (which moves
+    // rb.position straight through walls) park the ship outside/under the border wall.
+    if (!gen.IsCellInBounds(gp)) return false;
     if (gen.IsBlockAt(gp)) return false; // Cosmic Block: unbreakable wall, never respawn into it
+    // The sealed record vault: its chamber is permanently empty, but recovery glides by setting
+    // rb.position (straight through walls), so landing there would shut the ship in.
+    if (gen.IsRecordVaultSealed && gen.IsRecordVaultCell(gp)) return false;
     return !gen.TryGetCellState(gp, out var st) || st != DustCellState.Solid;
 }
 }

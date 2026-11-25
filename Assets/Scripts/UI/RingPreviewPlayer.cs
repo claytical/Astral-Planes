@@ -160,7 +160,7 @@ public class RingPreviewPlayer : MonoBehaviour
     /// <summary>Re-applies the current motif's drum level (AudioMixConfig.drumVolume × motif.drumVolumeMultiplier) to both decks.</summary>
     public void RefreshDrumVolume()
     {
-        float volume = AudioMixConfig.DrumVolumeOrDefault(_motif, 0.79f);
+        float volume = AudioMixConfig.DrumVolumeOrDefault(_motif, AudioMixConfig.DefaultDrumVolume);
         if (_drumActive != null) _drumActive.volume = volume;
         if (_drumIdle   != null) _drumIdle.volume   = volume;
     }
@@ -220,7 +220,7 @@ public class RingPreviewPlayer : MonoBehaviour
         src.playOnAwake  = false;
         src.loop         = true;
         src.spatialBlend = 0f;
-        src.volume       = mix != null ? mix.drumVolume : 0.79f;
+        src.volume       = mix != null ? mix.drumVolume : AudioMixConfig.DefaultDrumVolume;
         if (mix != null && mix.drumsGroup != null) src.outputAudioMixerGroup = mix.drumsGroup;
         return src;
     }

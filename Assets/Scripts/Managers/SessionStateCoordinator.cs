@@ -10,7 +10,6 @@ using UnityEngine;
 /// </summary>
 public sealed class SessionStateCoordinator
 {
-    private readonly GameFlowManager _gameFlow;
     private readonly List<LocalPlayer> _players = new();
     private bool _hasGameOverStarted;
     private bool _matchEnded;
@@ -18,11 +17,6 @@ public sealed class SessionStateCoordinator
     private bool _ghostCycleInProgress;
     private bool _bridgePending;
     private GameState _currentState = GameState.Begin;
-
-    public SessionStateCoordinator(GameFlowManager gameFlow)
-    {
-        _gameFlow = gameFlow;
-    }
 
     private GameMode _mode = GameMode.Coop;
 
@@ -33,7 +27,6 @@ public sealed class SessionStateCoordinator
     public IReadOnlyList<LocalPlayer> Players => _players;
     public List<LocalPlayer> MutablePlayers => _players;
     public GameState CurrentState => _currentState;
-    public bool HasGameOverStarted => _hasGameOverStarted;
     public bool GhostCycleInProgress => _ghostCycleInProgress;
     public bool BridgePending => _bridgePending;
 

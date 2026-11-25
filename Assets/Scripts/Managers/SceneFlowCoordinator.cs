@@ -37,6 +37,7 @@ public sealed class SceneFlowCoordinator
 
     private CanvasGroup _screenFadeOverlay;
     private Coroutine _motifBannerRoutine;
+    private Coroutine _feedbackRoutine;
     private readonly List<GameObject> _bannerHidden = new();
 
     public SceneFlowCoordinator(GameFlowManager gameFlow, SessionStateCoordinator session, BridgeCoordinator bridge)
@@ -66,6 +67,7 @@ public sealed class SceneFlowCoordinator
     {
         _setupInFlight = false;
         _motifBannerRoutine = null;
+        _feedbackRoutine = null;
         _gameFlow.RunControlSandbox = false;
         GameFlowManager.SandboxActive = false;
         if (_screenFadeOverlay != null)
@@ -212,6 +214,8 @@ public sealed class SceneFlowCoordinator
 
     public IEnumerator StartNextMotifInPhase()
     {
+        // A collected record's exit spotlight never outlives the motif it belonged to.
+        _gameFlow.ReleaseRecordExitZoom("next motif");
         if (_gameFlow.dustGenerator != null)
             _gameFlow.dustGenerator.ResumeRegrowthAfterBridge();
 
@@ -287,6 +291,10 @@ public sealed class SceneFlowCoordinator
             yield break;
         }
 
+        // The Feedback Message panel is authored visible with placeholder text; it only shows for a caption.
+        var feedbackPanel = FindFeedbackPanel();
+        if (feedbackPanel != null) feedbackPanel.SetActive(false);
+
         _bridge.ClearSessionMotifs();
         _gameFlow.ResetRecordRecovery();
 
@@ -313,6 +321,15 @@ public sealed class SceneFlowCoordinator
             _gameFlow.phaseTransitionManager.StartChapterById(PhaseLibraryStartConfig.PhaseId, PhaseLibraryStartConfig.PhaseIndex, "GFM/Setup/Library");
             _gameFlow.phaseTransitionManager.JumpToMotif(PhaseLibraryStartConfig.MotifId, PhaseLibraryStartConfig.MotifIndex, "GFM/Setup/Library");
             PhaseLibraryStartConfig.Consume();
+        }
+        else if (_gameFlow.phaseTransitionManager.TryResolveResumeStart(
+                     out var resumePhaseId, out int resumePhase, out var resumeMotifId, out int resumeMotif))
+        {
+            // No carousel pick (e.g. a route that skips the motif carousel), but the tutorial is
+            // done: resume where the carousel would open instead of replaying the tutorial.
+            Debug.Log($"[MOTIF] No library pick; resuming at phase {resumePhase} motif {resumeMotif} ({resumeMotifId}).");
+            _gameFlow.phaseTransitionManager.StartChapterById(resumePhaseId, resumePhase, "GFM/Setup/Resume");
+            _gameFlow.phaseTransitionManager.JumpToMotif(resumeMotifId, resumeMotif, "GFM/Setup/Resume");
         }
         else
         {
@@ -343,17 +360,8 @@ public sealed class SceneFlowCoordinator
         _gameFlow.dustGenerator.ManualStart();
         _gameFlow.SetupBinRingController();
 
-        // Very first motif of the session. Competitive: show the record immediately, in darkness,
-        // before the maze exists, hold, then fade it while the maze grows in (below), as before.
-        // Co-op/solo: nothing yet — the record appears in its vault once the maze exists and the
-        // camera zooms in on it (IntroduceRecord, after StartNextPhaseMazeAndStar).
-        bool dockIntro = _session == null || !_session.IsCompetitive;
-        if (!dockIntro)
-        {
-            var firstMotifBinRings = _gameFlow.GetBinRingController();
-            if (firstMotifBinRings != null) firstMotifBinRings.ShowInitialRecord();
-            yield return new WaitForSeconds(firstMotifBinRings != null ? firstMotifBinRings.GetRecordHoldDuration(RecordHoldDurationFallback) : RecordHoldDurationFallback);
-        }
+        // Competitive: the record shows (in darkness) and holds before the ships launch.
+        yield return _gameFlow.StartCoroutine(ShowCompetitiveFirstRecordAndHold());
 
         foreach (var lp in _session.Players)
             if (lp != null) lp.Launch();
@@ -363,17 +371,7 @@ public sealed class SceneFlowCoordinator
         if (_gameFlow.phaseTransitionManager.currentMotif != null)
             _gameFlow.harmony.SetActiveProfile(_gameFlow.phaseTransitionManager.currentMotif.chordProgression, true);
 
-        if (!dockIntro)
-        {
-            var ringsToFade = _gameFlow.GetBinRingController();
-            if (ringsToFade != null) ringsToFade.FadeInitialRecordOut(MazeSpawnDuration);
-        }
-        yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
-        if (dockIntro) _gameFlow.StartCoroutine(_gameFlow.IntroduceRecord());
-        // Drums start only now (record hold + maze growth are silent) so bar 1 step 0 is
-        // where play begins, not partway through the first loop.
-        _gameFlow.activeDrumTrack.BeginMotifTransport("GFM/Setup");
-        yield return null;
+        yield return _gameFlow.StartCoroutine(GrowFirstMotifInPlace("GFM/Setup"));
 
         _session.SetCurrentState(GameState.Playing);
         _setupDone = true;
@@ -381,14 +379,12 @@ public sealed class SceneFlowCoordinator
     }
 
     // Control sandbox (ControlSandboxDirector): vehicles + role dust on an empty field, no
-    // PhaseStar (so no tentacles), no transport. When the lesson ends, a single rainbow road
-    // opens into the already-resolved motif and StartChosenMotifOrPhase brings it in exactly
-    // like any later motif (maze + star grow, transport starts, name/record reveal).
+    // PhaseStar (so no tentacles), no transport. When the lesson ends, the already-resolved motif
+    // (Tutorial Motif for a first solo run; the carousel pick / resume in multiplayer) grows in
+    // around the ships — no interstitial — via GrowFirstMotifInPlace, like the normal setup.
     private IEnumerator RunControlSandboxThenFirstMotif()
     {
         var ptm = _gameFlow.phaseTransitionManager;
-        int phase = ptm.CurrentPhaseIndex;
-        int motif = Mathf.Max(0, ptm.currentMotifIndex);
 
         _gameFlow.noteViz.Initialize();
         _gameFlow.harmony.Initialize(_gameFlow.activeDrumTrack, _gameFlow.controller);
@@ -410,20 +406,46 @@ public sealed class SceneFlowCoordinator
         var director = ControlSandboxDirector.Create(_gameFlow, _session.Players, ptm.currentMotif);
         yield return director.Run();
 
-        // The path: one road on the top edge into the session's motif. SandboxActive stays on
-        // until the vehicles are through it (fuel rescue, narration hold-off). Bridge flags are
-        // raised exactly as BridgeCoordinator does around a normal path choice: they suspend
-        // vehicle OOB recovery (which otherwise snaps the carried-off vehicle back on screen),
-        // the plow, and other mid-transition systems.
-        _session.SetBridgePending(true);
-        _session.SetGhostCycleInProgress(true);
-        yield return _gameFlow.StartCoroutine(_gameFlow.PathChoice.RunSingleExitAndAdvance(
-            BoundaryWrap.BoundarySide.Top, phase, motif));
-        _session.SetGhostCycleInProgress(false);
-        _session.SetBridgePending(false);
+        // No interstitial: the motif (Tutorial Motif for a first solo run, the chosen one in
+        // multiplayer) grows in right around the ships. SandboxActive stays on through the grow-in
+        // (fuel rescue, narration hold-off) and drops once play begins.
+        _bridge.StampMotifStartTime();
+        ShowMotifNameBanner();
+        yield return _gameFlow.StartCoroutine(ShowCompetitiveFirstRecordAndHold());
+        yield return _gameFlow.StartCoroutine(GrowFirstMotifInPlace("GFM/Sandbox"));
 
         GameFlowManager.SandboxActive = false;
         if (director != null) UnityEngine.Object.Destroy(director.gameObject);
+    }
+
+    // Competitive first motif: show the record immediately, in darkness, and hold it before the
+    // maze exists. GrowFirstMotifInPlace fades it while the maze grows in. No-op for co-op/solo.
+    private IEnumerator ShowCompetitiveFirstRecordAndHold()
+    {
+        if (_session == null || !_session.IsCompetitive) yield break;
+        var firstMotifBinRings = _gameFlow.GetBinRingController();
+        if (firstMotifBinRings != null) firstMotifBinRings.ShowInitialRecord();
+        yield return new WaitForSeconds(firstMotifBinRings != null ? firstMotifBinRings.GetRecordHoldDuration(RecordHoldDurationFallback) : RecordHoldDurationFallback);
+    }
+
+    // The session's first motif arriving where the ships already are — shared by the normal setup
+    // and the post-sandbox hand-off (no interstitial). Competitive: the record shown by
+    // ShowCompetitiveFirstRecordAndHold fades while the maze grows in. Co-op/solo: the record
+    // appears in its vault once the maze exists and the camera zooms in on it (IntroduceRecord).
+    // Drums start only after the maze so bar 1 step 0 is where play begins.
+    private IEnumerator GrowFirstMotifInPlace(string transportReason)
+    {
+        bool dockIntro = _session == null || !_session.IsCompetitive;
+        if (!dockIntro)
+        {
+            var ringsToFade = _gameFlow.GetBinRingController();
+            if (ringsToFade != null) ringsToFade.FadeInitialRecordOut(MazeSpawnDuration);
+        }
+
+        yield return _gameFlow.StartCoroutine(StartNextPhaseMazeAndStar(doHardReset: false));
+        if (dockIntro) _gameFlow.StartCoroutine(_gameFlow.IntroduceRecord());
+        if (_gameFlow.activeDrumTrack != null) _gameFlow.activeDrumTrack.BeginMotifTransport(transportReason);
+        yield return null;
     }
 
     private IEnumerator PlayIntroScreenSequenceAsync()
@@ -449,7 +471,89 @@ public sealed class SceneFlowCoordinator
         var introGo = FindIntroScreen();
         if (introGo == null) return null;
         if (ApplyCurrentMotifName(introGo) == null) return null;
+        return StartBanner(introGo);
+    }
 
+    /// <summary>"{0}" is the motif's name. Shown as the collected record shrinks away.</summary>
+    public const string LibraryCaptionFormat = "{0} added to record library";
+
+    /// <summary>
+    /// Shows <paramref name="text"/> in the top-right "Feedback Message" panel (progress messages),
+    /// fading in, holding and fading out. A newer caption cancels an older one; independent of the
+    /// motif-name banner. Not yielded by callers.
+    /// </summary>
+    public Coroutine ShowCaption(string text)
+    {
+        var panel = FindFeedbackPanel();
+        if (panel == null)
+        {
+            Debug.LogWarning("[SceneFlow] 'Feedback Message' panel not found for a caption.");
+            return null;
+        }
+        var label = panel.GetComponentInChildren<TMP_Text>(includeInactive: true);
+        if (label == null)
+        {
+            Debug.LogWarning("[SceneFlow] No TMP text under 'Feedback Message' for a caption.");
+            return null;
+        }
+        label.text = text;
+
+        // Captions play under a record zoom (the library caption always does), and the zoom's dim
+        // covers camera-space UI. Anchors are preserved, so the panel stays top-right.
+        CameraZoomDirector.MoveToOverlay(panel.transform as RectTransform);
+        if (_feedbackRoutine != null) _gameFlow.StopCoroutine(_feedbackRoutine);
+        _feedbackRoutine = _gameFlow.StartCoroutine(FadeFeedbackPanel(panel));
+        return _feedbackRoutine;
+    }
+
+    private IEnumerator FadeFeedbackPanel(GameObject panel)
+    {
+        var cg = panel.GetOrAddComponent<CanvasGroup>();
+        cg.blocksRaycasts = false;
+        panel.SetActive(true);
+        cg.alpha = 0f;
+
+        float elapsed = 0f;
+        while (elapsed < IntroFadeInDuration)
+        {
+            if (!panel) yield break;
+            elapsed += Time.deltaTime;
+            cg.alpha = Mathf.Clamp01(elapsed / IntroFadeInDuration);
+            yield return null;
+        }
+        cg.alpha = 1f;
+
+        yield return new WaitForSeconds(IntroHoldDuration);
+
+        elapsed = 0f;
+        while (elapsed < IntroFadeOutDuration)
+        {
+            if (!panel) yield break;
+            elapsed += Time.deltaTime;
+            cg.alpha = 1f - Mathf.Clamp01(elapsed / IntroFadeOutDuration);
+            yield return null;
+        }
+        if (!panel) yield break;
+        cg.alpha = 0f;
+        panel.SetActive(false);
+        _feedbackRoutine = null;
+    }
+
+    private static GameObject FindFeedbackPanel()
+    {
+        foreach (var root in SceneManager.GetActiveScene().GetRootGameObjects())
+        {
+            var match = root.GetComponentsInChildren<Transform>(includeInactive: true)
+                            .FirstOrDefault(t => t.name == "Feedback Message");
+            if (match != null) return match.gameObject;
+        }
+        return null;
+    }
+
+    private Coroutine StartBanner(GameObject introGo)
+    {
+        // Banners can play under a record zoom, and the zoom's dim covers camera-space UI.
+        CameraZoomDirector.MoveToOverlay(introGo.transform as RectTransform);
         if (_motifBannerRoutine != null)
         {
             _gameFlow.StopCoroutine(_motifBannerRoutine);

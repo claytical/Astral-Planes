@@ -26,22 +26,13 @@ MonoBehaviour:
   ringStaggerDelay: 0.08
   rotSpeedBase: 25
   rotSpeedMax: 174
-  fadeOutDuration: 0.5
   noteDotRadius: 0.01
   noteTravelDuration: 1
-  ringHoldScale: 0.25
-  bouncePressScale: 0.12
-  bouncePressDuration: 0.25
-  bounceSettleDuration: 0.35
   rollOffDuration: 2
-  ringAppearDuration: 0.1
-  noteLaunchLeadSteps: 2
   launchSfx: {fileID: 8300000, guid: 16b44a33b73884ed08017ba01d7f61bc, type: 3}
   launchSfxVolume: 0.115
   impactSfx: {fileID: 8300000, guid: bc570d14f72164a12a7c8adccbb03ca8, type: 3}
   impactSfxVolume: 0.135
-  spinOffExtraDegPerSec: 720
   spinOffDuration: 2
   tiltXDegrees: 75
-  tiltXDuration: 3
   scaleDownDuration: 3

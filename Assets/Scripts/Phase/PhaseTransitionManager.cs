@@ -130,6 +130,53 @@ public class PhaseTransitionManager : MonoBehaviour
     /// were recorded, e.g. an edit that inserted/removed/reordered phases). Falls back
     /// to the raw fallbackIndex when phaseId is null/empty or isn't found.
     /// </summary>
+    /// <summary>
+    /// Where a session with no carousel pick should start: the same rule as the carousel's
+    /// PickStartNode. False while the tutorial isn't done (start at the tutorial). Once it is (its
+    /// ring is saved, or any later ring is), the newest saved ring in the orbit phases, falling
+    /// back to phase 1's first motif.
+    /// </summary>
+    public bool TryResolveResumeStart(out string phaseId, out int phaseIndex, out string motifId, out int motifIndex)
+    {
+        phaseId = null; motifId = null; phaseIndex = 0; motifIndex = 0;
+        var phases = chapterLibrary != null ? chapterLibrary.phases : null;
+        if (phases == null || phases.Count < 2) return false;
+
+        var snaps = RingSessionStore.LoadAllRingsFromDisk();
+        if (snaps == null || snaps.Count == 0) return false;
+
+        bool tutorialDone = false;
+        long newest = long.MinValue;
+        int bestPhase = -1, bestMotif = -1;
+        foreach (var snap in snaps)
+        {
+            if (snap == null) continue;
+            int p = phases.FindIndex(ph => ph != null && ph.phaseId == snap.PhaseId);
+            if (p < 0) continue;
+            tutorialDone = true; // a ring in phase 0 is the tutorial's; any later ring implies it
+            if (p == 0) continue;
+
+            var motifs = phases[p].motifs;
+            if (motifs == null) continue;
+            int m = (snap.MotifIndex >= 0 && snap.MotifIndex < motifs.Count
+                     && motifs[snap.MotifIndex] != null && motifs[snap.MotifIndex].motifId == snap.MotifId)
+                ? snap.MotifIndex
+                : motifs.FindIndex(mp => mp != null && mp.motifId == snap.MotifId);
+            if (m < 0 || snap.SavedAtUtcTicks <= newest) continue;
+            newest = snap.SavedAtUtcTicks; bestPhase = p; bestMotif = m;
+        }
+        if (!tutorialDone) return false;
+
+        if (bestPhase < 0) { bestPhase = 1; bestMotif = 0; }
+        var phase = phases[bestPhase];
+        if (phase?.motifs == null || bestMotif >= phase.motifs.Count || phase.motifs[bestMotif] == null) return false;
+        phaseId    = phase.phaseId;
+        phaseIndex = bestPhase;
+        motifIndex = bestMotif;
+        motifId    = phase.motifs[bestMotif].motifId;
+        return true;
+    }
+
     public void StartChapterById(string phaseId, int fallbackIndex, string who)
     {
         int resolvedIndex = fallbackIndex;

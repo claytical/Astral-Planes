@@ -39,14 +39,8 @@ public class PhaseStarConfig : ScriptableObject
     [Header("1. Charge & Shards")]
     [Tooltip("Delay after the star becomes visible (dormant reveal) before tentacles begin hunting/growing.")]
     [Min(0f)] public float tentacleActivationDelay = 0.5f;
-    [Tooltip("Minimum alpha for a shard with zero charge — keeps it ghost-visible.")]
-    [Range(0f, 0.5f)] public float shardMinAlpha = 0.5f;
     [Tooltip("Lerp speed for the visual charge fill (units/sec in 0-1 space). Lower = slower, smoother rise from empty to full.")]
     [Min(0.1f)] public float chargeDisplayLerpSpeed = 2.5f;
-    [Tooltip("Minimum diamond scale while tentacles are actively drawing/draining, so shards bloom out of the particle field before charge is visible.")]
-    [Range(0f, 1f)] public float tentacleBloomMinScale = 0.22f;
-    [Tooltip("Baseline star seed scale shown during dormant dust-calling so the particle force exists before tentacles finish charging.")]
-    [Range(0f, 0.5f)] public float dormantSeedScale = 0.08f;
     [Tooltip("Accumulator diamond spin (deg/s). It turns opposite to the scout diamond.")]
     [Range(10f, 360f)] public float accumulatorRotSpeed = 90f;
     [Tooltip("Max tilt (± degrees) of the accumulator diamond while draining.")]
@@ -61,8 +55,6 @@ public class PhaseStarConfig : ScriptableObject
     [Header("2. Look")]
     [Tooltip("Seconds for the applied visual angle to settle to a new target angle.")]
     [Min(0.01f)] public float diamondAngleSmoothTime = 0.06f;
-    [Tooltip("Max angular separation between the two counter-rotating diamonds at zero charge.")]
-    public float dualMaxSeparationDeg = 45f;
     [Tooltip("Shard tint at zero charge (gray) and the alpha used while dim/hidden. Charging lerps from this to the role color.")]
     public Color dimShardTint = new Color(0.3584906f, 0.3584906f, 0.3584906f, 0.6431373f);
     [Tooltip("Disarmed look: RGB multiplier applied to the dim color (lower = darker).")]
@@ -122,21 +114,129 @@ public class PhaseStarConfig : ScriptableObject
     [Serializable]
     public sealed class GhostDriftTuning
     {
-        [Tooltip("Slow wander speed while dormant (world units/s).")]
-        public float driftSpeed = 0.35f;
-        [Tooltip("How quickly the star eases into its wander velocity.")]
-        public float driftAccel = 1.5f;
-        [Tooltip("Speed the star is flung away at when a ship passes through it.")]
-        public float scatterSpeed = 4f;
+        // Dormant movement itself is the swim (SwimTuning); this only covers ship pass-through.
+        [Tooltip("Push-away acceleration (world units/s²) for a star still overlapping a ship as it stops being a ghost (armed). Contact while charging is the soft bump (swim → Ship bump).")]
+        public float scatterSpeed = 1.5f;
         [Tooltip("How much of the ship's own heading the scatter inherits (0 = straight away from the ship).")]
         [Range(0f, 1f)] public float scatterFollowsShip = 0.5f;
         [Tooltip("Turbulence strength handed to the ship while it overlaps the star (0..1).")]
-        [Range(0f, 1f)] public float turbulence01 = 0.8f;
+        [Range(0f, 1f)] public float turbulence01 = 0.15f;
         [Tooltip("How long the turbulence lingers after the ship leaves the star.")]
         public float turbulenceSeconds = 0.6f;
     }
 
+    /// <summary>One role's swim rhythm: the star strokes on these drum steps.</summary>
+    [Serializable]
+    public sealed class RoleSwimStyle
+    {
+        public MusicalRole role;
+        [Tooltip("Stroke every N drum steps (16th-note steps: 4 = every beat, 16 = once a bar).")]
+        [Min(1)] public int stepsPerStroke = 8;
+        [Tooltip("Step offset within the stroke cycle (e.g. 6 of 8 = a syncopated 'and').")]
+        [Min(0)] public int stepOffset = 0;
+        [Tooltip("Speed each stroke adds, eased in over Thrust Seconds (world units/s).")]
+        [Min(0f)] public float strokeImpulse = 0.7f;
+        [Tooltip("How fast the glide bleeds off after a stroke (1/s). Lower = longer, floatier glide.")]
+        [Min(0f)] public float glideDrag = 0.8f;
+        [Tooltip("How far the tendrils pull in on the stroke (0 = not at all, 1 = fully).")]
+        [Range(0f, 1f)] public float contractAmount = 0.45f;
+
+        public RoleSwimStyle() { }
+        public RoleSwimStyle(MusicalRole r, int steps, int offset, float impulse, float drag, float contract)
+        { role = r; stepsPerStroke = steps; stepOffset = offset; strokeImpulse = impulse; glideDrag = drag; contractAmount = contract; }
+    }
+
+    /// <summary>
+    /// Charging stars swim like jellyfish in time with the music: tendrils contract on the role's
+    /// stroke step, the star kicks forward, then glides with its tendrils trailing. They are curious
+    /// about ships (lean toward one nearby) but shy (dart away when one gets close).
+    /// </summary>
+    [Serializable]
+    public sealed class SwimTuning
+    {
+        [Tooltip("Per-role stroke rhythm. A role missing here uses the first entry.")]
+        public RoleSwimStyle[] roles =
+        {
+            new RoleSwimStyle(MusicalRole.Bass,    16, 0, 0.9f,  0.6f, 0.55f),
+            new RoleSwimStyle(MusicalRole.Harmony,  8, 0, 0.7f,  0.8f, 0.45f),
+            new RoleSwimStyle(MusicalRole.Lead,     4, 0, 0.45f, 1.1f, 0.35f),
+            new RoleSwimStyle(MusicalRole.Groove,   8, 6, 0.6f,  0.9f, 0.45f),
+        };
+        [Tooltip("Seconds the tendrils take to pull in before the push.")]
+        [Min(0.02f)] public float contractSeconds = 0.12f;
+        [Tooltip("Seconds each stroke's push is eased over (sine in/out). Longer = softer.")]
+        [Min(0.05f)] public float thrustSeconds = 0.5f;
+        [Tooltip("Strokes stop adding speed above this (world units/s). Never brakes a faster glide.")]
+        [Min(0.1f)] public float maxSwimSpeed = 1.4f;
+        [Tooltip("How fast the star's heading can turn (degrees/s). Lower = wider, floatier curves.")]
+        [Min(1f)] public float turnDegreesPerSecond = 70f;
+        [Tooltip("Sideways flick added to the tendrils on beats that aren't stroke steps (× budWiggleAmplitude).")]
+        [Min(0f)] public float beatFlickAmount = 2.5f;
+        [Tooltip("How strongly gliding tendrils stream behind the star (0 = keep their resting spread).")]
+        [Range(0f, 1f)] public float trailStrength = 0.6f;
+        [Tooltip("Glide speed (world units/s) at which the trail is fully applied.")]
+        [Min(0.05f)] public float trailFullSpeed = 1.2f;
+        [Tooltip("Stroke impulse multiplier while a vine is out — the star holds on instead of swimming.")]
+        [Range(0f, 1f)] public float vineHoldImpulseMul = 0.15f;
+        [Tooltip("How far ahead (cells) a stroke looks for open space in the maze.")]
+        [Min(1f)] public float strokeProbeCells = 4f;
+        [Tooltip("Less open room than this (cells) in every forward direction → the star pulses in place instead of stroking.")]
+        [Min(0f)] public float minStrokeRoomCells = 0.75f;
+        [Tooltip("Seconds between picking a new wander heading.")]
+        public Vector2 headingRechooseSeconds = new Vector2(2.5f, 5f);
+
+        [Header("Ship curiosity")]
+        [Tooltip("A ship within this many cells draws the star's tendrils and heading toward it.")]
+        [Min(0f)] public float curiousRadiusCells = 5f;
+        [Tooltip("How much the heading bends toward a curious-range ship (0..1).")]
+        [Range(0f, 1f)] public float curiousHeadingBlend = 0.6f;
+        [Tooltip("How far tendrils lean toward a curious-range ship (0..1 of a full turn toward it).")]
+        [Range(0f, 1f)] public float curiousTendrilLean = 0.45f;
+        [Tooltip("Inside this many cells of a ship the star curls up progressively and drifts away from it.")]
+        [Min(0f)] public float repelRadiusCells = 3f;
+        [Tooltip("Push-away acceleration at point-blank range (world units/s²); falls off as (1 − d/R)².")]
+        [Min(0f)] public float repelAccel = 2.5f;
+
+        [Header("Ship bump (soft contact)")]
+        [Tooltip("Contact starts this many cells before the star and hull actually touch.")]
+        [Min(0f)] public float bumpSkinCells = 0.15f;
+        [Tooltip("Push on the star per cell of overlap (world units/s²). The star yields most.")]
+        [Min(0f)] public float bumpStarAccel = 14f;
+        [Tooltip("Shove back on the ship per cell of overlap (world units/s²).")]
+        [Min(0f)] public float bumpShipAccel = 10f;
+        [Tooltip("How quickly the ship's closing speed into the star is soaked up (1/s). Higher = firmer.")]
+        [Min(0f)] public float bumpShipDamping = 8f;
+
+        [Header("Entrance")]
+        [Tooltip("New stars swim in from the left, right or top edge of the play area (passing through walls). Off = they appear at their spawn cell.")]
+        public bool entranceEnabled = true;
+        [Tooltip("Stroke impulse multiplier while swimming in from off-screen to its spawn point.")]
+        [Min(0f)] public float entranceImpulseMul = 2.2f;
+        [Tooltip("Entrance ends when the star is within this many cells of its spawn point.")]
+        [Min(0.1f)] public float entranceArriveCells = 0.6f;
+        [Tooltip("Safety: entrance ends after this many seconds regardless.")]
+        [Min(0.5f)] public float entranceMaxSeconds = 8f;
+        [Tooltip("How far outside the play-area edge the star starts, in cells.")]
+        [Min(0f)] public float entranceStartOutsideCells = 1.5f;
+
+        [Header("Spawn spread")]
+        [Tooltip("Stars spawn at least this many cells from each other when possible.")]
+        [Min(0f)] public float minStarSeparationCells = 6f;
+        [Tooltip("Stars spawn in an open (dust-free) pocket of at least this many connected cells when one exists, so they have room to swim. Pockets sealed off from the ship by Cosmic Blocks or the vault are always avoided.")]
+        [Min(1)] public int minSpawnOpenCells = 8;
+
+        public RoleSwimStyle For(MusicalRole role)
+        {
+            if (roles == null || roles.Length == 0) return null;
+            for (int i = 0; i < roles.Length; i++)
+                if (roles[i] != null && roles[i].role == role) return roles[i];
+            return roles[0];
+        }
+    }
+
     [Header("3. Motion")]
+    [Tooltip("Charging stars swim in time with the music and react to ships (see SwimTuning).")]
+    public SwimTuning swim = new();
     public ScreenBoundsTuning bounds = new();
     public VehicleAvoidanceTuning avoidance = new();
     public SteeringTuning steering = new();
@@ -242,4 +342,32 @@ public class PhaseStarConfig : ScriptableObject
     [Min(1f)] public float vineMeanderSpacingCells = 2.5f;
     [Tooltip("Star within this many cells of a root breadcrumb → the vine shortens to it (pushed back along itself).")]
     [Min(0.1f)] public float vineRootSlackCells = 0.5f;
+    [Tooltip("A flower a vine failed to reach (\"vine blocked\") is skipped for this many seconds so other flowers get a turn.")]
+    [Min(0f)] public float blockedTargetCooldownSeconds = 3f;
+
+    [Header("5. Tentacles — idle tendrils (one per note still needed)")]
+    [Tooltip("Length of each idle tendril, in cells.")]
+    [Min(0.05f)] public float budLengthCells = 1.2f;
+    [Tooltip("Tendril opacity at the root (the tip fades to 60%).")]
+    [Range(0f, 1f)] public float budAlpha = 0.85f;
+    [Tooltip("Gap between the star's centre and where the tendrils start, in cells.")]
+    [Min(0f)] public float budRootOffsetCells = 0.12f;
+    [Tooltip("How far each tendril curls sideways toward its tip, in cells.")]
+    [Min(0f)] public float budCurlAmplitude = 0.3f;
+    [Tooltip("Tendril width at the root, in world units (tapers toward the tip).")]
+    [Min(0.005f)] public float budWidthWorld = 0.07f;
+    [Tooltip("Most tendrils shown at once (a star blocked on its count can't sprout dozens).")]
+    [Range(1, 64)] public int budMaxShown = 16;
+    [Tooltip("Tendril opacity multiplier while the star sleeps or is paused for a sibling.")]
+    [Range(0f, 1f)] public float budDimmedAlphaMul = 0.4f;
+    [Tooltip("Sideways wiggle at the bud tip, in cells.")]
+    [Min(0f)] public float budWiggleAmplitude = 0.08f;
+    [Tooltip("How fast the ring of buds slowly turns (degrees per second).")]
+    public float budSpinDegreesPerSecond = 12f;
+    [Tooltip("Tutorial callout (\"These are discoveries.\"): bud opacity at the peak of its pulse.")]
+    [Range(0f, 1f)] public float budHighlightAlpha = 1f;
+    [Tooltip("Tutorial callout: bud width multiplier at the peak of its pulse.")]
+    [Min(1f)] public float budHighlightWidthMul = 2.6f;
+    [Tooltip("Tutorial callout: pulses per second.")]
+    [Min(0.01f)] public float budHighlightPulseHz = 1.2f;
 }

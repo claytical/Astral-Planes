@@ -16,8 +16,4 @@ public class InstrumentTrackControllerConfig : ScriptableObject
     public AudioClip pickupTickHarmony;
     [Tooltip("Pickup tick for Groove notes (falls back to Pickup Tick Default).")]
     public AudioClip pickupTickGroove;
-    
-    [Header("Cohort")]
-    [Tooltip("Fraction of the leader loop used as the cohort arm window.")]
-    public float cohortWindowFraction = 0.5f;
 }

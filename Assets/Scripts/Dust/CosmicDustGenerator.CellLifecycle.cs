@@ -40,6 +40,19 @@ public partial class CosmicDustGenerator
             if (!existing.activeSelf)
                 existing.SetActive(true);
 
+            // Pooled GOs live forever, but the grid↔world mapping can change between mazes
+            // (SyncTileWithScreen). Re-seat on reuse so the collider sits on its logical cell.
+            if (drums != null)
+            {
+                Vector3 want = drums.GridToWorldPosition(gp);
+                if (((Vector2)(existing.transform.position - want)).sqrMagnitude > 1e-6f)
+                {
+                    existing.transform.position = want;
+                    var reused = _gridState.CellDust[gp.x, gp.y];
+                    if (reused != null)
+                        reused.SetCellSizeDrivenScale(Mathf.Max(0.001f, drums.GetCellWorldSize()), config.dustFootprintMul, cellClearanceWorld);
+                }
+            }
             return existing;
         }
         if (dustPrefab == null) return null;
@@ -379,6 +392,9 @@ public partial class CosmicDustGenerator
 
     public void SetStarKeepClear(Vector2Int centerCell, int radiusCells, bool forceRemoveExisting) =>
         _vehicleReservation.SetStarKeepClear(centerCell, radiusCells, forceRemoveExisting);
+
+    /// <summary>The Star is gone: drop its keep-clear pocket (its cells may regrow).</summary>
+    public void ReleaseStarKeepClear() => _vehicleReservation.ReleaseStarKeepClear(requestRegrow: true);
 
     private void CarvePermanentDisk(Vector2Int center, int radiusCells)
     {

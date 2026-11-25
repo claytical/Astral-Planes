@@ -130,7 +130,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
         () => drums != null ? drums.GetSpawnGridHeight() : 0,
         () => dustClaims,
         cell => _permanentClearCells.Contains(cell),
-        cell => RequestRegrowCellAt(cell, -1f, true, false));
+        cell => RequestRegrowCellAt(cell, -1f, true, false),
+        IsRecordVaultCell);
 
     private CosmicDustColliderSuppressionController _colliderSuppressionBacking;
     private CosmicDustColliderSuppressionController _colliderSuppression => _colliderSuppressionBacking ??= new CosmicDustColliderSuppressionController(
@@ -743,6 +744,14 @@ public partial class CosmicDustGenerator : MonoBehaviour
     /// </summary>
     public void GetColoredDustCells(List<Vector2Int> results) => _registry.GetColoredDustCells(results);
     private bool IsInBounds(Vector2Int gp) => _registry.IsInBounds(gp);
+    /// <summary>Public bounds check for recovery code (off-grid cells are never "empty").</summary>
+    public bool IsCellInBounds(Vector2Int gp) => _registry.IsInBounds(gp);
+    /// <summary>The registry's own cell for a dust GameObject (not re-derived from its world position).</summary>
+    public bool TryGetCellOfDust(GameObject go, out Vector2Int gp)
+    {
+        gp = default;
+        return go != null && _registry.GoToCell.TryGetValue(go, out gp);
+    }
 
     /// <summary>
     /// Wraps a grid coordinate toroidally when <see cref="toroidal"/> is enabled.
@@ -812,9 +821,9 @@ public partial class CosmicDustGenerator : MonoBehaviour
         return config.mazeTint;
     }
 
-    public Color SolidDustColor()
+    public Color InertBlockColor()
     {
-        return config.solidDustTint;
+        return config.inertBlockTint;
     }
     public void ApplyActiveRoles(MotifProfile motif)
     {
@@ -954,31 +963,15 @@ public partial class CosmicDustGenerator : MonoBehaviour
     /// Consistent with GetColoredDustCells so the star arms only when actual colored
     /// (vehicle-carved) cells exist — not just when imprints have been promoted.
     /// </summary>
-    public bool HasAnyDustWithRole()
-    {
-        if (_gridState.CellState == null || _gridState.CellDust == null) return false;
-        for (int y = 0; y < _gridState.Height; y++)
-        for (int x = 0; x < _gridState.Width; x++)
-        {
-            if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
-            var dust = _gridState.CellDust[x, y];
-            if (dust != null && dust.Role != MusicalRole.None && dust.currentEnergyUnits > 0 && dust.IsVisuallyPresentForTargeting()) return true;
-        }
-        return false;
-    }
+    public bool HasAnyDustWithRole() => _registry.FlowerCountAnyRole() > 0;
 
-    public bool HasAnyDustWithRole(MusicalRole role)
-    {
-        if (role == MusicalRole.None || _gridState.CellState == null || _gridState.CellDust == null) return false;
-        for (int y = 0; y < _gridState.Height; y++)
-        for (int x = 0; x < _gridState.Width; x++)
-        {
-            if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
-            var dust = _gridState.CellDust[x, y];
-            if (dust != null && dust.Role == role && dust.currentEnergyUnits > 0 && dust.IsVisuallyPresentForTargeting()) return true;
-        }
-        return false;
-    }
+    public bool HasAnyDustWithRole(MusicalRole role) => _registry.FlowerCount(role) > 0;
+
+    /// <summary>This frame's bloomed (star-drainable) cells of one role, from the shared
+    /// once-per-frame scan. Read-only; do not hold across frames.</summary>
+    public IReadOnlyList<Vector2Int> GetFlowerCells(MusicalRole role) => _registry.GetFlowerCells(role);
+
+    public int FlowerCount(MusicalRole role) => _registry.FlowerCount(role);
 
     // Paints existing dust with a role at reduced energy (DiscoveryTrackNode exhaust trail).
     // Does NOT create new dust — only paints cells that already have solid terrain.
@@ -993,10 +986,15 @@ public partial class CosmicDustGenerator : MonoBehaviour
         int maxUnits = profile.maxEnergyUnits;
         int exhaustUnits = Mathf.Max(1, Mathf.RoundToInt(maxUnits * Mathf.Clamp01(energyFraction)));
 
-        // Update imprint so regrowth remembers the role assignment.
+        // Update imprint so regrowth remembers the role assignment. Keep the cell's permanent
+        // hidden (Voronoi) role; a bare new DustImprint would reset it to default(MusicalRole) = Bass.
+        bool hadImp = _imprints.TryGetValue(cell, out var priorImp);
         _imprints[cell] = new DustImprint
         {
-            role               = role,
+            role                    = role,
+            hiddenRole              = hadImp ? priorImp.hiddenRole : MusicalRole.None,
+            hiddenVoiceIndex        = hadImp ? priorImp.hiddenVoiceIndex : 0,
+            hiddenRoleIsGenericFill = hadImp && priorImp.hiddenRoleIsGenericFill,
             color              = color,
             carveResistance01  = profile.carveResistance01,
             drainResistance01  = profile.drainResistance01,

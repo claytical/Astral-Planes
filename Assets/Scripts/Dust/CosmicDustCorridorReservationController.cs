@@ -17,6 +17,7 @@ public sealed class CosmicDustCorridorReservationController
     private readonly Func<DustClaimManager> _dustClaims;
     private readonly Func<Vector2Int, bool> _isPermanentClearCell;
     private readonly Action<Vector2Int> _requestRegrowCellAt;
+    private readonly Func<Vector2Int, bool> _isExcludedCell; // the record vault: a lane through it promises nothing
 
     private const string kClaimOwner = "Corridor";
     private readonly HashSet<Vector2Int> _currentCorridorCells = new HashSet<Vector2Int>();
@@ -26,8 +27,10 @@ public sealed class CosmicDustCorridorReservationController
         Func<int> drumsHeight,
         Func<DustClaimManager> dustClaims,
         Func<Vector2Int, bool> isPermanentClearCell,
-        Action<Vector2Int> requestRegrowCellAt)
+        Action<Vector2Int> requestRegrowCellAt,
+        Func<Vector2Int, bool> isExcludedCell = null)
     {
+        _isExcludedCell = isExcludedCell;
         _drumsWidth = drumsWidth;
         _drumsHeight = drumsHeight;
         _dustClaims = dustClaims;
@@ -58,6 +61,11 @@ public sealed class CosmicDustCorridorReservationController
                 foreach (var p in BresenhamLine(fromCells[i], toCells[j]))
                     DilateInto(next, p, r, w, h);
 
+        // The record vault's chamber and shell are never part of a lane. A straight lane through
+        // the sealed shell can't be travelled anyway, and a claim on a shell cell used to stop the
+        // shell regrowing there.
+        if (_isExcludedCell != null) next.RemoveWhere(c => _isExcludedCell(c));
+
         var dustClaims = _dustClaims();
         if (dustClaims == null) { _currentCorridorCells.Clear(); return; }
 
@@ -77,13 +85,15 @@ public sealed class CosmicDustCorridorReservationController
         _currentCorridorCells.UnionWith(next);
     }
 
-    public void ReleaseCorridors()
+    // requestRegrow: false when the whole maze is being torn down (ClearMaze) — a regrow request
+    // there would grow a stray cell into the next maze at the old lane's coordinates.
+    public void ReleaseCorridors(bool requestRegrow = true)
     {
         var dustClaims = _dustClaims();
         foreach (var cell in _currentCorridorCells)
         {
             dustClaims?.ReleaseCell(kClaimOwner, cell, DustClaimType.CorridorReserved);
-            if (!_isPermanentClearCell(cell)) _requestRegrowCellAt(cell);
+            if (requestRegrow && !_isPermanentClearCell(cell)) _requestRegrowCellAt(cell);
         }
         _currentCorridorCells.Clear();
     }

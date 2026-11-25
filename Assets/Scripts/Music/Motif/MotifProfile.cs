@@ -84,9 +84,6 @@ public class MotifProfile : ScriptableObject
     [Tooltip("Per-role NoteSet generation configs for this motif.")]
     public List<RoleMotifNoteSetConfig> roleNoteConfigs = new List<RoleMotifNoteSetConfig>();
 
-    [Header("Selection")]
-    [Tooltip("Optional weight for random selection in a MotifLibrary.")]
-    public float selectionWeight = 1f;
     
     [Tooltip("How many entries at the front of beatProfileSequence play once per motif, then are skipped on wrap.")]
     public int beatIntroCount = 0;

@@ -24,13 +24,10 @@ public partial class PhaseStar : MonoBehaviour
     private PhaseStarConfig Cfg => _cfg ??= PhaseStarConfig.OrDefault(config, this);
     // Shared tuning (PhaseStarConfig → 1. Charge & Shards)
     private float disarmedPushScale => Cfg.disarmedPushScale;
-    private float shardMinAlpha => Cfg.shardMinAlpha;
     private float accumulatorRotSpeed => Cfg.accumulatorRotSpeed;
     private float drainTiltDeg => Cfg.drainTiltDeg;
     private float drainTiltSpeed => Cfg.drainTiltSpeed;
     private float chargeDisplayLerpSpeed => Cfg.chargeDisplayLerpSpeed;
-    private float tentacleBloomMinScale => Cfg.tentacleBloomMinScale;
-    private float dormantSeedScale => Cfg.dormantSeedScale;
     private float tentacleActivationDelay => Cfg.tentacleActivationDelay;
 
     [SerializeField] private GameObject superNodePrefab;  // rainbow shard prefab (collider + visual)
@@ -45,6 +42,25 @@ public partial class PhaseStar : MonoBehaviour
 
     [SerializeField] private PhaseStarMotion2D motion;
     [SerializeField] private PhaseStarDustAffect dust;
+
+    /// <summary>
+    /// The star still needs notes and is on show: its idle tendrils (one per note) are visible.
+    /// Covers charging and paused/asleep (dimmed); not armed, ejecting, burst-hidden or blocked.
+    /// </summary>
+    public bool ShowsHungerTendrils =>
+        !_isArmed && !_burstOffScreen && !_isDisposing &&
+        _disarmReason != PhaseStarDisarmReason.NodeResolving &&
+        requiredZapCount > 0 && requiredZapCount != int.MaxValue &&
+        RemainingZapCount > 0;
+
+    /// <summary>Asleep or paused for a sibling: tendrils dim.</summary>
+    public bool IsDimmedVisual => _sleepVisual || _disarmReason == PhaseStarDisarmReason.SiblingActive;
+
+    /// <summary>Tutorial callout: makes this star's count buds glow and pulse.</summary>
+    public void SetBudHighlight(bool on) { if (dust != null) dust.SetBudHighlight(on); }
+
+    /// <summary>World distance from the star's centre to its idle tendril tips.</summary>
+    public float TendrilReachWorld => dust != null ? dust.TendrilReachWorld() : 0.5f;
     [SerializeField] private PhaseStarCravingNavigator cravingNavigator;
 
     private GameFlowManager _gfm;
@@ -55,7 +71,6 @@ public partial class PhaseStar : MonoBehaviour
     private Color       _previewColor;
     private MusicalRole _previewRole;
     private Transform   _previewVisual;
-    private Transform   _previewVisualB;   // second counter-rotating diamond
     private bool _isDisposing;
     private readonly PhaseStarInteractionState _interactionState = new();
     // Cached impact data for the next DiscoveryTrackNode spawn
@@ -100,6 +115,8 @@ public partial class PhaseStar : MonoBehaviour
     private readonly List<InstrumentTrack> _targets = new(4);
     private MusicalRole _attunedRole = MusicalRole.None;
     public MusicalRole AttunedRole => _attunedRole;
+    public PhaseStarMotion2D Motion => motion;
+    public PhaseStarDustAffect DustAffect => dust;
     public bool LastNodeWasSuperNode { get; private set; }
     public bool LastNodeWasExpired   { get; private set; }
     public bool LastNodeWasEscaped   { get; private set; }
@@ -282,11 +299,11 @@ public partial class PhaseStar : MonoBehaviour
 
         _accumulatorRotAngle += accumulatorRotSpeed * dt * (_sleepVisual ? kSleepRotationMul : 1f);
 
-        ComputeDiamondRotation(dt, out float rotA, out bool aLocked, out float rotB, out bool bLocked);
+        float rotA = ComputeDiamondRotation(dt);
 
         EnsureDormantSeedVisuals();
         UpdateDominantRole(dt);
-        UpdateChargeVisuals(rotA, aLocked, rotB, bLocked);
+        UpdateChargeVisuals(dt, rotA);
         UpdateSleepVisual();
         TickSuperNodeTell(dt);
     }

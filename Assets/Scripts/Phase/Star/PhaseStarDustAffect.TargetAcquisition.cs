@@ -32,7 +32,12 @@ public partial class PhaseStarDustAffect
 
         if (_gfm == null) _gfm = GameFlowManager.Instance;
         var drum = _gfm?.activeDrumTrack;
-        if (drum == null) return;
+        var gen = _gfm?.dustGenerator;
+        if (drum == null || gen == null) return;
+
+        // Nothing of this role has bloomed yet: skip the exclusion set and reach BFS entirely
+        // (stars wait up front for every role, so this is the common case).
+        if (gen.FlowerCount(_attunedRole) == 0) return;
 
         // Zap budget: one live tentacle per note still missing from the node payload.
         // Each available carved cell grows a tentacle immediately, up to that cap —
@@ -59,41 +64,39 @@ public partial class PhaseStarDustAffect
         var excluded = BuildExcludedCells(requester: null);
         var seededTargets = _seededTargetsScratch;
         seededTargets.Clear();
-        if (_navigator.TryGetTargetsForRole(_attunedRole, budget, excluded, out var targetCells) && targetCells != null)
-            seededTargets.AddRange(targetCells);
+        // A few spares past the budget, so a flower that fails the visual check doesn't leave a
+        // tentacle idle while another flower is available. Ranked open-path-first (navigator).
+        _navigator.TryGetTargetsForRole(_attunedRole, budget + 4, excluded, seededTargets);
 
-        int targetCursor = 0;
-        foreach (var tentacle in idleTentacles)
+        Vector2 starPos = transform.position;
+        foreach (var cell in seededTargets)
         {
-            if (budget <= 0) break;
+            if (budget <= 0 || idleTentacles.Count == 0) break;
 
-            Vector2Int cell;
-            bool activated = false;
-
-            while (targetCursor < seededTargets.Count)
+            // The bud pointing closest to this flower grows out toward it.
+            Vector2 toTarget = (Vector2)drum.GridToWorldPosition(cell) - starPos;
+            float targetAngle = Mathf.Atan2(toTarget.y, toTarget.x) * Mathf.Rad2Deg;
+            int bestIdx = 0;
+            float bestDiff = float.MaxValue;
+            for (int i = 0; i < idleTentacles.Count; i++)
             {
-                cell = seededTargets[targetCursor++];
-                if (!IsTargetValid(cell, tentacle.role, tentacle, out _))
-                    continue;
-                if (!TryReserveCell(tentacle, cell))
-                    continue;
-                BeginGrowingTentacle(tentacle, cell, drum, transform.position);
-                _lastTentacleStartTime = Time.time;
-                activated = true;
-                break;
+                var t = idleTentacles[i];
+                float diff = t.budVisible ? Mathf.Abs(Mathf.DeltaAngle(t.budAngle, targetAngle)) : 360f;
+                if (diff < bestDiff) { bestDiff = diff; bestIdx = i; }
             }
+            var tentacle = idleTentacles[bestIdx];
 
-            if (!activated &&
-                _navigator.TryGetTargetForRole(tentacle.role, out cell) &&
-                IsTargetValid(cell, tentacle.role, tentacle, out _) &&
-                TryReserveCell(tentacle, cell))
+            if (!IsTargetValid(cell, tentacle.role, tentacle, out var rejectReason))
             {
-                BeginGrowingTentacle(tentacle, cell, drum, transform.position);
-                _lastTentacleStartTime = Time.time;
-                activated = true;
+                LogTargetReject(cell, rejectReason);
+                continue;
             }
+            if (!TryReserveCell(tentacle, cell))
+                continue;
 
-            if (!activated) break;           // no valid target left anywhere
+            BeginGrowingTentacle(tentacle, cell, drum, starPos);
+            _lastTentacleStartTime = Time.time;
+            idleTentacles.RemoveAt(bestIdx);
             budget--;
 
             if (interTentacleStartInterval > 0f)
@@ -219,6 +222,40 @@ public partial class PhaseStarDustAffect
         foreach (var zappedCell in _zappedThisCycle)
             excluded.Add(zappedCell);
 
+        // Flowers a vine just failed to reach sit out a short cooldown so the next scan picks
+        // a different flower instead of re-boring the same wall.
+        if (_blockedUntil.Count > 0)
+        {
+            float now = Time.time;
+            _blockedExpiredScratch.Clear();
+            foreach (var kv in _blockedUntil)
+            {
+                if (kv.Value > now) excluded.Add(kv.Key);
+                else _blockedExpiredScratch.Add(kv.Key);
+            }
+            foreach (var c in _blockedExpiredScratch) _blockedUntil.Remove(c);
+        }
+
         return excluded;
+    }
+
+    private readonly Dictionary<Vector2Int, float> _blockedUntil = new();
+    private readonly List<Vector2Int> _blockedExpiredScratch = new();
+    private string _lastRejectLog;
+
+    private void MarkTargetBlocked(Vector2Int cell)
+    {
+        _blockedUntil[cell] = Time.time + Mathf.Max(0f, Cfg.blockedTargetCooldownSeconds);
+        if (GameFlowManager.VerboseLogging)
+            Debug.Log($"[STAR:TARGET] vine blocked cell={cell} role={_attunedRole} cooldown={Cfg.blockedTargetCooldownSeconds:0.##}s");
+    }
+
+    private void LogTargetReject(Vector2Int cell, string reason)
+    {
+        if (!GameFlowManager.VerboseLogging) return;
+        string line = $"[STAR:TARGET] reject cell={cell} role={_attunedRole} reason={reason}";
+        if (line == _lastRejectLog) return;
+        _lastRejectLog = line;
+        Debug.Log(line);
     }
 }

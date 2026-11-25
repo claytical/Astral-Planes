@@ -13,16 +13,12 @@ MonoBehaviour:
   m_Name: PhaseStarConfig
   m_EditorClassIdentifier: Assembly-CSharp::PhaseStarConfig
   tentacleActivationDelay: 0.5
-  shardMinAlpha: 0.5
   chargeDisplayLerpSpeed: 2.5
-  tentacleBloomMinScale: 0.22
-  dormantSeedScale: 0.08
   accumulatorRotSpeed: 90
   drainTiltDeg: 5
   drainTiltSpeed: 1.8
   disarmedPushScale: 0.1
   diamondAngleSmoothTime: 0.06
-  dualMaxSeparationDeg: 45
   dimShardTint: {r: 0.3584906, g: 0.3584906, b: 0.3584906, a: 0.6431373}
   dimRgbMul: 0.08
   dimUsesFixedTint: 0
@@ -47,9 +43,9 @@ MonoBehaviour:
   ghost:
     driftSpeed: 0.35
     driftAccel: 1.5
-    scatterSpeed: 4
+    scatterSpeed: 1.5
     scatterFollowsShip: 0.5
-    turbulence01: 0.8
+    turbulence01: 0.15
     turbulenceSeconds: 0.6
   pushDecayPerSecond: 5
   frozenSettleDeceleration: 20

@@ -8,7 +8,6 @@ public static class QuitPrompt
 {
     static ModalMenuSpec _spec;
 
-    public static bool IsShowing => _spec != null && ModalMenu.Current == _spec;
 
     /// <param name="pad">Gamepad allowed to answer; null = any gamepad.</param>
     public static void Show(Gamepad pad = null)

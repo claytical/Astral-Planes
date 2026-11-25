@@ -8,9 +8,12 @@ public partial class MotifRingGlyphApplicator
     /// <summary>
     /// Spin-and-roll-off the accumulated gameplay rings (used at bridge time).
     /// Restores visibility first if the record was hidden after the last deformation.
+    /// <paramref name="skipLoopWait"/>: start at once instead of waiting for the loop pass to end
+    /// (a collected record: its last ring already landed, and the camera is zoomed in on it).
     /// </summary>
-    public IEnumerator SpinAndRollOffActiveRings(float spinDuration, float rollDuration)
+    public IEnumerator SpinAndRollOffActiveRings(float spinDuration, float rollDuration, bool skipLoopWait = false)
     {
+        StopDockDrift(easeBack: false);
         // Prevent per-deformation scale-to-zero while waiting, but keep rings rotating so
         // the record stays animated during the wait (rings look live, not frozen).
         _spinOffPending = true;
@@ -35,7 +38,7 @@ public partial class MotifRingGlyphApplicator
         // starts wouldn't be covered by that guard.
         var gfmForDrum = GameFlowManager.Instance;
         var drum = gfmForDrum != null ? gfmForDrum.activeDrumTrack : null;
-        if (drum != null && drum.leaderStartDspTime > 0)
+        if (!skipLoopWait && drum != null && drum.leaderStartDspTime > 0)
         {
             double loopBoundaryDsp = drum.leaderStartDspTime + drum.GetLoopLengthInSeconds();
             while (AudioSettings.dspTime < loopBoundaryDsp)
@@ -147,6 +150,7 @@ public partial class MotifRingGlyphApplicator
         }
 
         // Phase 3: scale to zero; rings keep spinning
+        OnRecordShrinkStarted?.Invoke();
         elapsed = 0f;
         while (elapsed < scaleDur)
         {

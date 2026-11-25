@@ -9,6 +9,10 @@ using UnityEngine.Rendering;
 ///  • Anchored zoom: the camera scales about the focus point, so that point keeps its exact screen
 ///    position while it grows; it never slides toward the centre. The zoomed view is always a
 ///    sub-rectangle of the home view.
+///  • Centred zoom (HoldCentered): the camera also pans so the focus point ends up in the middle of
+///    the screen — for the collected record's exit, which plays big and centred like the original
+///    full-screen record. Pan and zoom share one progress value, so releasing it pans and zooms home
+///    together.
 ///  • Spotlight: as the camera zooms in, a dimming layer fades in over everything else (world and
 ///    HUD); the focus object (its renderers, via a SortingGroup) and the note tethers
 ///    (sorting layer Foreground, order ≥ 10) stay above it. Zooming out fades it away again.
@@ -22,14 +26,15 @@ using UnityEngine.Rendering;
 [DisallowMultipleComponent]
 public sealed class CameraZoomDirector : MonoBehaviour
 {
-    [Tooltip("Seconds to ease most of the way to a new framing (SmoothDamp time).")]
-    [SerializeField] private float smoothTime = 0.45f;
-    [Tooltip("Colour everything but the focus fades to while zoomed.")]
-    [SerializeField] private Color dimColor = Color.black;
-    [Tooltip("Strongest dim (1 = everything but the focus and the tethers fully hidden).")]
-    [SerializeField, Range(0f, 1f)] private float dimStrength = 1f;
-    [Tooltip("Fraction of the zoom-in at which the dim is at full strength.")]
-    [SerializeField, Range(0.1f, 1f)] private float dimFullAt = 0.6f;
+    // Only ever added at runtime (GetOrCreate), so these were never Inspector-tunable — consts.
+    // Seconds to ease most of the way to a new framing (SmoothDamp time).
+    private const float smoothTime  = 0.45f;
+    // Strongest dim (1 = everything but the focus and the tethers fully hidden).
+    private const float dimStrength = 1f;
+    // Fraction of the zoom-in at which the dim is at full strength.
+    private const float dimFullAt   = 0.6f;
+    // Colour everything but the focus fades to while zoomed.
+    private static readonly Color dimColor = Color.black;
 
     // Dim sits in Foreground above the HUD canvas (order 0); the focus sits just above it, and the
     // note tethers (NoteTether: Foreground 10 and 40) stay above both.
@@ -37,18 +42,85 @@ public sealed class CameraZoomDirector : MonoBehaviour
     private const int    kDimOrder       = 6;
     private const int    kSpotlightOrder = 8;
 
+    /// <summary>
+    /// Keeps UI readable during a spotlight. The zoom's dim covers camera-space canvases (whatever
+    /// their sorting), but never Screen Space - Overlay ones. Moves <paramref name="rt"/> (a
+    /// full-screen-relative child of a camera-space canvas) into a runtime overlay canvas that
+    /// mirrors that canvas's scaler, so its authored anchors, size and position are unchanged.
+    /// No-op if it is already in an overlay canvas. Returns true if it moved.
+    /// </summary>
+    public static bool MoveToOverlay(RectTransform rt)
+    {
+        if (rt == null) return false;
+        var src  = rt.parent != null ? rt.parent.GetComponentInParent<Canvas>(true) : null;
+        var root = src != null ? src.rootCanvas : null;
+        if (root == null || root.renderMode == RenderMode.ScreenSpaceOverlay) return false;
+
+        var overlay = GetOverlayFor(root);
+        rt.SetParent(overlay.transform, false);
+        // A nested override-sorting canvas (added for world-space ring meshes) would now sort among
+        // the overlay canvases themselves, above menus; the overlay root already draws over the world.
+        if (rt.TryGetComponent<Canvas>(out var nested)) nested.overrideSorting = false;
+        return true;
+    }
+
+    private static readonly System.Collections.Generic.Dictionary<Canvas, Canvas> s_overlays =
+        new System.Collections.Generic.Dictionary<Canvas, Canvas>();
+
+    private static Canvas GetOverlayFor(Canvas root)
+    {
+        if (s_overlays.TryGetValue(root, out var existing) && existing != null) return existing;
+        PruneDeadOverlays(); // scene changes destroy canvases; drop their stale keys before adding
+
+
+        var go = new GameObject($"{root.name} (Zoom-Safe Overlay)", typeof(RectTransform), typeof(Canvas),
+                                typeof(UnityEngine.UI.CanvasScaler));
+        if (root.gameObject.scene.IsValid())
+            UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(go, root.gameObject.scene);
+        var cv = go.GetComponent<Canvas>();
+        cv.renderMode   = RenderMode.ScreenSpaceOverlay;
+        cv.sortingOrder = 100;
+
+        var from = root.GetComponent<UnityEngine.UI.CanvasScaler>();
+        var to   = go.GetComponent<UnityEngine.UI.CanvasScaler>();
+        if (from != null)
+        {
+            to.uiScaleMode            = from.uiScaleMode;
+            to.referenceResolution    = from.referenceResolution;
+            to.screenMatchMode        = from.screenMatchMode;
+            to.matchWidthOrHeight     = from.matchWidthOrHeight;
+            to.scaleFactor            = from.scaleFactor;
+            to.referencePixelsPerUnit = from.referencePixelsPerUnit;
+            to.physicalUnit           = from.physicalUnit;
+            to.fallbackScreenDPI      = from.fallbackScreenDPI;
+            to.defaultSpriteDPI       = from.defaultSpriteDPI;
+        }
+        s_overlays[root] = cv;
+        return cv;
+    }
+
+    private static readonly List<Canvas> s_deadOverlayKeys = new List<Canvas>();
+    private static void PruneDeadOverlays()
+    {
+        foreach (var kv in s_overlays)
+            if (kv.Key == null || kv.Value == null) s_deadOverlayKeys.Add(kv.Key);
+        for (int i = 0; i < s_deadOverlayKeys.Count; i++) s_overlays.Remove(s_deadOverlayKeys[i]);
+        s_deadOverlayKeys.Clear();
+    }
+
     private Camera  _cam;
     private bool    _hasHome;
     private Vector3 _homePos;
     private float   _homeHalfH;
 
-    private struct Focus { public int Id; public Vector2 Anchor; public float Scale; public GameObject Spotlight; }
+    private struct Focus { public int Id; public Vector2 Anchor; public float Scale; public GameObject Spotlight; public bool Centered; }
     private readonly List<Focus> _focus = new List<Focus>(4);
     private int _nextId = 1;
 
     private float          _scale = 1f;        // current view size as a fraction of home
     private float          _scaleVel;
     private Vector2        _anchor;
+    private bool           _centered;          // the current anchor pans to screen centre (HoldCentered)
     private float          _deepestScale = 1f; // the latest focus's scale; the dim is measured against it
     private GameObject     _spotlight;
     private SortingGroup   _spotGroup;
@@ -59,11 +131,27 @@ public sealed class CameraZoomDirector : MonoBehaviour
     public Vector3 HomePosition   => _homePos;
     public float   HomeHalfHeight => _homeHalfH;
 
+    private float _targetScale = 1f;
+
+    /// <summary>True once the camera has arrived at its current target framing (zoomed in or home).</summary>
+    public bool IsSettled => Mathf.Abs(_scale - _targetScale) < 0.01f && Mathf.Abs(_scaleVel) < 0.05f;
+
     /// <summary>True while any focus is held.</summary>
     public bool IsFocused => _focus.Count > 0;
 
     /// <summary>True while the main camera is anywhere but its home framing.</summary>
     public static bool CameraAway { get; private set; }
+
+    /// <summary>True while a focus is held or the camera is still away (zooming in, holding, or easing home).</summary>
+    public static bool ZoomActive { get; private set; }
+
+    /// <summary>The live director (on the main camera), or null if none has been created. Cheap: no
+    /// Camera.main / GetComponent lookup, so it's safe to poll every frame.</summary>
+    public static CameraZoomDirector Current { get; private set; }
+
+    private void Awake() { Current = this; }
+
+    private void OnDestroy() { if (Current == this) Current = null; }
 
     /// <summary>Main camera's director, created if missing. Null without a main camera.</summary>
     public static CameraZoomDirector GetOrCreate()
@@ -99,6 +187,22 @@ public sealed class CameraZoomDirector : MonoBehaviour
         float s = _homeHalfH > 0f ? Mathf.Clamp(halfHeight / _homeHalfH, 0.05f, 1f) : 1f;
         if (mustShow.HasValue) s = Mathf.Max(s, ScaleToContain(anchor, mustShow.Value));
         _focus.Add(new Focus { Id = id, Anchor = anchor, Scale = Mathf.Min(1f, s), Spotlight = spotlight });
+        ZoomActive = true;
+        return id;
+    }
+
+    /// <summary>
+    /// Zoom in on <paramref name="center"/> and pan it to the middle of the screen, until about
+    /// <paramref name="halfHeight"/> world units show above and below it. Releasing it pans and zooms
+    /// home together. Returns an id for <see cref="Release"/>.
+    /// </summary>
+    public int HoldCentered(Vector2 center, float halfHeight, GameObject spotlight = null)
+    {
+        EnsureHome();
+        int id = _nextId++;
+        float s = _homeHalfH > 0f ? Mathf.Clamp(halfHeight / _homeHalfH, 0.05f, 1f) : 1f;
+        _focus.Add(new Focus { Id = id, Anchor = center, Scale = s, Spotlight = spotlight, Centered = true });
+        ZoomActive = true;
         return id;
     }
 
@@ -138,22 +242,29 @@ public sealed class CameraZoomDirector : MonoBehaviour
             // Switch anchor (and spotlight) only from home, so the pinned point never jumps.
             if (_scale > 0.995f || _spotlight == null)
             {
-                _anchor = f.Anchor;
+                _anchor   = f.Anchor;
+                _centered = f.Centered;
                 SetSpotlight(f.Spotlight);
             }
         }
 
+        _targetScale = target;
         _scale = Mathf.SmoothDamp(_scale, target, ref _scaleVel, smoothTime);
         if (_focus.Count == 0 && _scale > 0.9995f) { _scale = 1f; _scaleVel = 0f; }
 
-        // Anchored: view = anchor + (home − anchor)·s, so the anchor's screen position never changes.
-        var a = new Vector3(_anchor.x, _anchor.y, _homePos.z);
-        _cam.transform.position = a + (_homePos - a) * _scale;
-        _cam.orthographicSize   = _homeHalfH * _scale;
-        CameraAway = _scale < 0.9995f;
-
         float span = 1f - _deepestScale;
         float k    = span > 0.001f ? Mathf.Clamp01((1f - _scale) / span) : 0f;
+
+        var a = new Vector3(_anchor.x, _anchor.y, _homePos.z);
+        if (_centered)
+            // Centred: pan toward the anchor in step with the zoom (k: 0 at home, 1 fully in).
+            _cam.transform.position = Vector3.Lerp(_homePos, a, Mathf.SmoothStep(0f, 1f, k));
+        else
+            // Anchored: view = anchor + (home − anchor)·s, so the anchor's screen position never changes.
+            _cam.transform.position = a + (_homePos - a) * _scale;
+        _cam.orthographicSize   = _homeHalfH * _scale;
+        CameraAway = _scale < 0.9995f;
+        ZoomActive = CameraAway || _focus.Count > 0;
         ApplyDim(dimStrength * Mathf.SmoothStep(0f, 1f, k / Mathf.Max(0.1f, dimFullAt)));
     }
 
@@ -212,6 +323,7 @@ public sealed class CameraZoomDirector : MonoBehaviour
     private void OnDisable()
     {
         CameraAway = false;
+        ZoomActive = false;
         if (_dim != null) _dim.enabled = false;
         if (_spotGroup != null) _spotGroup.enabled = false;
     }

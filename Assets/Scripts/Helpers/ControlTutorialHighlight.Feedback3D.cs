@@ -45,7 +45,10 @@ public partial class ControlTutorialHighlight
 
         var pivot = controlSchemePivot ? controlSchemePivot : transform;
         pivot.localRotation = Quaternion.Euler(_smoothRotX, 0f, _smoothRotZ);
-        pivot.localScale    = _pivotBaseScale * _smoothScale;
+        // With no separate pivot assigned (the Control Scheme prefab), the pivot is the panel
+        // itself, and in the sandbox its scale is pinned by the sandbox pose (Dock.cs).
+        if (!(_sandboxMode && pivot == transform))
+            pivot.localScale = _pivotBaseScale * _smoothScale;
     }
 
     private void CacheOriginPosition()
@@ -61,6 +64,17 @@ public partial class ControlTutorialHighlight
     {
         if (!_rootCanvasGroup) return;
         float dt = Time.unscaledDeltaTime;
+        // Sandbox: steady, deliberate fades both ways (the exponential ramp below reads as a pop).
+        float sandboxFade = !_sandboxMode ? 0f
+            : (_rootAlphaTarget > _rootAlpha ? _sandboxFadeInSeconds
+            : _rootAlphaTarget < _rootAlpha ? _sandboxFadeOutSeconds : 0f);
+        if (sandboxFade > 0f)
+        {
+            _rootAlpha = Mathf.MoveTowards(_rootAlpha, _rootAlphaTarget, dt / sandboxFade);
+            float p = Mathf.Sin(_t * rootAlphaPulseSpeed * Mathf.PI * 2f) * rootAlphaPulseAmount;
+            _rootCanvasGroup.alpha = Mathf.Clamp01(Mathf.SmoothStep(0f, 1f, _rootAlpha) * (1f + p));
+            return;
+        }
         float fadeSeconds = (_rootAlphaTarget >= _rootAlpha)
             ? Mathf.Max(0.0001f, rootFadeInSeconds)
             : Mathf.Max(0.0001f, rootFadeOutSeconds);
@@ -73,7 +87,7 @@ public partial class ControlTutorialHighlight
     private void UpdatePositionAnimation()
     {
         if (!_rootRectTransform) return;
-        if (UpdateSandboxPose()) return; // control sandbox: present/dock owns the pose (Dock.cs)
+        if (UpdateSandboxPose()) return; // control sandbox: pinned centred pose (Dock.cs)
         var instr = CurrentInstruction;
 
         if (instr == Instruction.Drift || instr == Instruction.Boost || instr == Instruction.Release)

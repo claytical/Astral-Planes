@@ -3,12 +3,15 @@ using UnityEngine;
 
 public static class VisualFeedbackUtility
 {
-    public static IEnumerator SpectrumFlickerWithPulse(SpriteRenderer sr, Transform t, float duration = 0.4f, float scaleMultiplier = 1.2f, Color? baseTintOverride = null, bool cycleHue = false)
+    // restScale: the scale to pulse around and return to. Pass the object's authored scale: snapshotting
+    // the live scale (the old behaviour) baked in any squash still running when this started.
+    // scaleLocked: while true, another system owns scale (e.g. a path-exit shrink) — tint only.
+    public static IEnumerator SpectrumFlickerWithPulse(SpriteRenderer sr, Transform t, float duration = 0.4f, float scaleMultiplier = 1.2f, Color? baseTintOverride = null, bool cycleHue = false,
+        Vector3? restScale = null, System.Func<bool> scaleLocked = null)
     {
         float tElapsed = 0f;
 
-        // Instead of snapshotting original state *before* animation, do it *right before restore*
-        Vector3 initialScale = t.localScale;
+        Vector3 initialScale = restScale ?? t.localScale;
         Color originalColor = sr.color;
         Color baseColor = baseTintOverride ?? sr.color;
 
@@ -25,25 +28,22 @@ public static class VisualFeedbackUtility
             sr.color = flickerColor;
 
             float pulse = 1f + Mathf.Sin(progress * Mathf.PI) * (scaleMultiplier - 1f);
-            t.localScale = initialScale * pulse;
+            if (scaleLocked == null || !scaleLocked()) t.localScale = initialScale * pulse;
 
             yield return null;
         }
 
-        // Revalidate scale in case external system changed it (e.g. teleport or cutscene)
-        // Only restore if scale is still within expected bounds
-        if (t != null && t.localScale.magnitude < 100f) // sanity guard
-        {
-            t.localScale = initialScale; 
-        }
+        if (t != null && (scaleLocked == null || !scaleLocked()))
+            t.localScale = initialScale;
 
         sr.color = originalColor;
     }
-    public static IEnumerator BoundaryThudFeedback(SpriteRenderer sprite, Transform objTransform, Vector2 normal, float duration = 0.2f)
+    public static IEnumerator BoundaryThudFeedback(SpriteRenderer sprite, Transform objTransform, Vector2 normal, float duration = 0.2f,
+        Vector3? restScale = null, System.Func<bool> scaleLocked = null)
     {
         if (sprite == null || objTransform == null) yield break;
 
-        Vector3 originalScale = objTransform.localScale;
+        Vector3 originalScale = restScale ?? objTransform.localScale;
         Color originalColor = sprite.color;
 
         // Choose axis to squish based on collision direction
@@ -72,7 +72,8 @@ public static class VisualFeedbackUtility
             float t = elapsed / duration;
 
             // Interpolate scale
-            objTransform.localScale = Vector3.Lerp(squishScale, originalScale, t);
+            if (scaleLocked == null || !scaleLocked())
+                objTransform.localScale = Vector3.Lerp(squishScale, originalScale, t);
 
             // Interpolate flicker
             sprite.color = Color.Lerp(flickerColor, originalColor, t);
@@ -81,7 +82,8 @@ public static class VisualFeedbackUtility
             yield return null;
         }
 
-        objTransform.localScale = originalScale;
+        if (objTransform != null && (scaleLocked == null || !scaleLocked()))
+            objTransform.localScale = originalScale;
         sprite.color = originalColor;
     }
 

@@ -112,6 +112,14 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
         public int lineCount;           // valid entries in linePts (variable: pinned to the route's corners)
         public Vector3[] rootRenderPts; // spring-smoothed star-end segment
         public bool rootRenderInit;
+
+        // Idle bud (PhaseStarDustAffect.Buds.cs): one per flower the star still needs.
+        public bool budVisible;
+        public float budAngle;
+        public float budGrow01;
+        public Color lastBudColor = new Color(-1f, -1f, -1f, -1f);
+        public float lastBudAlpha = -1f;
+        public bool budCurveApplied;
     }
 
     public Action<MusicalRole, float> onDelivery;
@@ -195,6 +203,7 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
     public void SetAcquisitionEnabled(bool enabled, string reason)
     {
         _acquisitionEnabled = enabled;
+        if (!enabled) HideAllBuds();
         _navigator?.SetHuntingEnabled(enabled && _tentaclesActive);
         if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStarDust] acquisition enabled={_acquisitionEnabled} tentaclesActive={_tentaclesActive} reason={reason}");
     }
@@ -222,6 +231,7 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
             ResetTentacleState(tentacle, starPos, destroyVisual: false);
 
         _lastTentacleStartTime = 0f;
+        _blockedUntil.Clear();
         TryNotifyAllTentaclesRetracted();
     }
 
@@ -301,10 +311,17 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
             }
         }
 
-        if (!_tentaclesActive)
-            return;
-
         float dt = Time.deltaTime;
+
+        // Idle tendrils (one per note still needed) show for the star's whole hungry life, not
+        // only while it is acquiring: the pool and buds tick before the acquisition gate.
+        EnsureTentaclePoolForRole();
+        if (!_tentaclesActive)
+        {
+            TickBuds(dt);
+            return;
+        }
+
         _zappedThisCycle.Clear();
 
         _keepClearTimer += dt;
@@ -314,11 +331,12 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
             TickKeepClear();
         }
 
-        EnsureTentaclePoolForRole();
         AssignIdleTentacleTargets();
 
         foreach (var tentacle in _tentacles)
             TickTentacle(tentacle, dt);
+
+        TickBuds(dt);
     }
 
     private void EnsureTentaclePoolForRole()
@@ -374,6 +392,19 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
         Vector2Int center = drum.WorldToGridPosition(transform.position);
         int radius = Mathf.Max(0, _profile.starKeepClearRadiusCells + _nav.keepClearRadiusOffset);
         gen.SetStarKeepClear(center, radius, forceRemoveExisting: false);
+        _ownsKeepClearPocket = true;
+    }
+
+    // True once this Star has claimed a keep-clear pocket; released when it goes away so the
+    // pocket can't outlive it (it used to survive into the interstitial and the next maze).
+    private bool _ownsKeepClearPocket;
+
+    private void OnDisable()
+    {
+        if (!_ownsKeepClearPocket) return;
+        _ownsKeepClearPocket = false;
+        var gen = (_gfm != null ? _gfm : GameFlowManager.Instance)?.dustGenerator;
+        if (gen != null) gen.ReleaseStarKeepClear();
     }
 
     // Burrow nav mode: carve a small disk one cell ahead of the star's heading so it can tunnel
@@ -408,6 +439,7 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
         {
             if (_reservedCells.ContainsKey(cell)) continue;
             if (!gen.HasDustAt(cell)) continue;
+            if (gen.IsStarImpassable(cell)) continue; // ClearCell would refuse it anyway
             if (_attunedRole != MusicalRole.None &&
                 gen.TryGetDustAt(cell, out var dust) && dust != null && dust.Role == _attunedRole)
                 continue;
@@ -459,7 +491,9 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
     {
         // Pool = the node payload: one tentacle per note the next DiscoveryTrackNode will carry.
         // Concurrency below the cap is governed by AssignIdleTentacleTargets' zap budget.
-        return Mathf.Max(1, _star != null ? _star.GetDesiredTentacleCount() : fallbackTentaclesPerRole);
+        // Capped: a star whose readiness is blocked reports int.MaxValue as its requirement.
+        const int kMaxTentacles = 64;
+        return Mathf.Clamp(_star != null ? _star.GetDesiredTentacleCount() : fallbackTentaclesPerRole, 1, kMaxTentacles);
     }
 
     private LineRenderer CreateTentacleLine(MusicalRole role, Tentacle tentacle)
@@ -480,12 +514,9 @@ public sealed partial class PhaseStarDustAffect : MonoBehaviour
 
         lr.numCornerVertices = 5;
         lr.numCapVertices    = 5;
-        lr.widthCurve = new AnimationCurve(
-            new Keyframe(0f,    0.3f),
-            new Keyframe(0.2f,  1.0f),
-            new Keyframe(0.65f, 0.9f),
-            new Keyframe(1f,    0.0f)
-        );
+        lr.widthCurve = VineWidthCurve;
+        // Above the star's diamonds and the dust, so idle tendrils and vines both read.
+        lr.sortingOrder = (_star != null ? _star.BaseSortingOrder : PhaseStar.DefaultBaseSortingOrder) + 10;
 
         lr.SetPosition(0, transform.position);
         lr.SetPosition(1, transform.position);

@@ -4,6 +4,27 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "SuperNodeTrackNodeConfig", menuName = "Astral Planes/Discovery Nodes/SuperNode Config")]
 public class SuperNodeTrackNodeConfig : ScriptableObject
 {
+    private const string ResourcesPath = "Config/SuperNodeTrackNodeConfig";
+    private static SuperNodeTrackNodeConfig s_default;
+
+    /// <summary>Resources/Config/SuperNodeTrackNodeConfig, else field defaults. Never null.
+    /// For callers that need a SuperNode value without holding a SuperNodeTrackNode.</summary>
+    public static SuperNodeTrackNodeConfig Default
+    {
+        get
+        {
+            if (s_default != null) return s_default;
+            s_default = Resources.Load<SuperNodeTrackNodeConfig>(ResourcesPath);
+            if (s_default == null)
+            {
+                Debug.LogError($"[SuperNodeTrackNodeConfig] none at Resources/{ResourcesPath}; using field defaults.");
+                s_default = CreateInstance<SuperNodeTrackNodeConfig>();
+                s_default.hideFlags = HideFlags.HideAndDontSave;
+            }
+            return s_default;
+        }
+    }
+
     [Header("Speed (difficulty-scaled)")]
     [Tooltip("Cruise speed at difficulty 0 (world units/s).")]
     public float minSpeed = 1.5f;

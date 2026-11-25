@@ -1,3 +1,4 @@
+using UnityEngine.Serialization;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "CosmicDustGeneratorConfig", menuName = "Astral Planes/Dust & Maze/Cosmic Dust Generator Config")]
@@ -94,12 +95,13 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     public Color mazeTint = new Color(0.7f, 0.7f, 0.7f, 0.25f);
     [Tooltip("Distinct darker gray for cells deliberately filled with permanent generic MusicalRole.None dust (exact-count mode's leftover territory) — visually distinguishes 'permanent filler, never regrows this motif' cells from ordinary quick-regrowing gray dust (mazeTint), from the moment the maze spawns.")]
     public Color genericFillTint = new Color(0.35f, 0.35f, 0.35f, 0.25f);
-    [Tooltip("Color for the bypass-proof 'Solid' dust type (CellFlags.Solid) — uncarveable " +
-             "walls used by the path-choice interstitial maze and its resealed losing tunnels. " +
-             "Deliberately dim/desaturated against mazeTint so it reads as impassable. Kept off " +
-             "near-black on purpose: dust is particle-only now, and a near-black startColor read " +
-             "as fully invisible under the particle material's blend mode in an earlier attempt.")]
-    public Color solidDustTint = new Color(0.28f, 0.25f, 0.32f, 1f);
+    [Tooltip("THE colour of uncarveable dust with no musical role — dust that won't budge: the " +
+             "path-choice interstitial walls, resealed losing tunnels, and the record vault's shell " +
+             "(until a ring tints it). Change it here and all of them follow. Kept off near-black on " +
+             "purpose: dust is particle-only, and a near-black startColor read as invisible under the " +
+             "particle material's blend mode.")]
+    [FormerlySerializedAs("solidDustTint")]
+    public Color inertBlockTint = new Color(0.28f, 0.25f, 0.32f, 1f);
 
     [Tooltip("Cosmetic only — never affects Role/targeting/star-arming, only pre-carve display color. " +
              "When false (default), a motif's dust shows a darkened preview of its secret role color " +

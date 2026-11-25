@@ -13,8 +13,6 @@ public partial class Vehicle
     private CircleCollider2D _phasingRing;
     private Coroutine        _ringPhaseRoutine;
 
-    public bool IsRingPhasing => _ringPhasing;
-
     /// <summary>True if any part of this vehicle's collider overlaps the given circle.</summary>
     public bool OverlapsCircle(Vector2 center, float radius)
     {

@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 3fd1b8bb2f97d434da42e4b7d2d576ae
+guid: 059b23b2b7ff24af9b3bb4417605ee01
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 7523207921349720078
-    second: Scuttle_0
+      213: 3276473918741473981
+    second: Zip_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -46,7 +46,7 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 1
   spriteMeshType: 1
   alignment: 0
@@ -113,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Scuttle_0
+      name: Zip_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 137
-        height: 123
+        width: 55
+        height: 63
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: e08747baebdc76860800000000000000
-      internalID: 7523207921349720078
+      spriteID: dbaea6a6baf587d20800000000000000
+      internalID: 3276473918741473981
       vertices: []
       indices: 
       edges: []
@@ -138,7 +138,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 5e97eb03825dee720800000000000000
+    spriteID: 
     internalID: 0
     vertices: []
     indices: 
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Scuttle_0: 7523207921349720078
+      Zip_0: 3276473918741473981
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

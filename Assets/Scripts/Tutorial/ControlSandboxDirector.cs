@@ -4,8 +4,8 @@ using UnityEngine;
 
 /// <summary>
 /// Pre-motif control sandbox (GeneratedTrack, every new session). Players are in their vehicles
-/// on an empty field; the Control Scheme panel presents each command centred and full size, then
-/// docks into the bottom-right corner while they practise it:
+/// on an empty field; the Control Scheme panel fades each command in centred, holds until the
+/// input is detected, fades it out, and after a short gap fades in the next:
 ///   Drift  -> fly around.
 ///   Charge -> boost; role-coloured dust patches grow in (soft -> hard) and players carve each.
 /// Narration runs in the same lower-third panel as the narrated tutorial
@@ -23,7 +23,7 @@ public class ControlSandboxDirector : MonoBehaviour
     const string StageDrift    = "02_drift";
     const string StageCharge   = "03_charge";
     const string StageDust     = "04_dust";
-    const string StagePathOpen = "05_pathOpen";
+    const string StageWrapUp   = "05_wrapUp";
 
     enum Pending { None, OutOfFuel, Stuck }
 
@@ -79,8 +79,8 @@ public class ControlSandboxDirector : MonoBehaviour
 
         var ctd = ControlTutorialDirector.Instance;
         if (ctd != null)
-            _panel = ctd.BeginSandboxPanel(_players, _cfg.dockScale, _cfg.dockMargin, _cfg.dockLerpSpeed,
-                _view != null ? _view.PanelRect : null);
+            _panel = ctd.BeginSandboxPanel(_players);
+        if (_panel) _panel.SetSandboxFades(_cfg.panelFadeInSeconds, _cfg.panelFadeOutSeconds);
 
         TutorialEvents.RoleCellCarvedByVehicle += OnRoleCarved;
         TutorialEvents.OutOfEnergyRescued      += OnFuelRescued;
@@ -100,17 +100,19 @@ public class ControlSandboxDirector : MonoBehaviour
         {
             if (lesson != null) StopCoroutine(lesson);
             _pending = Pending.None;
-            // Fill the field anyway so the interstitial has something to grow around.
-            if (_roles.Count == 0) SpawnDustField();
         }
         _dustLessonActive = false;
         EndSkipHoldUi(completed: _skipped);
 
         if (ctd != null) ctd.EndSandboxPanel(completed: !_skipped);
 
-        // The path line stays up until the vehicles are on the road (input locked by the carry).
-        StartCoroutine(PathOpenNarration());
-        StartCoroutine(RefillOnTransfer());
+        // No interstitial road any more: the motif grows in right here once Run() returns.
+        // Top everyone up now, close on a wrap-up line, and clear whatever lesson dust is left so
+        // the maze's ClearMaze doesn't pop it.
+        foreach (var p in _players)
+            if (p && p.plane != null) p.plane.RecoverEnergy(p.plane.capacity);
+        StartCoroutine(WrapUpNarration());
+        yield return DissolveAllPatches();
     }
 
     // ---------------------------------------------------------------------------------------
@@ -119,6 +121,9 @@ public class ControlSandboxDirector : MonoBehaviour
 
     IEnumerator Lesson()
     {
+        // A quiet beat so the first line doesn't land the instant the sandbox appears.
+        yield return WaitSeconds(_cfg.introDelaySeconds);
+
         if (_canSkip && _script?.skipHint?.lines != null)
             yield return PlayLines(_script.skipHint.lines);
 
@@ -126,34 +131,27 @@ public class ControlSandboxDirector : MonoBehaviour
 
         // ── Drift ─────────────────────────────────────────────────────────────
         var drift = Stage(StageDrift);
-        if (_panel) _panel.PresentSandboxStep(0);
-        yield return ShowStageLine(drift, 0);
-        yield return WaitSeconds(_cfg.presentSeconds);
-        if (_panel) _panel.DockToCorner();
-
         float drifted = 0f;
-        yield return NarrateUntil(drift, 1, () =>
+        System.Func<bool> driftDone = () =>
         {
             if (AnyDrifting()) drifted += Time.unscaledDeltaTime;
             return drifted >= _cfg.driftPracticeSeconds;
-        });
-        yield return StepConfirm();
+        };
+        yield return PresentCommand(drift, 0, driftDone);
 
         // ── Charge ────────────────────────────────────────────────────────────
+        // Counts the trigger itself (not the boost), so an empty tank or a squeeze during the
+        // centred presentation still shows the player has it.
         var charge = Stage(StageCharge);
-        if (_panel) _panel.PresentSandboxStep(1);
-        yield return ShowStageLine(charge, 0);
-        yield return WaitSeconds(_cfg.presentSeconds);
-        if (_panel) _panel.DockToCorner();
-
-        SpawnDustField();
-
         float charged = 0f;
-        yield return NarrateUntil(charge, 1, () =>
+        System.Func<bool> chargeDone = () =>
         {
             if (AnyCharging()) charged += Time.unscaledDeltaTime;
             return charged >= _cfg.chargePracticeSeconds;
-        });
+        };
+        yield return PresentCommand(charge, 1, chargeDone);
+        // Both controls learned (the panel has faded out): the dust lesson runs without it.
+        SpawnDustField();
 
         // ── Dust: colour = role, some soft, some hard ─────────────────────────
         _dustLessonActive = true;
@@ -161,34 +159,40 @@ public class ControlSandboxDirector : MonoBehaviour
         yield return NarrateUntil(Stage(StageDust), 0, AllRolesCarved);
         _dustLessonActive = false;
 
-        // Lesson complete: the panel grows back for a beat, then fades as the path opens.
-        if (_panel) { _panel.PresentCentered(); _panel.PlayStepConfirm(); }
+        // Lesson complete: confirm beat, then EndSandboxPanel tidies the (already hidden) panel.
+        if (_panel) _panel.PlayStepConfirm();
         yield return WaitSeconds(Mathf.Max(_cfg.stepConfirmBeatSeconds, _panel ? _panel.StepConfirmSeconds : 0f));
         _lessonDone = true;
     }
 
-    IEnumerator StepConfirm()
+    // Fades a command in centred and holds it while the player practises (practice counts from
+    // the moment it appears). Once the input is detected: confirm ding, fade out, short gap.
+    IEnumerator PresentCommand(TutorialStage st, int panelStep, System.Func<bool> practiced)
     {
-        if (_panel) _panel.PlayStepConfirm();
-        yield return WaitSeconds(_cfg.stepConfirmBeatSeconds);
+        if (_panel) _panel.PresentSandboxStep(panelStep);
+        yield return ShowStageLine(st, 0);
+        yield return NarrateUntil(st, 1, practiced);
+
+        if (_panel)
+        {
+            _panel.PlayStepConfirm();
+            _panel.DismissSandboxStep();
+        }
+        yield return WaitSeconds(_cfg.panelFadeOutSeconds + _cfg.stepConfirmBeatSeconds);
     }
 
-    IEnumerator PathOpenNarration()
+    // Closing line(s) while the motif grows in around the ships, then the panel fades out.
+    IEnumerator WrapUpNarration()
     {
-        var st = Stage(StagePathOpen);
-        if (_view == null || st?.lines == null || st.lines.Length == 0) yield break;
-
-        for (int i = 0; i < st.lines.Length; i++)
-        {
-            yield return ShowLine(st.lines[i], eventDriven: i == 0);
-            if (i < st.lines.Length - 1)
-                for (float t = 0f; t < _script.holdSeconds && !AnyInputLocked(); t += Time.unscaledDeltaTime)
-                    yield return null;
-            if (AnyInputLocked()) break;
-        }
-
-        while (!AnyInputLocked()) yield return null;
-        yield return _view.Hide();
+        if (_view == null) yield break;
+        var st = Stage(StageWrapUp);
+        if (st?.lines != null && !_skipped)
+            for (int i = 0; i < st.lines.Length; i++)
+            {
+                yield return ShowLine(st.lines[i]);
+                yield return WaitSeconds(_script != null ? _script.holdSeconds : 2f);
+            }
+        if (_view != null) yield return _view.Hide();
     }
 
     // ---------------------------------------------------------------------------------------
@@ -206,7 +210,7 @@ public class ControlSandboxDirector : MonoBehaviour
     IEnumerator ShowStageLine(TutorialStage st, int index)
     {
         if (st?.lines == null || index < 0 || index >= st.lines.Length) yield break;
-        yield return ShowLine(st.lines[index], eventDriven: index == 0);
+        yield return ShowLine(st.lines[index]);
     }
 
     IEnumerator PlayLines(string[] lines)
@@ -232,7 +236,7 @@ public class ControlSandboxDirector : MonoBehaviour
         int i = startLine;
         float hold = _script != null ? _script.holdSeconds : 3f;
 
-        if (i < count) yield return ShowLine(lines[i], eventDriven: i == 0);
+        if (i < count) yield return ShowLine(lines[i]);
 
         float t = 0f;
         while (true)
@@ -303,16 +307,10 @@ public class ControlSandboxDirector : MonoBehaviour
     bool AnyCharging()
     {
         foreach (var p in _players)
-            if (p && p.plane != null && p.plane.boosting) return true;
+            if (p && p.plane != null && p.plane.BoostRequested) return true;
         return false;
     }
 
-    bool AnyInputLocked()
-    {
-        foreach (var p in _players)
-            if (p && p.IsInputLocked) return true;
-        return false;
-    }
 
     bool AllRolesCarved()
     {
@@ -377,11 +375,15 @@ public class ControlSandboxDirector : MonoBehaviour
 
     // Tanks are topped up the moment the road takes the vehicles (input locks for the carry),
     // so nobody starts the first motif on fumes from all the charging practice.
-    IEnumerator RefillOnTransfer()
+    // Every patch not already dissolved by meeting its quota dissolves together; returns when done.
+    IEnumerator DissolveAllPatches()
     {
-        while (!AnyInputLocked()) yield return null;
-        foreach (var p in _players)
-            if (p && p.plane != null) p.plane.RecoverEnergy(p.plane.capacity);
+        var running = new List<Coroutine>();
+        foreach (var role in _patchCells.Keys)
+            if (_doneRoles.Add(role))
+                running.Add(StartCoroutine(DissolvePatch(role)));
+        foreach (var co in running)
+            yield return co;
     }
 
     void Update()
@@ -484,40 +486,69 @@ public class ControlSandboxDirector : MonoBehaviour
         _roles.RemoveAll(role => !_neededByRole.ContainsKey(role));
     }
 
-    // The destination motif's own roles (so colour and hardness match what players meet next),
-    // sorted soft -> hard and thinned to maxRoles spread across that range.
+    // maxRoles colours spread soft -> hard. The destination motif's own roles come first (so the
+    // colours preview what players meet next); a motif with fewer roles (the Phase 0 tutorial
+    // has one) is padded from the other roles, each pick the one whose hardness differs most
+    // from those already chosen, so "every color feels a little different" is true on screen.
     void PickRoles()
     {
         _roles.Clear();
-        var candidates = new List<(MusicalRole role, float res)>();
-        var seen = new HashSet<MusicalRole>();
-
-        var source = _motif != null ? _motif.GetActiveRoles() : null;
-        if (source == null || source.Count == 0)
-            source = new List<MusicalRole> { MusicalRole.Lead, MusicalRole.Harmony, MusicalRole.Bass };
-
-        foreach (var role in source)
-        {
-            if (role == MusicalRole.None || !seen.Add(role)) continue;
-            var prof = ResolveProfile(role);
-            if (prof == null) continue;
-            candidates.Add((role, prof.carveResistance01));
-        }
-        candidates.Sort((a, b) => a.res.CompareTo(b.res));
-
-        int n = candidates.Count;
         int max = Mathf.Clamp(_cfg.maxRoles, 1, 5);
-        if (n <= max)
+
+        var required = new List<(MusicalRole role, float res)>();
+        var source = _motif != null ? _motif.GetActiveRoles() : null;
+        if (source != null)
+            foreach (var role in source)
+            {
+                if (role == MusicalRole.None || required.Exists(c => c.role == role)) continue;
+                var prof = ResolveProfile(role);
+                if (prof != null) required.Add((role, prof.carveResistance01));
+            }
+        required.Sort((a, b) => a.res.CompareTo(b.res));
+
+        var picked = new List<(MusicalRole role, float res)>();
+        if (required.Count > max)
         {
-            foreach (var c in candidates) _roles.Add(c.role);
-            return;
+            // More motif roles than slots: thin them evenly across the soft -> hard range.
+            int n = required.Count;
+            if (max == 1) picked.Add(required[0]);
+            else
+                for (int j = 0; j < max; j++)
+                {
+                    var c = required[Mathf.RoundToInt(j * (n - 1) / (float)(max - 1))];
+                    if (!picked.Exists(p => p.role == c.role)) picked.Add(c);
+                }
         }
-        if (max == 1) { _roles.Add(candidates[0].role); return; }
-        for (int j = 0; j < max; j++)
+        else
         {
-            var role = candidates[Mathf.RoundToInt(j * (n - 1) / (float)(max - 1))].role;
-            if (!_roles.Contains(role)) _roles.Add(role);
+            picked.AddRange(required);
+
+            var pool = new List<(MusicalRole role, float res)>();
+            foreach (MusicalRole role in System.Enum.GetValues(typeof(MusicalRole)))
+            {
+                if (role == MusicalRole.None || picked.Exists(c => c.role == role)) continue;
+                var prof = ResolveProfile(role);
+                if (prof != null) pool.Add((role, prof.carveResistance01));
+            }
+
+            while (picked.Count < max && pool.Count > 0)
+            {
+                int best = 0;
+                float bestGap = -1f;
+                for (int i = 0; i < pool.Count; i++)
+                {
+                    float gap = float.MaxValue;
+                    foreach (var c in picked) gap = Mathf.Min(gap, Mathf.Abs(c.res - pool[i].res));
+                    if (picked.Count == 0) gap = pool[i].res; // nothing yet: start from the hardest
+                    if (gap > bestGap) { bestGap = gap; best = i; }
+                }
+                picked.Add(pool[best]);
+                pool.RemoveAt(best);
+            }
         }
+
+        picked.Sort((a, b) => a.res.CompareTo(b.res)); // patches lay out soft (left) -> hard (right)
+        foreach (var c in picked) _roles.Add(c.role);
     }
 
     MusicalRoleProfile ResolveProfile(MusicalRole role)

@@ -22,7 +22,8 @@ MonoBehaviour:
   ringMeshMaterial: {fileID: 2100000, guid: db6f88bb6fd04da5bdaac2167f76440b, type: 2}
   ringAlpha: 0.339
   contourAlpha: 1
-  lineWidth: 0.15
+  lineWidth: 0.4
+  maxLineWidthToRadius: 0.25
   recordLineWidth: 0.01
   tugDepthFraction: 0.25
   tugHalfWidthRad: 0.75
@@ -36,8 +37,8 @@ MonoBehaviour:
   nonHighlightedAlphaMultiplier: 0.35
   remainingRingColor: {r: 0.6, g: 0.6, b: 0.6, a: 1}
   remainingRingAlpha: 0.4
-  remainingRingLineWidth: 0.2
-  remainingRingMaterial: {fileID: 2100000, guid: 6105b1678cf74057aa09e8f3545e97ee,
+  remainingRingLineWidth: 1
+  remainingRingMaterial: {fileID: 2100000, guid: dd1569b72d06452c9c649f7d0bc0247a,
     type: 2}
   nextUpColorCycleDuration: 0.5
   ringDrawInDuration: 0.5
@@ -61,10 +62,10 @@ MonoBehaviour:
   backgroundDiscColor: {r: 0, g: 0, b: 0, a: 1}
   placedBackgroundAlpha: 0.388
   fullBackgroundAlpha: 0.692
-  spinOffDuration: 2
-  rollOffDuration: 2
+  spinOffDuration: 0.8
+  rollOffDuration: 1.2
   tiltXDegrees: 75
-  scaleDownDuration: 3
+  scaleDownDuration: 1.5
   breakShakeDuration: 0.35
   breakShakeAmplitude: 0.18
   breakShakeFrequency: 18
@@ -73,3 +74,14 @@ MonoBehaviour:
   denialShakeFrequency: 40
   recordHoldDuration: 5
   recordFadeOutDuration: 0.75
+  nextUpHighlightColor: {r: 0.95, g: 0.95, b: 1, a: 1}
+  nextUpRingAlpha: 1
+  nextUpMaximizeBrightness: 1
+  nextUpStrainPeriod: 1.2
+  nextUpStrainScale: 1.06
+  dockDriftWanderSpeed: 0.35
+  dockDriftWanderShare: 0.45
+  dockLungeIntervalRange: {x: 2.5, y: 5}
+  dockLungeSeconds: 0.7
+  dockHoldDuration: 1
+  dockMoveDuration: 1.2

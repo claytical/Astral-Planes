@@ -34,8 +34,6 @@ public partial class DrumTrack : MonoBehaviour
     private AudioSource _inactiveDrum;
     public double leaderStartDspTime { get; private set; }
     [HideInInspector]
-    public List<MotifSnapshot> SessionPhases = new();
-    [HideInInspector]
     public List<DiscoveryTrackNode> activeMineNodes = new List<DiscoveryTrackNode>();
     [HideInInspector]
     public int currentStep;

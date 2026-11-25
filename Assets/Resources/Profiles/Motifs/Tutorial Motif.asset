@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Tutorial Motif
   m_EditorClassIdentifier: Assembly-CSharp::MotifProfile
   motifId: intro
-  displayName: Loops
+  displayName: Tutorial
   keyRootMidi: 58
   entryDrumLoops:
   - {fileID: 8300000, guid: a6b537cd91fc44bc2a4357aa1a154bea, type: 3}
@@ -43,6 +43,7 @@ MonoBehaviour:
     breadth01: 0.5
     pressure01: 0.5
     maxConsecutiveLoopSeconds: 0
+  drumVolumeMultiplier: 1
   entryLoopCount: 8
   resetFirstCarryOnStart: 0
   bridgeSamples:
@@ -56,19 +57,15 @@ MonoBehaviour:
   starBehavior: {fileID: 11400000, guid: 40e4098fb94c1460aaf328cc0cbf8f8d, type: 2}
   mazePattern: {fileID: 11400000, guid: 54860779885a484c8ecf697eae720e66, type: 2}
   roleGeoConfigs: []
-  genericFillNeverRegrowRatio: 1
   genericFillRatio01: 0
-  genericFillRegrowSoftenMultiplier01: 1
   chordProgression: {fileID: 11400000, guid: 2a062f8d123824270a7f50a7ef3eb230, type: 2}
   alternateChordProgressionProfile: {fileID: 11400000, guid: 04a688fc570cd408bb4261ed5647fa97,
     type: 2}
   roleNoteConfigs:
   - {fileID: 11400000, guid: 4ec45572f751b490bb622b7f3ec15e63, type: 2}
-  selectionWeight: 1
   beatIntroCount: 0
   driveBeatsFromDensity: 1
   spawnVehicleTrap: 0
   trapShape: 0
   trapRadius: 3
-  trapGrowSeconds: 0.4
   trapRole: 1

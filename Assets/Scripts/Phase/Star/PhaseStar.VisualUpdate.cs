@@ -12,32 +12,23 @@ public partial class PhaseStar
     private float _accumulatorRotAngle;
     private float _accumulatorDrainTimer;
 
-    // Computes this frame's diamond rotation angles and lock state from the dust
-    // subcomponent's drain state. Called from Update() after _accumulatorRotAngle advances.
-    private void ComputeDiamondRotation(float dt, out float rotA, out bool aLocked, out float rotB, out bool bLocked)
+    // Computes this frame's body rotation from the dust subcomponent's lock/drain state.
+    // Called from Update() after _accumulatorRotAngle advances. Tentacles on either tip pair
+    // (diamond index 0 or 1) keep the drain-sway timer running; only index 0 steers the angle.
+    private float ComputeDiamondRotation(float dt)
     {
-        aLocked = false;
-        bLocked = false;
+        if (dust == null) return _accumulatorRotAngle;
 
-        if (dust != null)
-        {
-            dust.GetDiamondLockState(0, out aLocked, out float aLockDeg, out bool aDraining);
-            dust.GetDiamondLockState(1, out bLocked, out float bLockDeg, out bool bDraining);
+        dust.GetDiamondLockState(0, out bool aLocked, out float aLockDeg, out bool aDraining);
+        dust.GetDiamondLockState(1, out _, out _, out bool bDraining);
 
-            if (aDraining || bDraining)
-                _accumulatorDrainTimer += dt;
-            else
-                _accumulatorDrainTimer = 0f;
-
-            float sway = Mathf.Sin(_accumulatorDrainTimer * drainTiltSpeed * Mathf.PI * 2f) * drainTiltDeg;
-            rotA = aLocked ? aLockDeg + (aDraining ? sway : 0f) : _accumulatorRotAngle;
-            rotB = bLocked ? bLockDeg + (bDraining ? sway : 0f) : -_accumulatorRotAngle;
-        }
+        if (aDraining || bDraining)
+            _accumulatorDrainTimer += dt;
         else
-        {
-            rotA = _accumulatorRotAngle;
-            rotB = -_accumulatorRotAngle;
-        }
+            _accumulatorDrainTimer = 0f;
+
+        float sway = Mathf.Sin(_accumulatorDrainTimer * drainTiltSpeed * Mathf.PI * 2f) * drainTiltDeg;
+        return aLocked ? aLockDeg + (aDraining ? sway : 0f) : _accumulatorRotAngle;
     }
 
     // Handles latched-but-dormant recovery and pending-activation finalization each frame.
@@ -67,7 +58,6 @@ public partial class PhaseStar
                 _previewColor = ResolveRoleColor(_attunedRole, _cachedTrack);
                 if (zappedCount == 0)
                     TryRefreshRequiredZapCountForPlannedRole(_attunedRole, _cachedTrack, resetCurrentZapCount: false, reason: "attuned-role-switch");
-                visuals?.ResetDualDiamondVisualState();
             }
             else
             {
@@ -90,11 +80,9 @@ public partial class PhaseStar
         }
     }
 
-    // Drives diamond rendering and the charge-scale/body-color visuals each frame.
-    // Must be called after UpdateDominantRole() and after diamond rotation angles are computed.
-    // Note: UpdateDualDiamonds resets diamond localScale to 1, so the charge-scale block
-    // below must run after it to win for the Dormant phase.
-    private void UpdateChargeVisuals(float rotA, bool aLocked, float rotB, bool bLocked)
+    // Drives the star body (count diamonds, PhaseStar.DiamondBody.cs) and the body/particle colour
+    // each frame. Must be called after UpdateDominantRole() and ComputeDiamondRotation().
+    private void UpdateChargeVisuals(float dt, float rotA)
     {
         // A sleeping star (blocked by work elsewhere, PhaseStar.PokeFeedback.cs) never shows
         // the fast ready-spin, even when its own zaps are met.
@@ -102,47 +90,20 @@ public partial class PhaseStar
 
         // Paused (SiblingActive) stars keep updating too — Sleeping desaturates them and the
         // rotation runs slowed (PhaseStar.PokeFeedback.cs), instead of freezing mid-frame.
-        if (_previewVisual != null)
-        {
-            visuals?.UpdateDualDiamonds(
-                _previewColor,
-                _displayedCharge01,
-                rotA, aLocked,
-                rotB, bLocked,
-                dominantReady,
-                _previewRole,
-                ReadyRotSpeedMul);
-        }
+        UpdateStarBody(dt, rotA, dominantReady);
 
-        // Scale 0→1 as charge builds. _previewVisual and _previewVisualB are children of
-        // PhaseStar (not of visuals), so they must be scaled explicitly here.
-        // Sqrt curve: front-loads growth so small charge values are perceptible.
-        // e.g. 10% charge → 32% scale, 25% charge → 50% scale, 100% → 100%.
-        if ((_state == PhaseStarState.Dormant ||
-             (_state == PhaseStarState.WaitingForPoke && ZapProgress01 < 1f))
-            && !_burstOffScreen)
-        {
-            float visualScale01 = Mathf.Max(dormantSeedScale, Mathf.Sqrt(_displayedCharge01));
-            if (dust != null && dust.HasActiveTentacles)
-                visualScale01 = Mathf.Max(visualScale01, tentacleBloomMinScale);
+        if (visuals == null || _burstOffScreen || _sleepVisual || _disarmReason == PhaseStarDisarmReason.SiblingActive)
+            return;
 
-            Vector3 chargeScale = Vector3.one * visualScale01;
-            if (visuals != null) visuals.transform.localScale = chargeScale;
-            if (_previewVisual != null)  _previewVisual.localScale  = chargeScale;
-            if (_previewVisualB != null) _previewVisualB.localScale = chargeScale;
+        // The body is now sized by its count, never by charge: the root stays at full scale.
+        if (visuals.transform.localScale != Vector3.one) visuals.transform.localScale = Vector3.one;
 
-            if (visualScale01 > 0.001f && !_sleepVisual && _disarmReason != PhaseStarDisarmReason.SiblingActive)
-            {
-                visuals?.ToggleShardRenderers(true);
-                Color roleColor = _previewRole != MusicalRole.None ? _previewColor : Color.gray;
-                visuals?.LerpBodyColor(roleColor, _displayedCharge01);
-            }
-        }
-        else if (visuals != null && !_burstOffScreen && !_sleepVisual && _disarmReason != PhaseStarDisarmReason.SiblingActive)
-        {
-            Color bodyColor = _previewRole != MusicalRole.None ? _previewColor : Color.gray;
-            visuals.LerpBodyColor(bodyColor, _displayedCharge01);
-        }
+        bool charging = _state == PhaseStarState.Dormant ||
+                        (_state == PhaseStarState.WaitingForPoke && ZapProgress01 < 1f);
+        if (charging) visuals.ToggleShardRenderers(true);
+
+        Color bodyColor = _previewRole != MusicalRole.None ? _previewColor : Color.gray;
+        visuals.LerpBodyColor(bodyColor, _displayedCharge01);
     }
 
     private void EnsureDormantSeedVisuals()
@@ -158,9 +119,6 @@ public partial class PhaseStar
             _dormantSeedVisualPrimed = true;
         }
 
-        float minScale = Mathf.Max(0f, dormantSeedScale);
-        if (visuals.transform.localScale.x < minScale)
-            visuals.transform.localScale = Vector3.one * minScale;
     }
 
     private void SetVisual(VisualMode mode, Color tint)

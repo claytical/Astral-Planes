@@ -88,7 +88,6 @@ public partial class ControlTutorialHighlight : MonoBehaviour
 
     private Instruction[] _activeSequence;
     private Instruction[] ActiveSequence => _activeSequence ?? tutorialSequence;
-    public Instruction[] TutorialSequence => ActiveSequence;
 
     /// <summary>Builds the runtime sequence from the authored one, optionally dropping the Release ("Place") step.</summary>
     public void ConfigureSequence(bool includeRelease)

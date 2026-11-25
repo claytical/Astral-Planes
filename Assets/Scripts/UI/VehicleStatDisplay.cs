@@ -1,4 +1,3 @@
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -14,12 +13,6 @@ public class VehicleStatDisplay : MaskableGraphic
     public Color axisColor = new Color(1f, 1f, 1f, 0.2f);
     public Color statFillColor = new Color(0.4f, 0.8f, 1f, 0.4f);
     public Color statEdgeColor = new Color(0.5f, 0.85f, 1f, 0.9f);
-
-    [Header("Labels")]
-    public TMP_Text speedLabel;
-    public TMP_Text agilityLabel;
-    public TMP_Text powerLabel;
-    public TMP_Text fuelLabel;
 
     private float _speed = 0.5f;
     private float _agility = 0.5f;

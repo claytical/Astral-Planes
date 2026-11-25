@@ -32,6 +32,7 @@ public partial class PhaseStarDustAffect
                 UpdateVineRoot(tentacle, starPos, drum);
                 if (!TickVineGrowth(tentacle, dt, drum, gen, starPos))
                 {
+                    MarkTargetBlocked(tentacle.targetCell);
                     BeginRetractingTentacle(tentacle, starPos, "vine blocked");
                     break;
                 }
@@ -152,7 +153,10 @@ public partial class PhaseStarDustAffect
         if (tentacle.targetCell != cell)
             ReleaseReservation(tentacle, tentacle.targetCell);
 
-        TutorialEvents.RaiseTentacleAppeared();
+        TutorialEvents.RaiseTentacleAppeared(transform);
+        tentacle.budVisible     = false; // the bud grows out as this vine
+        if (tentacle.line != null) tentacle.line.widthCurve = VineWidthCurve;
+        tentacle.budCurveApplied = false;
         tentacle.targetCell     = cell;
         tentacle.targetWorldPos = drum.GridToWorldPosition(cell);
         tentacle.tipPos         = starPos;
@@ -310,6 +314,8 @@ public partial class PhaseStarDustAffect
         tentacle.rootRenderInit = false;
         tentacle.rootCrumbs = 0;
         tentacle.lineCount = 0;
+        tentacle.budVisible = false;
+        tentacle.budGrow01 = 0f;
 
         if (tentacle.line != null)
         {
@@ -340,7 +346,8 @@ public partial class PhaseStarDustAffect
             if (tentacle.state != TentacleState.Idle)
                 return;
 
-            if (tentacle.line != null && tentacle.line.enabled)
+            // An idle bud's line is a count tell, not an outstanding vine.
+            if (tentacle.line != null && tentacle.line.enabled && !tentacle.budVisible)
                 return;
         }
 

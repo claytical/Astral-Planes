@@ -9,7 +9,7 @@ public static class TutorialEvents
 {
     public static event Action CellCarvedByVehicle;
     public static event Action<MusicalRole> RoleCellCarvedByVehicle; // same carve, with the cell's (revealed) role
-    public static event Action TentacleAppeared;
+    public static event Action<Transform> TentacleAppeared;    // the star whose bud grew a tentacle
     public static event Action<Transform> StarArmed;            // the armed star's transform
     public static event Action StarPoked;
     public static event Action DiscoveryBurst;
@@ -23,10 +23,12 @@ public static class TutorialEvents
     public static event Action IntroRecordHidden;               // the motif-start ring record has finished fading out
     public static event Action CommitPressedWithoutNote;        // commit/release pressed while carrying nothing
     public static event Action<Vehicle> OutOfEnergyRescued;     // tutorial motif: a vehicle hit 0 energy and was refilled instead of dying
+    public static event Action RecordAccessible;                // motif complete: the vault has opened and the record can be collected
+    public static event Action RecordCollected;                 // a ship collected the finished record
 
     public static void RaiseCellCarvedByVehicle() => CellCarvedByVehicle?.Invoke();
     public static void RaiseRoleCellCarvedByVehicle(MusicalRole role) => RoleCellCarvedByVehicle?.Invoke(role);
-    public static void RaiseTentacleAppeared()    => TentacleAppeared?.Invoke();
+    public static void RaiseTentacleAppeared(Transform star) => TentacleAppeared?.Invoke(star);
     public static void RaiseStarArmed(Transform star) => StarArmed?.Invoke(star);
     public static void RaiseStarPoked()           => StarPoked?.Invoke();
     public static void RaiseDiscoveryBurst()      => DiscoveryBurst?.Invoke();
@@ -40,4 +42,6 @@ public static class TutorialEvents
     public static void RaiseIntroRecordHidden()   => IntroRecordHidden?.Invoke();
     public static void RaiseCommitPressedWithoutNote() => CommitPressedWithoutNote?.Invoke();
     public static void RaiseOutOfEnergyRescued(Vehicle v) => OutOfEnergyRescued?.Invoke(v);
+    public static void RaiseRecordAccessible()    => RecordAccessible?.Invoke();
+    public static void RaiseRecordCollected()     => RecordCollected?.Invoke();
 }

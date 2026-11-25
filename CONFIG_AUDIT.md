@@ -109,7 +109,7 @@ Conventions: asset paths are relative to `Assets/`. "Inspector header" is the bo
 | AudioMixConfig | 1 (Resources load) | Music/Tracks & Mix/Audio Mix Config | Mixer bus per role, drum level |
 | DrumTrackConfig | 1 | Music/Tracks & Mix/Drum Track Config | Grid, intensity, bass drop, clip polling |
 | InstrumentTrackConfig | 1 | Music/Tracks & Mix/Instrument Track Config | Ascension, root shift, loop multiplier |
-| InstrumentTrackControllerConfig | 1 | Music/Tracks & Mix/Instrument Track Controller Config | Pickup SFX, cohort |
+| InstrumentTrackControllerConfig | 1 | Music/Tracks & Mix/Instrument Track Controller Config | Pickup SFX |
 | CosmicDustGeneratorConfig | 1 | Dust & Maze/Cosmic Dust Generator Config | Dust lifecycle + cell animation timing |
 | MazePatternConfig | 43 | Dust & Maze/Maze Pattern Config | Maze generation + star nav |
 | WispConfig | 1 | Dust & Maze/Wisp Config | Wisps |
@@ -141,7 +141,7 @@ Conventions: asset paths are relative to `Assets/`. "Inspector header" is the bo
 | Collectable bomb | CollectableTuning `blastRadius` × MusicalRoleProfile `bombBlastRadiusMul` | multiply | keep; document |
 | Discovery-node expiry | RoleMotifNoteSetConfig `mineNodeExpireAfterLoops` → else LocomotionProfile `expireAfterLoops`; blast radius on DiscoveryTrackNodeConfig | NoteSet wins when > 0 *(tooltips fixed)* | T2-2 |
 | Discovery-node tuning | DiscoveryTrackNodeConfig (shared) + LocomotionProfile (per role) | — | ✅ done (T2-2) |
-| Ascend loops | RoleMotifNoteSetConfig `ascendLoops` → else InstrumentTrackConfig `defaultAscendLoops`; NoteAscensionDirector `ascendLoops` is a separate marker default | *(tooltip was wrong, now fixed)* | T3: remove the director field |
+| Ascend loops | RoleMotifNoteSetConfig `ascendLoops` → else InstrumentTrackConfig `defaultAscendLoops`; NoteAscensionDirector `ascendLoops` is a separate marker default | *(tooltip was wrong, now fixed)* | Done 2026-11-24 (VARIABLE_AUDIT B2): markers keep their own count; the director field is only a fallback |
 | Gravity void | CosmicDustGeneratorConfig → Gravity Void (world side) + VehicleConfig (probe, refuel, eject) | split by design, tooltips cross-reference | ✅ done (T3-2) |
 | Pickup SFX | InstrumentTrackControllerConfig | odd home | T3: move to AudioMixConfig |
 | Ship rules | ShipMusicalProfile (per ship) vs VehicleConfig (shared) | intended split | keep; the rule is "per-ship = feel, shared = rules & tells" |

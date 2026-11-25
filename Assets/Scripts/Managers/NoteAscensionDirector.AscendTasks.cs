@@ -5,7 +5,7 @@ using UnityEngine;
 
 public sealed partial class NoteAscensionDirector
 {
-    [Tooltip("Ascend duration in drum loops (1 = one full loop).")]
+    [Tooltip("Fallback ascend duration in drum loops, used only when the caller passes no loop count. Each marker keeps the count it started with.")]
     [Min(1)] public int ascendLoops = 8;
 
     private struct MarkerState
@@ -13,6 +13,9 @@ public sealed partial class NoteAscensionDirector
         public GameObject go;
         public float stepY;          // world-space Y increment per loop
         public int loopsRemaining;
+        // Loop count this marker's current countdown started from (per-burst / per-role
+        // length). Phrasing resets and the fade ratio use it instead of the global default.
+        public int totalLoops;
         public int delayLoopsRemaining;
         // Cached tag so we can clear isAscending on arrival without GetComponent each step.
         public MarkerTag tag;
@@ -36,7 +39,7 @@ public sealed partial class NoteAscensionDirector
 
     /// <summary>
     /// Reset all active ascension countdowns as if they are starting a new phrasing —
-    /// keeps markers in place visually but resets loopsRemaining to ascendLoops and
+    /// keeps markers in place visually but resets loopsRemaining to the marker's own totalLoops and
     /// recomputes stepY from the marker's current position. Called on chord-progression
     /// changes so notes don't arrive at the line mid-phrase.
     /// </summary>
@@ -45,7 +48,6 @@ public sealed partial class NoteAscensionDirector
         if (_ascendTasks.Count == 0) return;
 
         float targetY = GetAscendTargetWorldY();
-        int   loops   = Mathf.Max(1, ascendLoops);
 
         var keys = new List<InstrumentTrack>(_ascendTasks.Keys);
         foreach (var trk in keys)
@@ -56,9 +58,11 @@ public sealed partial class NoteAscensionDirector
                 var ms = task.markers[i];
                 if (ms.go == null) continue;
 
+                int loops = Mathf.Max(1, ms.totalLoops > 0 ? ms.totalLoops : ascendLoops);
                 float remainingY = targetY - ms.go.transform.position.y;
                 ms.stepY         = remainingY / loops;
                 ms.loopsRemaining = loops;
+                ms.totalLoops     = loops;
                 ms.delayLoopsRemaining = 0;
 
                 // Refresh commit-time snapshot (same pattern as TriggerBurstAscend merge).
@@ -145,7 +149,7 @@ public sealed partial class NoteAscensionDirector
 
                 ms.loopsRemaining = Mathf.Max(0, ms.loopsRemaining - 1);
 
-                FadeMarkerParticles(ms.go, (float)ms.loopsRemaining / Mathf.Max(1, ascendLoops));
+                FadeMarkerParticles(ms.go, (float)ms.loopsRemaining / Mathf.Max(1, ms.totalLoops > 0 ? ms.totalLoops : ascendLoops));
 
                 if (ms.loopsRemaining <= 0)
                 {
@@ -296,6 +300,7 @@ public sealed partial class NoteAscensionDirector
                 go = go,
                 stepY = stepY,
                 loopsRemaining = loops,
+                totalLoops = loops,
                 delayLoopsRemaining = 0,
                 tag = tag,
                 committedStep = committedStep,
@@ -318,6 +323,7 @@ public sealed partial class NoteAscensionDirector
                 float remainingY = targetY - ms.go.transform.position.y;
                 ms.stepY = remainingY / loops;
                 ms.loopsRemaining = loops;
+                ms.totalLoops = loops;
                 // Refresh committedStep — noteMarkers key can shift between bursts.
                 if (committedStepResolver != null && ms.go != null)
                 {

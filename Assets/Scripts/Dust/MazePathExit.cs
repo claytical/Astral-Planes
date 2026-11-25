@@ -56,9 +56,6 @@ public class MazePathExit : MonoBehaviour
     /// streamers race outward.</summary>
     public void BeginSwallow() => _portal?.Swallow();
 
-    /// <summary>Current width of this exit's rainbow road (0 if it has none).</summary>
-    public float PortalWidth => _portal != null ? _portal.Width : 0f;
-
     /// <summary>Distance from the screen edge (Geometry.VisualCenter) back along Inward to where the
     /// rainbow road starts. Falls back to the capture lane's inner end if there is no road.</summary>
     public float RoadInnerDistance => _portal != null
@@ -240,7 +237,20 @@ public class MazePathExit : MonoBehaviour
 
         var vehicle = rb.GetComponentInParent<Vehicle>();
         if (vehicle == null) return;
-        if (_col != null && !_col.OverlapPoint(vehicle.transform.position)) return;
+        if (_col != null && !ReachesMouth(vehicle)) return;
         _owner?.OnVehicleReachedExit(this, vehicle);
+    }
+
+    // The centre test alone fails on Top/Bottom exits: those boundary walls are solid colliders,
+    // so a ship's centre stops a hull radius short of the wall face and may never enter the
+    // shallow trigger (Left/Right walls are wrap triggers that clamp the centre onto the face).
+    // So also test the hull's leading point toward the wall. It shares the centre's along-wall
+    // coordinate, so a ship merely grazing the side of a neighbouring exit still isn't captured.
+    private bool ReachesMouth(Vehicle vehicle)
+    {
+        Vector2 center = vehicle.transform.position;
+        if (_col.OverlapPoint(center)) return true;
+        float hull = vehicle.GetColliderBoundingRadiusWorld();
+        return hull > 0f && _col.OverlapPoint(center + Geometry.Outward * hull);
     }
 }

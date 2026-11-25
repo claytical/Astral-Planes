@@ -63,11 +63,7 @@ public partial class Vehicle
     }
     private IEnumerator Co_CarveSpawnRestPocket()
     {
-        // Optional delay to allow spawn ordering (dust grid, drumTrack, etc.) to settle.
-        if (vehicleConfig.spawnRestPocketDelaySeconds > 0f)
-            yield return new WaitForSeconds(vehicleConfig.spawnRestPocketDelaySeconds);
-        else
-            yield return null; // at least one frame so the dust grid exists
+        yield return null; // one frame so the dust grid exists
 
         if (gfm == null) yield break;
 
@@ -151,7 +147,9 @@ public partial class Vehicle
                 float liveRes      = gen.GetLiveCarveResistance01(cell);
                 float effectiveRes = liveRes * (1f - Mathf.Clamp01(profile.carveResistanceBypass01));
 
-                if (profile.carveVelocityDrainPerCell > 0f)
+                // Drag only from dust this ship could actually carve: an uncarveable wall is a wall,
+                // not mud (it was braking ships that brushed one, e.g. Sandwave).
+                if (profile.carveVelocityDrainPerCell > 0f && gen.CanVehicleChip(cell))
                     totalVelocityDrain = Mathf.Max(totalVelocityDrain, liveRes * profile.carveVelocityDrainPerCell);
 
                 if (!isSolid) continue;

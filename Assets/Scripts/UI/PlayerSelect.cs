@@ -11,7 +11,6 @@ public class PlayerSelect : MonoBehaviour
     public Image vehicleIcon;
     public VehicleStatDisplay statDisplay;
     public GameObject controlsAndStats;
-    public GameObject tutorialControls;
     public Image border;
     public TMP_Text modelNameLabel;
     [Tooltip("Text line below the stat chart; D-pad up/down cycles the note placement method.")]

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
@@ -347,7 +348,7 @@ public partial class PhaseStar
                 {
                     int binSz = targetTrack.BinSize();
                     targetTrack.controller?.StartSuperNodeCompletionSequence(
-                        targetTrack, fromBin, toBin, /*ascendLoopsOverride*/ 3, binSz, _drum);
+                        targetTrack, fromBin, toBin, SuperNodeTrackNodeConfig.Default.ascendLoopsOverride, binSz, _drum);
                 }
                 else
                 {
@@ -434,8 +435,10 @@ public partial class PhaseStar
         }
         ResolveGameFlowManager();
         var noteSet = _gfm != null ? _gfm.GenerateNotes(track, 0) : null;
-        if (!TryResolveAuthoritativeZapCount(track.assignedRole, track, out _currentBurstRequiredZaps))
-            _currentBurstRequiredZaps = Mathf.Max(1, GetNoteSetNoteCount(noteSet));
+        _currentBurstRequiredZaps = noteSet != null ? CountDiscoveryNotes(noteSet, track) : 0;
+        if (_currentBurstRequiredZaps <= 0 &&
+            !TryResolveAuthoritativeZapCount(track.assignedRole, track, out _currentBurstRequiredZaps))
+            _currentBurstRequiredZaps = 1;
         if (GameFlowManager.VerboseLogging) Debug.Log($"[DiscoveryTrackNode] Initializing track {track.name} with {track.assignedRole}");
         node.Initialize(track, noteSet, color, cell, diamondSprite: visuals?.diamond);
         return node;
@@ -451,7 +454,10 @@ public partial class PhaseStar
         }
 
         int totalBins = Mathf.Max(1, track.maxLoopMultiplier);
-        var cfg = _assignedMotif.GetConfigForRoleAtBin(role, 0, totalBins, track.voiceIndex);
+        // The bin this discovery will fill (same non-consuming peek GameFlowManager.GenerateNotes uses).
+        int bin = track.controller != null ? track.controller.PeekBinForNextSpawn(track) : track.GetBinCursor();
+        bin = Mathf.Clamp(bin, 0, totalBins - 1);
+        var cfg = _assignedMotif.GetConfigForRoleAtBin(role, bin, totalBins, track.voiceIndex);
         if (cfg == null)
         {
             Debug.LogWarning($"[PhaseStar:ZapCount] cfg null for role={role} voiceIndex={track.voiceIndex} totalBins={totalBins} motif={_assignedMotif.name}");
@@ -469,13 +475,20 @@ public partial class PhaseStar
         return false;
     }
 
-    private static int GetNoteSetNoteCount(NoteSet noteSet)
+    /// <summary>
+    /// Collectables the discovery will release for this NoteSet: one per distinct bin-local step,
+    /// exactly as InstrumentTrackCompositionSpawner.SpawnBurst normalizes its step list. This is
+    /// the star's flower requirement — one flower (and one tentacle) per note.
+    /// </summary>
+    private static int CountDiscoveryNotes(NoteSet noteSet, InstrumentTrack track)
     {
-        if (noteSet == null) return 0;
-        int persistentTemplateCount = noteSet.persistentTemplate != null ? noteSet.persistentTemplate.Count : 0;
-        int distinctStepCount = noteSet.GetStepList()?.Distinct().Count() ?? 0;
-        int noteListCount = noteSet.GetNoteList()?.Count ?? 0;
-        return Mathf.Max(persistentTemplateCount, Mathf.Max(distinctStepCount, noteListCount));
+        var steps = noteSet?.GetStepList();
+        if (steps == null || steps.Count == 0) return 0;
+        int binSize = Mathf.Max(1, track != null ? track.BinSize() : 16);
+        var seen = new HashSet<int>();
+        for (int i = 0; i < steps.Count; i++)
+            if (steps[i] >= 0) seen.Add(steps[i] % binSize);
+        return seen.Count;
     }
 
     // Shared tail for DiscoveryTrackNode/SuperNode resolution: park the star off-screen and hold

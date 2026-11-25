@@ -51,6 +51,23 @@ public sealed class DrumTrackGridMapper
     /// Returns the world-space play area used to map SpawnGrid cells to world positions.
     /// The play area is the visible camera region, clipped so it does not overlap the NoteVisualizer.
     /// </summary>
+    // A UI anchor's world corners follow the LIVE camera, so reading them during a presentation
+    // zoom (record intro/exit) moved the play area — and with it the whole grid↔world mapping —
+    // while pooled dust stayed where it was: walls ended up a cell off from the logical maze
+    // (sealed-looking exits, ships embedded in "clear" cells). The anchor's on-screen fraction is
+    // zoom-independent, so map it through the unzoomed frame instead (same origin-anchored
+    // convention as the bounds above).
+    private static float AnchorYToGameplayFrame(RectTransform anchor, Vector3 corner, Camera cam, float halfH)
+    {
+        var canvas = anchor.GetComponentInParent<Canvas>();
+        float vy;
+        if (canvas != null && canvas.rootCanvas.renderMode == RenderMode.ScreenSpaceOverlay)
+            vy = Screen.height > 0 ? corner.y / Screen.height : 0f;
+        else
+            vy = cam.WorldToViewportPoint(corner).y;
+        return Mathf.LerpUnclamped(-halfH, halfH, vy);
+    }
+
     public bool TryGetPlayAreaWorld(out DrumTrack.PlayArea area)
     {
         var config = _config();
@@ -124,7 +141,9 @@ public sealed class DrumTrackGridMapper
             anchor.GetWorldCorners(corners);
             // Only override when Canvas layout has been applied (rect has non-zero width).
             if (corners[2].x - corners[0].x > 0.001f)
-                bottom = corners[1].y;  // top-left corner — same source as NoteVisualizer.GetTopWorldY()
+                bottom = cam.orthographic
+                    ? AnchorYToGameplayFrame(anchor, corners[1], cam, halfH)
+                    : corners[1].y;  // top-left corner — same source as NoteVisualizer.GetTopWorldY()
         }
 
         // Reserve a top viewport band for UI derived from config.uiTopPaddingPx.
@@ -143,7 +162,9 @@ public sealed class DrumTrackGridMapper
             topAnchor.GetWorldCorners(topCorners);
             // Only override when Canvas layout has been applied (rect has non-zero width).
             if (topCorners[2].x - topCorners[0].x > 0.001f)
-                top = topCorners[0].y;  // bottom-left corner of GameStats — mirrors bottom anchor's corners[1]
+                top = cam.orthographic
+                    ? AnchorYToGameplayFrame(topAnchor, topCorners[0], cam, halfH)
+                    : topCorners[0].y;  // bottom-left corner of GameStats — mirrors bottom anchor's corners[1]
         }
         // Validate.
         if (!IsFinite(left) || !IsFinite(right) || !IsFinite(bottom) || !IsFinite(top)) return false;

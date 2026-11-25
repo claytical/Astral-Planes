@@ -1,65 +1,61 @@
 {
-  "holdSeconds": 4,
+  "holdSeconds": 2.5,
   "stages": [
     {
       "id": "01_welcome",
       "gateName": "None",
       "lines": [
-        "Before we venture out into the Let's take your ship for a spin."
+        "Hello, Sonic Wanderer{s}!",
+        "Take your vessel for a spin..."
       ]
     },
     {
       "id": "02_drift",
       "gateName": "None",
       "lines": [
-        "Tilt the stick to drift.",
-        "Drift around and get a feel for your ship.",
-        "Loop around a little. There's no rush."
+        "Steer with the stick."
       ]
     },
     {
       "id": "03_charge",
       "gateName": "None",
       "lines": [
-        "Hold Charge to push forward.",
-        "Charging burns energy, but it's the only way through dust.",
-        "Some dust has grown in. Charge into it."
+        "Squeeze the trigger to go faster."
       ]
     },
     {
       "id": "04_dust",
       "gateName": "None",
       "lines": [
-        "Dust takes the colour of a musical role.",
-        "Each colour carves differently. Bright dust gives way easily...",
-        "...while deep, heavy colours push back. Keep charging.",
-        "Carve through every colour."
+        "Charging burns energy, but it's the only way through dust.",
+        "Every color feels a little different.",
+        "Some takes more energy to get through."
       ]
     },
     {
-      "id": "05_pathOpen",
+      "id": "05_wrapUp",
       "gateName": "None",
       "lines": [
-        "Nicely done! A path is opening.",
-        "Follow it into the music."
+        "Looks like you've got the basics down."
       ]
     }
   ],
   "skipHint": {
     "lines": [
-      "Welcome back! Hold your confirm button to skip ahead."
+      "Hold {button} to skip ahead."
     ]
   },
   "outOfEnergy": {
     "lines": [
-      "Running on empty! Out here your tank refills, but in the music it won't.",
-      "Ease off Charge to save energy."
+      "You ran out of energy! Your tank refills here, but it won't in the field.",
+      "Let go of the trigger and drift to conserve energy."
     ]
   },
   "stuckOnHardDust": {
     "lines": [
       "Heavy dust takes more effort. Keep charging and it'll break.",
-      "Or try a brighter colour first."
+      "Some vessels are better at this than others.",
+      "Or try a different color first."
     ]
   }
 }

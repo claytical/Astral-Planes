@@ -89,10 +89,16 @@ public partial class GameFlowManager
 
     public void BeginGameAfterTutorial()
     {
-        RunControlSandbox = true;
+        // Solo: the sandbox runs once — only while the tutorial isn't done (no ring saved yet), and
+        // it leads into the Tutorial Motif. Multiplayer: it always opens the session, then the
+        // chosen motif grows in around the ships.
+        int playerCount = 0;
+        foreach (var p in SessionState.Players) if (p != null) playerCount++;
+        bool tutorialDone = RingSessionStore.LoadAllRingsFromDisk().Count > 0;
+        RunControlSandbox = playerCount > 1 || !tutorialDone;
         // Raised now, not when the sandbox starts: NarratedTutorialController starts on scene load
         // (before setup reaches the sandbox) and would otherwise see phase 0 and begin narrating.
-        SandboxActive = true;
+        SandboxActive = RunControlSandbox;
         SessionGenome.BootNewSessionSeed((int)Random.Range(0, 1000f));
         StartCoroutine(SceneFlow.TransitionToScene("GeneratedTrack"));
     }

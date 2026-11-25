@@ -20,8 +20,6 @@ MonoBehaviour:
   autoSizeSpawnGridToScreen: 1
   lockPlayAreaAfterInit: 1
   timingWindowSteps: 4
-  pressureDustWeight: 0.5
-  pressureFuelWeight: 0.5
   axisSmoothFactor: 0.35
   axisHysteresis: 0.08
   minClipDwellSeconds: 4

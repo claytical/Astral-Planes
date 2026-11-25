@@ -5,7 +5,7 @@ using Random = UnityEngine.Random;
 
 [RequireComponent(typeof(Rigidbody2D))]
 [DisallowMultipleComponent]
-public sealed class PhaseStarMotion2D : MonoBehaviour
+public sealed partial class PhaseStarMotion2D : MonoBehaviour
 {
     public event Action<Vector2> OnVelocityChanged;
 
@@ -93,6 +93,8 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         _rb = GetComponent<Rigidbody2D>();
         _rb.gravityScale = 0f;
         _rb.constraints = RigidbodyConstraints2D.FreezeRotation;
+        // Smooth rendering between physics ticks (the prefab ships with interpolation off).
+        _rb.interpolation = RigidbodyInterpolation2D.Interpolate;
 
         _cam = Camera.main;
         _driftDir = Random.insideUnitCircle.normalized;
@@ -199,7 +201,15 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
     {
         if (!_rb) return;
         SyncGhostCollisions();
+        EnsureSwimDrumSubscription();
         if (!_enabled || _profile == null) return;
+
+        // Swim (jellyfish stroke) only while a dormant ghost; an entrance is abandoned otherwise.
+        if (!GhostWanted)
+        {
+            EndEntrance(snapToTarget: true);
+            RelaxSwim(Time.fixedDeltaTime);
+        }
 
         if (_frozen && _ghostRequested)
         {
@@ -436,6 +446,7 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
     private void SoftContainInsideScreen()
     {
+        if (_entering) return; // swimming in from off-screen — containment resumes on arrival
         if (_cam == null) _cam = Camera.main;
         if (_cam == null || _rb == null) return;
 
@@ -546,32 +557,13 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
 
     private void TickGhostDrift(float dt)
     {
-        // Ships passing through: buffet them and fling the star somewhere else.
-        CollectVehicleColliders();
-        for (int i = 0; i < _vehicleColScratch.Count; i++)
-        {
-            var vc = _vehicleColScratch[i];
-            if (!vc || !vc.enabled || vc.isTrigger) continue;
-            if (!OverlapsStar(vc)) continue;
-            var vehicle = vc.GetComponentInParent<Vehicle>();
-            if (vehicle == null) continue;
-            vehicle.ApplyTurbulence(ghost.turbulence01, ghost.turbulenceSeconds);
-            ScatterFrom(vehicle);
-        }
+        // Ships and charging stars soft-bump: a springy push apart instead of a hard contact
+        // (a hard collider can pin a ship) or a pass-through (PhaseStarMotion2D.Swim.cs).
+        TickSoftBump(dt);
 
-        // Slow wander; anything faster (a scatter) bleeds off at the settle rate.
-        _rechooseTimer -= dt;
-        if (_rechooseTimer <= 0f) PickNewDriftDir();
-
-        Vector2 dir = _driftDir + ComputeEdgeRepulsion(_rb.position);
-        if (dir.sqrMagnitude > 0.0001f) dir.Normalize();
-        Vector2 target = dir * Mathf.Max(0f, ghost.driftSpeed);
-
-        Vector2 cur = _rb.linearVelocity;
-        float accel = cur.sqrMagnitude > target.sqrMagnitude * 2.25f + 0.01f
-            ? frozenSettleDeceleration
-            : ghost.driftAccel;
-        _rb.linearVelocity = Vector2.MoveTowards(cur, target, accel * dt);
+        // Jellyfish swim in time with the music (PhaseStarMotion2D.Swim.cs); a scatter glides off
+        // under the same drag.
+        TickSwim(dt);
         SoftContainInsideScreen();
         OnVelocityChanged?.Invoke(_rb.linearVelocity);
     }
@@ -589,10 +581,12 @@ public sealed class PhaseStarMotion2D : MonoBehaviour
         if (dir.sqrMagnitude < 0.0001f) dir = away;
         dir.Normalize();
 
-        Vector2 scatter = dir * Mathf.Max(ghost.scatterSpeed, shipVel.magnitude * 0.5f);
-        if (_rb.linearVelocity.sqrMagnitude < scatter.sqrMagnitude)
-            _rb.linearVelocity = scatter;
+        // Gentle nudge, applied every tick while overlapping (an acceleration, not a velocity set),
+        // so a ship drifting through a star eases it aside instead of flinging it.
+        _rb.linearVelocity += dir * (Mathf.Max(0f, ghost.scatterSpeed) * Time.fixedDeltaTime);
         _driftDir = dir; // keep wandering the way it was knocked
+        _swimHeading = dir;
+        _swimHeadingTimer = Random.Range(1.2f, 2.4f);
         _rechooseTimer = Random.Range(1.2f, 2.4f);
     }
 

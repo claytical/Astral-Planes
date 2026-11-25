@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: aac3893ab850d4e2d8237ce04dc9e3df
+guid: cb80cc42ec9d544f2a37493571f92e99
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -3495420660709828112
-    second: Xagong_0
+      213: 7223363152320260212
+    second: Sandwave_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -113,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Xagong_0
+      name: Sandwave_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 230
-        height: 171
+        width: 59
+        height: 51
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 0f954d9bd65cd7fc0800000000000000
-      internalID: -3495420660709828112
+      spriteID: 478e1b9148a8e3460800000000000000
+      internalID: 7223363152320260212
       vertices: []
       indices: 
       edges: []
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Xagong_0: -3495420660709828112
+      Sandwave_0: 7223363152320260212
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

@@ -45,7 +45,7 @@ private bool _rainbowParticleDirty;
 private void ClearRainbowParticleDirtyIfNeeded()
 {
     if (!_rainbowParticleDirty) return;
-    SetRainbowParticleColor(_baseCaptured ? _baseColor : _currentTint);
+    SetRainbowParticleColor(_currentTint); // the cell's rest tint, not the prefab's authored colour
     _rainbowParticleDirty = false;
 }
 
@@ -55,7 +55,6 @@ private void ClearRainbowParticleDirtyIfNeeded()
     // successive chips don't compound. Set wherever the base role tint is (re)applied.
     private Color _undrainedRgb = Color.white;
 
-    private Color _baseColor;
     private float _baseSize;
     private float _baseAlpha;
     private bool _baseCaptured;
@@ -395,14 +394,11 @@ private void ClearRainbowParticleDirtyIfNeeded()
 {
     _tintPulseActive = true;
 
-    // Particles rest at their authored base color (_baseColor), not _currentTint — a
-    // role's near-black tint (e.g. path-choice maze walls' solidDustTint) is fine for the
-    // opaque sprite but reads as invisible once pushed onto particles under an additive
-    // blend, which is exactly the regression this isolates against (see
-    // SetDustColorAllParticles' comment). The bright rainbow hues themselves are safe
-    // either way — only the rest color needs to avoid _currentTint.
-    if (!_baseCaptured) CaptureBaseVisual();
-    Color particleRestColor = _baseCaptured ? _baseColor : _currentTint;
+    // Particles return to the cell's own rest tint (_currentTint), so walls land back on their
+    // colour (e.g. the interstitial walls' inertBlockTint) rather than on the prefab's authored
+    // startColor, which left them brown or purple after the wisp's maze pulse.
+    // inertBlockTint is deliberately kept off near-black, so it stays visible on particles.
+    Color particleRestColor = _currentTint;
     _rainbowParticleDirty = true;
 
     float fadeIn  = Mathf.Clamp(seconds * 0.15f, 0.05f, 0.3f);
@@ -541,8 +537,7 @@ private void ClearRainbowParticleDirtyIfNeeded()
         // _baseAlpha drift with the cell's history (and the grow-in ramp scales it too).
         if (!_baseCaptured)
         {
-            _baseColor = main.startColor.color;
-            _baseAlpha = _baseColor.a;
+            _baseAlpha = main.startColor.color.a;
         }
         // Size is safe to refresh: cell-relative sizing (SetCellSizeDrivenScale) rewrites it.
         _baseSize  = main.startSize.constant / Mathf.Max(0.0001f, _blockSizeMul); // block form is layered on top

@@ -19,6 +19,12 @@ Shader "Astral Planes/RingUnlit"
         // Particle quads: 1 = fade alpha radially (soft round dot) instead of across the strip width.
         [Toggle] _Radial ("Radial Fade (particles)", Float) = 0
         _EdgePower ("Edge Power (LineRenderer only)", Range(1, 8)) = 1
+        // Max + premultiplied output: overlapping parts of one line (a contour folding over itself at
+        // a tight note dip, LineRenderer joints) take the brighter value instead of adding up, so they
+        // can't flare. Blend factors are ignored under Max, so alpha (edge softness) is folded into
+        // rgb instead. Defaults (Add, off) leave every existing material unchanged.
+        [Enum(UnityEngine.Rendering.BlendOp)] _BlendOp ("Blend Op", Float) = 0          // Add
+        [Toggle] _PremultiplyOut ("Premultiply Output (use with Max)", Float) = 0
     }
 
     SubShader
@@ -31,6 +37,7 @@ Shader "Astral Planes/RingUnlit"
         }
 
         Blend [_SrcBlend] [_DstBlend]
+        BlendOp [_BlendOp]
         ZWrite Off
         Cull Off
 
@@ -54,6 +61,8 @@ Shader "Astral Planes/RingUnlit"
                 float  _EdgePower;
                 float  _Radial;
                 float  _TipFade;
+                float  _BlendOp;
+                float  _PremultiplyOut;
             CBUFFER_END
 
             struct Attributes
@@ -92,6 +101,7 @@ Shader "Astral Planes/RingUnlit"
                 {
                     half r = saturate(1.0 - length(IN.uv * 2.0 - 1.0));
                     col.a *= smoothstep(0.0, 1.0, r);
+                    if (_PremultiplyOut > 0.5) col.rgb *= col.a;
                     return col;
                 }
                 if (_EdgeSoftness > 0.0001)
@@ -105,6 +115,7 @@ Shader "Astral Planes/RingUnlit"
                     half along = _TipFade > 0.0 ? 1.0 - IN.uv.x : IN.uv.x;
                     col.a *= smoothstep(0.0, 1.0, saturate(along / abs(_TipFade)));
                 }
+                if (_PremultiplyOut > 0.5) col.rgb *= col.a;
                 return col;
             }
             ENDHLSL

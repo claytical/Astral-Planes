@@ -318,13 +318,7 @@ public partial class MotifRingGlyphApplicator
         {
             go = Instantiate(noteTravelDotPrefab, startWorld, Quaternion.identity, transform);
             go.transform.localScale = Vector3.one * (config.noteDotRadius * 2f);
-            var lr2 = go.GetComponentInChildren<LineRenderer>();
-            if (lr2 != null) { lr2.startColor = lr2.endColor = color; }
-            else
-            {
-                var sr = go.GetComponentInChildren<SpriteRenderer>();
-                if (sr != null) sr.color = color;
-            }
+            TintTravelDot(go, color);
         }
         else
         {
@@ -393,5 +387,54 @@ public partial class MotifRingGlyphApplicator
         }
 
         Destroy(go);
+    }
+
+    // Role-tints every renderer on a travel-dot prefab instance (Ring Note.prefab: a sprite plus a
+    // child particle system). Tinting only the first renderer left the particles at their
+    // authored white, so the dot read as grey. RGB comes from the role colour; each part keeps its
+    // own authored alpha.
+    private static readonly ParticleSystem.Particle[] _dotParticleScratch = new ParticleSystem.Particle[256];
+
+    private static void TintTravelDot(GameObject go, Color color)
+    {
+        if (go == null) return;
+        static Color WithAlpha(Color c, float a) { c.a = a; return c; }
+
+        foreach (var sr in go.GetComponentsInChildren<SpriteRenderer>(true))
+            sr.color = WithAlpha(color, sr.color.a);
+
+        foreach (var lr in go.GetComponentsInChildren<LineRenderer>(true))
+        {
+            lr.startColor = WithAlpha(color, lr.startColor.a);
+            lr.endColor   = WithAlpha(color, lr.endColor.a);
+        }
+
+        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var main = ps.main;
+            var sc = main.startColor;
+            switch (sc.mode)
+            {
+                case ParticleSystemGradientMode.TwoColors:
+                    main.startColor = new ParticleSystem.MinMaxGradient(
+                        WithAlpha(color, sc.colorMin.a), WithAlpha(color, sc.colorMax.a));
+                    break;
+                default:
+                    main.startColor = WithAlpha(color, sc.color.a);
+                    break;
+            }
+
+            // Particles already emitted on awake keep their spawn colour — recolour them too.
+            int n = ps.GetParticles(_dotParticleScratch);
+            if (n > 0)
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    Color32 pc = _dotParticleScratch[i].startColor;
+                    _dotParticleScratch[i].startColor = WithAlpha(color, pc.a / 255f);
+                }
+                ps.SetParticles(_dotParticleScratch, n);
+            }
+        }
     }
 }

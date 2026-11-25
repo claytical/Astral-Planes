@@ -4,7 +4,8 @@ using UnityEngine;
 
 /// <summary>
 /// Manages a pool of PhaseStar husks — one slot per distinct MusicalRole in the active motif.
-/// Spawns Stars reactively when role-colored dust exists and no Star for that role is live.
+/// Keeps one Star waiting per active role from motif start (respawned when its slot empties and the
+/// role isn't mid-sequence or walled); its buds show how many flowers it needs.
 /// Orchestrates pause/resume across Stars during active DiscoveryTrackNode processing.
 /// Owns the bridge gate — fires GameFlowManager.BeginMotifBridge when all ejections complete.
 /// </summary>
@@ -76,6 +77,8 @@ public sealed partial class StarPool : MonoBehaviour
 
         BuildPhasePlan();
         SubscribeToTracks();
+        _motifStartSpawned.Clear();
+        _starSpawnCells.Clear();
 
         if (GameFlowManager.VerboseLogging) Debug.Log($"[StarPool] Initialized — total ejections={_remainingEjectionsTotal}");
     }

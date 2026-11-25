@@ -96,6 +96,7 @@ public class CosmicBlockField : MonoBehaviour
         _swapPending = false;
         _pendingTrack = null;
         Gen?.ReleaseRoleBlock();
+        GameFlowManager.Instance?.RefreshNextUpRingPalette(); // the walled role is available again
     }
 
     // True from the moment the motif is complete (record docking, then the bridge) until the
@@ -120,6 +121,13 @@ public class CosmicBlockField : MonoBehaviour
     private void LateUpdate()
     {
         if (!_swapPending) return;
+        ApplyPendingSwap();
+        // The record's next-up ring cycles the roles that can fill it now (minus the walled one).
+        GameFlowManager.Instance?.RefreshNextUpRingPalette();
+    }
+
+    private void ApplyPendingSwap()
+    {
         _swapPending = false;
         var track = _pendingTrack;
         _pendingTrack = null;
@@ -150,10 +158,8 @@ public class CosmicBlockField : MonoBehaviour
 
         foreach (var t in tracks)
         {
-            if (t == null || t.assignedRole == MusicalRole.None) continue;
-            if (t.assignedRole == completed.assignedRole) continue;
-            if (activeRoles != null && !activeRoles.Contains(t.assignedRole)) continue;
-            if (t.GetFilledBinCount() < Mathf.Max(1, t.maxLoopMultiplier)) return true;
+            if (t == null || t.assignedRole == completed.assignedRole) continue;
+            if (GameFlowManager.TrackCanStillProgress(t, activeRoles)) return true;
         }
         return false;
     }

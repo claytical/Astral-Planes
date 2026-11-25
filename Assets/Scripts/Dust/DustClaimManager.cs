@@ -83,6 +83,20 @@ public sealed class DustClaimManager : MonoBehaviour
         }
     }
 
+    /// <summary>Diagnostic: number of claimed cells per owner (live claims only).</summary>
+    public void TallyClaimedCellsByOwner(Dictionary<string, int> into)
+    {
+        into.Clear();
+        float now = Time.time;
+        foreach (var kv in _claims)
+            foreach (var c in kv.Value)
+            {
+                if (c.expiresAt > 0f && now >= c.expiresAt) continue;
+                into.TryGetValue(c.owner, out int n);
+                into[c.owner] = n + 1;
+            }
+    }
+
     public void ReleaseCell(string owner, Vector2Int cell, DustClaimType? type = null)
     {
         CleanupExpired(cell);

@@ -1274,6 +1274,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e84647cb53cd94c9eb8da1d63d8a23ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  recordDockRadiusCells: 2
+  recordDockMinShipDistanceCells: 5
+  recordVaultNeutralTint: {r: 0.6981132, g: 0.6981132, b: 0.6981132, a: 0.36862746}
+  recordVaultExplodeTint: {r: 0.6320754, g: 0.6320754, b: 0.6320754, a: 1}
+  recordSizeInChamber: 0.5
+  recordExitMaxHoldSeconds: 8
+  recordZoomFraming: 2.6
+  recordZoomSettleSeconds: 0.9
+  recordIntroHoldSeconds: 1.6
+  recordRingHoldSeconds: 0.6
+  recordRingMaxLoops: 1.25
   motifRingGlyphApplicator: {fileID: 0}
   binRingController: {fileID: 0}
   vehiclePhaseInFxPrefab: {fileID: 4807525718738022760, guid: 5962a9437261f4908b0f4999318283dd,
@@ -1310,11 +1321,9 @@ MonoBehaviour:
   profile: {fileID: 0}
   cursor: 0
   burnIfOutsideWindow: 0
-  retunePolicy: 0
   seedFromProfileOnPhaseStart: 0
   useMotifChordProfiles: 1
   applyInitialMotifProfileImmediately: 1
-  conflictPolicy: 0
 --- !u!114 &1151719981
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1332,8 +1341,6 @@ MonoBehaviour:
   primaryAnchorName: PrimaryTutorialAnchor
   pressAnyStepSeconds: 0.5
   pressAnyLoop: 1
-  tutorialStepSeconds: 4
-  useInputGatedTutorial: 1
   primaryFullScale: {x: 1, y: 1, z: 1}
   primaryCompactScale: {x: 0.5, y: 0.5, z: 1}
 --- !u!1 &1241868050

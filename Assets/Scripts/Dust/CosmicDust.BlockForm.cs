@@ -24,7 +24,7 @@ public partial class CosmicDust
 
     public bool IsBlockForm { get; private set; }
 
-    public void SetBlockForm(bool on, float sizeMul = 4f)
+    public void SetBlockForm(bool on, float sizeMul = 1f) // sizeMul only matters when on; callers pass their config value
     {
         IsBlockForm = on;
         // A block shows no flower bud and never reads as bright star food. The bloom itself is

@@ -7,6 +7,14 @@ public class VehicleConfig : ScriptableObject
     [Tooltip("Hard ceiling on rigidbody angular velocity (deg/s), applied every physics tick regardless of ship. Safety clamp, not a per-ship feel knob — see arcadeAngularDamping on ShipMusicalProfile for day-to-day rotational feel.")]
     public float maxAngularVelocityDegPerSec = 540f;
 
+    [Header("Heading")]
+    [Min(0f), Tooltip("Max degrees per second the nose turns toward its target heading (input while pressing into something, velocity in free flight). 0 = snap instantly (old behaviour, jitters against walls).")]
+    public float headingTurnRateDegPerSec = 720f;
+    [Min(0f), Tooltip("Below this speed (world units/s) the nose stops following velocity and follows input instead, so tiny solver push-outs don't swing it.")]
+    public float headingMinSpeed = 0.25f;
+    [Min(0f), Tooltip("Idle (no drift input, no charge) and touching a collider: rotation is frozen and speed is capped to this, so a ship overlapping a wall settles out gently with its nose in place. 0 = no cap.")]
+    public float contactIdleMaxSpeed = 0.5f;
+
     [Header("Manual Note Release")]
     [Tooltip("Max notes a ship can carry at once in Manual placement. A full queue refuses further pickups (LEGIBILITY_AUDIT.md C1).")]
     public int manualReleaseQueueCapacity = 9;
@@ -132,8 +140,6 @@ public class VehicleConfig : ScriptableObject
     public int spawnRestPocketRadiusCells = 1;
     [Tooltip("Fade time (seconds) for the initial pocket carve.")]
     public float spawnRestPocketFadeSeconds = 0.05f;
-    [Tooltip("Delay (seconds) before carving the pocket.")]
-    public float spawnRestPocketDelaySeconds = 0.0f;
 
     /// <summary>
     /// Returns the effective arm-ahead window in steps, respecting the minimum

@@ -27,7 +27,6 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     private float notReadyShakeHz => Cfg.notReadyShakeHz;
     private float sleepDesaturate01 => Cfg.sleepDesaturate01;
     private float sleepAlphaMul => Cfg.sleepAlphaMul;
-    private float dualMaxSeparationDeg => Cfg.dualMaxSeparationDeg;
     private Color dimShardTint => Cfg.dimShardTint;
 
     private float _notReadyShakeStart = -999f;
@@ -42,34 +41,44 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
 
     private SpriteRenderer[] _shardSpriteRenderers;
 
-    private SpriteRenderer _diamondASprite;
-    private SpriteRenderer _diamondBSprite;
-
-    private float _diamondAAngleCurrent;
-    private float _diamondBAngleCurrent;
-    private float _diamondAAngleVelocity;
-    private float _diamondBAngleVelocity;
-    private bool _diamondAnglesInitialized;
+    // The star's count diamonds (PhaseStar.DiamondBody.cs): tinted by PhaseStar itself, so the
+    // generic shard tint (dim/bright) skips them.
+    private readonly HashSet<SpriteRenderer> _starDiamonds = new HashSet<SpriteRenderer>();
 
     public void Initialize()
     {
         CacheShardRenderers();
     }
 
-    public void BindDualDiamondRenderers(Transform diamondA, Transform diamondB)
+    public void RegisterStarDiamond(SpriteRenderer sr)   { if (sr) _starDiamonds.Add(sr); }
+    public void UnregisterStarDiamond(SpriteRenderer sr) { if (sr) _starDiamonds.Remove(sr); }
+
+    /// <summary>Sprite for a formed diamond of this role.</summary>
+    public Sprite FormedDiamondSprite(MusicalRole role) =>
+        (role == MusicalRole.Rhythm && activeDiamondRhythm != null) ? activeDiamondRhythm
+        : (activeDiamond != null ? activeDiamond : diamond);
+
+    /// <summary>Applies the sleeping (blocked elsewhere) desaturate and fade, if asleep.</summary>
+    public Color ApplySleepTint(Color c)
     {
-        _diamondASprite = diamondA ? diamondA.GetComponent<SpriteRenderer>() : null;
-        _diamondBSprite = diamondB ? diamondB.GetComponent<SpriteRenderer>() : null;
-        ResetDualDiamondVisualState();
-        CacheShardRenderers();
+        if (!Sleeping) return c;
+        Color grey = new Color(dimShardTint.r, dimShardTint.g, dimShardTint.b, 1f);
+        float a = c.a * sleepAlphaMul;
+        c = Color.Lerp(c, grey, sleepDesaturate01);
+        c.a = a;
+        return c;
     }
 
-    public void ResetDualDiamondVisualState()
+    /// <summary>The not-ready head shake's current angle (degrees), 0 when idle.</summary>
+    public float CurrentShakeDeg()
     {
-        _diamondAnglesInitialized = false;
-        _diamondAAngleVelocity = 0f;
-        _diamondBAngleVelocity = 0f;
+        float shakeT = Time.time - _notReadyShakeStart;
+        if (shakeT < 0f || shakeT >= notReadyShakeSeconds) return 0f;
+        float decay = 1f - shakeT / notReadyShakeSeconds;
+        return Mathf.Sin(shakeT * notReadyShakeHz * Mathf.PI * 2f) * notReadyShakeDeg * decay;
     }
+
+    public float DiamondAngleSmoothTime => diamondAngleSmoothTime;
 
     private void CacheShardRenderers()
     {
@@ -85,19 +94,9 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         }
 
         _shardSpriteRenderers = list.ToArray();
-
-        // Only fall back if explicit refs were never provided.
-        if (_diamondASprite == null && _shardSpriteRenderers.Length > 0)
-            _diamondASprite = _shardSpriteRenderers[0];
-
-        if (_diamondBSprite == null && _shardSpriteRenderers.Length > 1)
-            _diamondBSprite = _shardSpriteRenderers[1];
     }
 
-    /// <summary>
-    /// Clears only the generic cache. It must NOT wipe the explicit diamond refs,
-    /// or BuildPreviewRing() will reintroduce renderer-order bugs.
-    /// </summary>
+    /// <summary>Clears the generic renderer cache (call after adding/removing child renderers).</summary>
     public void InvalidateShardCache()
     {
         _shardSpriteRenderers = null;
@@ -107,91 +106,6 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
     {
         if (ejectionPrefab != null)
             Instantiate(ejectionPrefab, transform.position, Quaternion.identity);
-    }
-
-    public void UpdateDualDiamonds(
-        Color roleColor,
-        float charge01,
-        float rotDegA,
-        bool aLocked,
-        float rotDegB,
-        bool bLocked,
-        bool isReady,
-        MusicalRole role,
-        float readyRotMul = 2.5f)
-    {
-        if (_diamondASprite == null || _diamondBSprite == null)
-            CacheShardRenderers();
-
-        if (_diamondASprite == null && _diamondBSprite == null)
-            return;
-
-        Color startGray = new Color(dimShardTint.r, dimShardTint.g, dimShardTint.b, 1f);
-        Color tint = Color.Lerp(startGray, roleColor, charge01 * charge01);
-        tint.a = Mathf.Lerp(dimShardTint.a, 1f, charge01);
-        if (Sleeping)
-        {
-            float a = tint.a * sleepAlphaMul;
-            tint = Color.Lerp(tint, startGray, sleepDesaturate01);
-            tint.a = a;
-        }
-
-        float sep = isReady ? 0f : Mathf.Lerp(dualMaxSeparationDeg, 0f, charge01);
-
-        float targetAngleA = aLocked ? rotDegA : (isReady ? rotDegA * readyRotMul : rotDegA) + sep;
-        float targetAngleB = bLocked ? rotDegB : (isReady ? rotDegB * readyRotMul : rotDegB) - sep;
-
-        if (!_diamondAnglesInitialized)
-        {
-            _diamondAAngleCurrent = targetAngleA;
-            _diamondBAngleCurrent = targetAngleB;
-            _diamondAnglesInitialized = true;
-        }
-        else
-        {
-            _diamondAAngleCurrent = Mathf.SmoothDampAngle(
-                _diamondAAngleCurrent,
-                targetAngleA,
-                ref _diamondAAngleVelocity,
-                diamondAngleSmoothTime);
-
-            _diamondBAngleCurrent = Mathf.SmoothDampAngle(
-                _diamondBAngleCurrent,
-                targetAngleB,
-                ref _diamondBAngleVelocity,
-                diamondAngleSmoothTime);
-        }
-
-        // Not-ready head shake: applied after smoothing so the damper doesn't eat it.
-        float shakeDeg = 0f;
-        float shakeT = Time.time - _notReadyShakeStart;
-        if (shakeT >= 0f && shakeT < notReadyShakeSeconds)
-        {
-            float decay = 1f - shakeT / notReadyShakeSeconds;
-            shakeDeg = Mathf.Sin(shakeT * notReadyShakeHz * Mathf.PI * 2f) * notReadyShakeDeg * decay;
-        }
-
-        Sprite shardSprite = charge01 <= 0.001f
-            ? diamond
-            : (role == MusicalRole.Rhythm && activeDiamondRhythm != null)
-                ? activeDiamondRhythm
-                : (activeDiamond != null ? activeDiamond : diamond);
-
-        if (_diamondASprite != null)
-        {
-            _diamondASprite.color = tint;
-            _diamondASprite.sprite = shardSprite;
-            _diamondASprite.transform.localRotation = Quaternion.Euler(0f, 0f, _diamondAAngleCurrent + shakeDeg);
-            _diamondASprite.transform.localScale = Vector3.one;
-        }
-
-        if (_diamondBSprite != null)
-        {
-            _diamondBSprite.color = tint;
-            _diamondBSprite.sprite = shardSprite;
-            _diamondBSprite.transform.localRotation = Quaternion.Euler(0f, 0f, _diamondBAngleCurrent + shakeDeg);
-            _diamondBSprite.transform.localScale = Vector3.one;
-        }
     }
 
     public void ShowBright(Color c)
@@ -280,7 +194,7 @@ public sealed class PhaseStarVisuals2D : MonoBehaviour
         {
             var sr = _shardSpriteRenderers[i];
             if (!sr) continue;
-            if (sr == _diamondASprite || sr == _diamondBSprite) continue;
+            if (_starDiamonds.Contains(sr)) continue;
             sr.color = c;
         }
     }

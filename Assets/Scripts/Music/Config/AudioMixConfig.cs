@@ -26,7 +26,10 @@ public class AudioMixConfig : ScriptableObject
 
     [Range(0f, 1f)]
     [Tooltip("Base AudioSource volume of the drum loop, live and in the carousel preview.")]
-    public float drumVolume = 0.79f;
+    public float drumVolume = DefaultDrumVolume;
+
+    /// <summary>Drum level used when no AudioMixConfig asset is found.</summary>
+    public const float DefaultDrumVolume = 0.79f;
 
     private const string ResourcePath = "Config/AudioMixConfig";
     private static AudioMixConfig _instance;

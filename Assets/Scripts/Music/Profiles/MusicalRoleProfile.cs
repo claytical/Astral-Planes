@@ -171,11 +171,4 @@ public class MusicalRoleProfile : ScriptableObject
         c.a = baseAlpha;
         return c;
     }
-
-    public Color GetShadowColor()
-    {
-        var c = dustColors.shadowColor;
-        c.a = baseAlpha;
-        return c;
-    }
 }

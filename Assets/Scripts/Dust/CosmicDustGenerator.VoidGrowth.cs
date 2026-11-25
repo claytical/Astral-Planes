@@ -283,9 +283,11 @@ public partial class CosmicDustGenerator
             }
 
             if (_permanentClearCells.Contains(gp)) continue;
-            if (IsKeepClearCell(gp)) continue;
-            if (dustClaims != null && dustClaims.IsBlocked(gp)) continue;
-            if (IsDustSpawnBlocked(gp)) continue;
+            // A standing vault shell cell overrides every claim (keep-clear pockets, trails,
+            // travel corridors): a claim there would otherwise leave a permanent hole in the
+            // sealed shell. VoidGrowCellNow still waits out a ship physically on the cell.
+            bool vaultShell = IsSealedVaultShell(gp);
+            if (!vaultShell && (dustClaims != null && dustClaims.IsBlocked(gp))) continue;
             if (_regrowthScheduler.VoidGrowCoroutines.ContainsKey(gp)) continue;
 
             SetCellFlag(gp, CellFlags.VoidGrow);
@@ -350,14 +352,14 @@ public partial class CosmicDustGenerator
         // ripple checks current state rather than stale state from ring-imprint time.
         if (startDelaySeconds > 0f) yield return new WaitForSeconds(startDelaySeconds);
 
+        // Standing vault shell cells ignore claims (see SpawnDustAtCells); only a ship on the cell stops them.
+        bool vaultShell0       = IsSealedVaultShell(gp);
         bool veto0_perm        = _permanentClearCells.Contains(gp);
-        bool veto0_spawnBlocked = IsDustSpawnBlocked(gp);
-        bool veto0_claim       = (dustClaims != null && dustClaims.IsBlocked(gp));
-        bool veto0_keep        = IsKeepClearCell(gp);
+        // IsDustSpawnBlocked / IsKeepClearCell are the same claim lookup as dustClaims.IsBlocked.
+        bool veto0_claim       = !vaultShell0 && dustClaims != null && dustClaims.IsBlocked(gp);
 
-        // Permanent/spawn-block/claim are hard vetoes for even showing visuals.
-        // Keep-clear is NOT a veto for visuals (it only prevents solid/collision).
-        if (veto0_perm || veto0_spawnBlocked || veto0_claim)
+        // Permanent clear and claims are hard vetoes for even showing visuals.
+        if (veto0_perm || veto0_claim)
         {
             _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
             yield break;
@@ -412,26 +414,16 @@ public partial class CosmicDustGenerator
             yield break;
         }
 
-        bool veto1_spawnBlocked = IsDustSpawnBlocked(gp);
         bool veto1_vehicle      = IsVehicleOverlappingCell(gp);
-        bool veto1_claim        = (dustClaims != null && dustClaims.IsBlocked(gp));
-        bool veto1_keep         = IsKeepClearCell(gp);
+        bool veto1_claim        = !IsSealedVaultShell(gp) && dustClaims != null && dustClaims.IsBlocked(gp);
 
-        if (veto1_spawnBlocked || veto1_vehicle || veto1_claim)
+        // (There was a "keep-clear at end → visual only" branch here; it could never run, since
+        // keep-clear IS a claim and the claim veto above already aborted. Removed 2026-11-25.)
+        if (veto1_vehicle || veto1_claim)
         {
-            if (GameFlowManager.VerboseLogging) Debug.Log($"[VOID_GROW] ABORT_END gp={gp} keep={veto1_keep} spawnBlocked={veto1_spawnBlocked} vehicle={veto1_vehicle} claim={veto1_claim}");
+            if (GameFlowManager.VerboseLogging) Debug.Log($"[VOID_GROW] ABORT_END gp={gp} vehicle={veto1_vehicle} claim={veto1_claim}");
             SetCellState(gp, DustCellState.Empty);
             FadeAndHideCellGO(go);
-            _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
-            yield break;
-        }
-
-        // Keep-clear at end: allow visuals, but never become solid/colliding.
-        if (veto1_keep)
-        {
-            if (GameFlowManager.VerboseLogging) Debug.Log($"[VOID_GROW] VISUAL_ONLY gp={gp} (keep-clear)");
-            SetCellState(gp, DustCellState.Regrowing); // or define a VisualOnly state later
-            if (dust != null) SetDustCollision(dust, false);
             _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
             yield break;
         }

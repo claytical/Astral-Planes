@@ -79,8 +79,15 @@ public class RingGlyphConfig : ScriptableObject
     [Tooltip("Alpha for the contour LineRenderer. 1 = fully opaque track color.")]
     public float contourAlpha = 1f;
 
-    [Tooltip("LineRenderer width in local units.")]
+    [Tooltip("LineRenderer width in local units. In-game record: also the width of the placeholder " +
+             "(not-yet-recorded) rings, so committed and placeholder rings share one line weight.")]
     public float lineWidth = 0.003f;
+
+    [Range(0f, 1f)]
+    [Tooltip("In-game record only: every ring's line is capped at this fraction of the INNERMOST ring's outer " +
+             "radius (its note dips are the tightest), so the line can't fold over itself there and all rings " +
+             "share one width. 0 = no cap.")]
+    public float maxLineWidthToRadius = 0.25f;
 
     [Tooltip("Contour width for record/carousel rings (AnimateApply/ApplyVinyl) only — wider than lineWidth so the ethereal edge-softness gradient (RingLineEthereal.mat) is actually visible instead of collapsing into a few pixels. Gameplay rings use lineWidth; placeholder rings use remainingRingLineWidth.")]
     public float recordLineWidth = 0.012f;
@@ -303,9 +310,37 @@ public class RingGlyphConfig : ScriptableObject
     // Record recovery (MotifRingGlyphApplicator.Dock.cs): when the motif completes, the finished
     // record is shown full-size, then shrinks and moves to its dock spot to be collected.
     [Header("Record Dock (collection)")]
-    [Tooltip("The innermost placeholder ring (the next ring to record) pulses between remainingRingColor " +
-             "and this. Neutral on purpose: a ring only takes a role color once it is recorded.")]
+    [Tooltip("Fallback for the next-up placeholder ring's colour cycle when no role colours are supplied " +
+             "(SetNextUpPalette): it pulses between remainingRingColor and this.")]
     public Color nextUpHighlightColor = new Color(0.95f, 0.95f, 1f, 1f);
+
+    [Range(0f, 1f)]
+    [Tooltip("Opacity of the next-up placeholder ring (the one cycling role colours). Separate from " +
+             "remainingRingAlpha so the cycle can read at full strength while the other placeholders stay faint.")]
+    public float nextUpRingAlpha = 1f;
+
+    [Tooltip("Show the next-up ring's role colours at full brightness (hue and saturation kept, value pushed to 1), " +
+             "so each role reads clearly even when its profile colour is dark.")]
+    public bool nextUpMaximizeBrightness = true;
+
+    [Tooltip("Seconds per strain pulse of the next-up placeholder ring (it swells outward, as if trying to get out, then settles).")]
+    public float nextUpStrainPeriod = 1.2f;
+
+    [Tooltip("Peak scale of the next-up placeholder ring's strain pulse (1 = none).")]
+    public float nextUpStrainScale = 1.06f;
+
+    [Header("Record Dock (trapped drift)")]
+    [Tooltip("Speed of the docked record's slow wander inside its chamber.")]
+    public float dockDriftWanderSpeed = 0.35f;
+
+    [Tooltip("Fraction of the free room in the chamber the slow wander uses (lunges use all of it).")]
+    [Range(0f, 1f)] public float dockDriftWanderShare = 0.45f;
+
+    [Tooltip("Seconds between the trapped record's lunges at its shell (random in this range).")]
+    public Vector2 dockLungeIntervalRange = new Vector2(2.5f, 5f);
+
+    [Tooltip("Seconds one lunge takes: a quick push to the shell, then a spring back.")]
+    public float dockLungeSeconds = 0.7f;
 
     [Tooltip("Seconds the finished record stays shown full-size before it shrinks to its dock spot.")]
     public float dockHoldDuration = 1.0f;

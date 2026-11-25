@@ -81,6 +81,18 @@ public partial class Vehicle
         {
             // Record recovery: the finished record is waiting to be collected. Any touch collects it
             // (once it's collectable); no tether breaks or denial shake on a finished record.
+            // TEMP probe (record collected from far away, 2026-11-24): remove once explained.
+            {
+                var rc = ringApplicator.RingCollider;
+                var cam = Camera.main;
+                Vector2 contactPt = coll.contactCount > 0 ? coll.GetContact(0).point : Vector2.zero;
+                Debug.Log($"[RECORD:HIT] ship={(Vector2)transform.position} record={(Vector2)ringApplicator.transform.position} " +
+                          $"contact={contactPt} hitCollider={coll.collider.GetType().Name}@{coll.collider.name} " +
+                          $"ringCol(enabled={(rc != null && rc.enabled)}, radiusLocal={(rc != null ? rc.radius : -1f):F3}, " +
+                          $"worldExtents={(rc != null ? rc.bounds.extents.x : -1f):F3}) lossyScale={ringApplicator.transform.lossyScale} " +
+                          $"dockR={ringApplicator.DockWorldRadius:F3} dockPos={(Vector2)ringApplicator.DockWorldPosition} " +
+                          $"cam={(cam != null ? (Vector2)cam.transform.position : Vector2.zero)} camSize={(cam != null ? cam.orthographicSize : 0f):F2}", this);
+            }
             gfmForRecord.TryCollectRecord(this);
         }
         else if (ringApplicator != null)
@@ -180,10 +192,16 @@ public partial class Vehicle
         if (rb == null) return;
         rb.AddForce(impulseWorld, ForceMode2D.Impulse);
     }
+    // The path-exit shrink (VehicleSwallowScale) owns scale while it runs; feedback only tints then.
+    private System.Func<bool> _scaleLockedByExitCached;
+    private System.Func<bool> _scaleLockedByExit =>
+        _scaleLockedByExitCached ??= () => VehicleSwallowScale.IsScaled(this);
+
     private IEnumerator ThudRoutine(Vector2 coll)
         {
             isFlickering = true;
-            yield return VisualFeedbackUtility.BoundaryThudFeedback(baseSprite, transform, coll);
+            yield return VisualFeedbackUtility.BoundaryThudFeedback(baseSprite, transform, coll,
+                restScale: BaseLocalScale, scaleLocked: _scaleLockedByExit);
             isFlickering = false;
             flickerPulseRoutine = null;
         }
@@ -197,7 +215,9 @@ public partial class Vehicle
                 duration,
                 scaleMultiplier,
                 cycleHue ? null : baseColor,
-                cycleHue
+                cycleHue,
+                restScale: BaseLocalScale,
+                scaleLocked: _scaleLockedByExit
             );
 
             isFlickering = false;

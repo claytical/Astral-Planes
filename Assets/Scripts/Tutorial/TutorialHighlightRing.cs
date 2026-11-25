@@ -15,8 +15,12 @@ public class TutorialHighlightRing : MonoBehaviour
     SpriteRenderer _sr;
     Color _color;
     float _expand, _hold, _fade, _t;
+    float _minRadius = 0.4f;
 
-    public static void Spawn(Transform target, float expandSeconds, float holdSeconds, float fadeSeconds, Color color)
+    /// <param name="minRadius">Smallest enclosing radius (world). Use it for a target whose visible
+    /// extent isn't sprites, e.g. a star's tendrils.</param>
+    public static void Spawn(Transform target, float expandSeconds, float holdSeconds, float fadeSeconds, Color color,
+                             float minRadius = 0.4f)
     {
         if (target == null) return;
 
@@ -34,6 +38,7 @@ public class TutorialHighlightRing : MonoBehaviour
         ring._expand = Mathf.Max(0.01f, expandSeconds);
         ring._hold = Mathf.Max(0f, holdSeconds);
         ring._fade = Mathf.Max(0.01f, fadeSeconds);
+        ring._minRadius = Mathf.Max(0.05f, minRadius);
         ring._sr = go.AddComponent<SpriteRenderer>();
         ring._sr.sprite = GetSprite();
         ring._sr.sortingOrder = 500;
@@ -77,7 +82,7 @@ public class TutorialHighlightRing : MonoBehaviour
     // World-space centre and enclosing radius of the target (UI marker, sprites, or collider).
     Vector3 TargetCenter(out float radius)
     {
-        const float minRadius = 0.4f;
+        float minRadius = _minRadius;
         Bounds b;
         if (_target is RectTransform rt)
         {

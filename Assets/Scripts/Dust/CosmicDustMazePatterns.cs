@@ -942,23 +942,6 @@ public static class CosmicDustMazePatterns
     }
 
     /// <summary>
-    /// Assigns a MusicalRole to every cell in <paramref name="cells"/> using a Voronoi
-    /// partition driven by the motif's active roles.
-    ///
-    /// If activeRoles has 1 role, every cell gets that role (no Voronoi needed).
-    /// If 2–4 roles, the first role gets the farthest seed (dominant territory);
-    /// remaining roles get evenly-distributed closer seeds.
-    ///
-    /// </summary>
-    /// <param name="cells">Growth cells produced by the maze pattern builder.</param>
-    /// <param name="starCell">Grid-space position of the PhaseStar spawn.</param>
-    /// <param name="gridW">Grid width in cells.</param>
-    /// <param name="gridH">Grid height in cells.</param>
-    /// <param name="activeRoles">Roles active in the current motif. First entry is dominant.</param>
-    /// <returns>Dictionary mapping each cell to its assigned MusicalRole.</returns>
-
-
-    /// <summary>
     /// Builds the set of border cells that should be filled as dust walls.
     /// Covers the top row and full side columns, including bottom corners.
     /// <paramref name="exitCount"/> evenly-spaced gaps are punched out using segment-based

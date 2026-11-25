@@ -9,8 +9,9 @@ public partial class GameFlowManager
     public void BeginMotifBridge(string who)
     {
         if (GhostCycleInProgress || BridgePending) return;
-        // Co-op/solo arrive here from TryCollectRecord (RecordRecovery.cs); clear any leftover state.
-        ResetRecordRecovery();
+        // Co-op/solo arrive here from TryCollectRecord (RecordRecovery.cs); clear any leftover state,
+        // but keep the collected record's exit spotlight up.
+        ResetRecordRecovery(keepExitZoom: true);
         OnMotifCompleted?.Invoke();
 
         // Competitive motif mode: the run ends here. The bridge still plays the ring's spin-off, then

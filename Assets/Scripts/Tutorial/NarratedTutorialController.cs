@@ -42,6 +42,52 @@ public class NarratedTutorialController : MonoBehaviour
     Vehicle[] _vehicleCache = System.Array.Empty<Vehicle>();
     float _vehicleCacheTime = -10f;
 
+    // Record spotlight driven by stage lines (TutorialStage.spotlightLine / spotlightEndLine).
+    int _spotlightId;
+    int _spotlightStage = -1;
+    const float SpotlightSettleTimeout = 2.5f;
+
+    // The star whose buds stage 03 ("These are discoveries.") lights up.
+    PhaseStar _budStar;
+    bool _budHighlightOn;
+
+    static NarratedTutorialController _instance;
+
+    /// <summary>
+    /// The auto-started Phase 0 tutorial is in charge of the motif-start record zoom (its own lines
+    /// zoom in and out), so GameFlowManager.IntroduceRecord skips its timed zoom.
+    /// </summary>
+    public static bool WillDriveIntroZoom
+    {
+        get
+        {
+            if (_instance == null || _instance._manualStart || !_instance.enabled) return false;
+            var ptm = GameFlowManager.Instance != null ? GameFlowManager.Instance.phaseTransitionManager : null;
+            return ptm != null && ptm.CurrentPhaseIndex == 0;
+        }
+    }
+
+    /// <summary>
+    /// A stage still ahead (or current) zooms on the record from its own lines (spotlightLine, e.g.
+    /// "You've completed your first ring!") and hasn't yet. Until it has, GameFlowManager's per-ring
+    /// zoom stays out of the way, so the camera follows the narration rather than two competing
+    /// clocks (note landing vs. holdSeconds).
+    /// </summary>
+    public static bool ClaimsRingSpotlight
+    {
+        get
+        {
+            var t = _instance;
+            if (t == null || !t.enabled || t._script == null || t._script.stages == null) return false;
+            var stages = t._script.stages;
+            for (int i = Mathf.Max(0, t._stage); i < stages.Length; i++)
+                if (stages[i].spotlightLine >= 0 && t._spotlightStage != i) return true;
+            return false;
+        }
+    }
+
+    void Awake() => _instance = this;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void Register()
     {
@@ -136,6 +182,9 @@ public class NarratedTutorialController : MonoBehaviour
 
     void OnDestroy()
     {
+        if (_instance == this) _instance = null;
+        EndSpotlight();
+        SetBudHighlight(false);
         if (_view != null) _view.Deactivate();
         TutorialEvents.IntroRecordHidden -= OnIntroRecordHidden;
         Unsubscribe();
@@ -145,8 +194,13 @@ public class NarratedTutorialController : MonoBehaviour
 
     void HandleRecordComplete()
     {
+        // The record was collected: Run is finishing its last line over the bridge and
+        // cleans itself up when it ends.
+        if (_latched.Contains(TutorialGate.RecordCollected)) return;
         // Record finished: the tutorial's job is done. Existing flow owns completion/saving.
         StopAllCoroutines();
+        EndSpotlight();
+        SetBudHighlight(false);
         _view?.HideImmediate();
         Destroy(gameObject, 0.1f);
     }
@@ -169,6 +223,8 @@ public class NarratedTutorialController : MonoBehaviour
         TutorialEvents.NoteDiscarded       += OnDiscarded;
         TutorialEvents.CommitPressedWithoutNote += OnCommitWithoutNote;
         TutorialEvents.OutOfEnergyRescued  += OnOutOfEnergyRescued;
+        TutorialEvents.RecordAccessible    += OnRecordAccessible;
+        TutorialEvents.RecordCollected     += OnRecordCollected;
     }
 
     void Unsubscribe()
@@ -187,13 +243,29 @@ public class NarratedTutorialController : MonoBehaviour
         TutorialEvents.NoteDiscarded       -= OnDiscarded;
         TutorialEvents.CommitPressedWithoutNote -= OnCommitWithoutNote;
         TutorialEvents.OutOfEnergyRescued  -= OnOutOfEnergyRescued;
+        TutorialEvents.RecordAccessible    -= OnRecordAccessible;
+        TutorialEvents.RecordCollected     -= OnRecordCollected;
     }
 
     void OnCarved()
     {
         if (++_carvedCells >= _script.carveCellThreshold) _latched.Add(TutorialGate.CarveComplete);
     }
-    void OnTentacle()  => _latched.Add(TutorialGate.TentacleAppeared);
+    void OnTentacle(Transform star)
+    {
+        if (star != null)
+        {
+            var ps = star.GetComponentInParent<PhaseStar>();
+            if (ps != null && ps != _budStar)
+            {
+                bool wasOn = _budHighlightOn;
+                SetBudHighlight(false);
+                _budStar = ps;
+                if (wasOn) SetBudHighlight(true);
+            }
+        }
+        _latched.Add(TutorialGate.TentacleAppeared);
+    }
     void OnStarPoked() => _latched.Add(TutorialGate.StarPoked);
     void OnBurst()     => _latched.Add(TutorialGate.DiscoveryBurst);
     void OnPlaced()
@@ -202,6 +274,8 @@ public class NarratedTutorialController : MonoBehaviour
         _latched.Add(TutorialGate.NotePlaced);
     }
     void OnRing()      => _latched.Add(TutorialGate.RingCompleted);
+    void OnRecordAccessible() => _latched.Add(TutorialGate.RecordAccessible);
+    void OnRecordCollected()  => _latched.Add(TutorialGate.RecordCollected);
 
     void OnStarArmed(Transform star)
     {
@@ -339,6 +413,12 @@ public class NarratedTutorialController : MonoBehaviour
 
     bool Superseded() => _pending != Interruption.None || ComputeStage() > _stage;
 
+    // Narration waits: a stage advance only replaces the current line once it has been readable
+    // for minLineSeconds, so fast gates can't flash lines past. Interruptions still cut through.
+    bool LineSuperseded() =>
+        _pending != Interruption.None ||
+        (ComputeStage() > _stage && Time.unscaledTime - _lineShownTime >= _script.minLineSeconds);
+
     void Pulse(Transform target)
     {
         if (target == null || _script == null) return;
@@ -375,10 +455,58 @@ public class NarratedTutorialController : MonoBehaviour
             int last = stLines.Length - 1;
             line = Mathf.Clamp(line, 0, last);
             int stCue = CueIndexFor(st);
+            // Cozy Co-Pilot copy narrates what the co-pilot is doing; its gates fire on their own,
+            // so the lines play through instead of being dropped when the gate latches early.
+            bool finishLines = HasAutoVariant(st);
+
+            // Record spotlight: end it once its line range is over; zoom in (and wait for the camera
+            // to arrive) before the line that starts it.
+            if (_spotlightId != 0 && (_spotlightStage != _stage || line < st.spotlightLine ||
+                                      (st.spotlightEndLine >= 0 && line >= st.spotlightEndLine)))
+                EndSpotlight();
+            if (line == st.spotlightLine && _spotlightId == 0 && _spotlightStage != _stage)
+            {
+                yield return BeginSpotlight();
+                if (Superseded())
+                {
+                    // Moved on while the camera travelled: drop the zoom and re-evaluate.
+                    EndSpotlight();
+                    int ahead = ComputeStage();
+                    if (ahead > _stage)
+                    {
+                        _stage = ahead;
+                        line = 0;
+                        eventDriven = false;
+                        continue;
+                    }
+                    // An interruption: play it, then resume like the main interruption path
+                    // (the cue line if still in progress, else the stage's final line).
+                    yield return PlayInterruption();
+                    _stage = ComputeStage();
+                    int resumeCue = _stage < stages.Length ? CueIndexFor(stages[_stage]) : -1;
+                    line = (resumeCue >= 0 && _cueCompletedStage != _stage) ? resumeCue : int.MaxValue;
+                    eventDriven = true;
+                    continue;
+                }
+            }
+
+            // "These are discoveries.": the star's buds glow while that stage is up.
+            SetBudHighlight(st.gate == TutorialGate.StarArmed);
 
             yield return ShowLine(stLines[line], eventDriven);
             eventDriven = false;
             if (line == last) PulseForGate(st.gate);
+            // "These are discoveries.": ring the whole tendril mass as the line appears.
+            if (line == 0 && st.gate == TutorialGate.StarArmed) PulseTendrils();
+
+            // Line first, then the camera visits the record and comes home; that visit is the
+            // line's hold ("There's a piece of music trapped here.").
+            bool visited = false;
+            if (line == st.spotlightDuringLine && _spotlightStage != _stage)
+            {
+                yield return SpotlightVisit();
+                visited = true;
+            }
 
             if (line == stCue && _cueCompletedStage != _stage)
             {
@@ -389,14 +517,15 @@ public class NarratedTutorialController : MonoBehaviour
             else if (line < last)
             {
                 // Narration line: auto-advance on the hold interval, unless the player got ahead.
-                yield return WaitUntilSuperseded(_script.holdSeconds);
+                // After a spotlight visit the line has already been up for the whole zoom.
+                yield return WaitUntilSuperseded(visited ? 0.5f : _script.holdSeconds, ignoreAdvance: finishLines);
             }
             else if (st.gate == TutorialGate.None)
             {
-                // Final instruction (stage 09): stays up until an interruption or the record completes.
-                // A replay started from the pause menu has no reason to linger until the motif
-                // ends (it can be a long wait), so it holds one interval, fades out, and finishes.
-                if (_manualStart)
+                // Final stage: stays up until an interruption or the record completes. Once the
+                // record has been collected (the closing "listen" beat, playing over the bridge), or
+                // for a replay started from the pause menu, it holds one interval, fades out, and finishes.
+                if (_manualStart || _latched.Contains(TutorialGate.RecordCollected))
                 {
                     for (float t = 0f; t < _script.holdSeconds && _pending == Interruption.None; t += Time.unscaledDeltaTime)
                         yield return null;
@@ -413,11 +542,12 @@ public class NarratedTutorialController : MonoBehaviour
             else
             {
                 // Final line holds until its gate fires (or the player is already further along).
-                while (!Superseded()) yield return null;
+                while (!LineSuperseded()) yield return null;
             }
 
             if (_pending != Interruption.None)
             {
+                EndSpotlight();
                 yield return PlayInterruption();
                 _stage = ComputeStage();   // resume the instruction the player actually needs now
                 // Resume at the cue line if that stage has one still in progress, else its final line.
@@ -428,24 +558,38 @@ public class NarratedTutorialController : MonoBehaviour
             }
 
             int next = ComputeStage();
+            if (next > _stage && finishLines && line < last)
+            {
+                line++;   // co-pilot copy: finish this stage's lines before moving on
+                continue;
+            }
             if (next > _stage)
             {
                 // Objective done (possibly several): drop the rest of this stage's narration.
+                // The new prompt fades in at the normal pace so the change reads as an advance.
                 _stage = next;
                 line = 0;
-                eventDriven = true;
+                eventDriven = false;
                 continue;
             }
 
             if (line < last) line++;
         }
+
+        // Every gate is done (record collected): let the last line be read, fade out, finish.
+        for (float t = 0f; t < _script.minLineSeconds; t += Time.unscaledDeltaTime)
+            yield return null;
+        yield return _view.Hide();
+        Destroy(gameObject);
     }
 
-    // Waits up to `seconds`, ending early if an interruption is queued or the player moved on.
-    IEnumerator WaitUntilSuperseded(float seconds)
+    // Waits up to `seconds`, ending early on a commit-skip, a queued interruption, or (unless
+    // ignoreAdvance) the player having moved on once the line has been readable for minLineSeconds.
+    IEnumerator WaitUntilSuperseded(float seconds, bool ignoreAdvance = false)
     {
         float t = 0f;
-        while (t < seconds && !Superseded() && !ConsumeSkip())
+        while (t < seconds && !ConsumeSkip() &&
+               !(ignoreAdvance ? _pending != Interruption.None : LineSuperseded()))
         {
             t += Time.unscaledDeltaTime;
             yield return null;
@@ -520,6 +664,64 @@ public class NarratedTutorialController : MonoBehaviour
         if (viz == null || ws.track == null) return;
         if (viz.noteMarkers.TryGetValue((ws.track, ws.targetAbsStep), out var marker) && marker != null)
             Pulse(marker);
+    }
+
+    // Zooms in on the docked record and waits (capped) for the camera to arrive.
+    IEnumerator BeginSpotlight()
+    {
+        _spotlightStage = _stage; // once per stage, even if there is nothing to show
+        var gfm = GameFlowManager.Instance;
+        if (gfm == null) yield break;
+        _spotlightId = gfm.BeginNarrationSpotlight();
+        if (_spotlightId == 0) yield break;
+        // Let the zoom start moving before testing for arrival (it reads settled at rest).
+        yield return null;
+        yield return null;
+        for (float t = 0f; t < SpotlightSettleTimeout && !gfm.IsSpotlightSettled && !Superseded(); t += Time.unscaledDeltaTime)
+            yield return null;
+    }
+
+    // With the line up: wait a beat, zoom in on the record, hold, pull back, and wait until the
+    // camera is home. Ends early (releasing the zoom) if the player moves on or an interruption queues.
+    IEnumerator SpotlightVisit()
+    {
+        for (float t = 0f; t < _script.spotlightLeadSeconds && !Superseded(); t += Time.unscaledDeltaTime)
+            yield return null;
+        if (Superseded()) { _spotlightStage = _stage; yield break; }
+
+        yield return BeginSpotlight();
+        if (_spotlightId != 0)
+            for (float t = 0f; t < _script.spotlightHoldSeconds && !Superseded(); t += Time.unscaledDeltaTime)
+                yield return null;
+        EndSpotlight();
+
+        var gfm = GameFlowManager.Instance;
+        for (float t = 0f; gfm != null && t < SpotlightSettleTimeout && !gfm.IsCameraHome && !Superseded(); t += Time.unscaledDeltaTime)
+            yield return null;
+    }
+
+    void EndSpotlight()
+    {
+        if (_spotlightId == 0) return;
+        var gfm = GameFlowManager.Instance;
+        if (gfm != null) gfm.EndNarrationSpotlight(_spotlightId);
+        _spotlightId = 0;
+    }
+
+    // The star has no sprite body yet (it is all tendrils), so size the ring from their reach.
+    void PulseTendrils()
+    {
+        if (_budStar == null || _script == null) return;
+        TutorialHighlightRing.Spawn(_budStar.transform, _script.highlightExpandSeconds, _script.highlightHoldSeconds,
+                                    _script.highlightFadeSeconds, _script.highlightColor,
+                                    minRadius: _budStar.TendrilReachWorld * 1.55f);
+    }
+
+    void SetBudHighlight(bool on)
+    {
+        if (_budHighlightOn == on) return;
+        _budHighlightOn = on;
+        if (_budStar != null) _budStar.SetBudHighlight(on);
     }
 
     IEnumerator PlayInterruption()

@@ -338,11 +338,10 @@ public partial class ControlTutorialDirector : MonoBehaviour
     // ======================================================================
     /// <summary>
     /// GeneratedTrack control sandbox: hands the primary panel to ControlSandboxDirector, which
-    /// presents/docks it per command. Live stick/trigger input from <paramref name="players"/> keeps
+    /// fades each command in and out, centred. Live stick/trigger input from <paramref name="players"/> keeps
     /// flowing into it every frame (Update). Returns null if the scene has no panel.
     /// </summary>
-    public ControlTutorialHighlight BeginSandboxPanel(IEnumerable<LocalPlayer> players,
-        float dockScale, float dockMargin, float dockLerpSpeed, RectTransform avoidRect)
+    public ControlTutorialHighlight BeginSandboxPanel(IEnumerable<LocalPlayer> players)
     {
         _tutorialPlayers = new List<LocalPlayer>();
         if (players != null)
@@ -354,7 +353,7 @@ public partial class ControlTutorialDirector : MonoBehaviour
         ApplyDesiredPrimaryMode();
         if (!primaryInstance) return null;
 
-        primaryInstance.BeginSandbox(dockScale, dockMargin, dockLerpSpeed, avoidRect);
+        primaryInstance.BeginSandbox();
         return primaryInstance;
     }
 

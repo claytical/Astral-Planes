@@ -17,7 +17,36 @@ public class WispExitPathfinder
     public IReadOnlyList<Vector2Int> Waypoints { get; private set; }
     public bool HasPath { get; private set; }
 
-    public bool TryFindPath(DrumTrack drumTrack, Vector2Int fromCell, Vector2Int targetCell)
+    /// <summary>
+    /// Finds a route to <paramref name="targetCell"/>. Prefers a lane with
+    /// <paramref name="clearanceCells"/> of open cells around every step (so a following ship's
+    /// hull fits through corners and gap mouths), falling back to any dust-free route.
+    /// </summary>
+    public bool TryFindPath(DrumTrack drumTrack, Vector2Int fromCell, Vector2Int targetCell, int clearanceCells = 1)
+    {
+        if (clearanceCells > 0 && TryFindPathWithClearance(drumTrack, fromCell, targetCell, clearanceCells)) return true;
+        return TryFindPathWithClearance(drumTrack, fromCell, targetCell, 0);
+    }
+
+    // Cells near the start or the target are exempt: a ship can be hugging a wall, and an exit's
+    // anchor sits at the grid edge.
+    private static bool HasClearance(DrumTrack drumTrack, Vector2Int c, int r, Vector2Int from, Vector2Int target, int w, int h)
+    {
+        if (r <= 0) return true;
+        if (Chebyshev(c, from) <= r || Chebyshev(c, target) <= r) return true;
+        for (int dx = -r; dx <= r; dx++)
+            for (int dy = -r; dy <= r; dy++)
+            {
+                var n = new Vector2Int(c.x + dx, c.y + dy);
+                if (n.x < 0 || n.y < 0 || n.x >= w || n.y >= h) continue;
+                if (drumTrack.HasDustAt(n)) return false;
+            }
+        return true;
+    }
+
+    private static int Chebyshev(Vector2Int a, Vector2Int b) => Mathf.Max(Mathf.Abs(a.x - b.x), Mathf.Abs(a.y - b.y));
+
+    private bool TryFindPathWithClearance(DrumTrack drumTrack, Vector2Int fromCell, Vector2Int targetCell, int clearance)
     {
         HasPath = false;
         Waypoints = null;
@@ -49,6 +78,7 @@ public class WispExitPathfinder
                 // The target cell itself (a maze exit's anchor) is always walkable even
                 // if dust bookkeeping hasn't caught up yet — everything else must be clear.
                 if (nb != targetCell && drumTrack.HasDustAt(nb)) continue;
+                if (nb != targetCell && !HasClearance(drumTrack, nb, clearance, fromCell, targetCell, w, h)) continue;
                 parents[nb] = cell;
                 queue.Enqueue(nb);
 

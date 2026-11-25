@@ -374,12 +374,82 @@ public sealed class PorousBorderParams
 
     /// <summary>exitSides only: Top/Bottom gaps are kept within this centered fraction of the
     /// edge's width (1 = anywhere along the edge). Left/Right gaps are unaffected.</summary>
-    [Tooltip("With exitSides: Top/Bottom exit gaps stay within this centered fraction of the grid width (1 = anywhere along the edge).")]
-    [Range(0.1f, 1f)] public float topBottomCenterBand = 1f;
+    // Runtime-only: PathChoiceCoordinator copies PathExitConfig.topBottomExitCenterBand here. Tune it there.
+    [HideInInspector] public float topBottomCenterBand = 1f;
 
     public void Validate()
     {
         exitCount = Mathf.Max(0, exitCount);
+    }
+}
+
+/// <summary>Shape of the record's sealed vault (chamber + shell). Auto picks per MazePatternType.</summary>
+public enum VaultShape
+{
+    Auto = 0,
+    Ring = 1,      // round chamber, round shell (the original vault)
+    Box = 2,       // a sealed clearing in the ClearBoxes outline (rectangle / ellipse / diamond / plus)
+    Capsule = 3,   // stretched along the DiagonalLanes direction, so it lies between lanes
+    Geode = 4,     // ragged, noise-perturbed chamber: a crystal pocket in rock
+    RoomCell = 5,  // square room with a square shell: a locked room in the tunnel lattice
+}
+
+/// <summary>Where the vault goes. Auto picks per MazePatternType.</summary>
+public enum VaultPlacement
+{
+    Auto = 0,
+    Edge = 1,          // shell touches the top, left or right edge of the visible field
+    Interior = 2,      // anywhere clear of the edges
+    PatternAnchor = 3, // scored against the pattern's own walls/rooms (planned after the pattern is laid out)
+}
+
+/// <summary>
+/// How the record vault fits this maze (MAZE_VAULT_AUDIT.md §C). Size still comes from
+/// GameFlowManager.recordDockRadiusCells and the motif (shell = ceil(nodesPerStar/4) cells).
+/// </summary>
+[System.Serializable]
+public sealed class VaultShapeParams
+{
+    [Tooltip("Auto: Tunnels→RoomCell, ClearBoxes→Box, DiagonalLanes→Capsule, CellularAutomata/DrunkenStrokes→Geode, " +
+             "RingChokepoints/FullFill→Ring.")]
+    public VaultShape shape = VaultShape.Auto;
+    [Tooltip("Auto: FullFill/DrunkenStrokes→Edge, everything else→PatternAnchor (Tunnels: in a room; ClearBoxes: in a " +
+             "clearing; Rings: buried in an outer ring wall; Lanes: between lanes; CA: inside the rock).")]
+    public VaultPlacement placement = VaultPlacement.Auto;
+    [Range(0f, 1f), Tooltip("Geode only: how ragged the chamber is.")]
+    public float geodeRoughness01 = 0.45f;
+    [Range(1f, 3f), Tooltip("Capsule only: chamber length as a multiple of its width.")]
+    public float capsuleLength = 1.8f;
+
+    public VaultShape ResolveShape(MazePatternType t)
+    {
+        if (shape != VaultShape.Auto) return shape;
+        return t switch
+        {
+            MazePatternType.Tunnels          => VaultShape.RoomCell,
+            MazePatternType.ClearBoxes       => VaultShape.Box,
+            MazePatternType.DiagonalLanes    => VaultShape.Capsule,
+            MazePatternType.CellularAutomata => VaultShape.Geode,
+            MazePatternType.DrunkenStrokes   => VaultShape.Geode,
+            _                                => VaultShape.Ring,
+        };
+    }
+
+    public VaultPlacement ResolvePlacement(MazePatternType t)
+    {
+        if (placement != VaultPlacement.Auto) return placement;
+        return t switch
+        {
+            MazePatternType.FullFill       => VaultPlacement.Edge,
+            MazePatternType.DrunkenStrokes => VaultPlacement.Edge,
+            _                              => VaultPlacement.PatternAnchor,
+        };
+    }
+
+    public void Validate()
+    {
+        geodeRoughness01 = Mathf.Clamp01(geodeRoughness01);
+        capsuleLength = Mathf.Clamp(capsuleLength, 1f, 3f);
     }
 }
 
@@ -416,6 +486,10 @@ public class MazePatternConfig : ScriptableObject
     [Tooltip("How the PhaseStar moves through this maze. Stacks on the motif's PhaseStarBehaviorProfile.")]
     public StarNavigationParams starNavigation = new();
 
+    [Header("Record Vault")]
+    [Tooltip("Shape and placement of the record's sealed vault in this maze.")]
+    public VaultShapeParams recordVault = new();
+
     [Header("Generic Fill Floor")]
     [Range(0f, 1f), Tooltip("Minimum fraction of occupied maze cells guaranteed to be reserved as generic " +
         "MusicalRole.None dust for ANY motif using this pattern, regardless of that motif's own " +
@@ -435,6 +509,7 @@ public class MazePatternConfig : ScriptableObject
         tunnels ??= new TunnelsParams();
         porousBorder ??= new PorousBorderParams();
         starNavigation ??= new StarNavigationParams();
+        recordVault ??= new VaultShapeParams();
 
         dustTiming.Validate();
         clearBoxes.Validate();
@@ -445,6 +520,7 @@ public class MazePatternConfig : ScriptableObject
         tunnels.Validate();
         porousBorder.Validate();
         starNavigation.Validate();
+        recordVault.Validate();
 
         minGenericFillRatio01 = Mathf.Clamp01(minGenericFillRatio01);
     }

@@ -16,7 +16,6 @@ public class HarmonyDirector : MonoBehaviour
     public int ProgressionOffset => _progressionOffset;
 
     private bool _hasPendingProfileSwap;
-    private int  _globalBuiltCount = 1;
 
     // Re-key offset so TryGetChordAt agrees with NoteSetFactory's authored register:
     // NoteSetFactory rekeys chordSequence[0].rootNote to the current motif's keyRootMidi
@@ -48,8 +47,6 @@ public class HarmonyDirector : MonoBehaviour
     private readonly Dictionary<InstrumentTrack, List<int>> _trackSeq = new();
     private readonly Dictionary<InstrumentTrack, int> _trackPos = new();
     private ChordProgressionProfile _pendingProfile;
-    [SerializeField] private bool burnIfOutsideWindow;            // consume rings even if mistimed (no chord change)
-    [SerializeField] private bool seedFromProfileOnPhaseStart;    // leave false for Option C
 
     [Header("Motif Integration")]
     [SerializeField] private bool useMotifChordProfiles = true;
@@ -186,7 +183,6 @@ public class HarmonyDirector : MonoBehaviour
             _progressionOffset = ComputeProgressionOffset(profile, GetPlayheadBinSafe());
             this.profile = profile;
             RecomputeKeyRekeyDelta();
-            _globalBuiltCount = (this.profile.chordSequence != null && this.profile.chordSequence.Count > 0) ? 1 : 0;
 
             if (GameFlowManager.Instance.controller?.tracks != null && this.profile.chordSequence.Count > 0)
             {
@@ -347,7 +343,6 @@ public class HarmonyDirector : MonoBehaviour
                         tr.RetuneLoopToCurrentProgression(forceHarmonyDirector: true);
                 }
 
-                _globalBuiltCount = 1;
 
                 // Reset ascension phrasings so notes don't arrive at the line mid-phrase
                 // after a chord swap — they restart their countdown from current position.

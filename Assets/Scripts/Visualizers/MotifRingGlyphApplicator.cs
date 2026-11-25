@@ -64,6 +64,9 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
     /// <summary>Fires when the motif's finished record begins its spin/roll-off exit, after the final ring's notes have all landed.</summary>
     public event System.Action OnRecordSpinOffStarted;
 
+    /// <summary>Fires when the exiting record, spun and tilted, begins its final scale-out.</summary>
+    public event System.Action OnRecordShrinkStarted;
+
     /// <summary>True from the start of the record's spin-off exit until its rings are destroyed.</summary>
     public bool IsRecordLeaving => _gameplayFadingOut;
 
@@ -94,6 +97,9 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
         public int           RingOrdinal;
         // Fill annulus mesh — owned by this entry; destroying Root does not free it (see DestroyEntry).
         public Mesh          FillMesh;
+        // In-game rings: the contour width in the stack's LOCAL units. LineRenderer width ignores
+        // the transform's scale, so LateUpdate re-applies it × lossyScale (SyncGameplayLineWidths).
+        public float         LocalLineWidth;
     }
 
     private readonly List<RingEntry> _gameplayRings  = new();
@@ -197,14 +203,25 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
     }
 
     // A placeholder ring has no contour, so its filled band is the line: thin it to
-    // remainingRingLineWidth, centred on the same outer edge.
-    private void ApplyPlaceholderLineWidth(ref float innerR, ref float outerR)
+    // remainingRingLineWidth (or, in-game, the shared GameplayLineWidth), centred on the same outer edge.
+    private void ApplyPlaceholderLineWidth(ref float innerR, ref float outerR, bool gameplay = false)
     {
-        float w = config.remainingRingLineWidth;
+        float w = gameplay ? GameplayLineWidth() : config.remainingRingLineWidth;
         if (w <= 0f || w >= outerR - innerR) return;
         float edge = outerR;
         innerR = edge - w * 0.5f;
         outerR = edge + w * 0.5f;
+    }
+
+    // In-game record line weight: committed contours and placeholder bands all use lineWidth. The
+    // cap is taken from the INNERMOST ring's radius (its dips are the tightest) and applied to every
+    // ring, so the whole stack shares one width and the gaps between lines stay even.
+    private float GameplayLineWidth()
+    {
+        float w = config.lineWidth;
+        if (config.maxLineWidthToRadius <= 0f) return w;
+        float innermostOuter = RingInnerRadius(0) + config.ringThickness;
+        return Mathf.Min(w, innermostOuter * config.maxLineWidthToRadius);
     }
 
     private float RingInnerRadius(int idx) =>
@@ -222,6 +239,27 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
         if (_ringCollider != null && _ringCollider.enabled
             && Mathf.Abs(transform.lossyScale.x) < 1e-3f)
             _ringCollider.enabled = false;
+        SyncGameplayLineWidths();
+    }
+
+    private float _lineWidthScale = -1f;
+    private int   _lineWidthRingCount = -1;
+
+    // LineRenderer width is in world units whatever the transform's scale, while the ring meshes
+    // shrink with the stack. The docked record is scaled far down, so unscaled lines came out as
+    // wide as the rings themselves (filled circles). Keep each in-game contour at its local width
+    // × the stack's scale, so it scales with the record (including the spin-off's scale-out).
+    private void SyncGameplayLineWidths()
+    {
+        float s = Mathf.Abs(transform.lossyScale.x);
+        if (Mathf.Approximately(s, _lineWidthScale) && _gameplayRings.Count == _lineWidthRingCount) return;
+        _lineWidthScale     = s;
+        _lineWidthRingCount = _gameplayRings.Count;
+        for (int i = 0; i < _gameplayRings.Count; i++)
+        {
+            var e = _gameplayRings[i];
+            if (e.Contour != null && e.LocalLineWidth > 0f) e.Contour.widthMultiplier = e.LocalLineWidth * s;
+        }
     }
 
     private void EnsureRingCollider()

@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// Tuning for the pre-motif control sandbox (ControlSandboxDirector). Dialogue lives in
-/// Resources/Tutorial/ControlSandbox.json; this asset is pacing, panel docking and the dust field.
+/// Resources/Tutorial/ControlSandbox.json; this asset is pacing, the control panel and the dust field.
 /// Loaded from Resources/Config/ControlSandboxConfig; code defaults apply if the asset is missing.
 /// </summary>
 [CreateAssetMenu(menuName = "Astral Planes/Control Sandbox Config", fileName = "ControlSandboxConfig")]
@@ -10,23 +10,23 @@ public class ControlSandboxConfig : ScriptableObject
 {
     public const string ResourcePath = "Config/ControlSandboxConfig";
 
-    [Header("Control panel: present -> dock")]
-    [Tooltip("Seconds the panel holds centred at full size on a new command before shrinking into the corner.")]
-    public float presentSeconds = 1.6f;
-    [Tooltip("Docked size as a fraction of the full-size panel.")]
-    [Range(0.1f, 1f)] public float dockScale = 0.4f;
-    [Tooltip("Gap (canvas units) between the docked panel and the screen edge / narration panel.")]
-    public float dockMargin = 32f;
-    [Tooltip("Smoothing speed for the present <-> dock move (higher = snappier).")]
-    public float dockLerpSpeed = 5f;
-    [Tooltip("Beat after a command's practice is satisfied (confirm sound) before the next command presents.")]
+    [Header("Narration")]
+    [Tooltip("Quiet beat after the sandbox starts before the first line fades in.")]
+    public float introDelaySeconds = 2.5f;
+
+    [Header("Control panel (one command at a time, centred)")]
+    [Tooltip("Seconds each command takes to fade in.")]
+    public float panelFadeInSeconds = 0.8f;
+    [Tooltip("Seconds a command takes to fade out once its input is detected.")]
+    public float panelFadeOutSeconds = 0.5f;
+    [Tooltip("Gap after a command has faded out before the next one fades in.")]
     public float stepConfirmBeatSeconds = 0.6f;
 
     [Header("Gates")]
-    [Tooltip("Seconds of drifting (stick past the threshold, any player) after the panel docks.")]
+    [Tooltip("Seconds of drifting (stick past the threshold, any player), counted from when the command appears.")]
     public float driftPracticeSeconds = 2.5f;
-    [Tooltip("Seconds of charging (trigger held, any player) before the dust lesson starts.")]
-    public float chargePracticeSeconds = 1.5f;
+    [Tooltip("Seconds the trigger is held (any player, with or without energy), counted from when the command appears, before the dust lesson starts.")]
+    public float chargePracticeSeconds = 0.75f;
     [Tooltip("Cells of EACH sandbox role that must be carved (any player) to finish. When a colour reaches this, the rest of its patch dissolves.")]
     public int cellsPerRole = 4;
     [Tooltip("Seconds over which a finished colour's remaining patch dissolves.")]
@@ -34,7 +34,7 @@ public class ControlSandboxConfig : ScriptableObject
     [Range(0f, 1f)] public float inputThreshold = 0.35f;
 
     [Header("Dust field")]
-    [Tooltip("At most this many roles get a patch (picked soft -> hard from the destination motif's roles).")]
+    [Tooltip("Number of dust colours (one patch each). The destination motif's roles come first, padded from other roles for a soft -> hard spread.")]
     [Range(1, 5)] public int maxRoles = 3;
     [Tooltip("Radius of each role's patch, in grid cells.")]
     public int patchRadiusCells = 3;

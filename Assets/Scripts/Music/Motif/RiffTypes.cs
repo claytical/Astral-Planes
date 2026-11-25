@@ -15,12 +15,6 @@ public struct RiffNoteEvent
     public float velocity01;  // feeds persistentLoopNotes.velocity
 }
 
-public enum RiffOverlapPolicy
-{
-    AllowOverlap,
-    ClampToNextOnset
-}
-
 [Serializable]
 public struct Riff
 {
@@ -31,7 +25,6 @@ public struct Riff
     public int loopSteps;
     public List<RiffNoteEvent> events;
 
-    public RiffOverlapPolicy overlapPolicy;
     public int octaveShift;        // applied post-transpose
 
     // Quantization grid the importer used to produce `events` (e.g. 16 = 16th notes).

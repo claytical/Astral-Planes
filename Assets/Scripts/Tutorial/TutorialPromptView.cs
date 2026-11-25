@@ -36,6 +36,13 @@ public class TutorialPromptView : MonoBehaviour
         var parentCanvas = panel.parent != null ? panel.parent.GetComponentInParent<Canvas>(true) : null;
         if (parentCanvas != null) cv.sortingLayerID = parentCanvas.sortingLayerID;
         cv.sortingOrder = 20000;
+        // Narration plays during record zooms ("There's a piece of music trapped here."), and the
+        // zoom's dim covers camera-space UI: the panel lives in a zoom-safe overlay canvas.
+        CameraZoomDirector.MoveToOverlay(panel as RectTransform);
+        // Re-bind: the panel already lives in an overlay canvas, so MoveToOverlay no-ops and would
+        // leave the override above on (sorting it above menus). Overlay roots already draw over the world.
+        var root = panel.parent != null ? panel.parent.GetComponentInParent<Canvas>(true) : null;
+        if (root != null && root.rootCanvas.renderMode == RenderMode.ScreenSpaceOverlay) cv.overrideSorting = false;
 
         label.text = string.Empty;
         panel.gameObject.SetActive(true);
@@ -55,9 +62,18 @@ public class TutorialPromptView : MonoBehaviour
     /// Returns null (after a warning) if it isn't there. Shared by every narrated sequence so they
     /// all read from the same place on screen.
     /// </summary>
+    static readonly System.Collections.Generic.Dictionary<string, TutorialPromptView> s_boundByPath =
+        new System.Collections.Generic.Dictionary<string, TutorialPromptView>();
+
     public static TutorialPromptView BindAuthored(string panelPath, string logTag = "Tutorial")
     {
         string path = string.IsNullOrEmpty(panelPath) ? "Canvas/UI/Tutorial" : panelPath;
+
+        // Already bound (and moved into the zoom-safe overlay canvas, so the path no longer finds it)
+        // by an earlier sequence, e.g. the control sandbox before the narrated tutorial.
+        if (s_boundByPath.TryGetValue(path, out var bound) && bound != null && bound.label != null)
+            return Bind(bound.transform, bound.label);
+
         int slash = path.IndexOf('/');
         string rootName = slash < 0 ? path : path.Substring(0, slash);
         string rest = slash < 0 ? null : path.Substring(slash + 1);
@@ -71,7 +87,9 @@ public class TutorialPromptView : MonoBehaviour
             if (panel == null) continue;
             var label = panel.GetComponentInChildren<TMP_Text>(true);
             if (label == null) continue;
-            return Bind(panel, label);
+            var view = Bind(panel, label);
+            s_boundByPath[path] = view;
+            return view;
         }
 
         Debug.LogWarning($"[{logTag}] Authored panel '{path}' (with a TMP_Text child) not found in '{scene.name}'; using a generated overlay.");
@@ -85,9 +103,6 @@ public class TutorialPromptView : MonoBehaviour
         int players = GameFlowManager.Instance?.SessionState?.Players?.Count ?? 1;
         return text.Replace("{s}", players >= 2 ? "s" : "");
     }
-
-    /// <summary>The bound panel's rect (null for a generated overlay) — lets other UI keep clear of it.</summary>
-    public RectTransform PanelRect => _group != null ? _group.transform as RectTransform : null;
 
     public static TutorialPromptView Create(Transform parent)
     {
@@ -121,8 +136,10 @@ public class TutorialPromptView : MonoBehaviour
     /// <summary>Shows a line. eventDriven=true uses the short fade (gate fired / interruption).</summary>
     public IEnumerator Show(string text, bool eventDriven)
     {
+        // A normal advance fades the old line fully out before the new one fades in; the quick
+        // event fade (cue words, returning from an interruption) halves the fade-out.
         float d = eventDriven ? eventFadeSeconds : lineFadeSeconds;
-        yield return FadeTo(0f, d * 0.5f);
+        yield return FadeTo(0f, eventDriven ? d * 0.5f : d);
         label.text = text;
         yield return FadeTo(1f, d);
     }

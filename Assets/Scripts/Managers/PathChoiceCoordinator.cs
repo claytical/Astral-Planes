@@ -40,6 +40,7 @@ public sealed class PathChoiceCoordinator
         var ascension = Object.FindAnyObjectByType<NoteAscensionDirector>();
         ascension?.SetAscentLineVisible(false);
         yield return _gameFlow.StartCoroutine(RunPathChoiceAndAdvanceInner());
+        _gameFlow.ReleaseRecordExitZoom("path choice over"); // idempotent backstop
         DestroyLockedStubs(); // idempotent; covers every exit path out of the inner routine
         ascension?.SetAscentLineVisible(true);
     }
@@ -52,6 +53,7 @@ public sealed class PathChoiceCoordinator
 
         if (ptm == null || dust == null || drums == null)
         {
+            _gameFlow.ReleaseRecordExitZoom("no interstitial");
             yield return _gameFlow.StartCoroutine(_sceneFlow.StartNextMotifInPhase());
             yield break;
         }
@@ -111,41 +113,6 @@ public sealed class PathChoiceCoordinator
         { Side = side; Phase = phase; Motif = motif; Kind = kind; }
     }
 
-    /// <summary>
-    /// Control sandbox hand-off: grows the same blind interstitial around the vehicles with a
-    /// single rainbow road on <paramref name="side"/> leading to (phase, motif). Driving into it
-    /// carries the vehicles out and starts that motif (StartChosenMotifOrPhase) — the session's
-    /// first motif arrives exactly the way every later motif does.
-    /// </summary>
-    public IEnumerator RunSingleExitAndAdvance(BoundaryWrap.BoundarySide side, int phase, int motif)
-    {
-        var ptm = _gameFlow.phaseTransitionManager;
-        var dust = _gameFlow.dustGenerator;
-        var drums = _gameFlow.activeDrumTrack;
-
-        // Fallback (no generator / no exit produced): start the motif straight from the mirrored edge.
-        System.Func<IEnumerator> direct = () => _sceneFlow.StartChosenMotifOrPhase(
-            phase, motif, SceneFlowCoordinator.MirrorSide(side), Vector2Int.zero, PathExitKind.NewMotif);
-
-        if (ptm == null || dust == null || drums == null)
-        {
-            yield return _gameFlow.StartCoroutine(direct());
-            yield break;
-        }
-
-        _playedKeys = new HashSet<(string, string)>();
-        foreach (var r in RingSessionStore.LoadAllRingsFromDisk())
-            _playedKeys.Add((r.PhaseId, r.MotifId));
-        var kind = IsPlayed(phase, motif) ? PathExitKind.VisitedMotif : PathExitKind.NewMotif;
-
-        var ascension = Object.FindAnyObjectByType<NoteAscensionDirector>();
-        ascension?.SetAscentLineVisible(false);
-        yield return _gameFlow.StartCoroutine(RunExitsAndAdvance(
-            new List<ExitTarget> { new ExitTarget(side, phase, motif, kind) },
-            lockedPhaseDirs: null, spawnWisp: false, onNoExits: direct));
-        ascension?.SetAscentLineVisible(true);
-    }
-
     // Shared tail of every path choice: interstitial maze with one exit per target, wait for a
     // vehicle to take one, carry everyone out, start the chosen motif.
     private IEnumerator RunExitsAndAdvance(List<ExitTarget> targets, List<MazeArm> lockedPhaseDirs,
@@ -200,6 +167,10 @@ public sealed class PathChoiceCoordinator
         yield return _gameFlow.StartCoroutine(dust.GenerateInterstitialMaze(
             vehicleCells, pattern, totalSpawnDuration: 1.0f,
             onExitsComputed: infos => exitInfos = infos));
+
+        // The players now stand in the interstitial maze: the collected record's exit spotlight
+        // lifts and everything fades back in (RecordRecovery.cs).
+        _gameFlow.ReleaseRecordExitZoom("interstitial maze grown");
 
         Object.Destroy(pattern);
 
@@ -510,7 +481,7 @@ public sealed class PathChoiceCoordinator
         foreach (var exit in _allExits)
         {
             if (exit == winnerExit || exit == null) continue;
-            dust.SpawnDustAtCells(exit.GapCells, MusicalRole.None, dust.SolidDustColor(), energy01: 1f, growInSeconds: 0.5f, solid: true);
+            dust.SpawnDustAtCells(exit.GapCells, MusicalRole.None, dust.InertBlockColor(), energy01: 1f, growInSeconds: 0.5f, solid: true);
         }
 
         var geo = winnerExit.Geometry;

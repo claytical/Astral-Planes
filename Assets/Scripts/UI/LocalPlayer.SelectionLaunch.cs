@@ -30,7 +30,6 @@ public partial class LocalPlayer
     public Color DisplayColor => _color;
     /// <summary>Ship sprite cached at launch; survives the vehicle being destroyed on death.</summary>
     public Sprite DisplaySprite { get; private set; }
-    public string DisplayName => $"Player {(_playerInput != null ? _playerInput.playerIndex + 1 : _id)}";
     private PlayerStatsTracking _playerStats;
 
     public void CreatePlayerSelect()

@@ -14,7 +14,6 @@ public partial class InstrumentTrack
 
         _activeProfile   = prof;
         trackColor       = prof.GetColorForVoice(voiceIndex);
-        trackShadowColor = prof.GetShadowColor();
         preset           = prof.midiPreset;
         midiVoice?.SetPreset(prof.midiPreset);
         // Base channel level only; volumeMultiplier is pushed live per-note as a gain trim

@@ -46,8 +46,9 @@ public partial class PhaseStarDustAffect
     private System.Func<Vector2Int, bool> _hardCommon;
     private System.Func<Vector2Int, bool> _hardProtectRole;
 
+    // Walls a vine can't break (Cosmic Blocks, record vault shell) or another tentacle's target.
     private bool HardCommon(Vector2Int c) =>
-        (_planGen != null && _planGen.IsBlockAt(c)) || IsReservedByAnotherTentacle(c, _planTentacle);
+        (_planGen != null && _planGen.IsStarImpassable(c)) || IsReservedByAnotherTentacle(c, _planTentacle);
 
     private bool HardProtectRole(Vector2Int c)
     {
@@ -171,7 +172,7 @@ public partial class PhaseStarDustAffect
                 tentacle.boreCell = ahead;
                 tentacle.boreTimer = 0f;
 
-                bool breakable = gen != null && !gen.IsBlockAt(ahead) && !IsReservedByAnotherTentacle(ahead, tentacle);
+                bool breakable = gen != null && !gen.IsStarImpassable(ahead) && !IsReservedByAnotherTentacle(ahead, tentacle);
                 if (breakable)
                     gen.CarveCell(ahead, fadeSeconds: boreFadeSeconds, scheduleRegrow: true,
                         source: DustClearSource.StarBurrow, runPreExplode: true);

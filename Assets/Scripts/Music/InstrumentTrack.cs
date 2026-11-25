@@ -31,7 +31,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     public InstrumentTrackController controller; // 🎛️ Reference to main controller
     public MidiStreamPlayer midiStreamPlayer; // Plays MIDI notes
     public DrumTrack drumTrack;
-    private int channel;
     private int preset;
     private int bank;
 
@@ -119,8 +118,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
     [SerializeField] private LoopPattern loopPattern;
 // Scratch buffer to avoid allocations each step.
     private readonly List<(int note, int duration, float velocity01)> _tmpStepNotes = new();
-    [SerializeField] private Color trackShadowColor = new Color(0.08f,0.08f,0.08f,1f);
-    public Color TrackShadowColor => trackShadowColor;
 
     public enum BurstPlacementMode
     {

@@ -7,7 +7,10 @@ public partial class PhaseStar
     private Coroutine _waitForDustCo;
     private Coroutine _tentacleActivationCo;
 
-    public void EnterInMaze(Vector2 worldPos)
+    /// <param name="worldPos">Where the star settles (its spawn cell).</param>
+    /// <param name="entryFrom">Optional off-screen start: the star swims in from here to
+    /// <paramref name="worldPos"/> (PhaseStarMotion2D.BeginEntrance) before it reaches for flowers.</param>
+    public void EnterInMaze(Vector2 worldPos, Vector2? entryFrom = null)
     {
         EnsureSubcomponents();
         StopManagedCoroutine(ref _waitForDustCo);
@@ -15,7 +18,10 @@ public partial class PhaseStar
 
         _state = PhaseStarState.Dormant;
 
-        transform.position = (Vector3)worldPos + Vector3.forward * transform.position.z;
+        Vector2 startPos = entryFrom ?? worldPos;
+        transform.position = (Vector3)startPos + Vector3.forward * transform.position.z;
+        var rb = motion != null ? motion.GetComponent<Rigidbody2D>() : GetComponent<Rigidbody2D>();
+        if (rb != null) rb.position = startPos;
 
         visuals?.HideAll();
         DisableColliders();
@@ -30,6 +36,8 @@ public partial class PhaseStar
 
         if (motion != null)
         {
+            // Before Enable(): Enable() soft-contains the star on screen, which an entrance skips.
+            if (entryFrom.HasValue) motion.BeginEntrance(worldPos);
             motion.Enable(true);
             motion.SetFrozen(true);
             motion.SetSpeedMultiplier(0f);
@@ -48,11 +56,8 @@ public partial class PhaseStar
 
         visuals?.ToggleShardRenderers(true);
 
-        float seedScale = Mathf.Max(0f, dormantSeedScale);
-        Vector3 seed = Vector3.one * seedScale;
-        if (visuals != null) visuals.transform.localScale = seed;
-        if (_previewVisual != null) _previewVisual.localScale = seed;
-        if (_previewVisualB != null) _previewVisualB.localScale = seed;
+        // No seed body: a charging star is its tentacles until notes form diamonds (DiamondBody.cs).
+        if (visuals != null) visuals.transform.localScale = Vector3.one;
         visuals?.ShowDim(ResolvePreviewColorByReadiness());
         _dormantSeedVisualPrimed = true;
 
@@ -79,6 +84,9 @@ public partial class PhaseStar
     {
         if (tentacleActivationDelay > 0f)
             yield return new WaitForSeconds(tentacleActivationDelay);
+        // Finish swimming in before reaching for flowers (buds still show during the entrance).
+        while (motion != null && motion.IsEntering && _state == PhaseStarState.Dormant)
+            yield return null;
 
         _tentacleActivationCo = null;
         if (_state != PhaseStarState.Dormant) yield break;
@@ -168,8 +176,9 @@ public partial class PhaseStar
     private bool HasColoredDustAvailable()
     {
         if (!TryResolveContext(out _, out var dustGen)) return false;
+        // O(1): reads the shared once-per-frame flower scan.
         return _attunedRole != MusicalRole.None
-            ? dustGen.HasAnyDustWithRole(_attunedRole)
+            ? dustGen.FlowerCount(_attunedRole) > 0
             : dustGen.HasAnyDustWithRole();
     }
 }

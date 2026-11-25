@@ -12,6 +12,8 @@ public enum TutorialGate
     NoteCaught,
     NotePlaced,
     RingCompleted,
+    RecordAccessible,
+    RecordCollected,
 }
 
 [Serializable]
@@ -25,10 +27,16 @@ public class TutorialStage
     [NonSerialized] public TutorialGate gate;
     [Tooltip("Index of a line that becomes a Now!/Here! placement-window cue loop while the player carries a note. -1 = none.")]
     public int cueLineIndex = -1;
-    [Tooltip("Optional replacement lines used when the active vehicle(s) are Cozy Co-Pilot (auto placement). Empty = use 'lines'.")]
+    [Tooltip("Optional replacement lines used when the active vehicle(s) are Cozy Co-Pilot (auto placement). Empty = use 'lines'. The co-pilot fires gates by itself, so these always play through even when the gate fires early.")]
     public string[] linesAuto;
     [Tooltip("Cue line index within linesAuto. -1 = none (auto placement has no release window).")]
     public int cueLineIndexAuto = -1;
+    [Tooltip("Line that zooms the camera in on the docked record; the line waits until the camera has arrived. -1 = none.")]
+    public int spotlightLine = -1;
+    [Tooltip("Line that releases the record spotlight (the camera pulls back as it appears). -1 = when the stage ends.")]
+    public int spotlightEndLine = -1;
+    [Tooltip("Line shown first; then the camera zooms in on the record, holds, and pulls back before the next line. -1 = none.")]
+    public int spotlightDuringLine = -1;
 }
 
 [Serializable]
@@ -50,10 +58,16 @@ public class NarratedTutorialScript : ScriptableObject
     public string panelPath = "Canvas/UI/Tutorial";
     [Tooltip("Seconds each non-final line stays up before the next appears.")]
     public float holdSeconds = 2.75f;
+    [Tooltip("A line stays up at least this long before a stage advance can replace it (commit-skip and interruptions still cut through).")]
+    public float minLineSeconds = 2.5f;
     [Tooltip("Pause after the motif-start rings have disappeared before the first message appears.")]
     public float introSettleSeconds = 0.5f;
     [Tooltip("A commit press with no carried note skips the current delay, but only after the line has been up this long (stops accidental double-presses).")]
     public float skipMinLineSeconds = 0.4f;
+    [Tooltip("spotlightDuringLine: seconds the line is up before the camera zooms in.")]
+    public float spotlightLeadSeconds = 1.5f;
+    [Tooltip("spotlightDuringLine: seconds the camera holds on the record before pulling back.")]
+    public float spotlightHoldSeconds = 1.5f;
     [Tooltip("Vehicle-plow cells carved to satisfy the carve gate.")]
     public int carveCellThreshold = 25;
 
@@ -155,6 +169,21 @@ public class NarratedTutorialScript : ScriptableObject
             {
                 Debug.LogWarning($"[NarratedTutorial] Stage '{label}' cueLineIndex {st.cueLineIndex} is outside its {st.lines.Length} lines; cue disabled.");
                 st.cueLineIndex = -1;
+            }
+            if (st.spotlightLine < -1 || st.spotlightLine >= st.lines.Length)
+            {
+                Debug.LogWarning($"[NarratedTutorial] Stage '{label}' spotlightLine {st.spotlightLine} is outside its {st.lines.Length} lines; spotlight disabled.");
+                st.spotlightLine = -1;
+            }
+            if (st.spotlightDuringLine < -1 || st.spotlightDuringLine >= st.lines.Length)
+            {
+                Debug.LogWarning($"[NarratedTutorial] Stage '{label}' spotlightDuringLine {st.spotlightDuringLine} is outside its {st.lines.Length} lines; disabled.");
+                st.spotlightDuringLine = -1;
+            }
+            if (st.spotlightEndLine >= 0 && st.spotlightEndLine <= st.spotlightLine)
+            {
+                Debug.LogWarning($"[NarratedTutorial] Stage '{label}' spotlightEndLine {st.spotlightEndLine} must come after spotlightLine {st.spotlightLine}; releasing at stage end.");
+                st.spotlightEndLine = -1;
             }
             if (st.linesAuto != null && st.linesAuto.Length > 0 &&
                 (st.cueLineIndexAuto < -1 || st.cueLineIndexAuto >= st.linesAuto.Length))

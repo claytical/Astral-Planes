@@ -10,7 +10,8 @@ public partial class MotifRingGlyphApplicator
         List<MotifSnapshot.NoteEntry> notes, int totalSteps,
         float? fillAlphaOverride = null, float? contourAlphaOverride = null,
         int? fillSortingOrderOverride = null, int? contourSortingOrderOverride = null,
-        float? contourWidthOverride = null, int ringOrdinal = 0, bool skipContour = false, Material fillMaterialOverride = null)
+        float? contourWidthOverride = null, int ringOrdinal = 0, bool skipContour = false, Material fillMaterialOverride = null,
+        float? fillBandWidth = null)
     {
         var root = new GameObject(goName);
         root.transform.SetParent(transform, worldPositionStays: false);
@@ -19,7 +20,15 @@ public partial class MotifRingGlyphApplicator
         var fillGo = new GameObject("Fill");
         fillGo.transform.SetParent(root.transform, worldPositionStays: false);
 
-        var mesh     = BuildAnnulusMesh(innerR, outerR, segs);
+        // fillBandWidth: the fill is only a thin guide band of that width centred on the outer edge
+        // (the in-game record), not the whole innerR..outerR annulus. The contour still sits at outerR.
+        float fillInner = innerR, fillOuter = outerR;
+        if (fillBandWidth.HasValue && fillBandWidth.Value > 0f && fillBandWidth.Value < outerR - innerR)
+        {
+            fillInner = outerR - fillBandWidth.Value * 0.5f;
+            fillOuter = outerR + fillBandWidth.Value * 0.5f;
+        }
+        var mesh     = BuildAnnulusMesh(fillInner, fillOuter, segs);
         var fullTris = mesh.triangles;          // save before clearing
         mesh.SetTriangles(System.Array.Empty<int>(), 0);
 

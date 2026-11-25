@@ -105,7 +105,29 @@ public sealed class BridgeCoordinator
 
         if (rings != null)
         {
-            yield return _gameFlow.StartCoroutine(rings.SpinAndRollOffActiveRings(spinDur, rollDur));
+            // As the record shrinks away it is in the library: say so (not when the match ends on it).
+            System.Action caption = null;
+            if (!endMatchAfterSpin)
+            {
+                var motif = _gameFlow.phaseTransitionManager != null ? _gameFlow.phaseTransitionManager.currentMotif : null;
+                string motifName = motif == null ? null
+                    : (!string.IsNullOrEmpty(motif.displayName) ? motif.displayName : motif.motifId);
+                if (!string.IsNullOrEmpty(motifName))
+                {
+                    caption = () =>
+                    {
+                        rings.OnRecordShrinkStarted -= caption;
+                        _gameFlow.SceneFlow?.ShowCaption(string.Format(SceneFlowCoordinator.LibraryCaptionFormat, motifName));
+                    };
+                    rings.OnRecordShrinkStarted += caption;
+                }
+            }
+
+            // A collected record exits at once, under the camera's spotlight (RecordRecovery.cs);
+            // the camera pulls back once the interstitial maze has grown (PathChoiceCoordinator).
+            yield return _gameFlow.StartCoroutine(rings.SpinAndRollOffActiveRings(
+                spinDur, rollDur, skipLoopWait: _gameFlow.RecordExitZoomActive));
+            if (caption != null) rings.OnRecordShrinkStarted -= caption;
         }
         else
         {
@@ -120,7 +142,9 @@ public sealed class BridgeCoordinator
 
         // Let all bins finish their final cycle before clearing the loop.
         // If the ring animation already outlasted the loop, this is a no-op.
-        if (loopBoundaryDsp > 0)
+        // A collected record goes straight on to the interstitial maze: the loop keeps playing
+        // unseen until BeginNewMotif clears it, so there's no need to hold a dim, empty screen.
+        if (loopBoundaryDsp > 0 && !_gameFlow.RecordExitZoomActive)
             while (AudioSettings.dspTime < loopBoundaryDsp)
                 yield return null;
 
@@ -129,6 +153,7 @@ public sealed class BridgeCoordinator
             // Clear the ghost-cycle guard first: TryBeginMatchEnd refuses while it is set.
             _session.SetGhostCycleInProgress(false);
             _session.SetBridgePending(false);
+            _gameFlow.ReleaseRecordExitZoom("match end");
             _gameFlow.BeginCompetitiveMatchEnd(MatchEndReason.MotifComplete);
             yield break;
         }

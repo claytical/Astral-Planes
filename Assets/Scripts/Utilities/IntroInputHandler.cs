@@ -6,7 +6,6 @@ using UnityEngine.SceneManagement;
 public class IntroInputHandler : MonoBehaviour
 {
     public GameObject quoteText;
-    public GameObject gameModeSelect;
     private bool inputReceived = false;
 
     public void OnAnyInput(InputAction.CallbackContext context)

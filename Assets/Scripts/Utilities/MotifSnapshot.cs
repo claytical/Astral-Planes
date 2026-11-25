@@ -363,12 +363,6 @@ public class MotifSnapshot
             TrackColor = trackColor;
         }
 
-        /// <summary>How long this bin took to fill, in seconds. 0 if not filled.</summary>
-        public float FillDurationSeconds =>
-            IsFilled && CompletionTime >= MotifStartTime
-                ? CompletionTime - MotifStartTime
-                : 0f;
-
         /// <summary>Fraction of collected notes that matched the authored template [0..1].</summary>
         public float MatchRatio
         {

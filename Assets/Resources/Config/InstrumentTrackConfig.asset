@@ -16,5 +16,3 @@ MonoBehaviour:
   ascensionLoopsPerExtraBin: 2
   rootShiftNotesByChord: 1
   maxLoopMultiplier: 4
-  spawnPickMaxTries: 80
-  spawnColumnBandFraction: 0.25

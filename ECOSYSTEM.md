@@ -164,7 +164,7 @@ Per-role MIDI loop state. The **bin** is the expansion unit — each bin adds on
 | `RoleMotifNoteSetConfig` | Per-role generation rules: weighted scales, melodic patterns, rhythms, chord function palette, optional riff override |
 | `ChordProgressionProfile` | Ordered chord sequence; `NoteSetFactory` shifts note pitches to each chord's root |
 | `MusicalRoleProfile` | Role constants: dust colors (base + shadow), energy units (dust-cell plow HP, not a star currency), carve/drain resistance, mine node speed + agility, ripeness duration, per-role regrowth delay override (`regrowthDelay`, vehicle carves only) |
-| `MazePatternConfig` | Maze wall pattern + `dustTiming.regrowDelay`: regrow delay for role-less (filler/None) cells only. The per-source overrides were removed 2026-11-17 (`LEGIBILITY_AUDIT.md` A5) |
+| `MazePatternConfig` | Maze wall pattern + `dustTiming.regrowDelay`: regrow delay for role-less (filler/None) cells only. The per-source overrides were removed 2026-11-17 (`LEGIBILITY_AUDIT.md` A5). `starNavigation` sets how the Star moves; `recordVault` sets the record vault's shape and placement for this maze (2026-11-25, `MAZE_VAULT_AUDIT.md` §C) |
 | `ShipMusicalProfile` | Ship physics, fuel, plow footprint. `regrowDelayMultipliers` was removed 2026-11-17; it was 1.0 on every ship |
 
 `MotifProfile` → references `RoleMotifNoteSetConfig[]`, `ChordProgressionProfile`, and `MazePatternConfig` (`mazePattern`).

@@ -12,13 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 428e91924fac43bbb6a23f2f5efda698, type: 3}
   m_Name: ControlSandboxConfig
   m_EditorClassIdentifier: Assembly-CSharp::ControlSandboxConfig
-  presentSeconds: 1.6
-  dockScale: 0.4
-  dockMargin: 32
-  dockLerpSpeed: 5
   stepConfirmBeatSeconds: 0.6
   driftPracticeSeconds: 2.5
-  chargePracticeSeconds: 1.5
+  chargePracticeSeconds: 0.75
   cellsPerRole: 4
   patchDissolveSeconds: 0.8
   inputThreshold: 0.35

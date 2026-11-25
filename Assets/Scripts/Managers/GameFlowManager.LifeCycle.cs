@@ -11,7 +11,7 @@ public partial class GameFlowManager
             Instance = this;
             DontDestroyOnLoad(gameObject);
             vehicles = new List<Vehicle>();
-            SessionState = new SessionStateCoordinator(this);
+            SessionState = new SessionStateCoordinator();
             BridgeFlow = new BridgeCoordinator(this, SessionState);
             SceneFlow = new SceneFlowCoordinator(this, SessionState, BridgeFlow);
             PathChoice = new PathChoiceCoordinator(this, SessionState, SceneFlow);

@@ -267,10 +267,16 @@ public partial class PhaseStar
             return false;
         }
 
+        // A new cycle (prime) must not inherit the previous discovery's payload as a floor.
+        if (resetCurrentZapCount)
+            _currentBurstRequiredZaps = 0;
+
         NoteSet planned = ResolvePlannedNoteSet(track);
 
-        int noteCount;
-        if (planned == null)
+        // One flower per note the discovery will actually release: the planned NoteSet for the
+        // bin it fills, counted exactly as the collectable burst counts it.
+        int noteCount = planned != null ? CountDiscoveryNotes(planned, track) : 0;
+        if (noteCount <= 0)
         {
             // NoteSet not yet generated (prebuilt missing, motif not applied yet).
             // Fall back to authoritative riff count so the star can still reach
@@ -283,11 +289,6 @@ public partial class PhaseStar
                 return false;
             }
             Debug.LogWarning($"[PhaseStar:Zap] planned NoteSet unavailable; using authoritative riff count={noteCount}. role={role} track={track.name} reason={reason}");
-        }
-        else
-        {
-            if (!TryResolveAuthoritativeZapCount(role, track, out noteCount))
-                noteCount = GetNoteSetNoteCount(planned);
         }
 
         if (_currentBurstRequiredZaps > 0)

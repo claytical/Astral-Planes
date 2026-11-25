@@ -41,8 +41,20 @@ public sealed class CosmicDustCellRegistry
     // several times per frame (hunt/sniffer ticks, tentacle target acquisition); with 4
     // roles active that's a full grid scan repeated ~16x/frame for identical results.
     // Cache the scan once per frame and hand every caller this frame a copy of it.
+    // The same scan also fills per-role buckets (flowers = star food), so a star asks only
+    // for its own role and "does role X have any flowers" is an O(1) count.
     private int _coloredCellsCacheFrame = -1;
     private readonly List<Vector2Int> _coloredCellsCache = new(512);
+    private static readonly int kRoleBucketCount = Enum.GetValues(typeof(MusicalRole)).Length;
+    private readonly List<Vector2Int>[] _flowerBuckets = CreateBuckets();
+    private static readonly List<Vector2Int> s_emptyCells = new(0);
+
+    private static List<Vector2Int>[] CreateBuckets()
+    {
+        var b = new List<Vector2Int>[kRoleBucketCount];
+        for (int i = 0; i < b.Length; i++) b[i] = new List<Vector2Int>(64);
+        return b;
+    }
 
     public CosmicDustCellRegistry(
         DustGridState gridState,
@@ -115,25 +127,48 @@ public sealed class CosmicDustCellRegistry
     /// </summary>
     public void GetColoredDustCells(List<Vector2Int> results)
     {
-        if (_coloredCellsCacheFrame != Time.frameCount)
-        {
-            _coloredCellsCacheFrame = Time.frameCount;
-            _coloredCellsCache.Clear();
-            if (_gridState.CellState != null && _gridState.CellDust != null)
-            {
-                for (int y = 0; y < _gridState.Height; y++)
-                for (int x = 0; x < _gridState.Width; x++)
-                {
-                    if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
-                    var dust = _gridState.CellDust[x, y];
-                    if (dust != null && dust.Role != MusicalRole.None && dust.currentEnergyUnits > 0 && dust.IsVisuallyPresentForTargeting())
-                        _coloredCellsCache.Add(new Vector2Int(x, y));
-                }
-            }
-        }
-
+        RefreshFlowerCache();
         results.Clear();
         results.AddRange(_coloredCellsCache);
+    }
+
+    /// <summary>This frame's star-drainable (bloomed) cells of one role. Shared — do not modify.</summary>
+    public IReadOnlyList<Vector2Int> GetFlowerCells(MusicalRole role)
+    {
+        RefreshFlowerCache();
+        int i = (int)role;
+        return role == MusicalRole.None || i < 0 || i >= kRoleBucketCount ? s_emptyCells : _flowerBuckets[i];
+    }
+
+    public int FlowerCount(MusicalRole role) => GetFlowerCells(role).Count;
+
+    public int FlowerCountAnyRole()
+    {
+        RefreshFlowerCache();
+        return _coloredCellsCache.Count;
+    }
+
+    // One full-grid scan per frame, shared by every star, navigator and StarPool query.
+    private void RefreshFlowerCache()
+    {
+        if (_coloredCellsCacheFrame == Time.frameCount) return;
+        _coloredCellsCacheFrame = Time.frameCount;
+        _coloredCellsCache.Clear();
+        for (int i = 0; i < _flowerBuckets.Length; i++) _flowerBuckets[i].Clear();
+        if (_gridState.CellState == null || _gridState.CellDust == null) return;
+
+        for (int y = 0; y < _gridState.Height; y++)
+        for (int x = 0; x < _gridState.Width; x++)
+        {
+            if (_gridState.CellState[x, y] != DustCellState.Solid) continue;
+            var dust = _gridState.CellDust[x, y];
+            if (dust == null || dust.Role == MusicalRole.None || dust.currentEnergyUnits <= 0 || !dust.IsVisuallyPresentForTargeting())
+                continue;
+            var c = new Vector2Int(x, y);
+            _coloredCellsCache.Add(c);
+            int ri = (int)dust.Role;
+            if (ri >= 0 && ri < kRoleBucketCount) _flowerBuckets[ri].Add(c);
+        }
     }
 
     /// <summary>

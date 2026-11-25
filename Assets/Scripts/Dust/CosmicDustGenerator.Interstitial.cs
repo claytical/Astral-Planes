@@ -52,7 +52,12 @@ public partial class CosmicDustGenerator
             activeDustRoot.gameObject.SetActive(true);
 
         ClearMaze();
+        bool hadArea = drums.TryGetPlayAreaWorld(out var areaBefore);
         drums.SyncTileWithScreen();
+        if (hadArea && drums.TryGetPlayAreaWorld(out var areaAfter) &&
+            (Mathf.Abs(areaAfter.bottom - areaBefore.bottom) > 0.01f || Mathf.Abs(areaAfter.top - areaBefore.top) > 0.01f))
+            Debug.LogWarning($"[MAZE] Interstitial: play area moved on resync (bottom {areaBefore.bottom:F2}->{areaAfter.bottom:F2}, " +
+                             $"top {areaBefore.top:F2}->{areaAfter.top:F2}); pooled dust is re-seated on reuse.");
         EnsureCellGrid();
         int w = drums.GetSpawnGridWidth();
         int h = drums.GetSpawnGridHeight();
@@ -88,6 +93,7 @@ public partial class CosmicDustGenerator
         }
 
         var mazeResult = BuildMazeGrowthFromConfig(interstitialPattern, contextAnchor, reserved, out var gapGroups, busyness01Override: 0.5f);
+        LogMazeDiag("interstitial-built", contextAnchor, w, h, mazeResult.Count, 0, interstitialPattern);
 
         _mazePatternCells = new HashSet<Vector2Int>(mazeResult.Count);
         foreach (var (cell, _) in mazeResult)
@@ -104,7 +110,10 @@ public partial class CosmicDustGenerator
             _imprints[gp] = new DustImprint
             {
                 role              = MusicalRole.None,
-                color             = config.solidDustTint,
+                // Explicit: MusicalRole's default (0) is Bass, and a hidden role makes the
+                // legibility rule paint the wall as a darkened Bass hint (brown/purple).
+                hiddenRole        = MusicalRole.None,
+                color             = config.inertBlockTint,
                 carveResistance01 = 1f,
                 drainResistance01 = 1f,
                 maxEnergyUnits    = 1,
@@ -138,23 +147,37 @@ public partial class CosmicDustGenerator
         int passRadiusCells = Mathf.Max(1, Mathf.CeilToInt((corridorWidth - 1) / 2f));
 
         int vehicleHoleRadiusCells = Mathf.Max(3, passRadiusCells);
+
+        // vehicleCells was sampled before growth; ships keep driving during the ~1s grow-in, so
+        // carve around both the sampled and the live positions. Hole centres are kept off the
+        // outer ring so a ship hugging the edge doesn't punch an unintended border gap.
+        var holeCells = new List<Vector2Int>();
         if (vehicleCells != null)
             foreach (var vehCell in vehicleCells)
-                CarvePermanentDisk(vehCell, vehicleHoleRadiusCells);
+                AddInteriorHoleCell(holeCells, vehCell, w, h);
+        if (_gfm == null) _gfm = GameFlowManager.Instance;
+        var liveVehicles = _gfm != null ? _gfm.GetVehicles() : null;
+        if (liveVehicles != null)
+            foreach (var v in liveVehicles)
+                if (v != null && v.isActiveAndEnabled)
+                    AddInteriorHoleCell(holeCells, drums.WorldToGridPosition(v.transform.position), w, h);
+        var holeDisk = new HashSet<Vector2Int>();
+        foreach (var holeCell in holeCells)
+            DustGridMath.FillDisk(holeDisk, holeCell, vehicleHoleRadiusCells, w, h);
+        foreach (var gp in holeDisk)
+            if (IsStrictInterior(gp, w, h))
+                DespawnDustAtAndMarkPermanent(gp);
 
         // Everything must connect to the first vehicle's region: neither a vehicle's hole nor an
         // exit gap is guaranteed to touch BuildPacManTunnels' DFS network, and an open pocket
         // that merely touches a gap isn't necessarily reachable from the players. Each connector
         // walks to the region already reachable from vehicle 0, carving only the walls crossed.
-        Vector2Int seedCell = (vehicleCells != null && vehicleCells.Count > 0)
-            ? vehicleCells[0]
-            : new Vector2Int(w / 2, h / 2);
+        Vector2Int seedCell = holeCells.Count > 0 ? holeCells[0] : new Vector2Int(w / 2, h / 2);
         var reachable = FloodOpenInterior(seedCell, w, h);
-        if (vehicleCells != null)
-            for (int i = 1; i < vehicleCells.Count; i++)
-                if (!reachable.Contains(vehicleCells[i]) &&
-                    CarveConnectorToReachable(vehicleCells[i], null, reachable, w, h, passRadiusCells))
-                    reachable = FloodOpenInterior(seedCell, w, h);
+        for (int i = 1; i < holeCells.Count; i++)
+            if (!reachable.Contains(holeCells[i]) &&
+                CarveConnectorToReachable(holeCells[i], null, reachable, w, h, passRadiusCells))
+                reachable = FloodOpenInterior(seedCell, w, h);
 
         var exits = new List<PathExitInfo>(gapGroups.Count);
         foreach (var group in gapGroups)
@@ -199,6 +222,13 @@ public partial class CosmicDustGenerator
     {
         new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, 1), new Vector2Int(0, -1)
     };
+
+    private static void AddInteriorHoleCell(List<Vector2Int> list, Vector2Int c, int w, int h)
+    {
+        if (w < 3 || h < 3) return;
+        var clamped = new Vector2Int(Mathf.Clamp(c.x, 1, w - 2), Mathf.Clamp(c.y, 1, h - 2));
+        if (!list.Contains(clamped)) list.Add(clamped);
+    }
 
     private static bool IsStrictInterior(Vector2Int c, int w, int h) =>
         c.x > 0 && c.x < w - 1 && c.y > 0 && c.y < h - 1;

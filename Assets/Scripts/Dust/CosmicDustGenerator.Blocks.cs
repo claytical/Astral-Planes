@@ -66,6 +66,14 @@ public partial class CosmicDustGenerator
     /// <summary>True when this cell is currently a Cosmic Block (role-blocked dust).</summary>
     public bool IsBlockAt(Vector2Int cell) => HasCellFlag(cell, CellFlags.RoleBlocked);
 
+    /// <summary>
+    /// Cells a Star's vine/burrow can never break: Cosmic Blocks and the record vault's standing
+    /// shell — the same two guards ClearCell refuses on. Star routing treats these as walls
+    /// (anything else is breakable dust).
+    /// </summary>
+    public bool IsStarImpassable(Vector2Int cell) =>
+        HasCellFlag(cell, CellFlags.RoleBlocked) || IsSealedVaultShell(cell);
+
     // Bypass-proof walls: interstitial solid dust + Cosmic Blocks.
     private bool IsUnbreakable(Vector2Int cell) => HasCellFlag(cell, CellFlags.Solid | CellFlags.RoleBlocked);
 

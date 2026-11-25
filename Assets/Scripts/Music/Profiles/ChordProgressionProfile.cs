@@ -4,7 +4,6 @@ using UnityEngine;
 [CreateAssetMenu(menuName = "Astral Planes/Music/Motif/Chord Progression Profile", fileName = "ChordProgressionProfile")]
 public class ChordProgressionProfile : ScriptableObject
 {
-    public string progressionName = "I–IV–V";
     public List<Chord> chordSequence = new();
 }
 

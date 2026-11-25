@@ -198,6 +198,27 @@ public sealed class CosmicDustVehicleReservationController
         }
     }
 
+    /// <summary>
+    /// Drops the PhaseStar's keep-clear pocket (the Star died, or the maze is being torn down).
+    /// SetStarKeepClear only ever diffs the pocket against the next one, so without this the
+    /// last Star's pocket (radius 3–5) outlived it: an empty disk in the interstitial and the
+    /// next motif's maze. requestRegrow: false during ClearMaze (nothing may regrow into the next maze).
+    /// </summary>
+    public void ReleaseStarKeepClear(bool requestRegrow)
+    {
+        _exclusions.UpdateStarPocket(null, _tmpReleased, _tmpClaimed);
+        const string claimOwner = "PhaseStarPocket";
+        var dustClaims = _dustClaims();
+        dustClaims?.ReleaseOwner(claimOwner);
+        if (!requestRegrow) return;
+        for (int i = 0; i < _tmpReleased.Count; i++)
+        {
+            var cell = _tmpReleased[i];
+            if (_isPermanentClearCell(cell)) continue;
+            _requestRegrowCellAt(cell);
+        }
+    }
+
     // Short decaying "wake" behind a moving vehicle: claims a recently-visited cell for a few
     // seconds so backtracking never gets boxed in, without carving a permanent scar. Distinct from
     // SetVehicleKeepClear (which protects the vehicle's *current* footprint) — this protects a

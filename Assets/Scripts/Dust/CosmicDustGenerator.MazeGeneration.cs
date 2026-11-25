@@ -131,6 +131,13 @@ public partial class CosmicDustGenerator
         ReleaseRoleBlock();
         ResetRecordVault(); // the record's dock/vault belongs to the old maze
 
+        // Claims belong to the maze they were made in. The last Star's keep-clear pocket and the
+        // old travel lanes used to survive into the next maze's build, where BuildMazeGrowthFromConfig
+        // skips claimed cells: an empty disk / stripe in the new maze. No regrow requests here.
+        // (Ship keep-clear pockets and trails are live and stay.)
+        _vehicleReservation.ReleaseStarKeepClear(requestRegrow: false);
+        _corridorReservation.ReleaseCorridors(requestRegrow: false);
+
         try
         {
             for (int x = 0; x < _gridState.Width; x++)
@@ -264,6 +271,7 @@ public partial class CosmicDustGenerator
             _imprints[gp] = new DustImprint
             {
                 role               = MusicalRole.None,
+                hiddenRole         = MusicalRole.None, // set by the Voronoi pass; default(MusicalRole) is Bass
                 color              = config.mazeTint,
                 carveResistance01  = config.noneCarveResistance01,
                 drainResistance01  = config.noneDrainResistance01,
@@ -932,11 +940,14 @@ public partial class CosmicDustGenerator
             _imprints.SetHiddenRole(cell, newVoice.role, newVoice.voiceIndex);
     }
 
-    // TEMP DIAGNOSTIC (control-sandbox "only the border grew" report): one line per maze build,
-    // always on, tallying why interior cells were vetoed and how many ended up Solid. Remove
-    // once the cause is found.
-    private void LogMazeDiag(string phase, Vector2Int starCell, int w, int h, int mazeCount, int preinject)
+    // DIAGNOSTIC: one line per maze build (motif and interstitial), always on, tallying why cells
+    // were vetoed (spawn-grid occupancy, permanent clear, claims by owner) and how many ended up
+    // Solid. Originally for the control-sandbox "only the border grew" report; kept for the
+    // 2026-11-25 "interstitial corner empty" report (MAZE_VAULT_AUDIT.md A1).
+    private void LogMazeDiag(string phase, Vector2Int starCell, int w, int h, int mazeCount, int preinject,
+                             MazePatternConfig patternOverride = null)
     {
+        var pattern = patternOverride != null ? patternOverride : _activeMazePattern;
         int solid = 0, spawnOccupied = 0, permClear = 0, keepClear = 0, dustThere = 0, voidGrow = 0;
         var grid = _gfm != null ? _gfm.spawnGrid : null;
         for (int x = 0; x < w; x++)
@@ -950,10 +961,23 @@ public partial class CosmicDustGenerator
             if (HasCellFlag(c, CellFlags.VoidGrow)) voidGrow++;
         }
         Debug.Log($"[MAZE:DIAG] {phase} motif='{phaseTransitionManager?.currentMotif?.name}' " +
-                  $"pattern='{_activeMazePattern?.name}' type={_activeMazePattern?.patternType} grid={w}x{h} star={starCell} " +
+                  $"pattern='{pattern?.name}' type={pattern?.patternType} grid={w}x{h} star={starCell} " +
                   $"busy={(_densitySnapshot != null ? _densitySnapshot.MotifBusyness01 : -1f):F2} mazeCells={mazeCount} preinject={preinject} " +
                   $"solid={solid} spawnGridOccupied={spawnOccupied} permClear={permClear} keepClear={keepClear} voidGrow={voidGrow} " +
-                  $"sandbox={GameFlowManager.SandboxActive} bridge={_gfm?.BridgePending} rootActive={(activeDustRoot != null && activeDustRoot.gameObject.activeInHierarchy)}");
+                  $"sandbox={GameFlowManager.SandboxActive} bridge={_gfm?.BridgePending} rootActive={(activeDustRoot != null && activeDustRoot.gameObject.activeInHierarchy)} " +
+                  $"claimsByOwner=({DescribeClaimOwners()})");
+    }
+
+    private readonly Dictionary<string, int> _claimTallyScratch = new Dictionary<string, int>();
+
+    // keepClear above counts claimed cells; this says whose claims they are (a stale
+    // "PhaseStarPocket" or "Corridor" here means a claim outlived its maze).
+    private string DescribeClaimOwners()
+    {
+        if (dustClaims == null) return "none";
+        dustClaims.TallyClaimedCellsByOwner(_claimTallyScratch);
+        if (_claimTallyScratch.Count == 0) return "none";
+        return string.Join(", ", _claimTallyScratch.Select(kv => $"{kv.Key}={kv.Value}"));
     }
 
     public void ResetMazeGenerationFlag()
@@ -1026,10 +1050,22 @@ public partial class CosmicDustGenerator
         const int starHoleRadiusCells    = 3;
         const int vehicleHoleRadiusCells = 2;
 
-        // The record's vault comes first; the maze is laid out around it (RecordDock.cs).
-        bool vaultPlanned = PlanRecordVaultForMaze(starCell, vehicleCells, reserved, starHoleRadiusCells, vehicleHoleRadiusCells);
+        // The record's vault (RecordDock.cs). Edge/Interior placement comes first and the pattern is
+        // laid out around it. PatternAnchor placement is planned after the pattern has computed its
+        // walls (nothing has grown yet), so the vault can sit in a room / clearing / ring wall /
+        // between lanes / in the rock, and the pattern's cells under it are dropped.
+        bool anchorVault  = ResolveVaultPlacement() == VaultPlacement.PatternAnchor;
+        bool vaultPlanned = !anchorVault &&
+                            PlanRecordVaultForMaze(starCell, vehicleCells, reserved, starHoleRadiusCells, vehicleHoleRadiusCells);
 
         var mazeResult = BuildMazeGrowthFromConfig(_activeMazePattern, starCell, reserved);
+        if (anchorVault)
+        {
+            var patternSolid = new HashSet<Vector2Int>();
+            foreach (var e in mazeResult) patternSolid.Add(e.grid);
+            vaultPlanned = PlanRecordVaultForMaze(starCell, vehicleCells, reserved, starHoleRadiusCells,
+                                                  vehicleHoleRadiusCells, patternSolid);
+        }
         if (vaultPlanned) mazeResult.RemoveAll(e => IsRecordVaultCell(e.grid));
         if (GameFlowManager.VerboseLogging) Debug.Log($"[MAZE] maze cell count={mazeResult.Count} ring cell count={preinjectCount}");
         LogMazeDiag("built", starCell, w, h, mazeResult.Count, preinjectCount);

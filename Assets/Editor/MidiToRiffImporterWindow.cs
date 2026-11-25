@@ -671,7 +671,6 @@ public class MidiToRiffImporterWindow : EditorWindow
                 .OrderBy(n => n.step)
                 .ThenBy(n => n.midiNote)
                 .ToList(),
-            overlapPolicy = clampDurToNextOnset ? RiffOverlapPolicy.ClampToNextOnset : RiffOverlapPolicy.AllowOverlap,
             octaveShift = octaveShift
         };
     }

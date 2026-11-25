@@ -1,15 +1,17 @@
 {
-  "holdSeconds": 6,
+  "holdSeconds": 3,
+  "minLineSeconds": 2.5,
   "stages": [
     {
       "id": "01_welcome",
       "gateName": "CarveComplete",
       "cueLineIndex": -1,
+      "spotlightLine": 0,
+      "spotlightEndLine": 1,
       "lines": [
-        "Hello, Sonic Wanderer{s}! Welcome to the field.",
-        "Drift around and explore the field.",
-        "It's full of music waiting to happen. You'll be jamming in no time.",
-        "Now charge through the field to generate musical potential."
+        "There's a piece of music trapped here.",
+        "It wants to be made.",
+        "Charge through the dust to stir up some musical potential."
       ]
     },
     {
@@ -17,9 +19,8 @@
       "gateName": "TentacleAppeared",
       "cueLineIndex": -1,
       "lines": [
-        "Careful, that vessel of yours can burn through energy fast.",
-        "Especially with those heavier sounds.",
-        "Looks like you've attracted some attention..."
+        "Stir up enough of potential and you might discover something.",
+        "Look! Something's reaching for it."
       ]
     },
     {
@@ -27,8 +28,7 @@
       "gateName": "StarArmed",
       "cueLineIndex": -1,
       "lines": [
-        "Discoveries are drawn to the energy you've stirred up.",
-        "The hungriest ones have the most potential."
+        "Discoveries feed on musical potential until an idea takes shape."
       ]
     },
     {
@@ -36,9 +36,9 @@
       "gateName": "StarPoked",
       "cueLineIndex": -1,
       "lines": [
-        "It's ready to be harvested!",
-        "It might be a little tricky to reach.",
-        "Get it!"
+        "Look! An idea formed.",
+        "They can be fleeting...",
+        "Don't let it get away!"
       ]
     },
     {
@@ -46,8 +46,7 @@
       "gateName": "DiscoveryBurst",
       "cueLineIndex": -1,
       "lines": [
-        "That's it!",
-        "Smash it and tease out that melody!"
+        "Break it open and let the notes out!"
       ]
     },
     {
@@ -55,8 +54,8 @@
       "gateName": "NoteCaught",
       "cueLineIndex": -1,
       "lines": [
-        "Can you hear it?",
-        "Go catch one!"
+        "Can you hear the idea?",
+        "Go catch one of the notes."
       ]
     },
     {
@@ -65,11 +64,13 @@
       "cueLineIndex": 1,
       "lines": [
         "Listen. The note you caught has gone quiet where it used to play.",
-        "That note won't be heard again unless you place it."
+        "It's waiting for you to give it a place in the loop.",
+        "Place it with {button} when an open spot comes around."
       ],
       "cueLineIndexAuto": -1,
       "linesAuto": [
-        "And the cosmos take care of the rest..."
+        "Listen. Your co-pilot is finding a place for that role in the loop.",
+        "It's becoming part of the music."
       ]
     },
     {
@@ -78,45 +79,52 @@
       "cueLineIndex": 3,
       "lines": [
         "Now it's part of the loop!",
-        "You hear it play as it wraps around?",
-        "Now catch some more.",
-        "Place them anywhere there's an open spot.",
-        "If you miss the timing window... watch out!"
+        "Hear it come around again?",
+        "Catch some more notes and place them in open spots.",
+        "Be careful. Miss the timing window and you'll lose a note."
       ],
       "cueLineIndexAuto": -1,
       "linesAuto": [
         "Now it's part of the loop!",
-        "You hear it play as it wraps around?",
-        "Now catch some more.",
-        "The cosmos will place them for you."
+        "Keep collecting notes and let your co-pilot find their places."
       ]
     },
     {
       "id": "09_record",
-      "gateName": "None",
+      "gateName": "RecordAccessible",
       "cueLineIndex": -1,
+      "spotlightLine": 0,
+      "spotlightEndLine": 1,
       "lines": [
         "You've completed your first ring!",
-        "It's coming together.",
-        "Let's finish the rest of this record."
+        "This record is almost complete.",
+        "Complete the remaining ring and set it free."      
+      ]
+    },
+    {
+      "id": "10_collect",
+      "gateName": "RecordCollected",
+      "cueLineIndex": -1,
+      "lines": [
+        "Your record is ready. Go collect it!"
       ]
     }
   ],
   "discoveryEscaped": {
     "lines": [
-      "It got away!",
-      "Keep stirring things up. There's more to discover."
+      "That idea got away.",
+      "Keep stirring things up, there are more ideas out there."
     ]
   },
   "noteDiscarded": {
     "lines": [
-      "Discarded!",
-      "You meant to do that, right?"
+      "That note slipped away.",
+      "Was that intentional?"
     ]
   },
   "outOfEnergy": {
     "lines": [
-      "Easy on the boost, that could have been the end of your journey."
+      "Easy off the trigger. Drift whenever you can to conserve energy."
     ]
   },
   "cueWindowTexts": [

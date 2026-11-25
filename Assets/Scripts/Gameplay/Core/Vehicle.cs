@@ -52,6 +52,8 @@ public partial class Vehicle : MonoBehaviour
     private Vector2 _moveInput;
     public float energyLevel;
     public bool boosting = false;
+    /// <summary>Trigger held, whether or not there is energy to actually boost (tutorial gates read this).</summary>
+    public bool BoostRequested { get; private set; }
     private float _boostHeldSeconds;
     public float BoostHeldSeconds => _boostHeldSeconds;
     private Vector2 _lastNonZeroInput; // remembers the last aim direction
@@ -145,14 +147,21 @@ public partial class Vehicle : MonoBehaviour
     // ------------------------------------------------------------
     // Manual-release cue (visual guidance)
     // ------------------------------------------------------------
+    /// <summary>The ship's authored scale, captured before anything animates it. Hit feedback
+    /// (thud/pulse) and the path-exit shrink both return to this, never to a live mid-animation scale.</summary>
+    public Vector3 BaseLocalScale { get; private set; } = Vector3.one;
+
     private void Awake()
     {
         baseSprite = GetComponent<SpriteRenderer>();
+        BaseLocalScale = transform.localScale;
     }
 
     void Start()
         {
             rb = GetComponent<Rigidbody2D>();
+            // Render between physics ticks instead of stepping at 50 Hz (only Tumble had this on).
+            if (rb != null) rb.interpolation = RigidbodyInterpolation2D.Interpolate;
             gfm = GameFlowManager.Instance;
             _mineNodeLayerMask = LayerMask.GetMask("DiscoveryTrackNode");
             _pressureFilter.SetLayerMask(_mineNodeLayerMask);
@@ -254,6 +263,7 @@ public partial class Vehicle : MonoBehaviour
 
         UpdatePressureInstability();
         UpdateMovementAndFuel(dt);
+        UpdateHeading(dt);
         UpdateVoidEnergyRecovery(dt);
         UpdateIdleTracking();
 
@@ -271,6 +281,9 @@ public partial class Vehicle : MonoBehaviour
         UpdateSafeAnchor();
         RecoverIfNeeded();
     }
+    // A ship wedged on (or embedded in) a wall it can't carve has no other way out: interstitial
+    // maze walls during the bridge, Cosmic Blocks / vault walls / bypass-proof Solid dust otherwise.
+    UpdateWallUnwedge();
 
 }
 
@@ -354,9 +367,75 @@ public partial class Vehicle : MonoBehaviour
             }
             ConsumeEnergy(flatBoostCost);
         }
+    }
 
-        if (rb.linearVelocity.sqrMagnitude > 0.0001f)
-            rb.rotation = Mathf.Atan2(rb.linearVelocity.y, rb.linearVelocity.x) * Mathf.Rad2Deg - 90f;
+    // ---- Heading ----
+    // The nose used to snap to the raw post-solve velocity every tick. Against a wall the
+    // solver's push-out velocity flips direction tick to tick, the nose followed it, and the
+    // rotated polygon hull dug back into the wall — a jitter loop. Now:
+    //   idle (no drift input, no charge) + touching → heading held, rotation frozen, push-out
+    //     speed capped, so the nose stays put while the contact settles;
+    //   steering + touching → turn toward the input, not the solver's deflected velocity;
+    //   free flight → turn toward the velocity heading (above a minimum speed);
+    // always at a capped turn rate via MoveRotation, so it interpolates.
+    private bool _headingFrozenForContact;
+
+    private void UpdateHeading(float dt)
+    {
+        if (rb == null) return;
+        if (_movementLocked || rb.bodyType != RigidbodyType2D.Dynamic)
+        {
+            ReleaseContactHeadingFreeze();
+            return;
+        }
+
+        bool hasInput = _moveInput.sqrMagnitude > 0.0001f;
+        bool steering = hasInput || boosting;
+        bool touching = rb.GetContacts(_stuckContacts) > 0;
+
+        if (!steering && touching)
+        {
+            // Only freeze (and later release) what we add — never clear an authored constraint.
+            if (!_headingFrozenForContact && (rb.constraints & RigidbodyConstraints2D.FreezeRotation) == 0)
+            {
+                rb.constraints |= RigidbodyConstraints2D.FreezeRotation;
+                _headingFrozenForContact = true;
+            }
+            rb.angularVelocity = 0f;
+            float cap = vehicleConfig != null ? vehicleConfig.contactIdleMaxSpeed : 0.5f;
+            if (cap > 0f && rb.linearVelocity.sqrMagnitude > cap * cap)
+                rb.linearVelocity = rb.linearVelocity.normalized * cap;
+            return;
+        }
+
+        ReleaseContactHeadingFreeze();
+
+        Vector2 dir;
+        float minSpeed = vehicleConfig != null ? vehicleConfig.headingMinSpeed : 0.25f;
+        if (touching || rb.linearVelocity.sqrMagnitude < minSpeed * minSpeed)
+        {
+            // Pressing into something (or nearly stopped): face where the player is steering.
+            if (hasInput) dir = _moveInput.normalized;
+            else if (boosting && _lastNonZeroInput.sqrMagnitude > 0f) dir = _lastNonZeroInput;
+            else return;
+        }
+        else
+        {
+            dir = rb.linearVelocity.normalized;
+        }
+
+        float target  = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - 90f;
+        float turn    = vehicleConfig != null ? vehicleConfig.headingTurnRateDegPerSec : 720f;
+        float next    = turn > 0f ? Mathf.MoveTowardsAngle(rb.rotation, target, turn * dt) : target;
+        rb.angularVelocity = 0f;
+        rb.MoveRotation(next);
+    }
+
+    private void ReleaseContactHeadingFreeze()
+    {
+        if (!_headingFrozenForContact || rb == null) return;
+        rb.constraints &= ~RigidbodyConstraints2D.FreezeRotation;
+        _headingFrozenForContact = false;
     }
 
     private void Update()
@@ -453,13 +532,7 @@ public partial class Vehicle : MonoBehaviour
         _moveInput     = direction;
         if (direction.sqrMagnitude > 0f) _lastNonZeroInput = direction.normalized;
         _lastMoveStamp = Time.time;
-
-        // Optional: face input immediately if we’re currently stopped
-        if (rb && direction.sqrMagnitude > 0.0001f && rb.linearVelocity.sqrMagnitude < 0.0001f)
-        {
-            float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
-            rb.rotation = angle;
-        }
+        // Facing a stopped ship toward its input is UpdateHeading's job (turn-rate capped).
     }
     private void Fly()
         {
@@ -474,6 +547,7 @@ public partial class Vehicle : MonoBehaviour
         }
     public void TurnOnBoost(float triggerValue)
     {
+        BoostRequested = true;
 
         if (energyLevel > 0 && !boosting)        {
             boosting = true;
@@ -487,6 +561,7 @@ public partial class Vehicle : MonoBehaviour
     }
     public void TurnOffBoost()
     {
+        BoostRequested = false;
         if (audioManager != null)
         {
             audioManager.StopSound();

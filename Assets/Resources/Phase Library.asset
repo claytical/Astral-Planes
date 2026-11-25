@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Phase Library
   m_EditorClassIdentifier: Assembly-CSharp::PhaseChapterLibrary
   phases:
-  - phaseName: Tutorial
+  - phaseName: Simple Loops
     phaseId: 2cfde5cf3d2048b8910ab984b7267338
     motifs:
     - {fileID: 11400000, guid: 39d204e098aac450aaa74bc66d2708b4, type: 2}

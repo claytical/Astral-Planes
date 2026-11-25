@@ -19,7 +19,9 @@ public static class VehicleSwallowScale
         if (v == null) return;
         if (!s_original.TryGetValue(v, out var orig))
         {
-            orig = v.transform.localScale;
+            // The authored scale, not the live one: a wall-thud squash still easing back when the
+            // exit grabs the ship would otherwise be "restored" as its new normal (squashed ship).
+            orig = v.BaseLocalScale;
             s_original[v] = orig;
         }
         v.transform.localScale = orig * Mathf.Max(Swallowed, factor);

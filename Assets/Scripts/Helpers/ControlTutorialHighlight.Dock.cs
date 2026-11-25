@@ -1,43 +1,39 @@
 using UnityEngine;
 
 /// <summary>
-/// Control-sandbox presentation: the panel either "presents" a command (centred, full size)
-/// or "docks" (shrinks into the bottom-right corner) while players practise it in their
-/// vehicles. Driven by ControlSandboxDirector; smoothed in Update like the rest of the panel.
-/// While sandbox mode is on, the Drift-step stick-follow in Feedback3D is suppressed — it
-/// would fight the dock target. Tilt/squash feedback still runs.
+/// Control-sandbox presentation: each command fades in centred at full size, holds while the
+/// player works out the input, and fades out once ControlSandboxDirector detects it. The panel
+/// never moves or rescales in the sandbox. While sandbox mode is on, the Drift-step stick-follow
+/// in Feedback3D is suppressed (the pose is pinned here). Tilt/squash feedback still runs.
 /// </summary>
 public partial class ControlTutorialHighlight
 {
     private bool _sandboxMode;
-    private bool _docked;
     private bool _restorePoseOnDisable;  // non-immediate EndSandbox: fade out in place, then restore
-    private float _dockScale = 0.4f;
-    private float _dockMargin = 32f;
-    private float _dockLerpSpeed = 5f;
-    private RectTransform _dockAvoid;          // e.g. the lower-third narration panel
     private Vector3 _sandboxBaseScale = Vector3.one;
     private Vector2 _presentPosition;
+    private float _sandboxFadeInSeconds;  // > 0: the root fades in linearly over this long
+    private float _sandboxFadeOutSeconds; // > 0: the root fades out linearly over this long
 
-    public bool IsSandboxMode => _sandboxMode;
+    /// <summary>Sandbox: steady linear fades of these lengths for each command's appearance/dismissal.</summary>
+    public void SetSandboxFades(float inSeconds, float outSeconds)
+    {
+        _sandboxFadeInSeconds  = Mathf.Max(0f, inSeconds);
+        _sandboxFadeOutSeconds = Mathf.Max(0f, outSeconds);
+    }
 
-    /// <summary>Enters sandbox mode with the panel's current pose as the "present" pose.</summary>
-    public void BeginSandbox(float dockScale, float dockMargin, float dockLerpSpeed, RectTransform avoidRect)
+
+    /// <summary>Enters sandbox mode: the panel is pinned centred on screen at its current size, hidden.</summary>
+    public void BeginSandbox()
     {
         StopAllModes();
         RestoreSandboxPoseIfPending();
         if (!gameObject.activeSelf) gameObject.SetActive(true);
 
-        _sandboxMode   = true;
-        _docked        = false;
-        _dockScale     = Mathf.Clamp(dockScale, 0.05f, 1f);
-        _dockMargin    = Mathf.Max(0f, dockMargin);
-        _dockLerpSpeed = Mathf.Max(0.1f, dockLerpSpeed);
-        _dockAvoid     = avoidRect;
-
+        _sandboxMode = true;
         _sandboxBaseScale = transform.localScale;
         _presentPosition  = _rootRectTransform ? ComputePresentPosition() : Vector2.zero;
-        if (_rootRectTransform) _rootRectTransform.anchoredPosition = _presentPosition; // first present starts in place
+        if (_rootRectTransform) _rootRectTransform.anchoredPosition = _presentPosition;
         _originPosition   = _presentPosition;
 
         // Sandbox sequence: Drift then Charge (Place is taught later by the narrated tutorial).
@@ -48,27 +44,26 @@ public partial class ControlTutorialHighlight
         if (_rootCanvasGroup) _rootCanvasGroup.alpha = 0f;
     }
 
-    /// <summary>Shows sandbox step <paramref name="index"/> (0 = Drift, 1 = Charge) centred and full size.</summary>
+    /// <summary>Fades in sandbox step <paramref name="index"/> (0 = Drift, 1 = Charge), centred and full size.</summary>
     public void PresentSandboxStep(int index)
     {
         if (!_sandboxMode) return;
         var seq = ActiveSequence;
         if (seq == null || index < 0 || index >= seq.Length) return;
 
-        // Drift -> Charge keeps the stick lit and adds the trigger, same as the old sequence.
-        bool additive = _tutorialIndex >= 0 && _tutorialIndex < seq.Length
-                        && seq[_tutorialIndex] == Instruction.Drift && seq[index] == Instruction.Boost;
+        // Each command appears on its own: the previous one has already faded out.
         _tutorialActive = true;
         _tutorialIndex = index;
-        HighlightInstruction(seq[index], immediate: false, additive: additive);
-        _docked = false;
+        HighlightInstruction(seq[index], immediate: true, additive: false);
     }
 
-    /// <summary>Shrinks the panel into the bottom-right corner (label + live feedback stay on).</summary>
-    public void DockToCorner() { if (_sandboxMode) _docked = true; }
-
-    /// <summary>Grows the panel back to its centred, full-size pose.</summary>
-    public void PresentCentered() { if (_sandboxMode) _docked = false; }
+    /// <summary>Fades the current command out (the input was detected). The panel stays centred.</summary>
+    public void DismissSandboxStep()
+    {
+        if (!_sandboxMode) return;
+        FadeRootOut();
+        FadeLabelTo(0f, labelFadeOutSeconds);
+    }
 
     public void PlayStepConfirm()
     {
@@ -83,7 +78,8 @@ public partial class ControlTutorialHighlight
     {
         if (!_sandboxMode) return;
         _sandboxMode = false;
-        _docked = false;
+        _sandboxFadeInSeconds = 0f;
+        _sandboxFadeOutSeconds = 0f;
         _originPosition = _presentPosition;
         if (immediate) transform.localScale = _sandboxBaseScale;
         else _restorePoseOnDisable = true; // don't pop size mid-fade; restored once hidden
@@ -98,17 +94,12 @@ public partial class ControlTutorialHighlight
         if (_rootRectTransform) _rootRectTransform.anchoredPosition = _presentPosition;
     }
 
-    // Returns true when sandbox mode owns position/scale this frame.
+    // Returns true when sandbox mode owns position/scale this frame (pinned centred, full size).
     private bool UpdateSandboxPose()
     {
         if (!_sandboxMode || !_rootRectTransform) return false;
-
-        Vector2 targetPos   = _docked ? ComputeDockPosition() : _presentPosition;
-        Vector3 targetScale = _docked ? _sandboxBaseScale * _dockScale : _sandboxBaseScale;
-
-        float k = 1f - Mathf.Exp(-_dockLerpSpeed * Time.unscaledDeltaTime);
-        _rootRectTransform.anchoredPosition = Vector2.Lerp(_rootRectTransform.anchoredPosition, targetPos, k);
-        transform.localScale = Vector3.Lerp(transform.localScale, targetScale, k);
+        transform.localScale = _sandboxBaseScale;
+        _rootRectTransform.anchoredPosition = _presentPosition;
         return true;
     }
 
@@ -122,36 +113,6 @@ public partial class ControlTutorialHighlight
         Vector2 size  = Vector2.Scale(_rootRectTransform.rect.size, (Vector2)_sandboxBaseScale);
         Vector2 pivot = _rootRectTransform.pivot;
         Vector2 pivotInCanvas = canvasRT.rect.center + Vector2.Scale(pivot - new Vector2(0.5f, 0.5f), size);
-        return CanvasToAnchored(canvasRT, parentRT, pivotInCanvas);
-    }
-
-    // Bottom-right of the screen, inset by the margin. If the avoid rect (lower-third narration)
-    // overlaps that corner horizontally, the panel sits on top of it instead.
-    private Vector2 ComputeDockPosition()
-    {
-        if (!TryGetScreenSpace(out var canvasRT, out var parentRT)) return _presentPosition;
-
-        Rect r = canvasRT.rect;
-        Vector2 size  = Vector2.Scale(_rootRectTransform.rect.size, (Vector2)(_sandboxBaseScale * _dockScale));
-        Vector2 pivot = _rootRectTransform.pivot;
-
-        float right  = r.xMax - _dockMargin;
-        float bottom = r.yMin + _dockMargin;
-        float left   = right - size.x;
-
-        if (_dockAvoid != null && _dockAvoid.gameObject.activeInHierarchy)
-        {
-            var corners = new Vector3[4];
-            _dockAvoid.GetWorldCorners(corners);
-            Vector2 aMin = canvasRT.InverseTransformPoint(corners[0]);
-            Vector2 aMax = canvasRT.InverseTransformPoint(corners[2]);
-            bool overlapsX = aMax.x > left && aMin.x < right;
-            if (overlapsX && aMax.y + _dockMargin > bottom)
-                bottom = aMax.y + _dockMargin;
-        }
-
-        // Where the pivot must sit for the scaled panel to occupy [left..right] x [bottom..].
-        Vector2 pivotInCanvas = new Vector2(left + size.x * pivot.x, bottom + size.y * pivot.y);
         return CanvasToAnchored(canvasRT, parentRT, pivotInCanvas);
     }
 

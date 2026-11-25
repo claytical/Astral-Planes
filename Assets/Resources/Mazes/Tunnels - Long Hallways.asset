@@ -15,40 +15,84 @@ MonoBehaviour:
   patternType: 6
   dustTiming:
     regrowDelay: 4
-    vehiclePlowRegrowDelay: -1
-    collectableArrivalRegrowDelay: -1
-    collectablePlowRegrowDelay: -1
-    jailRegrowDelay: -1
-    superNodeRegrowDelay: -1
-    zapRegrowDelay: -1
-    starDrainReleaseDelay: 7
-    collectableDiscardRegrowDelay: -1
-    collectableBombBlastRegrowDelay: 8
-    trackFilledRegrowDelay: 7
   clearBoxes:
     clearBoxCount: 4
     clearBoxWidth: 5
     clearBoxHeight: 5
+    shape: 0
+    placementJitter01: 1
+    staggerRows: 0
+    sizeJitter01: 0
+    connectorChance01: 0
+    connectorWidth: 2
   cellularAutomata:
     fillChance: 0.3
     iterations: 3
+    busynessInfluence01: 1
+    surviveMin: 2
+    surviveMax: 4
+    birthMin: 3
+    birthMax: 3
+    radialBias: 0
+    smoothPasses: 0
+    minIslandSize: 0
+    symmetry: 0
   ring:
     spacing: 6
     thickness: 1
     jitter: 0.35
+    metric: 0
+    innerClearRadius: 0
+    spacingGrowth: 1
+    thicknessGrowth: 0
+    gapCount: 0
+    gapWidth: 3
+    gapOffsetDeg: 0
+    gapTwistDeg: 0
   drunkenStrokes:
     strokes: 10
     maxLen: 18
     jitter: 0.35
     dilate: 0.3
+    startMode: 0
+    steered: 0
+    headingNoiseDeg: 25
+    curlDegPerStep: 0
+    branchChance01: 0
+    brushRadius: 0
+    minLenFraction: 0.5
   diagonalLanes:
     step: 12
+    slopeX: 1
+    slopeY: 2
+    thickness: 1
+    crossHatch: 0
+    gapPeriod: 0
+    gapLength: 0
+    waveAmplitude: 0
+    waveLength: 16
   tunnels:
     corridorStep: 4
-    corridorWidth: 2
+    corridorWidth: 3
     straightness01: 0.95
     braid01: 0.1
-    plazaChance01: 0.0
+    plazaChance01: 0
     plazaExtraCells: 0
   porousBorder:
     exitCount: 6
+    exitSides: 
+    topBottomCenterBand: 1
+  starNavigation:
+    mode: 0
+    speedMultiplier: 1
+    hungrySpeedMultiplier: 1
+    jitterMultiplier: 1
+    orbitBiasOffset: 0
+    replanIntervalMultiplier: 1
+    keepClearRadiusOffset: 0
+    pathLookaheadCells: 2
+    laneAlignStrength: 0.7
+    ringTangentialStrength: 0.6
+    burrowCarveRadiusCells: 1
+    burrowCarveInterval: 0.12
+  minGenericFillRatio01: 0.1

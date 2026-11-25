@@ -8,20 +8,11 @@ public class GlowPulseText : MonoBehaviour
     public float speed = 2f;
     public string glowProperty = "_GlowPower"; // Some shaders might use "_GlowStrength"
 
-    private TextMeshProUGUI _tmpText;
+    // NOTE (VARIABLE_AUDIT): the fontMaterial grab was commented out, so this is never assigned and
+    // the component is inert. Start used to NRE on it. Either restore
+    // `_textMaterial = GetComponent<TextMeshProUGUI>().fontMaterial;` or remove the component from scenes.
     private Material _textMaterial;
     private float _timer;
-
-    void Start()
-    {
-        _tmpText = GetComponent<TextMeshProUGUI>();
-//        _textMaterial = _tmpText.fontMaterial;
-
-        if (!_textMaterial.HasProperty(glowProperty))
-        {
-            Debug.LogWarning($"GlowPulseText: Material does not contain property '{glowProperty}'.");
-        }
-    }
 
     void Update()
     {

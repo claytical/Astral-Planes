@@ -220,10 +220,17 @@ public partial class MotifRingGlyphApplicator
         float innerR = RingInnerRadius(idx);
         float outerR = innerR + config.ringThickness;
         int   segs   = Mathf.Max(16, config.segments);
+        float lineW  = GameplayLineWidth();
 
         var entry = BuildRingEntry($"GameplayRing_Bin{binIndex}_{role}",
             innerR, outerR, segs, color, role, binIndex,
-            new List<MotifSnapshot.NoteEntry>(), totalSteps, ringOrdinal: idx);
+            new List<MotifSnapshot.NoteEntry>(), totalSteps,
+            contourWidthOverride: lineW, ringOrdinal: idx,
+            // Same thin guide band as the placeholder rings, so a recorded ring reads as an
+            // annulus line (with its note dips), not a solid band of colour.
+            fillBandWidth: lineW);
+        entry.LocalLineWidth = lineW;
+        _lineWidthScale = -1f; // re-apply line widths at the current scale (LateUpdate)
         if (existingIdx >= 0) _gameplayRings[existingIdx] = entry;
         else _gameplayRings.Add(entry);
 
@@ -545,7 +552,7 @@ public partial class MotifRingGlyphApplicator
             int   idx    = _gameplayRings.Count + i;
             float innerR = RingInnerRadius(idx);
             float outerR = innerR + config.ringThickness;
-            ApplyPlaceholderLineWidth(ref innerR, ref outerR);
+            ApplyPlaceholderLineWidth(ref innerR, ref outerR, gameplay: true);
 
             var entry = BuildRingEntry($"RemainingRing_{i}", innerR, outerR, segs,
                 config.remainingRingColor, default, -1,
@@ -567,39 +574,91 @@ public partial class MotifRingGlyphApplicator
         UpdateBackgroundDiscRadii(_gameplayRings.Count, totalRingCount);
         PhaseVehiclesInsideRing();
 
-        // Innermost not-yet-filled ring is the next slot: it pulses between placeholder gray and a
-        // neutral highlight. Never a role color — a ring takes its color only once recorded, so the
-        // player assembles the record from whatever music they choose. Rebuilt every call, so
-        // completing a bin hands the pulse to the new frontmost placeholder.
+        // Innermost not-yet-filled ring is the next slot. It lerps between the colours of the roles
+        // that could fill it right now (SetNextUpPalette: active roles minus the one walled into
+        // Cosmic Blocks) and strains outward like it wants out. Rebuilt every call, so completing a
+        // bin hands the pulse to the new frontmost placeholder.
         if (_remainingRings.Count > 0)
-        {
-            var pulse = new List<Color> { config.remainingRingColor, config.nextUpHighlightColor };
-            _nextUpColorCoroutine = StartCoroutine(AnimateNextUpRingColorCycle(_remainingRings[0], pulse));
-        }
+            _nextUpColorCoroutine = StartCoroutine(AnimateNextUpRingColorCycle(_remainingRings[0]));
     }
 
-    private IEnumerator AnimateNextUpRingColorCycle(RingEntry ring, List<Color> colors)
+    private readonly List<Color> _nextUpPalette = new List<Color>();
+
+    /// <summary>
+    /// Roles that could fill the next ring right now (GameFlowManager.RefreshNextUpRingPalette).
+    /// The running cycle picks the change up on its next leg. Empty = neutral grey/highlight pulse.
+    /// </summary>
+    public void SetNextUpPalette(IReadOnlyList<Color> colors)
     {
-        if (colors == null || colors.Count == 0 || ring.Root == null) yield break;
+        _nextUpPalette.Clear();
+        if (colors != null) _nextUpPalette.AddRange(colors);
+    }
 
-        // Single role: pulse between the role color and the placeholder gray (local copy, don't mutate the source list).
-        if (colors.Count == 1)
-            colors = new List<Color> { colors[0], config.remainingRingColor };
+    // The colours for one leg of the cycle, read fresh each leg.
+    private void BuildNextUpLegColors(List<Color> into)
+    {
+        into.Clear();
+        if (_nextUpPalette.Count == 0)
+        {
+            into.Add(config.remainingRingColor);
+            into.Add(config.nextUpHighlightColor);
+        }
+        else if (_nextUpPalette.Count == 1)
+        {
+            // Single role: pulse between the role colour and the placeholder grey.
+            into.Add(_nextUpPalette[0]);
+            into.Add(config.remainingRingColor);
+        }
+        else into.AddRange(_nextUpPalette);
 
-        int i = 0;
+        if (config.nextUpMaximizeBrightness && _nextUpPalette.Count > 0)
+            for (int i = 0; i < into.Count; i++)
+            {
+                // Role colours only; the grey partner in a one-role pulse stays grey.
+                if (_nextUpPalette.Count == 1 && i == 1) continue;
+                into[i] = FullBrightness(into[i]);
+            }
+    }
+
+    // Same hue and saturation, value pushed to 1: as bright as the colour can be.
+    private static Color FullBrightness(Color c)
+    {
+        Color.RGBToHSV(c, out float h, out float s, out float v);
+        var b = Color.HSVToRGB(h, s, 1f);
+        b.a = c.a;
+        return b;
+    }
+
+    private IEnumerator AnimateNextUpRingColorCycle(RingEntry ring)
+    {
+        if (ring.Root == null) yield break;
+
+        var   colors     = new List<Color>(4);
+        int   i          = 0;
+        float strainT    = 0f;
+        var   restScale  = ring.Root.transform.localScale;
+        Color from       = _nextUpCurrentColor.a > 0f ? _nextUpCurrentColor : config.remainingRingColor;
         while (ring.Root != null)
         {
-            Color from = colors[i];
-            Color to   = colors[(i + 1) % colors.Count];
-            float dur  = Mathf.Max(0.01f, config.nextUpColorCycleDuration);
-            float t    = 0f;
-            while (t < dur && ring.Root != null)
+            BuildNextUpLegColors(colors);
+            i %= colors.Count;
+            Color to  = colors[i];
+            float dur = Mathf.Max(0.01f, config.nextUpColorCycleDuration);
+            for (float t = 0f; t < dur && ring.Root != null; )
             {
                 t += Time.deltaTime;
                 ApplyNextUpColor(ring, Color.Lerp(from, to, t / dur));
+
+                // Strain: a quick outward swell, then a slow settle.
+                strainT += Time.deltaTime / Mathf.Max(0.05f, config.nextUpStrainPeriod);
+                float p = strainT - Mathf.Floor(strainT);
+                float swell = p < 0.2f ? Mathf.SmoothStep(0f, 1f, p / 0.2f) : 1f - Mathf.SmoothStep(0f, 1f, (p - 0.2f) / 0.8f);
+                float s = 1f + (Mathf.Max(1f, config.nextUpStrainScale) - 1f) * swell;
+                ring.Root.transform.localScale = new Vector3(restScale.x * s, restScale.y * s, restScale.z);
                 yield return null;
             }
-            i = (i + 1) % colors.Count;
+            from = to;
+            i++;
         }
     }
 
@@ -609,7 +668,7 @@ public partial class MotifRingGlyphApplicator
 
         if (ring.Fill != null)
             SetFillColor(ring.Fill,
-                new Color(baseColor.r, baseColor.g, baseColor.b, config.remainingRingAlpha),
+                new Color(baseColor.r, baseColor.g, baseColor.b, config.nextUpRingAlpha),
                 ScratchMpb);
     }
 
@@ -624,6 +683,8 @@ public partial class MotifRingGlyphApplicator
         _spinOffPending          = false;
         _docked                  = false;
         _dockMoving              = false;
+        _dockDriftRoutine        = null; // killed by StopAllCoroutines above
+        _dockDriftOffset         = Vector3.zero;
         _pendingDeformationCount = 0;
         _pendingRingNotes.Clear();
         DestroyList(_gameplayRings);
@@ -677,7 +738,7 @@ public partial class MotifRingGlyphApplicator
             {
                 var rgb = (i == 0) ? _nextUpCurrentColor : _remainingRings[i].BaseColor;
                 FadeEntry(_remainingRings[i], rgb,
-                    config.remainingRingAlpha * k, 0f);
+                    (i == 0 ? config.nextUpRingAlpha : config.remainingRingAlpha) * k, 0f);
             }
             FadeBackgroundDiscs(k);
             yield return null;
