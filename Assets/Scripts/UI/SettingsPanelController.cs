@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
-// Main.unity settings: the Global/OpenSettings action (gamepad Select/View/Share/Minus) toggles
+// Main.unity settings: the Global/OpenSettings action (gamepad Select/View/Share/Minus, keyboard F1 or O) toggles
 // the "Settings" modal (Publish Settings, Reset All Progress), shown through the generic ModalMenu. The Global action map is
 // enabled directly off the InputActionAsset (not through any PlayerInput), because Main.unity
 // is the title/boot scene and often has zero LocalPlayer instances joined yet.
@@ -75,9 +75,31 @@ public class SettingsPanelController : MonoBehaviour
             options = new List<ModalMenuOption>
             {
                 new ModalMenuOption("Publish Settings", ShowPublish),
+                new ModalMenuOption("Keyboard Controls", ShowKeyboardControls),
                 new ModalMenuOption("Reset All Progress", ShowResetConfirm),
             },
         });
+    }
+
+    // Keyboard/mouse player only: two separate schemes. A joined keyboard player switches live
+    // (LocalPlayer listens to ControlPrefs.Changed).
+    private void ShowKeyboardControls() => Show(BuildKeyboardControlsSpec(ShowRoot));
+
+    /// <summary>Shared with the in-game pause menu (PauseMenuController).</summary>
+    public static ModalMenuSpec BuildKeyboardControlsSpec(System.Action onCancel)
+    {
+        return new ModalMenuSpec
+        {
+            title = "Keyboard Controls",
+            description = "How the keyboard & mouse player steers.",
+            defaultIndex = ControlPrefs.Scheme == KbmScheme.Mouse ? 1 : 0,
+            onCancel = onCancel,
+            options = new List<ModalMenuOption>
+            {
+                new ModalMenuOption("Keyboard: A/D Turn, W/S Drift, Shift Boost, Space Place", () => ControlPrefs.Scheme = KbmScheme.Keyboard),
+                new ModalMenuOption("Mouse: Fly to Cursor, Left Boost, Right Place", () => ControlPrefs.Scheme = KbmScheme.Mouse),
+            },
+        };
     }
 
     private void ShowPublish()

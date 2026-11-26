@@ -127,6 +127,7 @@ public partial class LocalPlayer : MonoBehaviour
         _playLeaveAction.canceled += _onPlayLeaveCanceled;
 
         BindPauseAction();
+        BindKbmInput();
 
         // Optional: manual note release action
         _releaseAction = _playerInput.actions.FindAction(releaseActionName, throwIfNotFound: false);
@@ -186,6 +187,7 @@ public partial class LocalPlayer : MonoBehaviour
             _playLeaveAction.canceled -= _onPlayLeaveCanceled;
         }
         UnbindPauseAction();
+        UnbindKbmInput();
         if (_releaseAction != null)
         {
             _releaseAction.performed -= _onReleasePerformed;

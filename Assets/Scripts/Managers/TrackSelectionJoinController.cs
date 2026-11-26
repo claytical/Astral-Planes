@@ -164,6 +164,7 @@ public class TrackSelectionJoinController : MonoBehaviour
 
         UpdateHoldBackToCarousel(pim, assignedIds);
         UpdateRejoinHold(pim, assignedIds);
+        TryJoinKeyboardMouse(pim, assignedIds);
 
         // Confirm and start are instant join triggers. Back is handled by
         // UpdateHoldBackToCarousel above: a quick tap joins (same as before), a sustained hold
@@ -297,9 +298,9 @@ public class TrackSelectionJoinController : MonoBehaviour
     {
         if (_rejoinDeviceId >= 0)
         {
-            var held = InputSystem.GetDeviceById(_rejoinDeviceId) as Gamepad;
+            var held = InputSystem.GetDeviceById(_rejoinDeviceId);
             if (held == null || assignedIds.Count == 0 || !_leftDeviceIds.Contains(held.deviceId)
-                || !PadSemantics.ConfirmButton(held).isPressed)
+                || !IsJoinConfirmHeld(held))
             {
                 CancelRejoinHold();
                 return;
@@ -313,9 +314,13 @@ public class TrackSelectionJoinController : MonoBehaviour
             ControlTutorialDirector.Instance?.EndRejoinHoldUI();
             _leftDeviceIds.Remove(held.deviceId);
             Debug.Log($"[JoinController] Rejoin (held): {held.name} | id={held.deviceId}");
-            pim.JoinPlayer(pairWithDevices: new InputDevice[] { held });
-            _lastJoinTime = Time.unscaledTime;
-            assignedIds.Add(held.deviceId);
+            if (held is Keyboard) JoinKeyboardMouse(pim, assignedIds);
+            else
+            {
+                pim.JoinPlayer(pairWithDevices: new InputDevice[] { held });
+                _lastJoinTime = Time.unscaledTime;
+                assignedIds.Add(held.deviceId);
+            }
             return;
         }
 
@@ -330,6 +335,72 @@ public class TrackSelectionJoinController : MonoBehaviour
             _rejoinStartTime = Time.unscaledTime;
             ControlTutorialDirector.Instance?.BeginRejoinHoldUI(gp);
             return;
+        }
+
+        var kb = Keyboard.current;
+        if (kb != null && _leftDeviceIds.Contains(kb.deviceId) && !assignedIds.Contains(kb.deviceId)
+            && KeyboardMouseJoinPressedThisFrame())
+        {
+            _rejoinDeviceId = kb.deviceId;
+            _rejoinStartTime = Time.unscaledTime;
+            ControlTutorialDirector.Instance?.BeginRejoinHoldUI(null);
+        }
+    }
+
+    // ---- Keyboard & mouse player ----
+    // One player pairs BOTH Keyboard.current and Mouse.current; the control scheme ("Keyboard" or
+    // "Mouse", Settings → Keyboard Controls) is only a binding mask. Joins on Enter / Space / left
+    // click, under the same grace cooldown as gamepads. A keyboard player who backed out while
+    // others stayed in must hold the join input to rejoin (UpdateRejoinHold), like a gamepad.
+    private void TryJoinKeyboardMouse(PlayerInputManager pim, HashSet<int> assignedIds)
+    {
+        var kb = Keyboard.current;
+        if (kb == null || assignedIds.Contains(kb.deviceId) || _leftDeviceIds.Contains(kb.deviceId)) return;
+        if (Mouse.current != null && assignedIds.Contains(Mouse.current.deviceId)) return;
+        if (ModalMenu.IsOpen || ModalMenu.ShouldSuppressInput) return;
+        if (!KeyboardMouseJoinPressedThisFrame()) return;
+        if (Time.unscaledTime - _lastJoinTime < GraceSeconds) return;
+
+        JoinKeyboardMouse(pim, assignedIds);
+    }
+
+    private void JoinKeyboardMouse(PlayerInputManager pim, HashSet<int> assignedIds)
+    {
+        var kb = Keyboard.current;
+        if (kb == null) return;
+        var devices = Mouse.current != null
+            ? new InputDevice[] { kb, Mouse.current }
+            : new InputDevice[] { kb };
+
+        // The Mouse scheme requires a mouse; without one, fall back to the Keyboard scheme.
+        string scheme = Mouse.current != null ? ControlPrefs.SchemeName : ControlPrefs.KeyboardSchemeName;
+        if (GameFlowManager.VerboseLogging)
+            Debug.Log($"[JoinController] Joining keyboard/mouse player | scheme={scheme}");
+        pim.JoinPlayer(controlScheme: scheme, pairWithDevices: devices);
+        _lastJoinTime = Time.unscaledTime;
+        foreach (var d in devices) assignedIds.Add(d.deviceId);
+    }
+
+    private static bool KeyboardMouseJoinPressedThisFrame()
+    {
+        var kb = Keyboard.current;
+        var mouse = Mouse.current;
+        return (kb != null && (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame
+                               || kb.spaceKey.wasPressedThisFrame))
+            || (mouse != null && mouse.leftButton.wasPressedThisFrame);
+    }
+
+    private static bool IsJoinConfirmHeld(InputDevice device)
+    {
+        switch (device)
+        {
+            case Gamepad gp:
+                return PadSemantics.ConfirmButton(gp).isPressed;
+            case Keyboard kb:
+                return kb.enterKey.isPressed || kb.numpadEnterKey.isPressed || kb.spaceKey.isPressed
+                    || (Mouse.current != null && Mouse.current.leftButton.isPressed);
+            default:
+                return false;
         }
     }
 

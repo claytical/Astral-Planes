@@ -39,6 +39,25 @@ public static class PauseMenuController
                              GameFlowManager.Instance.CurrentState == GameState.Playing,
         };
 
+        // Keyboard/mouse player: switch Keyboard ⇄ Mouse steering without going back to Main.
+        if (opener != null && opener.IsKbmPlayer)
+        {
+            // ModalMenu closes before invoking a choice, so the callback can open the next modal.
+            // Cancel goes back to the pause menu; picking a scheme closes (resumes play).
+            var pauseSpec = _spec;
+            pauseSpec.options.Insert(1, new ModalMenuOption("Keyboard Controls", () =>
+            {
+                var kbSpec = SettingsPanelController.BuildKeyboardControlsSpec(() =>
+                {
+                    _spec = pauseSpec;
+                    ModalMenu.Show(pauseSpec);
+                });
+                kbSpec.keepOpen = pauseSpec.keepOpen;
+                _spec = kbSpec;
+                ModalMenu.Show(kbSpec);
+            }));
+        }
+
         if (!ModalMenu.Show(_spec)) return;
 
         // Stop any boost already in progress; input is locked from here until the menu closes.

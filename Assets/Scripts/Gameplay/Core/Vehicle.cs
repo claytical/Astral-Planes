@@ -380,12 +380,38 @@ public partial class Vehicle : MonoBehaviour
     // always at a capped turn rate via MoveRotation, so it interpolates.
     private bool _headingFrozenForContact;
 
+    // Rotational (keyboard) steering owns the nose outright: while set, the nose turns toward this
+    // direction (turn-rate capped) instead of facing velocity/input, so A/D can rotate the ship
+    // without thrust and the nose stays put through drifts and bounces.
+    private bool _headingOverrideActive;
+    private Vector2 _headingOverrideDir;
+
+    /// <summary>Drive the nose toward <paramref name="dir"/> every tick until cleared (keyboard rotational steering).</summary>
+    public void SetHeadingOverride(Vector2 dir)
+    {
+        if (dir.sqrMagnitude < 0.0001f) return;
+        _headingOverrideActive = true;
+        _headingOverrideDir = dir.normalized;
+    }
+
+    public void ClearHeadingOverride() => _headingOverrideActive = false;
+
     private void UpdateHeading(float dt)
     {
         if (rb == null) return;
         if (_movementLocked || rb.bodyType != RigidbodyType2D.Dynamic)
         {
             ReleaseContactHeadingFreeze();
+            return;
+        }
+
+        if (_headingOverrideActive)
+        {
+            ReleaseContactHeadingFreeze();
+            float tgt  = Mathf.Atan2(_headingOverrideDir.y, _headingOverrideDir.x) * Mathf.Rad2Deg - 90f;
+            float rate = vehicleConfig != null ? vehicleConfig.headingTurnRateDegPerSec : 720f;
+            rb.angularVelocity = 0f;
+            rb.MoveRotation(rate > 0f ? Mathf.MoveTowardsAngle(rb.rotation, tgt, rate * dt) : tgt);
             return;
         }
 

@@ -24,6 +24,7 @@ public static class SaveDataReset
     {
         Try("rings", RingSessionStore.DeleteAll);
         Try("publish choice", TelemetryConsent.Reset);
+        Try("control prefs", ControlPrefs.Reset);
         Try("telemetry runs", DeleteTelemetryRuns);
         Debug.Log("[SaveData] Reset all progress.");
     }

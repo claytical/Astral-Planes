@@ -200,13 +200,11 @@ MonoBehaviour:
   releaseActionName: ReleaseNote
   mouseSensitivity: 0.008
   stickMax: 1
-  stickDecayPerSec: 3.5
   uiBlockRadius: 0
   mouseDeltaSmoothing: 6
   maxPixelsPerFrame: 50
   angleSmoothTime: 0.08
-  keyboardTurnRateDeg: 360
-  keyboardAccelRate: 1
+  keyboardTurnRateDeg: 240
   miniTutorialPrefab: {fileID: 1743201695570324546, guid: 8fbe942bf3e9e427388555fa3d793b4a,
     type: 3}
   miniTutorialScale: {x: 0.25, y: 0.25, z: 1}

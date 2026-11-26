@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -7,19 +8,87 @@ public partial class LocalPlayer
     public float friction = 0.5f;
 
     [Header("Gameplay Input")]
-    private Vector2 _virtualStick;      // accumulated, clamped to radius 1
+    private Vector2 _virtualStick;      // desired travel direction fed to Vehicle.Move, radius ≤ 1
 
-    [Header("Keyboard")]
-    [Tooltip("Degrees per second the heading rotates toward the held arrow direction.")]
-    [SerializeField] private float keyboardTurnRateDeg = 270f;
-    [Tooltip("Rate at which stick magnitude ramps from 0 to 1 when an arrow key is held (units/sec).")]
-    [SerializeField] private float keyboardAccelRate = 5f;
-    [Tooltip("Exponential decay rate to 0 for the virtual stick when no input is held.")]
-    [SerializeField] private float stickDecayPerSec = 2.5f;
+    [Header("Keyboard (rotational steering)")]
+    [Tooltip("Degrees per second A/D (or Left/Right) rotate the keyboard player's nose. Steering only: W/S drift, Shift boosts.")]
+    [SerializeField] private float keyboardTurnRateDeg = 240f;
 
+    [Header("Mouse (fly toward cursor)")]
+    [Tooltip("World-unit radius around the cursor inside which the ship stops steering and coasts.")]
+    [SerializeField] private float mouseArriveRadius = 0.6f;
+    [Tooltip("Seconds of travel added to the arrive radius: radius = max(mouseArriveRadius, speed × this). " +
+             "Lets a fast (boosting) ship let go before it overshoots the cursor.")]
+    [SerializeField] private float mouseArriveSpeedScale = 0.12f;
+    [Tooltip("After arriving, steering resumes only once the cursor is this many arrive-radii away (hysteresis).")]
+    [SerializeField] private float mouseRearmMultiplier = 2f;
+    private bool _mouseArrived;
+
+    // Keyboard scheme heading (degrees, 0 = +X). Seeded from the vehicle's nose whenever the
+    // vehicle changes or the scheme switches to Keyboard.
+    private float _kbHeadingDeg;
+    private Vehicle _kbHeadingPlane;
+    private float _kbTurnAxis;              // last Turn reading (for tutorial "steering" intent)
+
+    private bool _kbReverseHeld;            // S/Down held last tick (flip the nose on a new press)
+
+    private InputAction _turnAction;
+    private InputAction _driveAction;       // Keyboard: W/Up = +1 (forward), S/Down = -1 (turn around)
+    private InputAction _thrustAction;      // Keyboard: Shift; Mouse: left click — boost
+    private bool _kbmThrustHeld;            // KBM boost currently on (TurnOnBoost sent)
+
+    // ---- Device / scheme queries -----------------------------------------------------------
+
+    /// <summary>True when this player is the keyboard &amp; mouse player (paired to a Keyboard).</summary>
+    public bool IsKbmPlayer => _playerInput != null && _playerInput.devices.Any(d => d is Keyboard);
+
+    /// <summary>The keyboard player's active scheme. Only meaningful when <see cref="IsKbmPlayer"/>.</summary>
+    public KbmScheme ActiveKbmScheme =>
+        _playerInput != null && _playerInput.currentControlScheme == ControlPrefs.MouseSchemeName
+            ? KbmScheme.Mouse
+            : KbmScheme.Keyboard;
+
+    private Keyboard PairedKeyboard =>
+        _playerInput != null ? _playerInput.devices.OfType<Keyboard>().FirstOrDefault() : null;
+
+    private Mouse PairedMouse =>
+        _playerInput != null ? _playerInput.devices.OfType<Mouse>().FirstOrDefault() : null;
+
+    private void BindKbmInput()
+    {
+        if (_playerInput == null) return;
+        _turnAction   = _playerInput.actions.FindAction("Play/Turn", throwIfNotFound: false);
+        _driveAction  = _playerInput.actions.FindAction("Play/Drive", throwIfNotFound: false);
+        _thrustAction = _playerInput.actions.FindAction("Play/Thrust", throwIfNotFound: false);
+        ControlPrefs.Changed += OnKbmSchemeChanged;
+    }
+
+    private void UnbindKbmInput() => ControlPrefs.Changed -= OnKbmSchemeChanged;
+
+    // Settings → Keyboard Controls changed: switch the joined keyboard player live.
+    private void OnKbmSchemeChanged(KbmScheme scheme)
+    {
+        if (!IsKbmPlayer) return;
+        var kb = PairedKeyboard;
+        var mouse = PairedMouse;
+        if (scheme == KbmScheme.Mouse && mouse == null) return; // Mouse scheme needs a mouse
+
+        string name = ControlPrefs.NameOf(scheme);
+        if (_playerInput.currentControlScheme == name) return;
+
+        if (_kbmThrustHeld) { _kbmThrustHeld = false; plane?.TurnOffBoost(); }
+        if (mouse != null) _playerInput.SwitchCurrentControlScheme(name, kb, mouse);
+        else _playerInput.SwitchCurrentControlScheme(name, kb);
+        _kbHeadingPlane = null; // re-seed the keyboard heading from the current nose
+        if (scheme != KbmScheme.Keyboard) plane?.ClearHeadingOverride();
+    }
+
+    // ---- Tutorial getters ------------------------------------------------------------------
 
     public Vector2 GetMoveInput()
     {
+        if (IsKbmPlayer) return GetKbmMoveIntent();
+
         // During gameplay, _virtualStick is maintained by FixedUpdate.
         // During the tutorial (before the vehicle exists) the Play action map isn't active,
         // so we read the device state directly instead.
@@ -33,23 +102,33 @@ public partial class LocalPlayer
                     return Vector2.ClampMagnitude(gp.leftStick.ReadValue(), 1f);
             }
         }
+        return Vector2.zero;
+    }
 
-        if (Keyboard.current != null)
+    // Steering *intent* for the keyboard player (tutorial gates / live highlight), not the
+    // raw travel direction: keyboard = turn or thrust keys held, mouse = cursor away from the ship.
+    private Vector2 GetKbmMoveIntent()
+    {
+        if (ActiveKbmScheme == KbmScheme.Mouse)
         {
-            var dir = Vector2.zero;
-            if (Keyboard.current.upArrowKey.isPressed || Keyboard.current.wKey.isPressed)    dir.y += 1f;
-            if (Keyboard.current.downArrowKey.isPressed || Keyboard.current.sKey.isPressed)  dir.y -= 1f;
-            if (Keyboard.current.leftArrowKey.isPressed || Keyboard.current.aKey.isPressed)  dir.x -= 1f;
-            if (Keyboard.current.rightArrowKey.isPressed || Keyboard.current.dKey.isPressed) dir.x += 1f;
-            return Vector2.ClampMagnitude(dir, 1f);
+            if (plane != null) return _virtualStick;
+            var mouse = PairedMouse;
+            return mouse != null ? Vector2.ClampMagnitude(mouse.delta.ReadValue() * 0.1f, 1f) : Vector2.zero;
         }
 
-        return Vector2.zero;
+        var kb = PairedKeyboard;
+        if (kb == null) return Vector2.zero;
+        float x = 0f, y = 0f;
+        if (kb.aKey.isPressed || kb.leftArrowKey.isPressed)  x -= 1f;
+        if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) x += 1f;
+        if (kb.wKey.isPressed || kb.upArrowKey.isPressed)     y += 1f; // W/S are the only (non-boost) thrust
+        if (kb.sKey.isPressed || kb.downArrowKey.isPressed)   y -= 1f;
+        return Vector2.ClampMagnitude(new Vector2(x, y), 1f);
     }
 
     public float GetThrustInput()
     {
-        // Same issue: Thrust is in the Play map. Read the device directly during tutorial.
+        // Thrust is in the Play map. Read this player's own devices directly during the tutorial.
         if (_playerInput != null)
         {
             foreach (var device in _playerInput.devices)
@@ -58,13 +137,26 @@ public partial class LocalPlayer
                     return gp.rightTrigger.ReadValue();
             }
         }
-        return Keyboard.current != null && Keyboard.current.spaceKey.isPressed ? 1f : 0f;
+
+        if (IsKbmPlayer)
+        {
+            if (ActiveKbmScheme == KbmScheme.Mouse)
+            {
+                var mouse = PairedMouse;
+                return mouse != null && mouse.leftButton.isPressed ? 1f : 0f;
+            }
+            var kb = PairedKeyboard;
+            return kb != null && (kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed) ? 1f : 0f;
+        }
+        return 0f;
     }
 
     public bool GetChooseInput() => _confirmAction?.IsPressed() ?? false;
 
-    /// <summary>Play-map South (ReleaseNote) held — the control sandbox's hold-to-skip.</summary>
+    /// <summary>Play-map ReleaseNote held — the control sandbox's hold-to-skip.</summary>
     public bool IsReleaseHeld() => _releaseAction?.IsPressed() ?? false;
+
+    // ---- Steering --------------------------------------------------------------------------
 
     private void FixedUpdate()
     {
@@ -72,84 +164,119 @@ public partial class LocalPlayer
 
         float dt = Time.fixedDeltaTime;
 
-        // Read raw stick/keys
-        Vector2 raw = (_moveAction != null) ? _moveAction.ReadValue<Vector2>() : Vector2.zero;
-        raw = Vector2.ClampMagnitude(raw, 1f);
-
-        bool isGamepad = _moveAction?.activeControl?.device is Gamepad;
-
-        if (isGamepad)
+        if (IsKbmPlayer)
         {
-            _virtualStick = raw;
+            if (ActiveKbmScheme == KbmScheme.Mouse) SteerTowardCursor();
+            else SteerKeyboardRotational(dt);
         }
         else
         {
-
-            if (Keyboard.current != null)
-            {
-                Vector2 arrowTarget = Vector2.zero;
-                if (Keyboard.current.upArrowKey.isPressed)    arrowTarget.y += 1f;
-                if (Keyboard.current.downArrowKey.isPressed)  arrowTarget.y -= 1f;
-                if (Keyboard.current.leftArrowKey.isPressed)  arrowTarget.x -= 1f;
-                if (Keyboard.current.rightArrowKey.isPressed) arrowTarget.x += 1f;
-
-                if (arrowTarget.sqrMagnitude > 0.0001f)
-                {
-                    arrowTarget.Normalize();
-                    float tgtAngle = Mathf.Atan2(arrowTarget.y, arrowTarget.x) * Mathf.Rad2Deg;
-                    float curMag   = _virtualStick.magnitude;
-                    float curAngle = curMag > 0.0001f
-                        ? Mathf.Atan2(_virtualStick.y, _virtualStick.x) * Mathf.Rad2Deg
-                        : tgtAngle;
-                    float newAngle = Mathf.MoveTowardsAngle(curAngle, tgtAngle, keyboardTurnRateDeg * dt);
-                    float newMag   = Mathf.MoveTowards(curMag, 1f, keyboardAccelRate * dt);
-                    float rad      = newAngle * Mathf.Deg2Rad;
-                    _virtualStick  = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * newMag;
-                }
-                else
-                {
-                    float k = Mathf.Exp(-stickDecayPerSec * dt);
-                    _virtualStick *= k;
-                    if (_virtualStick.sqrMagnitude < 0.0001f) _virtualStick = Vector2.zero;
-                }
-            }
+            // Gamepad: absolute-direction steering from the stick. (Previously a centred stick
+            // had no activeControl and fell into the keyboard decay path — no longer.)
+            Vector2 raw = (_moveAction != null) ? _moveAction.ReadValue<Vector2>() : Vector2.zero;
+            _virtualStick = Vector2.ClampMagnitude(raw, 1f);
         }
 
         if (!_inputLocked && !ModalMenu.IsOpen) plane.Move(_virtualStick * friction);
+    }
+
+    // Keyboard scheme: rotational steering, asteroids-style.
+    //   A/D (Left/Right) only rotate the nose. No thrust: the ship keeps drifting the way it was
+    //     going (coast brake as usual) and the nose stays where it was left.
+    //   W/Up drifts forward along the nose at normal (non-boost) speed.
+    //   S/Down turns the ship around (nose flips 180° on the press, at the vehicle's capped turn
+    //     rate) and drifts that way while held.
+    //   Shift boosts along the nose (see Update), with or without W/S.
+    // The nose is driven by Vehicle.SetHeadingOverride for as long as the keyboard scheme owns the
+    // plane, so it doesn't swing back to face velocity after a turn or a bounce.
+    //
+    // While driving or boosting the input is the heading, never zero: with zero input,
+    // Vehicle.UpdateMovementAndFuel boosts along _lastNonZeroInput, which goes stale after drifts
+    // and bounces.
+    private void SteerKeyboardRotational(float dt)
+    {
+        bool usable = !_inputLocked && !ModalMenu.IsOpen;
+        _kbTurnAxis = (_turnAction != null && _turnAction.enabled) ? Mathf.Clamp(_turnAction.ReadValue<float>(), -1f, 1f) : 0f;
+        float drive = (_driveAction != null && _driveAction.enabled) ? _driveAction.ReadValue<float>() : 0f;
+        bool forward = usable && drive > 0.01f;
+        bool reverse = usable && drive < -0.01f;
+        bool boostHeld = usable && _thrustAction != null && _thrustAction.enabled && _thrustAction.IsPressed();
+
+        // New plane (spawn/respawn) or scheme switch: start from where the nose points now.
+        if (_kbHeadingPlane != plane)
+        {
+            _kbHeadingPlane = plane;
+            Vector2 up = plane.transform.up;
+            _kbHeadingDeg = Mathf.Atan2(up.y, up.x) * Mathf.Rad2Deg;
+        }
+
+        // S: turn around once per press, then drift along the new heading while held.
+        if (reverse && !_kbReverseHeld)
+            _kbHeadingDeg = Mathf.Repeat(_kbHeadingDeg + 180f, 360f);
+        _kbReverseHeld = reverse;
+
+        if (usable && Mathf.Abs(_kbTurnAxis) > 0.01f)
+            _kbHeadingDeg = Mathf.Repeat(_kbHeadingDeg - _kbTurnAxis * keyboardTurnRateDeg * dt, 360f); // D = clockwise
+
+        float rad = _kbHeadingDeg * Mathf.Deg2Rad;
+        Vector2 heading = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
+        plane.SetHeadingOverride(heading);
+
+        _virtualStick = (forward || reverse || boostHeld) ? heading : Vector2.zero;
+    }
+
+    // Mouse scheme: fly toward the cursor as drawn on screen (Camera.main, orthographic in
+    // GeneratedTrack — also correct during CameraZoomDirector spotlights).
+    //
+    // Arriving: the input goes to zero inside an arrive radius that grows with speed, so a fast
+    // (boosting) ship lets go before it reaches the cursor instead of overshooting it. It then
+    // stays "arrived" until the cursor is more than mouseRearmMultiplier × that radius away. That
+    // hysteresis stops the 180° flip-flop a fast ship used to do around a parked cursor (overshoot,
+    // cursor now behind, reverse, overshoot again...).
+    private void SteerTowardCursor()
+    {
+        var mouse = PairedMouse;
+        var cam = Camera.main;
+        if (mouse == null || cam == null) { _virtualStick = Vector2.zero; return; }
+
+        Vector3 screen = mouse.position.ReadValue();
+        screen.z = Mathf.Abs(cam.transform.position.z - plane.transform.position.z);
+        Vector2 world = cam.ScreenToWorldPoint(screen);
+        Vector2 to = world - (Vector2)plane.transform.position;
+
+        float speed = plane.rb != null ? plane.rb.linearVelocity.magnitude : 0f;
+        float arrive = Mathf.Max(mouseArriveRadius, speed * mouseArriveSpeedScale);
+        float dist = to.magnitude;
+
+        if (_mouseArrived) _mouseArrived = dist <= arrive * mouseRearmMultiplier;
+        else _mouseArrived = dist <= arrive;
+
+        _virtualStick = _mouseArrived ? Vector2.zero : to / Mathf.Max(dist, 0.0001f);
     }
 
     private void Update()
     {
         if (plane == null) return;
 
-        if (ModalMenu.IsOpen) return;
-
-        if (Keyboard.current != null)
+        // Keyboard/mouse boost (Shift or left click). Polled with IsPressed so the Thrust action's
+        // gamepad-oriented Hold interaction doesn't delay or swallow key presses. The action only
+        // sees this player's paired devices under its scheme's binding mask.
+        if (IsKbmPlayer && _thrustAction != null)
         {
-            // Space held = boost.
-            if (Keyboard.current.spaceKey.wasPressedThisFrame)
-                plane.TurnOnBoost(1f);
-            else if (Keyboard.current.spaceKey.wasReleasedThisFrame)
-                plane.TurnOffBoost();
+            bool held = _thrustAction.enabled && _thrustAction.IsPressed()
+                        && !_inputLocked && !ModalMenu.ShouldSuppressInput;
+            // Mouse: left click. Keyboard: Shift. Both boost immediately.
+            bool boost = held;
 
-            // Enter / numpad Enter = release note (fallback only when no Input Action is bound).
-            if (_releaseAction == null)
-            {
-                if (Keyboard.current.enterKey.wasPressedThisFrame ||
-                    Keyboard.current.numpadEnterKey.wasPressedThisFrame)
-                {
-                    plane.TryReleaseQueuedNote();
-                    plane.SetReleaseButtonHeld(true);
-                }
-                if (Keyboard.current.enterKey.wasReleasedThisFrame ||
-                    Keyboard.current.numpadEnterKey.wasReleasedThisFrame)
-                    plane.SetReleaseButtonHeld(false);
-            }
+            if (boost && !_kbmThrustHeld) plane.TurnOnBoost(1f);
+            else if (!boost && _kbmThrustHeld) plane.TurnOffBoost();
+            _kbmThrustHeld = boost;
         }
     }
 
     public void OnThrust(InputValue value)
     {
+        if (IsKbmPlayer) return; // keyboard/mouse boost is polled in Update
         float v = value.Get<float>();
         if (v > 0 && ModalMenu.ShouldSuppressInput) return;
         if (v > 0) plane?.TurnOnBoost(v);
@@ -158,11 +285,11 @@ public partial class LocalPlayer
 
     }
 
-    public void OnMouseMove(InputValue value)
-    {
-        // Mouse delta is now read directly in Update() via Mouse.current.delta.
-        // This callback is kept to suppress Input System missing-binding warnings.
-    }
+    // PlayerInput (SendMessages) callbacks for actions polled elsewhere; kept so the messages
+    // have a receiver.
+    public void OnMouseMove(InputValue value) { }
+    public void OnTurn(InputValue value) { }
+    public void OnDrive(InputValue value) { }
 
     public void OnQuit(InputValue value)
     {
