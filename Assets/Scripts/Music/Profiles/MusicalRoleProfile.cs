@@ -120,10 +120,6 @@ public class MusicalRoleProfile : ScriptableObject
     [Tooltip("Ceiling of the velocity clamp applied to this role's notes before playback.")]
     public int maxVelocity = 127;
 
-    [Header("Regrowth")]
-    [Tooltip("Seconds before this cell regrows after being carved. −1 = use the active maze pattern's default.")]
-    public float regrowthDelay = -1f;
-
     [Header("Collectable Bomb")]
     [Tooltip("Multiplier on the discard-time-bomb's global blast radius (CollectableTuning.BombParams.blastRadius) for notes of this role. 1 = unchanged.")]
     [Min(0.1f)] public float bombBlastRadiusMul = 1f;

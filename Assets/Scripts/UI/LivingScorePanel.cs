@@ -55,15 +55,13 @@ public class LivingScorePanel : MonoBehaviour
     public void OnPublishClicked()
     {
         _choiceMadeFrame = Time.frameCount;
-        TelemetryConsent.PublishFlightPlansEnabled = true;
-        TelemetryConsent.HasDecided = true;
+        TelemetryConsent.Decide(true);
         FindAnyObjectByType<MazeTelemetryUploader>()?.FlushPendingNow();
     }
 
     public void OnDoNotPublishClicked()
     {
         _choiceMadeFrame = Time.frameCount;
-        TelemetryConsent.PublishFlightPlansEnabled = false;
-        TelemetryConsent.HasDecided = true;
+        TelemetryConsent.Decide(false);
     }
 }

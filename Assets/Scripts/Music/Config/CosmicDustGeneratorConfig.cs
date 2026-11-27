@@ -36,6 +36,9 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     public float hexGrowInSeconds = 0.45f;
 
     [Header("Regrowth")]
+    [Tooltip("Seconds a cleared cell waits before regrowing. One constant for every role, cell and clear source " +
+             "(per-role / per-maze / density-eased delays removed 2026-11-25 — DUST_LIFECYCLE_AUDIT.md).")]
+    [Min(0f)] public float regrowDelaySeconds = 3f;
     [Tooltip("Max cells that transition from PendingRegrow to Solid per drum step.")]
     public int regrowCellsPerStep = 1;
     [Tooltip("Seconds after a cell becomes visible before its collider re-enables.")]
@@ -70,11 +73,6 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     [Min(0.01f)] public float zapScaleOutSeconds = 0.12f;
 
     [Header("Commit Tightening")]
-    [Min(0), Tooltip("Each committed note permanently clears one cell of that role's territory (the maze " +
-        "closes in as the song builds). Tightening stops for a role once its remaining live territory " +
-        "would fall below this many cells, so its PhaseStar can always still be fed. Keep it at or " +
-        "above the largest riff note count in any motif, plus a buffer.")]
-    public int commitClearMinTerritoryPerRole = 16;
 
     [Header("Cell Animation Timing")]
     [Tooltip("Per-cell grow/shrink/fade durations for regrow and vehicle-carve clears. " +
@@ -148,31 +146,9 @@ public class CosmicDustGeneratorConfig : ScriptableObject
     [Tooltip("How far out to mark cells dirty when a tint-affecting event occurs.")]
     [Range(0, 3)] public int tintDirtyMarkRadius = 1;
 
-    [Header("Regrow Speed Preview")]
-    [Tooltip("Pulse each regrown cell toward a fast/slow color on commit, so regrow speed reads as a learnable color cue instead of only being discoverable through repeated play.")]
-    public bool regrowSpeedPreviewEnabled = true;
-    [Tooltip("MusicalRoleProfile.regrowthDelay value that maps to the fully-fast preview color.")]
-    [Min(0f)] public float regrowSpeedPreviewFastSeconds = 0.5f;
-    [Tooltip("MusicalRoleProfile.regrowthDelay value that maps to the fully-slow preview color.")]
-    [Min(0f)] public float regrowSpeedPreviewSlowSeconds = 2.5f;
-    [Tooltip("Color pulsed toward for roles at or below regrowSpeedPreviewFastSeconds.")]
-    public Color regrowSpeedPreviewFastColor = new Color(1f, 0.55f, 0.15f);
-    [Tooltip("Color pulsed toward for roles at or above regrowSpeedPreviewSlowSeconds.")]
-    public Color regrowSpeedPreviewSlowColor = new Color(0.3f, 0.85f, 1f);
-    [Tooltip("Duration of the pulse fired on regrow commit. Keep this well under regrowColliderEnableDelaySeconds " +
-             "(0.2s default) — EnsureMinSolidAlpha fires at that mark and boosts the cell to full opacity while " +
-             "the pulse coroutine is still tracking live alpha, so a pulse that outlasts that delay ends up held " +
-             "fully opaque for its remaining duration instead of fading out quickly.")]
-    [Min(0.01f)] public float regrowSpeedPreviewPulseSeconds = 0.15f;
-    [Tooltip("Blends the pulse color toward white by this fraction. Keep small — held at full opacity past " +
-             "regrowColliderEnableDelaySeconds, even a moderate boost reads as a wash of white rather than a tint.")]
-    [Range(0f, 1f)] public float regrowSpeedPreviewGlowBoost01 = 0.05f;
-
-    [Header("Regrow Density Easing")]
-    [Tooltip("Also throttles the Gravity Void — solid fraction at which density pressure starts easing (regrow slows, new void-growth rings halve).")]
+    [Header("Gravity Void Density Throttle")]
+    [Tooltip("Solid fraction at which new Gravity Void growth rings start halving.")]
     [Range(0f, 1f)] public float densityThrottleHalfAt = 0.5f;
-    [Tooltip("Also throttles the Gravity Void — solid fraction at which easing is at its strongest (regrow at its slowest, new void-growth rings skipped).")]
+    [Tooltip("Solid fraction at which new Gravity Void growth rings are skipped entirely.")]
     [Range(0f, 1f)] public float densityThrottleSkipAt = 0.8f;
-    [Tooltip("Regrow delay multiplier applied once solid fraction reaches densityThrottleSkipAt. Ramps smoothly from 1x at densityThrottleHalfAt. 1 = no easing.")]
-    [Min(1f)] public float regrowDensityEaseMaxMultiplier = 2.5f;
 }

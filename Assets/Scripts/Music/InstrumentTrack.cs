@@ -924,7 +924,6 @@ public partial class InstrumentTrack : MonoBehaviour, IExpansionHost
         if (GameFlowManager.VerboseLogging) Debug.Log($"[COLLECT:PITCH] track={name} step={stepIndex} raw={note} quantized={qNote} diff={qNote - note} authoredRoot={authoredRootMidi}");
         // Commit immediately (the loop evolves as notes are collected).
         AddNoteToLoop(stepIndex, note, durationTicks, force, false, authoredRootMidi);
-        NotifyNoteCommittedForDust();
 
         // Tactile confirmation, quantized + throttled per vehicle so clustered pickups don't stack.
         controller?.PlayQuantizedCollectConfirm(vehicle, this, note, force);

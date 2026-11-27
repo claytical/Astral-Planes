@@ -38,16 +38,6 @@ public partial class LocalPlayer
         // on this exact press.
         if (ModalMenu.ShouldSuppressInput) return;
 
-        if (_isReady &&
-            GameFlowManager.Instance != null &&
-            GameFlowManager.Instance.CurrentState == GameState.Selection &&
-            GameFlowManager.Instance.SessionState.AwaitingModeConfirm)
-        {
-            _sfxSource?.PlayOneShot(confirmFx);
-            GameFlowManager.Instance.ConfirmModeSelection();
-            return;
-        }
-
         OnChooseConfirm?.Invoke();
 
         if (_isReady ||GameFlowManager.Instance == null) return;
@@ -63,7 +53,7 @@ public partial class LocalPlayer
                     break;
                 }
                 playerVehicle = _selection.GetChosenPlane();
-                _placementMethod = _selection.CurrentPlacementMethod;
+                ConfirmPlacementMethod(_selection.CurrentPlacementMethod);
                 _selection.Confirm();
                 SetColor();
                 _isReady = true;
@@ -94,7 +84,7 @@ public partial class LocalPlayer
                         break;
                     }
                     playerVehicle = _selection.GetChosenPlane();
-                    if (_selection != null) _placementMethod = _selection.CurrentPlacementMethod;
+                    if (_selection != null) ConfirmPlacementMethod(_selection.CurrentPlacementMethod);
                     if (playerVehicle == null)
                     {
                         // No vehicle left to claim (hangar exhausted, or lost the

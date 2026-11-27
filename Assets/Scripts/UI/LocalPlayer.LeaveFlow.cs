@@ -28,6 +28,10 @@ public partial class LocalPlayer
     // instant leave during plain ship select, or a hold-to-confirm session abort mid-tutorial.
     private void HandleLeavePressed()
     {
+        // East / Escape is the modal's Back; it must not also undo ship select or start a
+        // tutorial-abort hold underneath the Options menu.
+        if (ModalMenu.ShouldSuppressInput) return;
+
         if (ControlTutorialDirector.Instance != null && ControlTutorialDirector.Instance.IsPrimaryTutorialRunning)
         {
             if (_leaveHoldCo == null)

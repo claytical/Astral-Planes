@@ -301,6 +301,7 @@ public partial class DiscoveryTrackNode : TrackNode
     private void OnDestroy()
     {
         ReleaseHeldDustOnce();
+        EndRoleRegrowthHold(WasCaptured);
         UnsubscribeLoopBoundary();
         if (_drumTrack != null) _drumTrack.activeMineNodes.Remove(this);
     }

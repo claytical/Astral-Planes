@@ -463,6 +463,11 @@ public partial class MotifRingGlyphApplicator
 
         _pendingDeformationCount--;
 
+        // Every note has landed: burst + pulse this ring and ripple the remaining placeholders
+        // (RingCompleteFlare.cs). A bin whose notes were all broken off never completed visibly.
+        if (revealedNotes.Count > 0 && ring.Root != null)
+            PlayRingCompleteFlare(ring, outerR);
+
         // Hide the stack after deformation — only when all concurrent deformations are done
         // and we are not in spin-off or SuperNode mode. Runs as its own coroutine so a newly
         // started bin's deformation can cancel it outright (see BeginBinRingDeformation).
@@ -664,12 +669,15 @@ public partial class MotifRingGlyphApplicator
 
     private void ApplyNextUpColor(RingEntry ring, Color baseColor)
     {
-        _nextUpCurrentColor = baseColor;
+        _nextUpCurrentColor = baseColor; // un-flared, so the fade-out reads the cycle colour
 
         if (ring.Fill != null)
-            SetFillColor(ring.Fill,
-                new Color(baseColor.r, baseColor.g, baseColor.b, config.nextUpRingAlpha),
-                ScratchMpb);
+        {
+            // Ring-complete ripple passing through (RingCompleteFlare.cs).
+            var   rgb   = Color.Lerp(baseColor, _nextUpFlareColor, _nextUpFlareK);
+            float alpha = Mathf.Lerp(config.nextUpRingAlpha, config.ringCompleteFlareAlpha, _nextUpFlareK);
+            SetFillColor(ring.Fill, new Color(rgb.r, rgb.g, rgb.b, alpha), ScratchMpb);
+        }
     }
 
     /// <summary>Destroy all gameplay rings immediately and hide the record.</summary>
@@ -687,6 +695,8 @@ public partial class MotifRingGlyphApplicator
         _dockDriftOffset         = Vector3.zero;
         _pendingDeformationCount = 0;
         _pendingRingNotes.Clear();
+        _ringFlareRippleCoroutine = null; // killed by StopAllCoroutines above
+        _nextUpFlareK             = 0f;
         DestroyList(_gameplayRings);
         DestroyList(_remainingRings);
         DestroyDisc(ref _fullBgDisc);
@@ -721,6 +731,7 @@ public partial class MotifRingGlyphApplicator
             StopCoroutine(_nextUpColorCoroutine);
             _nextUpColorCoroutine = null;
         }
+        StopRingFlareRipple(); // the fade below owns the placeholder fills now
 
         int total = _gameplayRings.Count + _remainingRings.Count;
         if (total == 0) { _recordFadeOutCoroutine = null; TutorialEvents.RaiseIntroRecordHidden(); yield break; }

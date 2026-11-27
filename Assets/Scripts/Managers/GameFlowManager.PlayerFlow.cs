@@ -13,16 +13,13 @@ public partial class GameFlowManager
             return;
         }
 
-        // Someone is still here. Don't strand them: the mode lock only made sense for the old
-        // roster, and if everyone left standing is already ready (e.g. the player who left was
-        // the only one still choosing) the session should proceed instead of waiting forever.
+        // Someone is still here. Don't strand them: if everyone left standing is already ready
+        // (e.g. the player who left was the only one still choosing) the session should proceed
+        // instead of waiting forever (VERSUS still needs two).
         var tutorial = ControlTutorialDirector.Instance;
         bool tutorialRunning = tutorial != null && tutorial.IsPrimaryTutorialRunning;
         if (CurrentState == GameState.Selection && !tutorialRunning)
-        {
-            SessionState.UnlockMode();
             CheckAllPlayersReady();
-        }
     }
 
     /// <summary>
@@ -71,13 +68,6 @@ public partial class GameFlowManager
             beginGameplay: BeginGameAfterTutorial);
     }
 
-    /// <summary>Multiplayer: the extra confirm after everyone is ready locks the mode and starts the tutorial.</summary>
-    public void ConfirmModeSelection()
-    {
-        SessionState.LockMode();
-        CheckAllPlayersReady();
-    }
-
     /// <summary>
     /// Set when leaving TrackSelection for a new session; consumed by
     /// SceneFlowCoordinator.HandleTrackSceneSetupAsync, which then opens in the control sandbox.
@@ -89,12 +79,12 @@ public partial class GameFlowManager
 
     public void BeginGameAfterTutorial()
     {
-        // Solo: the sandbox runs once — only while the tutorial isn't done (no ring saved yet), and
-        // it leads into the Tutorial Motif. Multiplayer: it always opens the session, then the
-        // chosen motif grows in around the ships.
+        // Solo: the sandbox runs once — only while the tutorial isn't done (START), and it leads
+        // into the Tutorial Motif. Multiplayer (co-op CONTINUE, VERSUS): it always opens the
+        // session, then the chosen motif grows in around the ships.
         int playerCount = 0;
         foreach (var p in SessionState.Players) if (p != null) playerCount++;
-        bool tutorialDone = RingSessionStore.LoadAllRingsFromDisk().Count > 0;
+        bool tutorialDone = StartIntent.TutorialComplete;
         RunControlSandbox = playerCount > 1 || !tutorialDone;
         // Raised now, not when the sandbox starts: NarratedTutorialController starts on scene load
         // (before setup reaches the sandbox) and would otherwise see phase 0 and begin narrating.

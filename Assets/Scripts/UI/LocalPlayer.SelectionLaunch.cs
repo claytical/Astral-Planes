@@ -32,6 +32,17 @@ public partial class LocalPlayer
     public Sprite DisplaySprite { get; private set; }
     private PlayerStatsTracking _playerStats;
 
+    private bool _placementConfirmed;
+
+    /// <summary>Locks in this player's Groove Style and remembers it as the next session's start.</summary>
+    private void ConfirmPlacementMethod(NotePlacementMethod method)
+    {
+        _placementMethod = method;
+        _placementConfirmed = true;
+        GameSettings.GrooveStyle = method;
+        GameSettings.Flush();
+    }
+
     public void CreatePlayerSelect()
     {
         // If we already had a selection UI from an earlier TrackSelection visit, kill it.
@@ -45,6 +56,9 @@ public partial class LocalPlayer
 
         GameObject ps = Instantiate(playerSelect);
         _selection = ps.GetComponent<PlayerSelect>();
+        // A player who already confirmed a Groove Style this session (respawn, later visits)
+        // keeps theirs; a fresh player starts on the saved one (Options → Controls).
+        if (!_placementConfirmed) _placementMethod = GameSettings.GrooveStyle;
         if (_selection != null) _selection.SetPlacementMethod(_placementMethod);
 
         // No per-player control hint during vehicle selection. Joining still hides the shared

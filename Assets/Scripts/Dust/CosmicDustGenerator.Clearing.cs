@@ -215,46 +215,7 @@ public partial class CosmicDustGenerator
         if (IsSealedVaultShell(gridPos)) return;
         DespawnDustAt(gridPos);
         _permanentClearCells.Add(gridPos);
-        _regrow?.CancelRegrow(gridPos);
-    }
-
-    private static readonly List<Vector2Int> _commitClearUnrevealed = new List<Vector2Int>();
-    private static readonly List<Vector2Int> _commitClearRevealed = new List<Vector2Int>();
-
-    /// <summary>
-    /// Permanently clears one cell of <paramref name="role"/>'s territory as a musical-progress
-    /// reward for a note committed to the timeline (the maze closes in as the song builds).
-    ///
-    /// Guarded so tightening can never starve a PhaseStar (gray start made the old version eat
-    /// exactly the cells the player had just carved, including bloomed flowers, and its
-    /// cross-role fallback deleted other roles' flowers, which could dead-end a motif):
-    /// - never a bloomed (star-food) or star-held cell, never another role's cell, never filler;
-    /// - prefers unrevealed gray cells of the role's hidden territory over revealed ones;
-    /// - stops once the role's live territory would drop below
-    ///   <c>config.commitClearMinTerritoryPerRole</c>.
-    /// Returns false when nothing was cleared.
-    /// </summary>
-    public bool PermanentlyClearOneCellForRole(MusicalRole role)
-    {
-        if (role == MusicalRole.None) return false;
-
-        var supply = ScanRoleSupply(role, _commitClearUnrevealed, _commitClearRevealed);
-        int floor = config != null ? config.commitClearMinTerritoryPerRole : 16;
-        if (supply.live - 1 < floor)
-        {
-            if (GameFlowManager.VerboseLogging)
-                Debug.Log($"[DUST:SUPPLY] commit-clear skipped (floor={floor}) {supply.Describe(role)}");
-            return false;
-        }
-
-        var pool = _commitClearUnrevealed.Count > 0 ? _commitClearUnrevealed : _commitClearRevealed;
-        if (pool.Count == 0) return false;
-
-        var cell = pool[Random.Range(0, pool.Count)];
-        DespawnDustAtAndMarkPermanent(cell);
-        if (GameFlowManager.VerboseLogging)
-            Debug.Log($"[DUST:SUPPLY] commit-clear {cell} (floor={floor}) before: {supply.Describe(role)}");
-        return true;
+        _regrow.CancelRegrow(gridPos);
     }
 
     private void RemoveActiveAt(Vector2Int grid, GameObject go) {

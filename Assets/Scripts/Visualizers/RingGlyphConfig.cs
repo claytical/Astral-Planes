@@ -297,6 +297,35 @@ public class RingGlyphConfig : ScriptableObject
     // Both fields here are consumed externally, one layer removed from this file's own code:
     // recordHoldDuration only via BinRingController.GetRecordHoldDuration() → SceneFlowCoordinator;
     // recordFadeOutDuration via FadeRecordOut (GameplayRings.cs).
+    [Header("Ring Complete Flare")]
+    [Tooltip("When a gameplay ring's last note lands: particle burst around the ring, a few pulses, " +
+             "and a brightness wave in its colour rippling outward through the remaining placeholder rings.")]
+    public bool enableRingCompleteFlare = true;
+
+    [Tooltip("Burst prefabs spawned evenly around the completed ring.")]
+    [Min(1)] public int ringCompleteBurstPoints = 12;
+
+    [Tooltip("Peak scale of each pulse of the completed ring (1 = no swell).")]
+    public float ringCompletePulseScale = 1.08f;
+
+    [Tooltip("Number of swells over ringCompletePulseDuration.")]
+    [Min(1)] public int ringCompletePulseCount = 2;
+
+    [Tooltip("Seconds for all of the completed ring's pulses together.")]
+    public float ringCompletePulseDuration = 0.9f;
+
+    [Tooltip("Seconds between each placeholder ring lighting up, innermost first (the ripple's speed).")]
+    public float ringCompleteRippleStepDelay = 0.08f;
+
+    [Tooltip("Seconds for one placeholder ring to brighten to the flare colour.")]
+    public float ringCompleteRippleRise = 0.12f;
+
+    [Tooltip("Seconds for one placeholder ring to fade back to its normal look.")]
+    public float ringCompleteRippleFall = 0.6f;
+
+    [Tooltip("Fill alpha of a placeholder ring at the peak of the ripple.")]
+    [Range(0f, 1f)] public float ringCompleteFlareAlpha = 1f;
+
     [Header("Record Hold / Fade Out")]
     [Tooltip("Seconds the completed record stays fully visible (100% opacity) before it starts " +
              "fading out, once shown at the start of a new motif.")]

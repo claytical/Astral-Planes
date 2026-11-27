@@ -94,8 +94,6 @@ public class SuperNodeTrackNodeConfig : ScriptableObject
     [Header("Dust Carving")]
     [Tooltip("Fade duration of dust cells the node carves through.")]
     public float dustFadeSeconds = 0.15f;
-    [Tooltip("-1 = the carved cell's role regrowthDelay (maze base for role-less cells); >= 0 overrides it.")]
-    public float dustRegrowDelay = -1f;
 
     [Header("Visual")]
     [Tooltip("How fast (deg/s) the sprite turns toward its travel direction.")]

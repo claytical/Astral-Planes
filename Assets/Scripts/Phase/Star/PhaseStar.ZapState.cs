@@ -91,6 +91,8 @@ public partial class PhaseStar
         bool readyNow = zappedCount >= requiredZapCount;
         if (readyNow)
         {
+            // Star becomes active: its role's regrowth is suspended from here on.
+            AcquireRegrowHold(role);
             TransitionZapState(ZapProgressState.WaitingForRetract, role, "count-threshold-met");
             dust?.SetAcquisitionEnabled(false, "waiting-for-retract-threshold-met");
             dust?.BeginRetractionForActiveTentacles();
@@ -369,6 +371,9 @@ public partial class PhaseStar
         if (_zapProgressState == next) return;
         var prev = _zapProgressState;
         _zapProgressState = next;
+        // Charge lost before a discovery took the hold (refresh/reset back to seeking).
+        if (next == ZapProgressState.Seeking || next == ZapProgressState.Zapping)
+            DropRegrowHold();
         ApplyDustAcquisitionPolicy($"zap-transition:{reason}");
         bool acquisitionEnabled = MayAcquireDustTargets();
         if (GameFlowManager.VerboseLogging) Debug.Log($"[PhaseStar:ZapState] {prev}->{next} role={role} zappedCount={zappedCount} requiredZapCount={requiredZapCount} acquisitionEnabled={acquisitionEnabled} reason={reason} interaction=({_interactionState.ToDebugString()})");

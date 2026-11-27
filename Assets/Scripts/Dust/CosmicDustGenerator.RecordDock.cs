@@ -665,7 +665,7 @@ public partial class CosmicDustGenerator
         {
             // A permanent-clear cell (e.g. the maze's star-anchor disk) would refuse the wall.
             _permanentClearCells.Remove(c);
-            _regrow?.CancelRegrow(c);
+            _regrow.CancelRegrow(c);
             _heldRegrowCells.Remove(c);
         }
 
@@ -729,9 +729,9 @@ public partial class CosmicDustGenerator
             if (HasDustAt(c)) { if (restyle) ApplyVaultLook(c, tint); continue; }
             if (!TryGetCellState(c, out var st)) continue;
             if (st == DustCellState.Clearing) continue; // finishing a fade; repaired next tick
-            if (_regrowthScheduler.VoidGrowCoroutines.ContainsKey(c)) continue; // already growing in
+            if (_regrow.IsVoidGrowing(c)) continue; // already growing in
             _permanentClearCells.Remove(c);
-            _regrow?.CancelRegrow(c);
+            _regrow.CancelRegrow(c);
             _heldRegrowCells.Remove(c);
             missing.Add(c);
         }
@@ -768,7 +768,7 @@ public partial class CosmicDustGenerator
                              $"permanentClear={_permanentClearCells.Contains(c)} " +
                              $"claimed={(dustClaims != null && dustClaims.IsBlocked(c))} " +
                              $"shipOnCell={IsVehicleOverlappingCell(c)} " +
-                             $"voidGrowing={_regrowthScheduler.VoidGrowCoroutines.ContainsKey(c)}", this);
+                             $"voidGrowing={_regrow.IsVoidGrowing(c)}", this);
         }
     }
 
@@ -1093,7 +1093,7 @@ public partial class CosmicDustGenerator
                 ClearCell(c, DustClearMode.FadeAndHide, kVaultExplodeSeconds, scheduleRegrow: false,
                           runPreExplode: true, explosionTintOverride: tint, burstDirection: dir);
                 _permanentClearCells.Add(c);
-                _regrow?.CancelRegrow(c);
+                _regrow.CancelRegrow(c);
             }
             yield return null;
         }

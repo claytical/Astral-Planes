@@ -108,6 +108,10 @@ public partial class CosmicDustGenerator
     {
         if (role == MusicalRole.None || _gridState.CellState == null) return;
         _blockedRole = role;
+        // Ring completed: the role's empty cells stay empty until it is released
+        // (CosmicBlockField → ResumeRoleRegrowth). ReleaseRoleBlock deliberately does NOT
+        // resume — it also runs during teardown, where new regrow timers would leak.
+        MarkRoleBlocked(role);
 
         var candidates = new HashSet<Vector2Int>();
         for (int y = 0; y < _gridState.Height; y++)

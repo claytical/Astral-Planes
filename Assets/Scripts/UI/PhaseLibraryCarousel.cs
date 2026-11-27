@@ -164,6 +164,20 @@ public class PhaseLibraryCarousel : MonoBehaviour
     private bool  _confirming;
     private float _nextInputTime;
 
+    // Main's title menu (MainMenu) keeps the carousel hidden until CONTINUE / VERSUS engages it;
+    // Back (East / Escape) hands control back through _onBack. Every other scene (the PhaseLibrary
+    // design scene) starts engaged.
+    private bool  _engaged = true;
+    private int   _engagedFrame = -1;
+    private System.Action _onBack;
+
+    /// <summary>Same rule the carousel uses to hide the tutorial: a ring is saved for it or beyond.</summary>
+    public bool TutorialComplete => _graph != null && _graph.TutorialComplete;
+    /// <summary>Whether there is anything to pick (a saved ring, or design reveal-all).</summary>
+    public bool HasEntries => _hasEntries;
+    public PhaseLibrary Library => phaseLibrary;
+    public bool Engaged => _engaged;
+
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     private void Start()
@@ -193,9 +207,10 @@ public class PhaseLibraryCarousel : MonoBehaviour
         _hasEntries = (revealAll || rings.Count > 0) && _graph.Exists(_phase, _motif);
         InitSlotLayout();
 
-        if (pressToStartCue != null) pressToStartCue.SetActive(!_hasEntries);
+        _engaged = SceneManager.GetActiveScene().name != MainMenu.SceneName;
+        if (pressToStartCue != null) pressToStartCue.SetActive(_engaged && !_hasEntries);
 
-        if (_hasEntries)
+        if (_hasEntries && _engaged)
         {
             BuildInitialScene();
             UpdatePreviewForCenter();
@@ -731,11 +746,43 @@ public class PhaseLibraryCarousel : MonoBehaviour
         else previewPlayer.Play(entry.Snapshot);
     }
 
+    // ── Main menu hand-off ────────────────────────────────────────────────────
+
+    /// <summary>Shows the carousel and gives it input. Back calls <paramref name="onBack"/> after
+    /// hiding it again. False when there's nothing to pick.</summary>
+    public bool Engage(System.Action onBack)
+    {
+        if (!_hasEntries || _engaged) return false;
+        _engaged = true;
+        _engagedFrame = Time.frameCount;
+        _onBack = onBack;
+        _nextInputTime = Time.unscaledTime + inputCooldown;
+        if (selectionLabel != null) selectionLabel.gameObject.SetActive(true);
+        BuildInitialScene();
+        UpdatePreviewForCenter();
+        return true;
+    }
+
+    private void Disengage()
+    {
+        _engaged = false;
+        if (previewPlayer != null) previewPlayer.Stop();
+        if (selectionLabel != null) selectionLabel.gameObject.SetActive(false);
+        if (orbitLines != null) orbitLines.Clear();
+        foreach (var g in _pool) g.gameObject.SetActive(false);
+        _selectedGlyph = null;
+        var cb = _onBack;
+        _onBack = null;
+        cb?.Invoke();
+    }
+
     // ── Input ──────────────────────────────────────────────────────────────────
 
     private void Update()
     {
         SpinUnselected();
+        if (!_engaged) return;
+        if (Time.frameCount == _engagedFrame) return; // the menu press that engaged us
 
         // This polls raw device state directly (no Input Action / EventSystem involved), so it
         // has no built-in awareness of modal UI on top of it. The settings panel's own Confirm
@@ -782,6 +829,19 @@ public class PhaseLibraryCarousel : MonoBehaviour
         }
 
         if (_sliding || _confirming) return; // ignore all input mid-slide/confirm so Confirm() never reads a stale node
+
+        // Back to the title menu (only when the menu engaged us).
+        if (_onBack != null)
+        {
+            bool backPad = gp != null && PadSemantics.BackButton(gp).wasPressedThisFrame;
+            bool backKey = kb != null && kb.escapeKey.wasPressedThisFrame;
+            if (backPad || backKey)
+            {
+                if (backKey) MenuNav.ClaimEscape(); // the Escape tap must not also open the Quit prompt
+                Disengage();
+                return;
+            }
+        }
 
         if (confirm) { Confirm(); return; }
 
@@ -922,10 +982,8 @@ public class PhaseLibraryCarousel : MonoBehaviour
 
     private IEnumerator ConfirmRoutine()
     {
-        // Record the pick FIRST (this runs synchronously inside Confirm()). The same confirm press
-        // can also fire Main's UI/Submit -> IntroInputHandler, which loads TrackSelection at the end
-        // of this frame and kills this coroutine at the fade yield below — previously before
-        // RequestStart ran, so the session silently fell back to the tutorial motif.
+        // Record the pick FIRST (this runs synchronously inside Confirm()), so nothing that loads
+        // TrackSelection mid-fade can drop it and fall back to the tutorial motif.
         var entry = CurrentEntry;
         PhaseLibraryStartConfig.RequestStart(entry.PhaseId, entry.PhaseIndex, entry.MotifIndex, entry.MotifId);
 
@@ -936,6 +994,7 @@ public class PhaseLibraryCarousel : MonoBehaviour
             yield return StartCoroutine(previewPlayer.StopAndFadeRoutine());
 
         onMotifConfirmed.Invoke();
+        GameFlowManager.Instance?.StartShipSelectionPhase();
         SceneManager.LoadScene(trackSelectionScene);
     }
 }

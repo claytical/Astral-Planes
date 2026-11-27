@@ -2,7 +2,8 @@ using System.Linq;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Gamepad Select (Play/Pause) opens the soft-pause menu (<see cref="PauseMenuController"/>).
+/// Gamepad Select / keyboard P (Play/Pause) opens the Options menu in its in-run, soft-pause form
+/// (<see cref="OptionsMenu"/>).
 /// Each player subscribes through their own PlayerInput, so the press always comes from a device
 /// that player owns (the Steam Deck's duplicate raw-HID gamepad never joins a player).
 /// </summary>
@@ -15,7 +16,7 @@ public partial class LocalPlayer
     {
         _pauseAction = _playerInput.actions.FindAction("Play/Pause", throwIfNotFound: false);
         if (_pauseAction == null) return;
-        _onPauseStarted = ctx => PauseMenuController.Toggle(this);
+        _onPauseStarted = ctx => OptionsMenu.Toggle(this);
         _pauseAction.started += _onPauseStarted;
     }
 
@@ -25,7 +26,7 @@ public partial class LocalPlayer
             _pauseAction.started -= _onPauseStarted;
     }
 
-    /// <summary>This player's own gamepad, used to drive the pause menu.</summary>
+    /// <summary>This player's own gamepad, used to drive the Options menu in a run.</summary>
     public Gamepad PrimaryGamepad() =>
         _playerInput != null ? _playerInput.devices.OfType<Gamepad>().FirstOrDefault() : null;
 }

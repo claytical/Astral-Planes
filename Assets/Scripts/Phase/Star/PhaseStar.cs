@@ -151,6 +151,32 @@ public partial class PhaseStar : MonoBehaviour
 
     public void RegisterHeldDrainCell(Vector2Int cell) => _heldDrainCells.Add(cell);
 
+    // Role regrowth hold (CosmicDustGenerator.RoleRegrowth.cs): taken when this star zaps
+    // enough energy to become active, handed to the discovery it ejects, dropped if the
+    // charge is lost, a SuperNode resolves instead, or the star is destroyed first.
+    private MusicalRole _regrowHoldRole = MusicalRole.None;
+
+    private void AcquireRegrowHold(MusicalRole role)
+    {
+        if (role == MusicalRole.None || _regrowHoldRole != MusicalRole.None) return;
+        _regrowHoldRole = role;
+        ResolveGameFlowManager()?.dustGenerator?.AcquireRoleRegrowthHold(role);
+    }
+
+    private MusicalRole TakeRegrowHold()
+    {
+        var r = _regrowHoldRole;
+        _regrowHoldRole = MusicalRole.None;
+        return r;
+    }
+
+    private void DropRegrowHold()
+    {
+        var r = TakeRegrowHold();
+        if (r != MusicalRole.None)
+            ResolveGameFlowManager()?.dustGenerator?.ReleaseRoleRegrowthHold(r, false);
+    }
+
     private void ReleaseUnassignedDrainCells()
     {
         if (_heldDrainCells.Count == 0) return;
@@ -350,6 +376,7 @@ public partial class PhaseStar : MonoBehaviour
         s_live.Remove(this);
         _isDisposing = true;
         ReleaseUnassignedDrainCells();
+        DropRegrowHold();
         SafeUnsubscribeAll();
         CleanupManagedCoroutines();
         DestroySuperRingMaterial();

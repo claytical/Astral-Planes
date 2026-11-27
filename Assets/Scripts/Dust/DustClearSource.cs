@@ -1,6 +1,6 @@
 /// <summary>
-/// Identifies what removed a dust cell, so regrow delay can be tuned per source
-/// via <see cref="DustTimingParams"/> on the active MazePatternConfig.
+/// Identifies what removed a dust cell. Not used for regrow timing (one constant,
+/// CosmicDustGeneratorConfig.regrowDelaySeconds); still gates flower bloom / ForceGray behaviour.
 /// </summary>
 public enum DustClearSource
 {

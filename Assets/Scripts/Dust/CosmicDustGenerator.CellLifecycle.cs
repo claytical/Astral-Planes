@@ -156,73 +156,24 @@ public partial class CosmicDustGenerator
         bool wasVoidCell = ClearCellFlag(cell, CellFlags.VoidGrow);
         if (wasVoidCell) _imprints.Remove(cell);
 
-        // Resolved after the role promotion above so it keys off the role the cell regrows as.
-        float delay = ResolveRegrowDelay(cell, -1f);
-
-        CarveCell(cell, fadeSeconds, scheduleRegrow: true, source: DustClearSource.VehiclePlow, regrowDelaySeconds: delay, runPreExplode: true, explosionTintOverride: explosionTint);
+        CarveCell(cell, fadeSeconds, scheduleRegrow: true, source: DustClearSource.VehiclePlow, runPreExplode: true, explosionTintOverride: explosionTint);
     }
 
     /// <summary>
-    /// Regrow delay = "each role regrows at its own speed" (LEGIBILITY_AUDIT.md A5):
-    /// 1. Explicit per-call override (>= 0) — jail holds, SuperNode/bomb call-site tuning.
-    /// 2. The cell's prospective role's MusicalRoleProfile.regrowthDelay (>= 0), whatever cleared
-    ///    it (vehicle plow, star drain, collectable, blast…). Pacing is role identity, not source.
-    /// 3. Role-less cells (generic filler / None) or a role authored -1: the maze pattern's base
-    ///    regrowDelay; 8s if no pattern is active.
-    /// Then × density easing (ApplyDensityRegrowEasing).
+    /// Regrow delay is one constant: CosmicDustGeneratorConfig.regrowDelaySeconds, for every role,
+    /// cell and clear source. An explicit per-call override (>= 0) still wins, but no caller
+    /// passes one today — it's kept as an internal hook for the composition-based regrowth
+    /// overhaul (DUST_LIFECYCLE_AUDIT.md).
     ///
-    /// Removed 2026-11-17: the 11-entry per-DustClearSource maze table (it only ever applied to
-    /// role-less cells, since every role profile authors regrowthDelay), the ship per-role
-    /// regrowDelayMultipliers (1.0 on every ship) and CosmicDustGeneratorConfig.zapRegrowDelaySeconds
-    /// (never read). DustClearSource itself stays — it still gates the flower bloom and
-    /// ForceGray color behavior, just not timing.
+    /// Removed 2026-11-25: MusicalRoleProfile.regrowthDelay (per-role speed), the maze pattern's
+    /// DustTimingParams.regrowDelay (role-less cells), density easing (up to 2.5x slower when
+    /// crowded) and the regrow-speed colour preview.
     /// </summary>
     private float ResolveRegrowDelay(Vector2Int cell, float explicitOverride)
     {
         if (explicitOverride >= 0f)
             return explicitOverride;
-
-        MusicalRole prospectiveRole = GetProspectiveRegrowRole(cell);
-        if (prospectiveRole != MusicalRole.None)
-        {
-            var roleProfile = _roleDensity.GetResolvedRoleProfile(prospectiveRole);
-            if (roleProfile != null && roleProfile.regrowthDelay >= 0f)
-                return ApplyDensityRegrowEasing(roleProfile.regrowthDelay);
-        }
-
-        var timing = _activeMazePattern != null ? _activeMazePattern.dustTiming : null;
-        float baseDelay = timing != null ? Mathf.Max(0f, timing.regrowDelay) : 8f;
-        return ApplyDensityRegrowEasing(baseDelay);
-    }
-
-    /// <summary>
-    /// Breathing-room easing: as overall solid fraction rises past densityThrottleHalfAt/SkipAt
-    /// (shared thresholds with GravityVoidController.ApplyDensityThrottle, which throttles new
-    /// void-growth rings at the same points), regrow delay ramps smoothly up to
-    /// regrowDensityEaseMaxMultiplier so already-cleared paths stay open longer as pressure
-    /// builds. A smooth ramp is used rather than a hard step because this value is felt on every
-    /// single cell, not just a discrete ring count. Only eases already-scheduled regrows; nothing
-    /// thins existing solid cells — GetSolidFraction() only drops as the player keeps clearing.
-    /// </summary>
-    private float ApplyDensityRegrowEasing(float baseDelay)
-    {
-        float solidFraction = GetRoleRelevantSolidFraction();
-        float t = Mathf.InverseLerp(config.densityThrottleHalfAt, config.densityThrottleSkipAt, solidFraction);
-        return baseDelay * Mathf.Lerp(1f, config.regrowDensityEaseMaxMultiplier, Mathf.Clamp01(t));
-    }
-
-    // Excludes generic-fill (exact-count leftover) cells from the density-pressure figure that
-    // paces regrow delay — hundreds of inert filler cells shouldn't make a role's authored
-    // regrowthDelay read as inflated near motif start. GetSolidFraction() itself is left
-    // untouched: GravityVoidController's void-growth throttle and DrumTrack's density-driven
-    // beat intensity both intentionally key off the literal, filler-inclusive figure.
-    private float GetRoleRelevantSolidFraction()
-    {
-        int w = _gridState.Width;
-        int h = _gridState.Height;
-        if (w <= 0 || h <= 0) return 0f;
-        int relevantSolid = _roleDensity.TotalSolidCount() - _roleDensity.GenericFillSolidCount;
-        return Mathf.Clamp01(Mathf.Max(0, relevantSolid) / (float)(w * h));
+        return Mathf.Max(0f, config.regrowDelaySeconds);
     }
 
     /// <summary>
@@ -332,12 +283,12 @@ public partial class CosmicDustGenerator
         }
     }
 
-    private void RequestRegrowCellAt(Vector2Int gridPos, float delaySeconds = -1f, bool refreshIfPending = false, bool clearImprintOnRefresh = false)
+    private void RequestRegrowCellAt(Vector2Int gridPos, float delaySeconds = -1f, bool refreshIfPending = false)
     {
         if (_regrowthSuppressed)
             return;
         if (!IsInBounds(gridPos)) {
-            _regrow?.CancelRegrow(gridPos);
+            _regrow.CancelRegrow(gridPos);
             return;
         }
 
@@ -346,6 +297,14 @@ public partial class CosmicDustGenerator
         if (_heldRegrowCells.Contains(gridPos))
             return;
 
+        // Role lifecycle gate (CosmicDustGenerator.RoleRegrowth.cs): once a role's discovery is
+        // harvested, and while it is walled, its cleared cells stay empty — whatever cleared them.
+        if (IsRegrowthSuspended(gridPos))
+        {
+            _regrow.CancelRegrow(gridPos);
+            return;
+        }
+
         // Generic filler (None) dust is permanent once cleared — carving it is progress that
         // holds for the rest of the motif. ClearMaze()'s _permanentClearCells.Clear() lifts this
         // at the next motif's maze generation.
@@ -353,7 +312,7 @@ public partial class CosmicDustGenerator
             && fillImp.hiddenRoleIsGenericFill)
         {
             _permanentClearCells.Add(gridPos);
-            _regrow?.CancelRegrow(gridPos);
+            _regrow.CancelRegrow(gridPos);
             return;
         }
 
@@ -386,8 +345,7 @@ public partial class CosmicDustGenerator
             _pendingRegrowDelay[gridPos] = delay;
         }
 
-        EnsureRegrowController();
-        _regrow?.RequestRegrowCellAt(gridPos, delay, refreshIfPending);
+        _regrow.RequestRegrowCellAt(gridPos, delay, refreshIfPending);
     }
 
     public void SetStarKeepClear(Vector2Int centerCell, int radiusCells, bool forceRemoveExisting) =>

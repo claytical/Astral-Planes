@@ -281,7 +281,6 @@ public partial class InstrumentTrack
         // Replace-or-add: enforce one persistent note per (track, stepAbs) for stability.
         persistentLoopNotes.RemoveAll(t => t.stepIndex == stepAbs);
         AddNoteToLoop(stepAbs, midiNote, durationTicks, velocity127, lightMarkerNow, authoredRootMidi, skipChordQuantize);
-        NotifyNoteCommittedForDust();
         TutorialEvents.RaiseNotePlaced();
         AwardCompetitiveNote(placer, burstId);
 

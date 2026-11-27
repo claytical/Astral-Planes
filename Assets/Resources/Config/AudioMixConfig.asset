@@ -27,4 +27,6 @@ MonoBehaviour:
       type: 2}
   drumsGroup: {fileID: 7911228863291149657, guid: 07985bf4f6d469340930e958ef313c14,
     type: 2}
+  effectsGroup: {fileID: 5833623550140716882, guid: 07985bf4f6d469340930e958ef313c14,
+    type: 2}
   drumVolume: 1

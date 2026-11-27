@@ -27,7 +27,9 @@ using UnityEngine;
 //  spin / tilt / scale-out exit plays under it; the camera pulls back once the interstitial maze
 //  has grown around the players (ReleaseRecordExitZoom).
 //
-//  The camera zoom is presentation only; gameplay reads GameplayFrame.
+//  The camera zoom is presentation only; gameplay reads GameplayFrame. All of these zooms (and
+//  the dim that hides everything but the record) play only during the narrated tutorial
+//  (RecordZoomsEnabled); in normal play the camera stays home and the same beats play unzoomed.
 //
 //  Competitive modes skip all of this: the intro fades and the motif bridges immediately, as
 //  before — those players compete over notes and stars, not over reaching the next motif.
@@ -83,6 +85,10 @@ public partial class GameFlowManager
 
     private bool CanUseRecordRecovery => SessionState == null || !SessionState.IsCompetitive;
 
+    // Record camera zooms (and the dim that hides everything else) play only during the narrated
+    // tutorial; in normal play the camera stays home.
+    private static bool RecordZoomsEnabled => NarratedTutorialController.IsRunning;
+
     // ── Motif start ──────────────────────────────────────────────────────────
 
     /// <summary>
@@ -117,6 +123,13 @@ public partial class GameFlowManager
         if (docked && NarratedTutorialController.WillDriveIntroZoom)
         {
             // The narrated tutorial zooms in and out on its own lines (BeginNarrationSpotlight).
+            TutorialEvents.RaiseIntroRecordHidden();
+            yield break;
+        }
+
+        if (docked && !RecordZoomsEnabled)
+        {
+            // Normal play: no zoom, no dim — the record just sits in its vault.
             TutorialEvents.RaiseIntroRecordHidden();
             yield break;
         }
@@ -391,7 +404,8 @@ public partial class GameFlowManager
 
         // The narrated tutorial zooms on this ring from its own lines; keep the camera still and
         // just let the notes land and the shell re-tint on the usual schedule.
-        bool zoomIn = !NarratedTutorialController.ClaimsRingSpotlight;
+        // Outside the tutorial there is no ring zoom at all.
+        bool zoomIn = RecordZoomsEnabled && !NarratedTutorialController.ClaimsRingSpotlight;
         var zoom = zoomIn ? CameraZoomDirector.GetOrCreate() : null;
         if (zoom != null) _ringFocusId = HoldOnRecord(zoom, rings, rings.DockWorldPosition);
         float loop    = activeDrumTrack != null ? activeDrumTrack.GetLoopLengthInSeconds() : 2f;
@@ -558,9 +572,10 @@ public partial class GameFlowManager
         TutorialEvents.RaiseRecordCollected();
 
         var rings = GetMotifRingGlyphApplicator();
-        var zoom  = CameraZoomDirector.GetOrCreate();
-        RecordExitZoomActive = true;
-        _recordExitZoomId    = rings != null ? HoldRecordCentered(zoom, rings) : 0;
+        RecordExitZoomActive = true; // "collected record is exiting", zoom or not (BridgeCoordinator)
+        // Tutorial only: centre and zoom on the exit. Normal play: it spins off in place.
+        _recordExitZoomId    = rings != null && RecordZoomsEnabled
+            ? HoldRecordCentered(CameraZoomDirector.GetOrCreate(), rings) : 0;
         if (_recordExitRoutine != null) StopCoroutine(_recordExitRoutine);
         _recordExitRoutine = StartCoroutine(RecordExitRoutine(rings));
         return true;

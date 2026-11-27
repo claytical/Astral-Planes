@@ -55,7 +55,7 @@ public partial class LocalPlayer : MonoBehaviour
     private void Awake()
     {
         _sfxSource = GetComponent<AudioSource>();
-        if (_sfxSource != null) _sfxSource.outputAudioMixerGroup = effectsMixerGroup;
+        if (_sfxSource != null) _sfxSource.outputAudioMixerGroup = AudioMixConfig.ResolveEffects(effectsMixerGroup);
 
         _playerInput = GetComponent<PlayerInput>();
         if (_playerInput == null) return;

@@ -115,7 +115,7 @@ public partial class CosmicDustGenerator
                 if (IsDustSpawnBlocked(gp)) continue;
 
     // 3) Spawn/regrow if empty
-                if (_regrowthScheduler.VoidGrowCoroutines.ContainsKey(gp))
+                if (_regrow.IsVoidGrowing(gp))
                     continue;
 
                 // Ripple: cells nearer the ring's inner edge (u≈0) start growing sooner than
@@ -127,7 +127,7 @@ public partial class CosmicDustGenerator
                 float effectiveGrowIn = Mathf.Max(0.05f, growInSeconds - startDelaySeconds);
 
                 SetCellFlag(gp, CellFlags.VoidGrow);
-                _regrowthScheduler.VoidGrowCoroutines[gp] = StartCoroutine(VoidGrowCellNow(gp, spawnRole, spawnColor, effectiveGrowIn, startDelaySeconds));
+                _regrow.StartVoidGrow(gp, VoidGrowCellNow(gp, spawnRole, spawnColor, effectiveGrowIn, startDelaySeconds));
             }
         }
 
@@ -288,11 +288,10 @@ public partial class CosmicDustGenerator
             // sealed shell. VoidGrowCellNow still waits out a ship physically on the cell.
             bool vaultShell = IsSealedVaultShell(gp);
             if (!vaultShell && (dustClaims != null && dustClaims.IsBlocked(gp))) continue;
-            if (_regrowthScheduler.VoidGrowCoroutines.ContainsKey(gp)) continue;
+            if (_regrow.IsVoidGrowing(gp)) continue;
 
             SetCellFlag(gp, CellFlags.VoidGrow);
-            _regrowthScheduler.VoidGrowCoroutines[gp] =
-                StartCoroutine(VoidGrowCellNow(gp, spawnRole, spawnColor, growInSeconds, 0f, bloomed));
+            _regrow.StartVoidGrow(gp, VoidGrowCellNow(gp, spawnRole, spawnColor, growInSeconds, 0f, bloomed));
         }
     }
 
@@ -346,7 +345,7 @@ public partial class CosmicDustGenerator
     /// </summary>
     private IEnumerator VoidGrowCellNow(Vector2Int gp, MusicalRole role, Color tintWithAlpha, float growInSeconds, float startDelaySeconds = 0f, bool bloomed = false)
     {
-        if (!IsInBounds(gp)) { _regrowthScheduler.VoidGrowCoroutines.Remove(gp); yield break; }
+        if (!IsInBounds(gp)) { _regrow.VoidGrowFinished(gp); yield break; }
 
         // Ripple delay: wait before evaluating vetoes/spawning so a cell delayed by A1's ring
         // ripple checks current state rather than stale state from ring-imprint time.
@@ -361,14 +360,14 @@ public partial class CosmicDustGenerator
         // Permanent clear and claims are hard vetoes for even showing visuals.
         if (veto0_perm || veto0_claim)
         {
-            _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
+            _regrow.VoidGrowFinished(gp);
             yield break;
         }
 
         var go = GetOrCreateCellGO(gp);
         if (go == null)
         {
-            _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
+            _regrow.VoidGrowFinished(gp);
             yield break;
         }
 
@@ -410,7 +409,7 @@ public partial class CosmicDustGenerator
         {
             SetCellState(gp, DustCellState.Empty);
             FadeAndHideCellGO(go);
-            _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
+            _regrow.VoidGrowFinished(gp);
             yield break;
         }
 
@@ -424,7 +423,7 @@ public partial class CosmicDustGenerator
             if (GameFlowManager.VerboseLogging) Debug.Log($"[VOID_GROW] ABORT_END gp={gp} vehicle={veto1_vehicle} claim={veto1_claim}");
             SetCellState(gp, DustCellState.Empty);
             FadeAndHideCellGO(go);
-            _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
+            _regrow.VoidGrowFinished(gp);
             yield break;
         }
 
@@ -436,6 +435,6 @@ public partial class CosmicDustGenerator
             SetDustCollision(dust, true);
         }
 
-        _regrowthScheduler.VoidGrowCoroutines.Remove(gp);
+        _regrow.VoidGrowFinished(gp);
     }
 }

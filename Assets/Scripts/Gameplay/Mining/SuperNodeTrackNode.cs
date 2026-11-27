@@ -45,7 +45,6 @@ public class SuperNodeTrackNode : TrackNode
     private float spawnGraceSeconds => Cfg.spawnGraceSeconds;
     private int ascendLoopsOverride => Cfg.ascendLoopsOverride;
     private float dustFadeSeconds => Cfg.dustFadeSeconds;
-    private float dustRegrowDelay => Cfg.dustRegrowDelay;
     private float faceTurnRate => Cfg.faceTurnRate;
     private float wobbleDeg => Cfg.wobbleDeg;
     private Vector2 wobbleHzRange => Cfg.wobbleHzRange;
@@ -374,7 +373,7 @@ public class SuperNodeTrackNode : TrackNode
         if (dust == null) return;
         if (AssignedTrack != null && dust.Role != AssignedTrack.assignedRole) return;
         Vector2Int cell = _drum.WorldToGridPosition(dust.transform.position);
-        _dustGen.CarveCellPreserveGray(cell, dustFadeSeconds, DustClearSource.SuperNode, dustRegrowDelay);
+        _dustGen.CarveCellPreserveGray(cell, dustFadeSeconds, DustClearSource.SuperNode);
     }
 
     private void Collect(Vehicle vehicle)

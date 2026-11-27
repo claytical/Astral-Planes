@@ -8,8 +8,9 @@ public enum NotePlacementMethod
 }
 
 /// <summary>
-/// Single source of truth for the starting placement mode (LEGIBILITY_AUDIT.md C4). LocalPlayer,
-/// PlayerSelect and Vehicle all initialize from this so they can't disagree again.
+/// Fallback starting placement mode (LEGIBILITY_AUDIT.md C4) and GameSettings' default. A fresh
+/// player at ship select starts on GameSettings.GrooveStyle (the last confirmed choice, also in
+/// Options → Controls); this constant only seeds field initializers and the settings default.
 /// </summary>
 public static class NotePlacementDefaults
 {

@@ -49,6 +49,9 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
     [Tooltip("One-shot particle prefab spawned at a note's position on its ring while RingPreviewPlayer plays it back (PhaseLibrary carousel preview only). Must self-destroy (e.g. via Explosion.cs) and expose a ParticleSystem to receive the ring's role color.")]
     [SerializeField] private GameObject notePlaybackFireworkPrefab;
 
+    [Tooltip("One-shot particle prefab spawned around a gameplay ring when its last note lands (RingCompleteFlare.cs; count = RingGlyphConfig.ringCompleteBurstPoints). Must self-destroy and expose a ParticleSystem to receive the ring's colour. Falls back to notePlaybackFireworkPrefab when unset.")]
+    [SerializeField] private GameObject ringCompleteBurstPrefab;
+
     [Tooltip("Mixer group for launch/impact one-shot SFX (see PlayOneShotRouted in Animation.cs).")]
     [SerializeField] private AudioMixerGroup effectsMixerGroup;
 
@@ -66,6 +69,19 @@ public partial class MotifRingGlyphApplicator : MonoBehaviour
 
     /// <summary>Fires when the exiting record, spun and tilted, begins its final scale-out.</summary>
     public event System.Action OnRecordShrinkStarted;
+
+    // World position where the last finished record shrank to nothing (set at the end of
+    // SpinAndRollOffActiveRings). The interstitial maze's wisp appears here (PathChoiceCoordinator).
+    private Vector3? _lastRecordVanishWorldPos;
+
+    /// <summary>Returns and clears where the last record vanished, so a stale point is never reused.</summary>
+    public bool TryTakeLastRecordVanishPos(out Vector2 pos)
+    {
+        pos = _lastRecordVanishWorldPos ?? Vector3.zero;
+        bool has = _lastRecordVanishWorldPos.HasValue;
+        _lastRecordVanishWorldPos = null;
+        return has;
+    }
 
     /// <summary>True from the start of the record's spin-off exit until its rings are destroyed.</summary>
     public bool IsRecordLeaving => _gameplayFadingOut;

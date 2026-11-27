@@ -24,8 +24,6 @@ public sealed class DustRoleDensityTracker
     private readonly Func<Vector2Int, CosmicDust> _tryGetDustAt;
 
     private readonly Dictionary<RoleVoiceKey, int> _solidCountByVoice = new Dictionary<RoleVoiceKey, int>();
-    private int _genericFillSolidCount;
-    public int GenericFillSolidCount => _genericFillSolidCount;
 
     private List<MusicalRole> _activeRoles;   // set from motif at phase start via SetActiveRoles
     private List<RoleVoiceKey> _activeVoices; // set from motif at phase start via SetActiveVoices
@@ -119,14 +117,10 @@ public sealed class DustRoleDensityTracker
         // Also check the live dust object in case the imprint was removed but Role was set.
         if (role == MusicalRole.None)
         {
-            // Generic-fill cells (exact-count leftover) are tracked separately so density-easing
-            // math can exclude inert filler from its solid-fraction figure — see
-            // CosmicDustGenerator.CellLifecycle.cs's GetRoleRelevantSolidFraction.
+            // Generic-fill cells (exact-count leftover) are inert filler: never counted toward a
+            // voice's density, even if the live dust object carries a stale role.
             if (isGenericFill)
-            {
-                _genericFillSolidCount = Mathf.Max(0, _genericFillSolidCount + (becomesSolid ? 1 : -1));
                 return;
-            }
             var d = _tryGetDustAt(gp);
             if (d != null) { role = d.Role; voiceIndex = d.VoiceIndex; }
         }

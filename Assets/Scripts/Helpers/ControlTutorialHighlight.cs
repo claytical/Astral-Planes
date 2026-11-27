@@ -107,7 +107,7 @@ public partial class ControlTutorialHighlight : MonoBehaviour
     {
         _audioSource = GetComponent<AudioSource>();
         if (!_audioSource) _audioSource = gameObject.AddComponent<AudioSource>();
-        _audioSource.outputAudioMixerGroup = effectsMixerGroup;
+        _audioSource.outputAudioMixerGroup = AudioMixConfig.ResolveEffects(effectsMixerGroup);
         CacheBaseScale(stickImage, ref _stickBaseScale);
         CacheBaseScale(boostImage, ref _boostBaseScale);
 

@@ -2,10 +2,14 @@ using System;
 using System.IO;
 using UnityEngine;
 
-// Settings → Reset All Progress. Returns the local install to a first-launch state:
-// rings, the Publish choice, and local telemetry run files. Deliberately keeps
-// publisher_identity.json (so a later "Don't Publish" can still remove this player's
-// published records server-side) and never touches Steam stats/achievements.
+// Options → Data → Reset All Progress. Erases progress only: rings and local telemetry run
+// files. Settings (GameSettings / settings.json: volume, controls, publish choice) are kept —
+// Options → Data → Restore Default Settings resets those separately.
+//
+// publisher_identity.json is kept too, so a later "Don't Publish" can still withdraw this
+// player's published records server-side. The only way to drop it is the reset confirm's
+// "Erase & Withdraw Published Records", which withdraws first and then calls
+// PublisherIdentity.Forget (OptionsMenu). Steam stats/achievements are never touched.
 // Ring deletions reach Steam Cloud (Auto-Cloud) when the game exits cleanly; if it crashes
 // before then, the cloud copies come back on next launch.
 public static class SaveDataReset
@@ -20,13 +24,11 @@ public static class SaveDataReset
         Debug.Log($"[SaveData] persistentDataPath = {Application.persistentDataPath} (ring save v{RingSessionStore.CurrentSaveVersion})");
     }
 
-    public static void ResetAll()
+    public static void ResetProgress()
     {
         Try("rings", RingSessionStore.DeleteAll);
-        Try("publish choice", TelemetryConsent.Reset);
-        Try("control prefs", ControlPrefs.Reset);
         Try("telemetry runs", DeleteTelemetryRuns);
-        Debug.Log("[SaveData] Reset all progress.");
+        Debug.Log("[SaveData] Reset all progress (settings kept).");
     }
 
     private static void DeleteTelemetryRuns()

@@ -24,6 +24,9 @@ public class AudioMixConfig : ScriptableObject
     [Tooltip("Bus the drum loop AudioSources route to (live DrumTrack decks and the carousel preview).")]
     public AudioMixerGroup drumsGroup;
 
+    [Tooltip("Sound-effects bus (ProceduralMixer/Effects). Options → Effects volume drives it; components whose own effectsMixerGroup is unassigned fall back to this (ResolveEffects).")]
+    public AudioMixerGroup effectsGroup;
+
     [Range(0f, 1f)]
     [Tooltip("Base AudioSource volume of the drum loop, live and in the carousel preview.")]
     public float drumVolume = DefaultDrumVolume;
@@ -60,6 +63,11 @@ public class AudioMixConfig : ScriptableObject
         var cfg = Instance;
         return cfg != null ? cfg.DrumVolumeFor(motif) : fallback;
     }
+
+    /// <summary><paramref name="serialized"/> if assigned, else the config's effectsGroup, so SFX
+    /// sources never bypass the mixer (and the Effects volume) just because a field was left empty.</summary>
+    public static AudioMixerGroup ResolveEffects(AudioMixerGroup serialized) =>
+        serialized != null ? serialized : Instance?.effectsGroup;
 
     public AudioMixerGroup GetGroup(MusicalRole role)
     {

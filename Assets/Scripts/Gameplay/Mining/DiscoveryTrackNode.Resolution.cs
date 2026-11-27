@@ -126,11 +126,37 @@ public partial class DiscoveryTrackNode
     private void FireResolvedOnce()
     {
         if (!TryMarkResolved()) return;
-        ReleaseHeldDustOnce();
+        ReleaseHeldDustOnce(); // role is still suspended here, so these cells stay empty
+        EndRoleRegrowthHold(WasCaptured);
         var outcome = WasCaptured ? DiscoveryTrackNodeOutcome.Captured
                     : WasEscaped  ? DiscoveryTrackNodeOutcome.Escaped
                                   : DiscoveryTrackNodeOutcome.Expired;
         OnResolved?.Invoke(this, outcome);
+    }
+
+    // Role regrowth hold (CosmicDustGenerator.RoleRegrowth.cs): the charged Star suspended this
+    // role's regrowth and hands the hold over at ejection; ended exactly once on resolve/destroy.
+    private MusicalRole _regrowHoldRole = MusicalRole.None;
+
+    /// <summary>Takes over the ejecting Star's hold. None → register one for this node's own role.</summary>
+    public void AdoptRoleRegrowthHold(MusicalRole heldRole)
+    {
+        if (_regrowHoldRole != MusicalRole.None) return;
+        if (heldRole == MusicalRole.None)
+        {
+            heldRole = _role;
+            if (heldRole == MusicalRole.None) return;
+            GameFlowManager.Instance?.dustGenerator?.AcquireRoleRegrowthHold(heldRole);
+        }
+        _regrowHoldRole = heldRole;
+    }
+
+    private void EndRoleRegrowthHold(bool captured)
+    {
+        var role = _regrowHoldRole;
+        if (role == MusicalRole.None) return;
+        _regrowHoldRole = MusicalRole.None;
+        GameFlowManager.Instance?.dustGenerator?.ReleaseRoleRegrowthHold(role, captured);
     }
 
     public void AttachHeldDustBatch(List<Vector2Int> cells)

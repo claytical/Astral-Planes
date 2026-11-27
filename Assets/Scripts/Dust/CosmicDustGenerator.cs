@@ -47,7 +47,6 @@ public readonly struct DustClearRequest
 public partial class CosmicDustGenerator : MonoBehaviour
 {
     private GameFlowManager _gfm;
-    private CosmicDustRegrowthController _regrow;
     private bool _isBootstrappingMaze = false;
     public GameObject dustPrefab;
     public Transform activeDustRoot;
@@ -118,7 +117,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         () => drums != null ? drums.GetSpawnGridHeight() : 0,
         () => dustClaims,
         cell => _permanentClearCells.Contains(cell),
-        cell => RequestRegrowCellAt(cell, -1f, true, false),
+        cell => RequestRegrowCellAt(cell, -1f, true),
         HasDustAt,
         (cell, fade) => CarveDustByVehicle(cell, fade),
         cell => { TryGetCellGo(cell, out var go); return go; },
@@ -130,7 +129,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         () => drums != null ? drums.GetSpawnGridHeight() : 0,
         () => dustClaims,
         cell => _permanentClearCells.Contains(cell),
-        cell => RequestRegrowCellAt(cell, -1f, true, false),
+        cell => RequestRegrowCellAt(cell, -1f, true),
         IsRecordVaultCell);
 
     private CosmicDustColliderSuppressionController _colliderSuppressionBacking;
@@ -172,7 +171,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
     private readonly DustGridState _gridState = new();
 
     private MazePatternConfig _activeMazePattern;
-    private readonly DustRegrowthScheduler _regrowthScheduler = new();
     private readonly MazeTopologyService _mazeTopologyService = new();
 
     private HashSet<Vector2Int> _permanentClearCells = new HashSet<Vector2Int>();
@@ -185,11 +183,11 @@ public partial class CosmicDustGenerator : MonoBehaviour
     // to specific sources (VehiclePlow, CollectableBombBlast). Written whenever a regrow is
     // scheduled; read-and-removed once.
     private readonly Dictionary<Vector2Int, DustClearSource> _pendingRegrowSource = new();
-    // The resolved regrow delay (role regrowthDelay x ship multiplier, or per-source pattern
-    // delay) for a cell's pending regrow cycle. Keep-clear releases (vehicle footprint/trail,
-    // star pocket, corridors) re-request regrow with no delay and refreshIfPending — without
-    // this they restarted the timer on the maze pattern's base regrowDelay (2-4s), silently
-    // replacing every role's authored delay (Bass 8s -> 2s). Cleared when the cell goes Solid.
+    // The regrow delay recorded for a cell's pending regrow cycle, so keep-clear releases
+    // (vehicle footprint/trail, star pocket, corridors) that re-request with no delay keep the
+    // cycle's delay. With one constant delay (config.regrowDelaySeconds) this only matters if
+    // an explicit override was passed; kept as the hook for the composition overhaul.
+    // Cleared when the cell goes Solid.
     private readonly Dictionary<Vector2Int, float> _pendingRegrowDelay = new();
     private Coroutine _spawnRoutine;
     private DrumTrack drums;
@@ -230,30 +228,8 @@ public partial class CosmicDustGenerator : MonoBehaviour
             _spawnRoutine = null;
         }
 
-        // Stop any pending per-cell regrowth-delay coroutines.
-        _regrow?.CancelAllPending();
-
-        // Stop any void-grow coroutines that might still be animating dust in.
-        if (_regrowthScheduler.VoidGrowCoroutines != null)
-        {
-            foreach (var kv in _regrowthScheduler.VoidGrowCoroutines)
-            {
-                if (kv.Value != null)
-                    StopCoroutine(kv.Value);
-            }
-            _regrowthScheduler.VoidGrowCoroutines.Clear();
-        }
-
-        // Stop any in-flight commit coroutines (past the delay, animating a cell solid).
-        if (_regrowthScheduler.CommitRegrowCoroutines != null)
-        {
-            foreach (var kv in _regrowthScheduler.CommitRegrowCoroutines)
-            {
-                if (kv.Value != null)
-                    StopCoroutine(kv.Value);
-            }
-            _regrowthScheduler.CommitRegrowCoroutines.Clear();
-        }
+        // Stop every regrow-delay, commit-regrow and void-grow coroutine and the step queue.
+        _regrow.CancelAll();
     }
 
     public void HardStopRegrowthForBridge(bool hideTransientDust = true)
@@ -302,15 +278,16 @@ public partial class CosmicDustGenerator : MonoBehaviour
             }
         }
 
-        // IMPORTANT:
-        // Drop the controller entirely so any internal pending queue/timers are discarded.
-        _regrow = null;
+        // CancelAllInFlightDustCoroutines above already emptied the controller's timers and
+        // step queue; _regrowthSuppressed keeps new requests out until ResumeRegrowthAfterBridge.
     }
 
      public void ResumeRegrowthAfterBridge()
     {
         _regrowthSuppressed = false;
-        EnsureRegrowController();
+        // Motif begins: every role regrows normally. ClearMaze already reset this on a fresh
+        // maze; a motif that grows in place (no ClearMaze) releases its leftover roles here.
+        ResumeAllRoleRegrowth();
     }
 
     private void SetDustCollision(CosmicDust dust, bool _enabled)
@@ -347,8 +324,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
                                      config.dustCoreParticleSize);
         TryEnsureRefs();
         EnsureCellGrid();
-        _regrowthScheduler.Initialize(config.regrowCellsPerStep, config.regrowColliderEnableDelaySeconds);
-        EnsureRegrowController();
         // Init extracted systems (no pooling/legacy queues required).
         if (_tintDiffusionSystem == null)
             _tintDiffusionSystem = new CosmicDustTintDiffusionSystem(
@@ -362,39 +337,38 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
         // Flow field sizing is lazy and handled in Update once drums is valid.
     }
-    private void EnsureRegrowController()
+    // Created on first use; lives for the generator's lifetime (bridges/maze resets call
+    // CancelAll instead of dropping it). Delegates read config/drums lazily.
+    private CosmicDustRegrowthController _regrowBacking;
+    private CosmicDustRegrowthController _regrow => _regrowBacking ??= new CosmicDustRegrowthController(
+        host: this,
+        isInBounds: IsInBounds,
+        isPermanentClear: gp => _permanentClearCells.Contains(gp),
+        hasDustAt: HasDustAt,
+        isKeepClearCell: IsKeepClearCell,
+        isRegrowBlocked: IsRegrowBlocked,
+        tryGetPendingRegrow: gp => TryGetCellState(gp, out var st) && st == DustCellState.PendingRegrow,
+        setCellEmpty: gp => SetCellState(gp, DustCellState.Empty),
+        setCellPendingRegrow: gp => SetCellState(gp, DustCellState.PendingRegrow),
+        commitRegrowCell: CommitRegrowCell,
+        getRegrowVetoRetryDelaySeconds: () => Mathf.Max(0.05f, config.regrowVetoRetryDelaySeconds),
+        getRegrowCellsPerStep: () => Mathf.Max(0, config.regrowCellsPerStep));
+
+    /// <summary>
+    /// The one regrow veto, checked by the delay coroutine, the step gate and CommitRegrowCell
+    /// (before grow-in and again before going Solid). A cell may not regrow while it is:
+    /// claimed / keep-clear (DustClaimManager — IsDustSpawnBlocked is the same lookup),
+    /// occupied by a collectable, unavailable on the spawn grid (nodes, notes, record vault),
+    /// or under a vehicle. Permanent clears are handled separately (they end the cycle).
+    /// </summary>
+    private bool IsRegrowBlocked(Vector2Int gp)
     {
-     
-        if (_regrow != null) return;
-        if (drums == null) return;
-
-        _regrow = new CosmicDustRegrowthController(
-            host: this,
-
-            isInBounds: IsInBounds,
-            isPermanentClear: gp => _permanentClearCells.Contains(gp),
-            hasDustAt: HasDustAt,
-            isKeepClearCell: IsKeepClearCell,
-            isDustSpawnBlocked: IsDustSpawnBlocked,
-            isCollectableCellFree: gp => Collectable.IsCellFreeStatic(gp),
-            isSpawnCellAvailable: gp => drums != null && drums.IsSpawnCellAvailable(gp.x, gp.y),
-            isVehicleOverlappingCell: gp =>
-            {
-                if (drums == null) return false;
-                float cellWorld = Mathf.Max(0.001f, drums.GetCellWorldSize());
-                Vector3 world = drums.GridToWorldPosition(gp);
-                return _colliderSuppression.IsVehicleOverlappingCellWorld(world, cellWorld);
-            },
-
-            tryGetPendingRegrow: gp => TryGetCellState(gp, out var st) && st == DustCellState.PendingRegrow,
-            setCellEmpty: gp => SetCellState(gp, DustCellState.Empty),
-            setCellPendingRegrow: gp => SetCellState(gp, DustCellState.PendingRegrow),
-            startCommitRegrowCell: gp => _regrowthScheduler.CommitRegrowCoroutines[gp] = StartCoroutine(CommitRegrowCell(gp)),
-
-            getRegrowVetoRetryDelaySeconds: () => Mathf.Max(0.05f, config.regrowVetoRetryDelaySeconds),
-            getRegrowCellsPerStep: () => Mathf.Max(0, config.regrowCellsPerStep)
-        );
+        if (IsKeepClearCell(gp)) return true;
+        if (!Collectable.IsCellFreeStatic(gp)) return true;
+        if (drums == null || !drums.IsSpawnCellAvailable(gp.x, gp.y)) return true;
+        return IsVehicleOverlappingCell(gp);
     }
+
     private void TryEnsureRefs()
     {
         if (drums != null && phaseTransitionManager != null) return;
@@ -410,7 +384,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
         if (_gfm == null) _gfm = GameFlowManager.Instance;
         drums = _gfm.activeDrumTrack;
         TryEnsureRefs();
-        EnsureRegrowController();
         if (dustClaims == null) dustClaims = FindAnyObjectByType<DustClaimManager>();
         if (_tintDiffusionSystem == null)
             _tintDiffusionSystem = new CosmicDustTintDiffusionSystem(
@@ -443,7 +416,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
         _colliderSuppression.Tick();
         if (_regrowthSuppressed)
             return;
-        EnsureRegrowController();
         // Tint diffusion: keep visual seams soft around recent changes.
         ProcessTintDiffusion(Time.deltaTime);
 
@@ -451,7 +423,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
 
 
         // Regrow step gate: promote PendingRegrow -> Regrowing/Solid rhythmically on drum steps.
-        _regrow?.ProcessStepGate(drums.currentStep);
+        _regrow.ProcessStepGate(drums.currentStep);
     }
 
     private bool IsVehicleOverlappingCell(Vector2Int gp) => _colliderSuppression.IsVehicleOverlappingCell(gp);
@@ -464,27 +436,22 @@ public partial class CosmicDustGenerator : MonoBehaviour
                 HideCellGO(existing);
 
             SetCellState(gp, DustCellState.Empty);
-            _regrowthScheduler.CommitRegrowCoroutines.Remove(gp);
+            _regrow.CommitFinished(gp);
             yield break;
         }
 
-        // ---------------------------------------------------------------
-        // VEHICLE GATE: never begin grow-in while a vehicle sits on the cell.
-        // Re-enqueue as PendingRegrow so the step gate retries later.
-        // ---------------------------------------------------------------
-        if (IsVehicleOverlappingCell(gp))
+        // Shared regrow veto (IsRegrowBlocked) — conditions may have changed since the step
+        // gate dequeued this cell. Re-enqueue as PendingRegrow so the step gate retries later.
+        if (_regrow.IsRegrowBlocked(gp))
         {
             SetCellState(gp, DustCellState.PendingRegrow);
             EnqueueStepRegrow(gp);
-            _regrowthScheduler.CommitRegrowCoroutines.Remove(gp);
+            _regrow.CommitFinished(gp);
             yield break;
         }
 
-        // Density gate: a frontier compensation cell already restored coverage for this
-        // erosion event. Suppress the original cell so dust "shifts" rather than doubling.
-
         var go = GetOrCreateCellGO(gp);
-        if (go == null) { _regrowthScheduler.CommitRegrowCoroutines.Remove(gp); yield break; }
+        if (go == null) { _regrow.CommitFinished(gp); yield break; }
         if (!go.activeSelf)
             go.SetActive(true);
         // Visual comes back first.
@@ -570,12 +537,6 @@ public partial class CosmicDustGenerator : MonoBehaviour
             dust.SetFeedbackColors(Color.white, denyColor);
             dust.Begin();
             SetDustCollision(dust, false);
-
-            if (config.regrowSpeedPreviewEnabled && roleProfile != null && roleProfile.regrowthDelay >= 0f)
-                dust.PreviewRegrowSpeed(roleProfile.regrowthDelay, config.regrowSpeedPreviewFastSeconds,
-                    config.regrowSpeedPreviewSlowSeconds, config.regrowSpeedPreviewFastColor,
-                    config.regrowSpeedPreviewSlowColor, config.regrowSpeedPreviewPulseSeconds,
-                    regrowTint, config.regrowSpeedPreviewGlowBoost01);
         }
 
         // Let the visual settle before collisions are reintroduced.
@@ -587,16 +548,16 @@ public partial class CosmicDustGenerator : MonoBehaviour
         {
             SetCellState(gp, DustCellState.Empty);
             FadeAndHideCellGO(go);
-            _regrowthScheduler.CommitRegrowCoroutines.Remove(gp);
+            _regrow.CommitFinished(gp);
             yield break;
         }
 
-        if (IsKeepClearCell(gp) || IsDustSpawnBlocked(gp) || IsVehicleOverlappingCell(gp))
+        if (_regrow.IsRegrowBlocked(gp))
         {
             SetCellState(gp, DustCellState.PendingRegrow);
             FadeAndHideCellGO(go);              // stays active, but invisible + non-colliding
             EnqueueStepRegrow(gp);
-            _regrowthScheduler.CommitRegrowCoroutines.Remove(gp);
+            _regrow.CommitFinished(gp);
             yield break;
         }
 
@@ -606,7 +567,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
             dust.EnsureMinSolidAlpha(0.30f);
             SetDustCollision(dust, true);
         }
-        _regrowthScheduler.CommitRegrowCoroutines.Remove(gp);
+        _regrow.CommitFinished(gp);
     }
 
     // One shared WaitForSeconds instead of one per regrowing cell (it's immutable, so sharing is
@@ -623,11 +584,7 @@ public partial class CosmicDustGenerator : MonoBehaviour
         return _regrowColliderDelayWait;
     }
 
-    private void EnqueueStepRegrow(Vector2Int gp)
-    {
-        EnsureRegrowController();
-        _regrow?.EnqueueStepRegrow(gp);
-    }
+    private void EnqueueStepRegrow(Vector2Int gp) => _regrow.EnqueueStepRegrow(gp);
 
 
     // ------------------------------------------------------------------

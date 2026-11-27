@@ -71,6 +71,24 @@ public static class PublisherIdentity
         return _cached;
     }
 
+    /// <summary>
+    /// Deletes the stored identity; the next publish creates a fresh one. Only called by Options →
+    /// Data → "Erase & Withdraw Published Records", after the server-side withdrawal succeeded —
+    /// once this is gone the old records can never be withdrawn.
+    /// </summary>
+    public static void Forget()
+    {
+        _cached = null;
+        try
+        {
+            if (File.Exists(FilePath)) File.Delete(FilePath);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[PublisherIdentity] Failed to delete publisher identity: {e.Message}");
+        }
+    }
+
     private static PublisherIdentityFile Load()
     {
         if (_cached != null && IsValid(_cached)) return _cached;

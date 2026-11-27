@@ -311,24 +311,15 @@ public partial class LocalPlayer
         }
     }
 
-    // A confirmed player can flip co-op/competitive with the Selection Next/Previous actions (D-pad left/right) while 2+ players are joined.
-    private bool TryCycleGameMode(int dir)
-    {
-        var gfm = GameFlowManager.Instance;
-        var session = gfm != null ? gfm.SessionState : null;
-        if (!_isReady || session == null || session.CurrentState != GameState.Selection || session.Players.Count < 2 || session.ModeLocked)
-            return false;
-
-        session.CycleMode(dir);
-        _sfxSource?.PlayOneShot(clickFx);
-        return true;
-    }
-
+    // Selection Next/Previous (D-pad / arrow Left-Right) cycle ship and Groove Style. (The game
+    // mode is chosen on the title menu now — StartIntent — so there is no mode cycling here.)
+    // The Options menu is reachable in ship select, and its value rows use the same Left/Right,
+    // so while any modal is open (or on the frame it opened/closed) these must do nothing.
     public void OnNext(InputValue value)
     {
         if (!value.isPressed) return;
-        if (TryCycleGameMode(+1)) return;
-        if (_isReady) return; // confirmed: no ship/mode navigation (or nav sfx) while the tutorial runs
+        if (ModalMenu.ShouldSuppressInput) return;
+        if (_isReady) return; // confirmed: no ship navigation (or nav sfx) while the tutorial runs
         _sfxSource?.PlayOneShot(clickFx);
 
         if (_selection != null)
@@ -343,8 +334,8 @@ public partial class LocalPlayer
     public void OnPrevious(InputValue value)
     {
         if (!value.isPressed) return;
-        if (TryCycleGameMode(-1)) return;
-        if (_isReady) return; // confirmed: no ship/mode navigation (or nav sfx) while the tutorial runs
+        if (ModalMenu.ShouldSuppressInput) return;
+        if (_isReady) return; // confirmed: no ship navigation (or nav sfx) while the tutorial runs
         _sfxSource?.PlayOneShot(clickFx);
 
         if (_selection != null)

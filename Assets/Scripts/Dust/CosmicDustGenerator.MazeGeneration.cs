@@ -163,9 +163,10 @@ public partial class CosmicDustGenerator
         _carveAccumulator.Clear();
         _pendingRegrowSource.Clear();
         _pendingRegrowDelay.Clear();
+        ResetRoleRegrowth(); // motif begins: every role regrows normally
 
         if (GameFlowManager.VerboseLogging)
-            Debug.Assert(_regrowthScheduler.VoidGrowCoroutines.Count == 0 && _regrowthScheduler.CommitRegrowCoroutines.Count == 0,
+            Debug.Assert(_regrow.InFlightGrowCount == 0,
                 "[MAZE] ClearMaze: scheduler coroutine dictionaries not empty after cancellation.");
     }
 

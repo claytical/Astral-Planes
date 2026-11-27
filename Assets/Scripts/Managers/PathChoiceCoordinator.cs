@@ -304,10 +304,17 @@ public sealed class PathChoiceCoordinator
         // outgoing motif). Falls back to the current motif if the peek misses.
         MotifProfile targetMotif = ptm.PeekMotif(targetExit.TargetPhaseIndex, targetExit.TargetMotifIndex) ?? ptm.currentMotif;
 
+        // The wisp appears where the finished record just vanished (nearest open cell).
+        var rings = _gameFlow.GetMotifRingGlyphApplicator();
+        Vector2Int? recordCell = rings != null && rings.TryTakeLastRecordVanishPos(out var recordPos)
+            ? drums.WorldToGridPosition(recordPos)
+            : (Vector2Int?)null;
+
         var go = Object.Instantiate(prefab, Vector3.zero, Quaternion.identity);
         bool placed = go.TryGetComponent<Wisp>(out var wisp) &&
                       wisp.Initialize(drums, vehicleCells[0], targetExit.AnchorCell, targetMotif,
-                                      targetExit.TargetPhaseIndex, targetExit.TargetMotifIndex);
+                                      targetExit.TargetPhaseIndex, targetExit.TargetMotifIndex,
+                                      recordCell);
         if (!placed)
         {
             Object.Destroy(go);

@@ -23,15 +23,11 @@ public struct RoleDustSupply
 
 public partial class CosmicDustGenerator
 {
-    public RoleDustSupply GetRoleSupply(MusicalRole role) => ScanRoleSupply(role, null, null);
+    public RoleDustSupply GetRoleSupply(MusicalRole role) => ScanRoleSupply(role);
 
-    // One pass over the imprint store. Optionally collects solid, non-bloomed, non-held cells
-    // split into unrevealed (gray) and revealed (colored) lists for commit tightening.
-    // Event-driven callers only (note commit, star refresh) — not per frame.
-    private RoleDustSupply ScanRoleSupply(MusicalRole role, List<Vector2Int> unrevealedOut, List<Vector2Int> revealedOut)
+    // One pass over the imprint store. Event-driven callers only (star refresh) — not per frame.
+    private RoleDustSupply ScanRoleSupply(MusicalRole role)
     {
-        unrevealedOut?.Clear();
-        revealedOut?.Clear();
         var s = default(RoleDustSupply);
         if (role == MusicalRole.None || _imprints == null) return s;
 
@@ -53,12 +49,10 @@ public partial class CosmicDustGenerator
             if (dust.Role == MusicalRole.None)
             {
                 s.unrevealed++;
-                unrevealedOut?.Add(gp);
             }
             else if (dust.Role == role)
             {
                 s.revealed++;
-                revealedOut?.Add(gp);
             }
         }
         return s;

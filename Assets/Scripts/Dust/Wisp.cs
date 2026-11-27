@@ -66,7 +66,8 @@ public class Wisp : MonoBehaviour
     // sitting whichever cell Instantiate happened to use, which historically defaulted to
     // the vehicle's own cell and caused an instant, silent self-consume on spawn.
     public bool Initialize(DrumTrack drum, Vector2Int vehicleStartCell, Vector2Int targetExitCell, MotifProfile targetMotif,
-                           int targetPhaseIndex = -1, int targetMotifIndex = -1)
+                           int targetPhaseIndex = -1, int targetMotifIndex = -1,
+                           Vector2Int? preferredSpawnCell = null)
     {
         _drum = drum;
         _targetPhaseIndex = targetPhaseIndex;
@@ -92,6 +93,29 @@ public class Wisp : MonoBehaviour
             Debug.LogWarning($"[Wisp] No path found from vehicle cell {vehicleStartCell} to exit anchor {targetExitCell} — skipping spawn.");
             return false;
         }
+
+        // Preferred spawn (where the finished record vanished): nearest open cell to it, as long
+        // as it can still reach the exit. Falls back to the route band below otherwise.
+        if (preferredSpawnCell.HasValue &&
+            TryFindNearestOpenCell(drum, preferredSpawnCell.Value, out var openCell) &&
+            _pathfinder.TryFindPath(drum, openCell, targetExitCell))
+        {
+            Vector2Int cell = openCell;
+            // Don't appear inside the ship's trigger (instant self-consume) — step a little
+            // along the route toward the exit instead.
+            if (Mathf.Max(Mathf.Abs(cell.x - vehicleStartCell.x), Mathf.Abs(cell.y - vehicleStartCell.y)) <= 1)
+            {
+                var wp = _pathfinder.Waypoints;
+                cell = wp[Mathf.Min(2, wp.Count - 1)];
+            }
+
+            PlaceAt(drum, cell);
+            Debug.Log($"[Wisp] spawned at record vanish cell {cell} (record cell {preferredSpawnCell.Value})");
+            return true;
+        }
+
+        if (!_pathfinder.TryFindPath(drum, vehicleStartCell, targetExitCell))
+            return false; // re-run: the preferred-cell attempt above may have overwritten the route
 
         var waypoints = _pathfinder.Waypoints;
         int count = waypoints.Count;
@@ -132,14 +156,50 @@ public class Wisp : MonoBehaviour
         }
 
         int spawnIndex = Random.Range(minIndex, maxIndex + 1);
-        Vector2Int spawnCell = waypoints[spawnIndex];
+        PlaceAt(drum, waypoints[spawnIndex]);
+        if (preferredSpawnCell.HasValue)
+            Debug.Log($"[Wisp] record vanish cell {preferredSpawnCell.Value} unusable — fell back to route band");
+        return true;
+    }
 
-        _rb.position = drum.GridToWorldPosition(spawnCell);
+    private void PlaceAt(DrumTrack drum, Vector2Int cell)
+    {
+        _rb.position = drum.GridToWorldPosition(cell);
         transform.position = _rb.position;
 
         _wanderSeedX = Random.Range(0f, 1000f);
         _wanderSeedY = Random.Range(0f, 1000f);
-        return true;
+    }
+
+    // Ring-by-ring outward search for the closest dust-free cell (the record's own cell may now
+    // sit inside a maze wall).
+    private static bool TryFindNearestOpenCell(DrumTrack drum, Vector2Int start, out Vector2Int cell)
+    {
+        const int kMaxRadius = 8;
+        int w = drum.GetSpawnGridWidth();
+        int h = drum.GetSpawnGridHeight();
+        cell = start;
+        if (w <= 0 || h <= 0) return false;
+        start.x = Mathf.Clamp(start.x, 0, w - 1);
+        start.y = Mathf.Clamp(start.y, 0, h - 1);
+
+        for (int r = 0; r <= kMaxRadius; r++)
+        {
+            bool found = false;
+            float bestSq = float.MaxValue;
+            for (int dx = -r; dx <= r; dx++)
+                for (int dy = -r; dy <= r; dy++)
+                {
+                    if (Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dy)) != r) continue; // ring only
+                    var c = new Vector2Int(start.x + dx, start.y + dy);
+                    if (c.x < 0 || c.y < 0 || c.x >= w || c.y >= h) continue;
+                    if (drum.HasDustAt(c)) continue;
+                    float sq = dx * dx + dy * dy;
+                    if (sq < bestSq) { bestSq = sq; cell = c; found = true; }
+                }
+            if (found) return true;
+        }
+        return false;
     }
 
     private void FixedUpdate()

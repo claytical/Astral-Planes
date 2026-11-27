@@ -19,7 +19,7 @@ public partial class MotifRingGlyphApplicator
 
         var src = go.AddComponent<AudioSource>();
         src.spatialBlend = 0f; // 2D, matches prior PlayClipAtPoint usage at Camera.main
-        src.outputAudioMixerGroup = effectsMixerGroup;
+        src.outputAudioMixerGroup = AudioMixConfig.ResolveEffects(effectsMixerGroup);
         src.PlayOneShot(clip, volume);
 
         Destroy(go, clip.length);

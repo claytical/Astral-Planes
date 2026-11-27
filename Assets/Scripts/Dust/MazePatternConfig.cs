@@ -13,19 +13,6 @@ public enum MazePatternType
     Tunnels
 }
 
-[System.Serializable]
-public sealed class DustTimingParams
-{
-    [FormerlySerializedAs("regrowDelay")]
-    [Tooltip("Seconds before a cleared role-less (filler/None) cell regrows. Role cells use their MusicalRoleProfile.regrowthDelay instead. (Per-source overrides were removed 2026-11-17 — LEGIBILITY_AUDIT.md A5.)")]
-    public float regrowDelay = 8f;
-
-    public void Validate()
-    {
-        regrowDelay = Mathf.Max(0f, regrowDelay);
-    }
-}
-
 /// <summary>How a PhaseStar moves through a maze. Auto picks per MazePatternType (see ResolveMode).</summary>
 public enum PhaseStarNavMode
 {
@@ -458,9 +445,6 @@ public class MazePatternConfig : ScriptableObject
 {
     public MazePatternType patternType = MazePatternType.FullFill;
 
-    [Header("Dust Timing")]
-    public DustTimingParams dustTiming = new();
-
     [Header("Clear Boxes")]
     public ClearBoxesParams clearBoxes = new();
 
@@ -500,7 +484,6 @@ public class MazePatternConfig : ScriptableObject
 
     public void Validate()
     {
-        dustTiming ??= new DustTimingParams();
         clearBoxes ??= new ClearBoxesParams();
         cellularAutomata ??= new CellularAutomataParams();
         ring ??= new RingParams();
@@ -511,7 +494,6 @@ public class MazePatternConfig : ScriptableObject
         starNavigation ??= new StarNavigationParams();
         recordVault ??= new VaultShapeParams();
 
-        dustTiming.Validate();
         clearBoxes.Validate();
         cellularAutomata.Validate();
         ring.Validate();

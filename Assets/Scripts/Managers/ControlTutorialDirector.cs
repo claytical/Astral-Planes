@@ -85,13 +85,11 @@ public partial class ControlTutorialDirector : MonoBehaviour
         switch (s.name)
         {
             case "Main":
+                // The title menu (MainMenu) replaces the press-any prompt, and its OPTIONS row
+                // replaces the Select-for-settings hint.
                 _primaryTutorialRunning = false;
-                _desiredMode = RingSessionStore.LoadAllRingsFromDisk().Count == 0
-                    ? PrimaryMode.PressAnyAuto
-                    : PrimaryMode.Hidden;
-                // Fresh game: only the title, the press-any prompt and the tutorial ring preview.
-                if (_desiredMode == PrimaryMode.PressAnyAuto)
-                    HideFreshGameMainClutter();
+                _desiredMode = PrimaryMode.Hidden;
+                HideFreshGameMainClutter();
                 break;
 
             case "TrackSelection":
@@ -164,7 +162,7 @@ public partial class ControlTutorialDirector : MonoBehaviour
         _abortHoldPrompt = go.GetComponentInChildren<AbortHoldPrompt>(true);
     }
 
-    // Hides the settings affordances on a brand-new game's Main screen (no saved rings yet).
+    // Hides the old settings affordances on Main (the title menu has an OPTIONS row).
     private static void HideFreshGameMainClutter()
     {
         foreach (var name in new[] { "Settings Glyph Hint", "Settings Panel Root" })

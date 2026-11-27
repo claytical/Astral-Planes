@@ -13,7 +13,6 @@ public sealed class SessionStateCoordinator
     private readonly List<LocalPlayer> _players = new();
     private bool _hasGameOverStarted;
     private bool _matchEnded;
-    private bool _modeLocked;
     private bool _ghostCycleInProgress;
     private bool _bridgePending;
     private GameState _currentState = GameState.Begin;
@@ -30,20 +29,11 @@ public sealed class SessionStateCoordinator
     public bool GhostCycleInProgress => _ghostCycleInProgress;
     public bool BridgePending => _bridgePending;
 
-    /// <summary>Selected mode. Competitive modes only take effect with 2+ players (see <see cref="IsCompetitive"/>).</summary>
+    /// <summary>Session mode, set from the title menu (StartIntent): co-op unless VERSUS. Competitive
+    /// modes only take effect with 2+ players (see <see cref="IsCompetitive"/>).</summary>
     public GameMode Mode => _mode;
     public bool IsCompetitive => _mode != GameMode.Coop && _players.Count > 1;
     public bool MatchEnded => _matchEnded;
-
-    /// <summary>Multiplayer: set by the extra confirm press after everyone is ready; the mode can no longer change.</summary>
-    public bool ModeLocked => _modeLocked;
-
-    /// <summary>2+ players, all ready, mode not yet locked: waiting for one more confirm press before the tutorial.</summary>
-    public bool AwaitingModeConfirm =>
-        !_modeLocked && _players.Count >= 2 && _players.All(p => p != null && p.IsReady);
-
-    public void LockMode() => _modeLocked = true;
-    public void UnlockMode() => _modeLocked = false;
 
     /// <summary>Players still in the match (competitive: not permanently eliminated).</summary>
     public int AliveCount => _players.Count(p => p != null && !p.IsEliminated);
@@ -53,13 +43,6 @@ public sealed class SessionStateCoordinator
         if (_mode == mode) return;
         _mode = mode;
         ModeChanged?.Invoke(mode);
-    }
-
-    /// <summary>Steps through the modes; dir &gt; 0 forward, otherwise backward.</summary>
-    public void CycleMode(int dir)
-    {
-        int count = Enum.GetValues(typeof(GameMode)).Length;
-        SetMode((GameMode)(((int)_mode + (dir > 0 ? 1 : count - 1)) % count));
     }
 
     /// <summary>
@@ -111,7 +94,8 @@ public sealed class SessionStateCoordinator
     public void CheckAllPlayersReady(Action beginTutorial, Action beginGameplay)
     {
         if (!_players.All(p => p != null && p.IsReady)) return;
-        if (AwaitingModeConfirm) return;
+        // VERSUS waits on the join screen until a second player is in and ready.
+        if (StartIntent.IsVersus && _players.Count < StartIntent.VersusMinPlayers) return;
 
         if (ControlTutorialDirector.Instance != null)
         {
@@ -155,7 +139,7 @@ public sealed class SessionStateCoordinator
         SetCurrentState(GameState.Selection);
         _hasGameOverStarted = false;
         _matchEnded = false;
-        _modeLocked = false;
+        SetMode(StartIntent.SessionMode);
 
         CleanupDestroyedPlayers();
         foreach (var player in _players)
@@ -171,7 +155,6 @@ public sealed class SessionStateCoordinator
     {
         _hasGameOverStarted = false;
         _matchEnded = false;
-        _modeLocked = false;
         SetGhostCycleInProgress(false);
         SetBridgePending(false);
         SetCurrentState(GameState.Begin);

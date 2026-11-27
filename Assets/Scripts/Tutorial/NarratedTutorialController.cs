@@ -68,6 +68,23 @@ public class NarratedTutorialController : MonoBehaviour
     }
 
     /// <summary>
+    /// True while the narrated tutorial is running: an on-demand start (pause menu), or the
+    /// auto-start on the Phase 0 motif. Record camera zooms (GameFlowManager.RecordRecovery) only
+    /// play while this is true; normal play keeps the camera home with nothing dimmed.
+    /// </summary>
+    public static bool IsRunning
+    {
+        get
+        {
+            var t = _instance;
+            if (t == null || !t.enabled) return false;
+            if (t._manualStart) return true;
+            var ptm = GameFlowManager.Instance != null ? GameFlowManager.Instance.phaseTransitionManager : null;
+            return ptm != null && ptm.CurrentPhaseIndex == 0;
+        }
+    }
+
+    /// <summary>
     /// A stage still ahead (or current) zooms on the record from its own lines (spotlightLine, e.g.
     /// "You've completed your first ring!") and hasn't yet. Until it has, GameFlowManager's per-ring
     /// zoom stays out of the way, so the camera follows the narration rather than two competing

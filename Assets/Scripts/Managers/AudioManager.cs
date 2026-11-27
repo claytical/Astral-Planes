@@ -10,7 +10,7 @@ public class AudioManager : MonoBehaviour
     void Awake()
     {
         audioSource = GetComponent<AudioSource>();
-        if (audioSource != null) audioSource.outputAudioMixerGroup = effectsMixerGroup;
+        if (audioSource != null) audioSource.outputAudioMixerGroup = AudioMixConfig.ResolveEffects(effectsMixerGroup);
     }
 
     public void PlaySound(AudioClip clip)

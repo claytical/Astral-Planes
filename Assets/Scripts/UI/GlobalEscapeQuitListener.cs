@@ -4,8 +4,8 @@ using UnityEngine.InputSystem;
 // Arbitrates a single physical keyboard Escape press between two independent listeners that
 // both react to it: the existing per-player Leave/abort hold-to-confirm flows
 // (LocalPlayer.LeaveFlow.cs, bound via AstralPlanes.inputactions' Selection/Play "Leave"
-// action — ungrouped, so it fires regardless of control scheme) and the quit prompt
-// (QuitPrompt, shown through the generic ModalMenu).
+// action — ungrouped, so it fires regardless of control scheme) and the Options menu
+// (OptionsMenu, opened with Quit pre-selected so quitting stays two presses away).
 //
 // Added at runtime to GameFlowManager's DontDestroyOnLoad object (GameFlowManager.QuitFlow), so
 // it works in every scene. Deliberately bypasses AstralPlanes.inputactions/PlayerInput entirely
@@ -15,9 +15,10 @@ using UnityEngine.InputSystem;
 // Resolution: hold Escape to the existing 3-second threshold and Leave's own hold coroutine
 // (if one is running) keeps doing exactly what it does today — this listener recognizes the
 // same threshold independently and stays out of the way. A quick tap-and-release instead opens
-// the quit prompt, UNLESS the same press already fired the one leave path that has no hold at all
-// (the non-tutorial ship-select instant LeaveShipSelect()) — see LocalPlayer.JustLeftShipSelectInstantly —
-// or a modal was already open when Escape went down (ModalMenu treats that press as cancel).
+// the Paused menu (in a run) or the Quit prompt, UNLESS the same press already fired the one
+// leave path that has no hold at all (the non-tutorial ship-select instant LeaveShipSelect()) —
+// see LocalPlayer.JustLeftShipSelectInstantly — a modal was already open when Escape went down
+// (ModalMenu treats that press as cancel), or a menu claimed it as Back (MenuNav.ClaimEscape).
 public class GlobalEscapeQuitListener : MonoBehaviour
 {
     private const float HoldThresholdSeconds = 3f;
@@ -26,6 +27,7 @@ public class GlobalEscapeQuitListener : MonoBehaviour
     private float _pressStartUnscaledTime;
     private bool _instantLeaveClaimedThisPress;
     private bool _modalOpenAtPress;
+    private int _pressFrame;
 
     private void Update()
     {
@@ -37,6 +39,7 @@ public class GlobalEscapeQuitListener : MonoBehaviour
         {
             _tracking = true;
             _pressStartUnscaledTime = Time.unscaledTime;
+            _pressFrame = Time.frameCount;
             // Snapshot now — LeaveShipSelect() (if it fires at all for this press) runs
             // synchronously inside the same started-callback this same physical press triggers,
             // so it's already reflected in this same frame.
@@ -56,10 +59,11 @@ public class GlobalEscapeQuitListener : MonoBehaviour
             if (elapsed >= HoldThresholdSeconds) return; // genuine hold — Leave's own coroutine (if any) already handled it
             if (_instantLeaveClaimedThisPress) return;    // this same tap already fired the instant, no-hold leave
             if (_modalOpenAtPress) return;                // that press cancelled a modal
+            if (MenuNav.EscapeClaimedFrame >= _pressFrame) return; // a menu used it as Back (carousel, Options)
             if (ModalMenu.IsOpen) return;
             if (LivingScorePanel.ShouldSuppressConfirm) return;
 
-            QuitPrompt.Show();
+            OptionsMenu.OpenFromEscape(); // Paused with Quit pre-selected in a run; the Quit prompt elsewhere
         }
     }
 }

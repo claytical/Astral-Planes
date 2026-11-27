@@ -89,6 +89,9 @@ public partial class MotifRingGlyphApplicator
         yield return RunSpinRollScale(
             _gameplayRings.Concat(_remainingRings).ToArray(), spinDuration, rollDuration);
 
+        // Spin/tilt/shrink never move the record, so this is exactly where it vanished.
+        _lastRecordVanishWorldPos = transform.position;
+
         DestroyList(_gameplayRings);
         DestroyList(_remainingRings);
         _gameplayFadingOut       = false;

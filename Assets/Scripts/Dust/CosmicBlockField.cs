@@ -134,16 +134,32 @@ public class CosmicBlockField : MonoBehaviour
 
         var gen = Gen;
         if (gen == null) return;
+        var previousRole = gen.BlockedRole;
         gen.ReleaseRoleBlock();
 
-        if (track == null || track.assignedRole == MusicalRole.None) return;
+        var role = track != null ? track.assignedRole : MusicalRole.None;
+        // Role released: its empty cells resume regrowth. Skipped when the same role is walled
+        // again right away (ApplyRoleBlock would just re-halt it).
+        bool rewallingSameRole = role != MusicalRole.None && role == previousRole
+            && !BridgeActive && !(_boundApplicator != null && _boundApplicator.IsRecordLeaving)
+            && AnyOtherRoleCanProgress(track);
+        if (previousRole != MusicalRole.None && !rewallingSameRole)
+            gen.ResumeRoleRegrowth(previousRole);
+
+        if (role == MusicalRole.None) return;
         // The final ring completes in the same frame the bridge starts (and releases the walls):
         // walling now would make those cells immune to the bridge's dust fade.
         if (BridgeActive) return;
         if (_boundApplicator != null && _boundApplicator.IsRecordLeaving) return;
-        if (!AnyOtherRoleCanProgress(track)) return;
+        if (!AnyOtherRoleCanProgress(track))
+        {
+            // No wall (it would deadlock the motif): nothing to release later, so the role is
+            // released straight away and can regrow for its remaining rings.
+            gen.ResumeRoleRegrowth(role);
+            return;
+        }
 
-        gen.ApplyRoleBlock(track.assignedRole);
+        gen.ApplyRoleBlock(role);
     }
 
     // True when some OTHER active role's track still has an unfilled bin — i.e. walling this

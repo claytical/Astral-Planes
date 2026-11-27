@@ -189,6 +189,8 @@ public partial class PhaseStar
         // when the node resolves or is destroyed.
         node.AttachHeldDustBatch(_heldDrainCells);
         _heldDrainCells.Clear();
+        // ...and the role's regrowth hold this star took when it became active.
+        node.AdoptRoleRegrowthHold(TakeRegrowHold());
 
         bool handledResolve = false;
 
@@ -332,6 +334,9 @@ public partial class PhaseStar
         sn.OnResolved += () =>
         {
             _activeSuperNode = null;
+            // A SuperNode fills the ring itself (→ blocked) or is missed; either way this star's
+            // regrowth hold ends here.
+            DropRegrowHold();
 
             // Mirror SuperNodeTrackNode.Collect() for the initiating/fully-expanded track —
             // shard tracks (if any) handle their own InstantFillAllBins via their

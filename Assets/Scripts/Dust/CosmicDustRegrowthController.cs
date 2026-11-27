@@ -4,21 +4,28 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Orchestrates regrowth timing:
-/// - delay coroutine per cell
-/// - step-gated promotion from PendingRegrow to CommitRegrowCell
+/// Owns every in-flight dust-growth coroutine and the regrow pipeline's timing:
+/// - per-cell delay coroutine (Empty → PendingRegrow)
+/// - step-gated promotion (PendingRegrow → CommitRegrowCell, run by the host)
+/// - tracking of the host's commit coroutines and Gravity Void grow-in coroutines,
+///   so one <see cref="CancelAll"/> stops everything.
 ///
-/// Does NOT own authoritative cell state data structures. It calls back into CosmicDustGenerator via delegates.
+/// Does NOT own authoritative cell state; it calls back into CosmicDustGenerator via delegates.
+/// Whether a cell may regrow right now is a single host predicate (<see cref="IsRegrowBlocked"/>),
+/// used at every stage (delay coroutine, step gate, and the host's commit) so the vetoes can't drift.
 /// </summary>
 public sealed class CosmicDustRegrowthController
 {
     private readonly MonoBehaviour _host;
 
-    // --- Scheduling state ---
-    private readonly Dictionary<Vector2Int, Coroutine> _regrowthCoroutines = new Dictionary<Vector2Int, Coroutine>();
-    private readonly Queue<Vector2Int> _pendingStepRegrow = new Queue<Vector2Int>();
-    private readonly HashSet<Vector2Int> _pendingStepRegrowSet = new HashSet<Vector2Int>();
+    // --- Coroutine tracking ---
+    private readonly Dictionary<Vector2Int, Coroutine> _delayCoroutines = new();
+    private readonly Dictionary<Vector2Int, Coroutine> _commitCoroutines = new();
+    private readonly Dictionary<Vector2Int, Coroutine> _voidGrowCoroutines = new();
 
+    // --- Step gate ---
+    private readonly Queue<Vector2Int> _pendingStepRegrow = new();
+    private readonly HashSet<Vector2Int> _pendingStepRegrowSet = new();
     private int _lastStepGateStep = -9999;
     private int _stepGateBudget = 0;
 
@@ -26,18 +33,12 @@ public sealed class CosmicDustRegrowthController
     private readonly Func<Vector2Int, bool> _isInBounds;
     private readonly Func<Vector2Int, bool> _isPermanentClear;
     private readonly Func<Vector2Int, bool> _hasDustAt;
-    private readonly Func<Vector2Int, bool> _isKeepClearCell;
-    private readonly Func<Vector2Int, bool> _isDustSpawnBlocked;
-    private readonly Func<Vector2Int, bool> _isCollectableCellFree;
-    private readonly Func<Vector2Int, bool> _isSpawnCellAvailable;
-    private readonly Func<Vector2Int, bool> _isVehicleOverlappingCell;
-
+    private readonly Func<Vector2Int, bool> _isKeepClearCell;  // subset of _isRegrowBlocked: wait instead of polling
+    private readonly Func<Vector2Int, bool> _isRegrowBlocked;
     private readonly Func<Vector2Int, bool> _tryGetPendingRegrow; // true if state == PendingRegrow
-    private readonly Action<Vector2Int> _setCellEmpty;            // used for permanent veto on step gate
-    private readonly Action<Vector2Int> _setCellPendingRegrow;    // used by delay coroutine
-    private readonly Action<Vector2Int> _startCommitRegrowCell;   // host starts + tracks the commit coroutine itself
-
-    // --- Tunables provided per tick / call ---
+    private readonly Action<Vector2Int> _setCellEmpty;
+    private readonly Action<Vector2Int> _setCellPendingRegrow;
+    private readonly Func<Vector2Int, IEnumerator> _commitRegrowCell;
     private readonly Func<float> _getRegrowVetoRetryDelaySeconds;
     private readonly Func<int> _getRegrowCellsPerStep;
 
@@ -47,64 +48,99 @@ public sealed class CosmicDustRegrowthController
         Func<Vector2Int, bool> isPermanentClear,
         Func<Vector2Int, bool> hasDustAt,
         Func<Vector2Int, bool> isKeepClearCell,
-        Func<Vector2Int, bool> isDustSpawnBlocked,
-        Func<Vector2Int, bool> isCollectableCellFree,
-        Func<Vector2Int, bool> isSpawnCellAvailable,
-        Func<Vector2Int, bool> isVehicleOverlappingCell,
+        Func<Vector2Int, bool> isRegrowBlocked,
         Func<Vector2Int, bool> tryGetPendingRegrow,
         Action<Vector2Int> setCellEmpty,
         Action<Vector2Int> setCellPendingRegrow,
-        Action<Vector2Int> startCommitRegrowCell,
+        Func<Vector2Int, IEnumerator> commitRegrowCell,
         Func<float> getRegrowVetoRetryDelaySeconds,
         Func<int> getRegrowCellsPerStep)
     {
         _host = host;
-
         _isInBounds = isInBounds;
         _isPermanentClear = isPermanentClear;
         _hasDustAt = hasDustAt;
         _isKeepClearCell = isKeepClearCell;
-        _isDustSpawnBlocked = isDustSpawnBlocked;
-        _isCollectableCellFree = isCollectableCellFree;
-        _isSpawnCellAvailable = isSpawnCellAvailable;
-        _isVehicleOverlappingCell = isVehicleOverlappingCell;
-
+        _isRegrowBlocked = isRegrowBlocked;
         _tryGetPendingRegrow = tryGetPendingRegrow;
         _setCellEmpty = setCellEmpty;
         _setCellPendingRegrow = setCellPendingRegrow;
-        _startCommitRegrowCell = startCommitRegrowCell;
-
+        _commitRegrowCell = commitRegrowCell;
         _getRegrowVetoRetryDelaySeconds = getRegrowVetoRetryDelaySeconds;
         _getRegrowCellsPerStep = getRegrowCellsPerStep;
     }
 
+    /// <summary>The single "may this cell regrow right now?" veto, shared by every stage.</summary>
+    public bool IsRegrowBlocked(Vector2Int cell) => _isRegrowBlocked(cell);
+
+    // ------------------------------------------------------------------
+    // Cancellation
+    // ------------------------------------------------------------------
+
+    /// <summary>Stops a cell's pending delay coroutine (not an in-flight commit).</summary>
     public void CancelRegrow(Vector2Int cell)
     {
-        if (_regrowthCoroutines.TryGetValue(cell, out var c) && c != null)
+        if (_delayCoroutines.TryGetValue(cell, out var c) && c != null)
             _host.StopCoroutine(c);
 
-        _regrowthCoroutines.Remove(cell);
+        _delayCoroutines.Remove(cell);
         _pendingStepRegrowSet.Remove(cell);
         // NOTE: queue removal is not trivial; we leave it and ignore when dequeued.
     }
 
-    // Stops every pending per-cell delay coroutine (RegrowCellAfterDelay). Does NOT touch
-    // CommitRegrowCell coroutines — those are started and tracked by the host generator
-    // via _startCommitRegrowCell, so the host is responsible for stopping those itself.
-    public void CancelAllPending()
+    /// <summary>
+    /// Stops every delay, commit and void-grow coroutine and empties the step queue.
+    /// Cell state is left to the caller (HardStopRegrowthForBridge / ClearMaze).
+    /// </summary>
+    public void CancelAll()
     {
-        foreach (var kv in _regrowthCoroutines)
-            if (kv.Value != null) _host.StopCoroutine(kv.Value);
-        _regrowthCoroutines.Clear();
-
+        StopAll(_delayCoroutines);
+        StopAll(_commitCoroutines);
+        StopAll(_voidGrowCoroutines);
         _pendingStepRegrow.Clear();
         _pendingStepRegrowSet.Clear();
+        _stepGateBudget = 0;
+        _lastStepGateStep = -9999;
     }
 
-    public void RequestRegrowCellAt(
-        Vector2Int gridPos,
-        float delaySeconds,
-        bool refreshIfPending)
+    public int InFlightGrowCount => _commitCoroutines.Count + _voidGrowCoroutines.Count;
+
+    private void StopAll(Dictionary<Vector2Int, Coroutine> map)
+    {
+        foreach (var kv in map)
+            if (kv.Value != null) _host.StopCoroutine(kv.Value);
+        map.Clear();
+    }
+
+    // Starts a tracked coroutine. The key is reserved before starting so a routine that finishes
+    // synchronously (yield break before its first yield) and calls its *Finished hook doesn't get
+    // a stale, already-dead entry written back after StartCoroutine returns.
+    private void StartTracked(Dictionary<Vector2Int, Coroutine> map, Vector2Int cell, IEnumerator routine)
+    {
+        map[cell] = null;
+        var c = _host.StartCoroutine(routine);
+        if (map.ContainsKey(cell)) map[cell] = c;
+    }
+
+    // ------------------------------------------------------------------
+    // Host-run coroutines (commit, void growth)
+    // ------------------------------------------------------------------
+
+    /// <summary>Host's CommitRegrowCell must call this on every exit path.</summary>
+    public void CommitFinished(Vector2Int cell) => _commitCoroutines.Remove(cell);
+
+    public bool IsVoidGrowing(Vector2Int cell) => _voidGrowCoroutines.ContainsKey(cell);
+
+    public void StartVoidGrow(Vector2Int cell, IEnumerator routine) => StartTracked(_voidGrowCoroutines, cell, routine);
+
+    /// <summary>Host's VoidGrowCellNow must call this on every exit path.</summary>
+    public void VoidGrowFinished(Vector2Int cell) => _voidGrowCoroutines.Remove(cell);
+
+    // ------------------------------------------------------------------
+    // Regrow pipeline
+    // ------------------------------------------------------------------
+
+    public void RequestRegrowCellAt(Vector2Int gridPos, float delaySeconds, bool refreshIfPending)
     {
         if (!_isInBounds(gridPos))
         {
@@ -112,24 +148,16 @@ public sealed class CosmicDustRegrowthController
             return;
         }
 
-        // Permanent veto: never schedule.
-        if (_isPermanentClear(gridPos))
+        if (_isPermanentClear(gridPos)) return;
+        if (_hasDustAt(gridPos)) return;
+
+        if (!refreshIfPending && _delayCoroutines.ContainsKey(gridPos))
             return;
 
-        // Already solid: don't schedule.
-        if (_hasDustAt(gridPos))
-            return;
-
-        // If there's already a coroutine and we're not refreshing, do nothing.
-        if (!refreshIfPending && _regrowthCoroutines.ContainsKey(gridPos))
-            return;
-
-        // If refreshing, cancel the prior coroutine.
         if (refreshIfPending)
             CancelRegrow(gridPos);
 
-        float delay = Mathf.Max(0f, delaySeconds);
-        _regrowthCoroutines[gridPos] = _host.StartCoroutine(RegrowCellAfterDelay(gridPos, delay));
+        StartTracked(_delayCoroutines, gridPos, RegrowCellAfterDelay(gridPos, Mathf.Max(0f, delaySeconds)));
     }
 
     public void EnqueueStepRegrow(Vector2Int gp)
@@ -158,70 +186,46 @@ public sealed class CosmicDustRegrowthController
             _pendingStepRegrowSet.Remove(gp);
             _stepGateBudget--;
 
-            // Must still be pending.
             if (!_tryGetPendingRegrow(gp)) continue;
 
-            // Permanent veto: collapse to Empty.
             if (_isPermanentClear(gp))
             {
                 _setCellEmpty(gp);
                 continue;
             }
 
-            // Vetoes: keep PendingRegrow and retry later by re-enqueue.
-            // NOTE: _isKeepClearCell (ExclusionMap) and _isDustSpawnBlocked (DustClaimManager)
-            // are two independent blocking systems. Both must pass before we commit.
-            // If a cell is released from one but not the other it will correctly stay blocked here.
-            if (_isKeepClearCell(gp)) { EnqueueStepRegrow(gp); continue; }
-            if (_isDustSpawnBlocked(gp)) { EnqueueStepRegrow(gp); continue; }
-            if (!_isCollectableCellFree(gp)) { EnqueueStepRegrow(gp); continue; }
-            if (!_isSpawnCellAvailable(gp)) { EnqueueStepRegrow(gp); continue; }
-
-            if (_isVehicleOverlappingCell(gp))
+            if (_isRegrowBlocked(gp))
             {
                 EnqueueStepRegrow(gp);
                 continue;
             }
 
-            _startCommitRegrowCell(gp);
+            StartTracked(_commitCoroutines, gp, _commitRegrowCell(gp));
         }
     }
 
     private IEnumerator RegrowCellAfterDelay(Vector2Int gridPos, float initialDelaySeconds)
     {
-        if (!_isInBounds(gridPos))
-        {
-            _regrowthCoroutines.Remove(gridPos);
-            yield break;
-        }
-
-        float delaySeconds = Mathf.Max(0.0f, initialDelaySeconds);
+        float delaySeconds = initialDelaySeconds;
 
         while (true)
         {
             if (!_isInBounds(gridPos))
             {
-                _regrowthCoroutines.Remove(gridPos);
+                _delayCoroutines.Remove(gridPos);
                 yield break;
             }
 
             yield return new WaitForSeconds(delaySeconds);
 
-            // Permanent veto: end pipeline.
-            if (_isPermanentClear(gridPos))
+            if (_isPermanentClear(gridPos) || _hasDustAt(gridPos))
             {
-                _regrowthCoroutines.Remove(gridPos);
+                _delayCoroutines.Remove(gridPos);
                 yield break;
             }
 
-            // If already solid, we're done.
-            if (_hasDustAt(gridPos))
-            {
-                _regrowthCoroutines.Remove(gridPos);
-                yield break;
-            }
-
-            // Keep-clear: wait until released, then retry immediately.
+            // Keep-clear (ship pocket/trail, star pocket, claims): wait until released, then
+            // re-check immediately rather than polling on the retry interval.
             if (_isKeepClearCell(gridPos))
             {
                 yield return new WaitUntil(() =>
@@ -231,7 +235,7 @@ public sealed class CosmicDustRegrowthController
 
                 if (!_isInBounds(gridPos) || _isPermanentClear(gridPos))
                 {
-                    _regrowthCoroutines.Remove(gridPos);
+                    _delayCoroutines.Remove(gridPos);
                     yield break;
                 }
 
@@ -239,26 +243,17 @@ public sealed class CosmicDustRegrowthController
                 continue;
             }
 
-            // Other vetoes: retry with backoff.
-            // NOTE: _isDustSpawnBlocked (DustClaimManager) and _isSpawnCellAvailable (ExclusionMap/SpawnGrid)
-            // are two independent systems – both must pass.
-            bool spawnBlocked  = _isDustSpawnBlocked(gridPos);
-            bool spawnUnavail  = !_isSpawnCellAvailable(gridPos);
-            bool vehicleHere   = _isVehicleOverlappingCell(gridPos);
-            bool collectBlock  = !_isCollectableCellFree(gridPos);
-            if (spawnBlocked || spawnUnavail || vehicleHere || collectBlock)
+            // Any other veto: retry with backoff.
+            if (_isRegrowBlocked(gridPos))
             {
                 delaySeconds = Mathf.Max(0.05f, _getRegrowVetoRetryDelaySeconds());
                 continue;
             }
 
-            // Success: mark PendingRegrow and enqueue for step-gate promotion. (Filler never
-            // reaches here any more — it's permanent once cleared — so the old filler
-            // step-gate bypass was removed with the quick-regrow sub-type.)
             _setCellPendingRegrow(gridPos);
             EnqueueStepRegrow(gridPos);
 
-            _regrowthCoroutines.Remove(gridPos);
+            _delayCoroutines.Remove(gridPos);
             yield break;
         }
     }

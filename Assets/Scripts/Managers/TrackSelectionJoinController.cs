@@ -151,6 +151,15 @@ public class TrackSelectionJoinController : MonoBehaviour
             return;
         }
 
+        // Options can be open here: its Confirm/Back presses must not join a pad or start the
+        // hold-back-to-carousel timer underneath it.
+        if (ModalMenu.ShouldSuppressInput)
+        {
+            CancelHoldBack();
+            CancelRejoinHold();
+            return;
+        }
+
         var assignedIds = new HashSet<int>();
         foreach (var lp in FindObjectsByType<LocalPlayer>())
         {
@@ -255,7 +264,7 @@ public class TrackSelectionJoinController : MonoBehaviour
             if (elapsed >= HoldBackSeconds)
             {
                 if (GameFlowManager.VerboseLogging)
-                    Debug.Log($"[JoinController] East hold-back: returning to carousel (Main).");
+                    Debug.Log($"[JoinController] East hold-back: returning to the main menu (Main).");
                 ControlTutorialDirector.Instance?.EndAbortHoldUI();
                 _holdBackDeviceId = -1;
                 SceneManager.LoadScene("Main");
@@ -269,7 +278,7 @@ public class TrackSelectionJoinController : MonoBehaviour
 
         _holdBackDeviceId = starter.deviceId;
         _holdBackStartTime = Time.unscaledTime;
-        ControlTutorialDirector.Instance?.BeginAbortHoldUI("Back to Motif Selection", HoldBackSeconds);
+        ControlTutorialDirector.Instance?.BeginAbortHoldUI("Back to Main Menu", HoldBackSeconds);
     }
 
     // A gamepad that was paired to a player last frame and isn't now (its player backed out)

@@ -39,6 +39,9 @@ public partial class GameFlowManager
         if (CurrentState != GameState.Selection)
             StartShipSelectionPhase();
 
+        // The title menu's choice decides co-op vs VERSUS; ship select has no mode picker.
+        StartIntent.ApplyMode();
+
         // Reset plane availability so the Hangar's persisting (DontDestroyOnLoad) state
         // doesn't block ship selection with planes marked in-use from the previous session.
         Hangar.Instance?.ResetForNewSession();
